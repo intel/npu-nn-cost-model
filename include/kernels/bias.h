@@ -1,0 +1,27 @@
+// Copyright © 2022 Intel Corporation
+// SPDX-License-Identifier: Apache 2.0
+// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// is subject to the terms and conditions of the software license agreements for the Software Package,
+// which may also include notices, disclaimers, or license terms for third party or open source software
+// included in or with the Software Package, and your use indicates your acceptance of all such terms.
+// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Software Package for additional details.
+
+#ifndef KERNELS_BIAS_H
+#define KERNELS_BIAS_H
+
+#include "core/tensors.h"
+
+namespace VPUNN {
+
+/**
+ * @brief Floating point bias layer (float). The operation is done implace in the output tensor
+ *
+ * @param bias a VPUNN::Tensor containing the bias
+ * @param output the input/output tensor
+ */
+VPUNN_API(void) Bias(VPUNN::Tensor<float>* bias, VPUNN::Tensor<float>* output);
+
+}  // namespace VPUNN
+
+#endif  // KERNELS_BIAS_H

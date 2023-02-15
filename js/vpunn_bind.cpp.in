@@ -1,0 +1,122 @@
+// Copyright © 2022 Intel Corporation
+// SPDX-License-Identifier: Apache 2.0
+// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// is subject to the terms and conditions of the software license agreements for the Software Package,
+// which may also include notices, disclaimers, or license terms for third party or open source software
+// included in or with the Software Package, and your use indicates your acceptance of all such terms.
+// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Software Package for additional details.
+
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <stdio.h>
+#include <vpu/types.h>
+#include <vpu_cost_model.h>
+#include "vpu/shave/layers.h"
+
+#define SW_LAYER_ENUMERATIONS @SW_LAYER_ENUMERATIONS@
+#define SW_LAYER_BINDINGS @SW_LAYER_BINDINGS@
+#define SW_LAYER_SWITCH_CASE @SW_LAYER_SWITCH_CASE@
+
+using namespace VPUNN;
+using namespace emscripten;
+
+enum SWActivationFunction SW_LAYER_ENUMERATIONS;
+
+// Define helper functions
+VPUTensor createTensor(size_t width, size_t height, size_t channels, size_t batch, DataType dt) {
+    return VPUTensor({width, height, channels, batch}, dt);
+}
+
+DPUWorkload createWorkload(VPUDevice device, Operation op, VPUTensor& inT, VPUTensor& outT,
+                           ExecutionMode execution_order, size_t Kx, size_t Ky, size_t Sx, size_t Sy, size_t Pt,
+                           size_t Pb, size_t Pl, size_t Pr) {
+    return DPUWorkload({device, op, {inT}, {outT}, {Kx, Ky}, {Sx, Sy}, {Pt, Pb, Pl, Pr}, execution_order});
+}
+
+DMAWorkload createDMA(VPUDevice device, VPUTensor& inT, VPUTensor& outT, MemoryLocation input_location = MemoryLocation::DRAM, MemoryLocation output_location = MemoryLocation::CMX, size_t output_write_tiles = 1) {
+    return DMAWorkload({device, inT, outT, input_location, output_location, output_write_tiles});
+}
+
+std::unique_ptr<SWOperation> createSHV(VPUDevice device, SWActivationFunction op, VPUTensor& inT, VPUTensor& outT) {
+    switch (op) {
+        SW_LAYER_SWITCH_CASE
+    }
+}
+
+std::unique_ptr<VPUCostModel> createVPUCostModel(std::string buff) {
+    return std::make_unique<VPUCostModel>(buff);
+}
+
+extern "C" {
+
+EMSCRIPTEN_BINDINGS(vpunn) {
+    enum_<VPUDevice>("VPUDevice")
+            .value("VPU_2_0", VPUDevice::VPU_2_0)
+            .value("VPU_2_1", VPUDevice::VPU_2_1)
+            .value("VPU_2_7", VPUDevice::VPU_2_7)
+            .value("VPU_4_0", VPUDevice::VPU_4_0);
+    enum_<DataType>("DataType")
+            .value("UINT8", DataType::UINT8)
+            .value("INT8", DataType::INT8)
+            .value("FLOAT16", DataType::FLOAT16)
+            .value("BFLOAT16", DataType::BFLOAT16);
+    enum_<Operation>("Operation")
+            .value("CONVOLUTION", Operation::CONVOLUTION)
+            .value("DW_CONVOLUTION", Operation::DW_CONVOLUTION)
+            .value("ELTWISE", Operation::ELTWISE)
+            .value("MAXPOOL", Operation::MAXPOOL)
+            .value("AVEPOOL", Operation::AVEPOOL)
+            .value("CM_CONVOLUTION", Operation::CM_CONVOLUTION);
+
+    enum_<SWActivationFunction>("SWActivationFunction")
+            SW_LAYER_BINDINGS;
+
+    enum_<ExecutionMode>("ExecutionMode")
+            .value("VECTOR", ExecutionMode::VECTOR)
+            .value("MATRIX", ExecutionMode::MATRIX)
+            .value("VECTOR_FP16", ExecutionMode::VECTOR_FP16)
+            .value("CUBOID_16x16", ExecutionMode::CUBOID_16x16)
+            .value("CUBOID_8x16", ExecutionMode::CUBOID_8x16)
+            .value("CUBOID_4x16", ExecutionMode::CUBOID_4x16);
+
+   enum_<MemoryLocation>("MemoryLocation")
+            .value("CMX", MemoryLocation::CMX)
+            .value("DRAM", MemoryLocation::DRAM)
+            .value("UPA", MemoryLocation::UPA)
+            .value("CSRAM", MemoryLocation::CSRAM);
+
+    class_<VPUCostModel>("VPUCostModel")
+            .constructor<std::string>()
+            .function("DPU", select_overload<unsigned int(DPUWorkload)>(&VPUCostModel::DPU))
+            .function("DMA", select_overload<unsigned int(VPUDevice, const VPUTensor&, const VPUTensor&, MemoryLocation, MemoryLocation, unsigned int)>(
+                                     &VPUCostModel::DMA))
+            .function("SHAVE", &VPUCostModel::SHAVE)
+            .function("hw_utilization", &VPUCostModel::hw_utilization)
+            .function("initialized", &VPUCostModel::nn_initialized)
+            // POWER API
+            .function("DPUActivityFactor", &VPUCostModel::DPUActivityFactor)
+            .function("DPUPower", select_overload<float(DPUWorkload&)>(&VPUCostModel::DPUPower))
+            .function("DMAPower", select_overload<float(DMAWorkload&)>(&VPUCostModel::DMAPower))
+            .function("SHAVEPower", select_overload<float(SWOperation&)>(&VPUCostModel::SHAVEPower));
+
+    // Helper functions
+    function("createTensor", &createTensor);
+    function("createWorkload", &createWorkload);
+    function("createDMA", &createDMA);
+    function("createSHV", &createSHV);
+    function("createVPUCostModel", &createVPUCostModel);
+
+    class_<VPUTensor>("VPUTensor")
+            .constructor<std::array<unsigned int, 4>, DataType>()
+            .function("size", &VPUTensor::size)
+            .function("is_float", &VPUTensor::is_float)
+            .function("is_int", &VPUTensor::is_int)
+            .function("get_shape", &VPUTensor::get_shape)
+            .function("get_dtype", &VPUTensor::get_dtype);
+
+    class_<DPUWorkload>("DPUWorkload");
+    class_<DMAWorkload>("DMAWorkload");
+    class_<SWOperation>("SWOperation");
+}
+}

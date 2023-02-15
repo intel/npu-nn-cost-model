@@ -1,0 +1,131 @@
+// Copyright © 2022 Intel Corporation
+// SPDX-License-Identifier: Apache 2.0
+// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// is subject to the terms and conditions of the software license agreements for the Software Package,
+// which may also include notices, disclaimers, or license terms for third party or open source software
+// included in or with the Software Package, and your use indicates your acceptance of all such terms.
+// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Software Package for additional details.
+
+namespace VPUNN_SCHEMA;
+
+// The "magic" values at the start of the file, that identify a file as a graphfile.
+file_identifier "VPUN";
+// The file extension a generated file will take.
+file_extension "vpunn";
+
+
+enum ActivationFunctionType : int32 {
+    NOOP = 0,
+    RELU = 1,
+    SIGMOID = 2,
+}
+
+
+union LayerType {
+    FullyConnectedLayer,
+    L2NormalizationLayer,
+    kNNLayer,
+    // Conv2DOptions,
+    // DepthwiseConv2DOptions,
+    // Pool2DOptions,
+}
+
+table FullyConnectedLayer {
+    // Empty: no option here
+}
+
+table L2NormalizationLayer {
+    // Empty: no option here
+}
+
+table kNNLayer {
+    // Number of neighbours for the search
+    n_neighbors: uint;
+}
+
+
+enum TensorType : byte {
+  FLOAT32 = 0,
+  FLOAT16 = 1,
+  INT32 = 2,
+  UINT8 = 3,
+  INT64 = 4,
+  STRING = 5,
+  BOOL = 6,
+  INT16 = 7,
+  COMPLEX64 = 8,
+  INT8 = 9,
+  FLOAT64 = 10,
+  COMPLEX128 = 11,
+  UINT64 = 12,
+  UINT32 = 15,
+}
+
+
+// Table of raw data buffers (used for constant tensors). Referenced by tensors
+// by index. The generous alignment accommodates mmap-friendly data structures.
+table Buffer {
+  data: [ubyte] (force_align: 16);
+}
+
+
+
+table Tensor {
+
+    name:string;
+    // The tensor shape. Canonical layout is:
+    // - Activations: [batch size, channels, height, width]
+    // - Weights: [output_channels, input_channels, height, width]
+    shape: [uint];
+    type: TensorType;
+    // An index that refers to the buffers table at the root of the model. Or,
+    // if there is no data buffer associated (i.e. intermediate results), then
+    // this is 0 (which refers to an always existent empty buffer)
+    buffer: uint;
+    // For debugging and importing back into tensorflow.
+
+}
+
+
+table Layer {
+
+    name: string;
+
+    // Indices of the tensors that are inputs into this network. Note this is
+    // the list of non-static tensors that feed into the network for inference.
+    inputs: [int];
+    // Indices of the tensors that are outputs out of this network. Note this is
+    // the list of output tensors that are considered the product of the inference.
+    outputs: [int];
+
+    implementation: LayerType;
+
+    activation_function:ActivationFunctionType;
+
+}
+
+
+table Model {
+
+    // Name of the network (used for debugging).
+    name:string;
+
+    // A list of all tensors used in the network.
+    tensors:[Tensor];
+
+    // Indices of the tensors that are inputs into this subgraph
+    inputs:[int];
+
+    // Indices of the tensors that are outputs out of this subgraph
+    outputs:[int];
+
+    // All operators, in execution order.
+    operators:[Layer];
+
+    // Buffers of the model.
+    buffers: [Buffer];
+}
+
+// This line just tells FlatBuffers to start with this object when parsing.
+root_type Model;
