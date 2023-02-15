@@ -131,7 +131,6 @@ dmypy.json
 
 
 # Ignore non-trackables
-*.json
 *.blob
 src/vpu_index/**/*.csv
 src/vpunn/archbench/*.csv
