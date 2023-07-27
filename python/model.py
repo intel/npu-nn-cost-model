@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,30 +11,31 @@ from array import array
 import numpy as np
 import argparse
 
-from vpunn import VPUNN as VPUNN_lib  # noqa
+from vpunn import VPUNN_lib  # noqa
 
 
 class VPUNN:
     def __init__(self, filename, profile=False, batch=1):
         self.model = VPUNN_lib.Runtime(filename, batch, profile)
 
-        assert len(self.model.input_tensors()) == 1
-        assert len(self.model.output_tensors()) == 1
+        assert len(self.model.input_shapes()) == 1
+        assert len(self.model.output_shapes()) == 1
 
     def input_shapes(self):
-        return [tuple(inT.shape()) for inT in self.model.input_tensors()]
+        return [tuple(shape) for shape in self.model.input_shapes()]
 
     def output_shapes(self):
-        return [tuple(outT.shape()) for outT in self.model.output_tensors()]
+        return [tuple(shape) for shape in self.model.output_shapes()]
 
     def run_inference(self, features):
         feature_array = array("f", features.tobytes())
 
         result_shape = self.output_shapes()[0]
-        arr = self.model.predict(feature_array, features.size)
+        arr = self.model.predict(feature_array)
 
-        data = np.frombuffer(
-            arr, dtype=features.dtype, count=int(np.prod(result_shape))
+        data = np.array(
+            arr,
+            dtype=features.dtype,
         )
 
         return data.reshape(result_shape)

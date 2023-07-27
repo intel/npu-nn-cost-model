@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,14 +10,15 @@
 #include "kernels/fully_connected.h"
 #include "kernels/vpunn_blas.h"
 
-void VPUNN::Dense(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output) {
+void VPUNN::Dense(const VPUNN::Tensor<float>* weights, const VPUNN::Tensor<float>* activations,
+                  VPUNN::Tensor<float>* output) {
     // Use cblas_sgemm to compute C <- alpha A * B + beta C
 
     int output_channels = output->shape()[1];
     int input_channels = activations->shape()[1];
     int batch_size = activations->shape()[0];
 
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, batch_size, output_channels, input_channels, 1.0,
-                activations->c_ptr(), input_channels, weights->c_ptr(), input_channels, 0.0, output->c_ptr(),
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, batch_size, output_channels, input_channels, 1.0F,
+                activations->c_ptr(), input_channels, weights->c_ptr(), input_channels, 0.0F, output->data(),
                 output_channels);
 }

@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -32,11 +32,10 @@ int main(int argc, char* argv[]) {
     auto layer = DPULayer(VPUDevice::VPU_2_0,      //
                           Operation::CONVOLUTION,  //
                           {input_tensor},          // input_0
-                          //{input_tensor},          // input_1, @todo: review if it is OK
-                          {output_tensor},  // output
-                          {3, 3},           // kernels
-                          {1, 1},           // strides
-                          {1, 1, 1, 1}      // padding
+                          {output_tensor},         // output
+                          {3, 3},                  // kernels
+                          {1, 1},                  // strides
+                          {1, 1, 1, 1}             // padding
     );
     auto optimal_mode = select_optimal_execution_mode(model, layer);
 

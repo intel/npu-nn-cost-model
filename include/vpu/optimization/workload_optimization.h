@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,6 +10,9 @@
 #ifndef VPUNN_WL_OPTIMIZATION_API_H
 #define VPUNN_WL_OPTIMIZATION_API_H
 
+#include <utility>
+#include <vector>
+#include "vpu/cycles_interface_types.h"
 #include "vpu/layer.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
@@ -30,71 +33,41 @@ enum class VPUSplitStrategy { HW_TILING, Z_TILING, H_TILING, W_TILING };
 
 /**
  * @brief VPU splitting optimization configuration options
- *
+ * Used to guide the splitting of a Layer to 1 or more DPUs
  */
 struct SplitOptions {
-    /**
-     * @brief Maximum number of workloads available. Default is 128 because of FIFO size
-     *
-     */
-    unsigned int maxWorkloads = 128;
-    /**
-     * @brief Number of DPU to optimize for. maxLatencyMs = 0 means full search
-     *
-     */
-    unsigned int maxLatencyUs = 0;
-    /**
-     * @brief Number of DPU to optimize for. Setting nDPU = 0 VPUNN autodetects the number of DPUs based on the device
-     *
-     */
-    unsigned int nDPU = 0;
-    /**
-     * @brief Per workload runtime overhead in cycles
-     *
-     */
-    unsigned int runtimeOverhead = 0;
-    /**
-     * @brief Optimization target. Default is LATENCY
-     *
-     */
-    VPUOptimizationTarget target = VPUOptimizationTarget::LATENCY;
-    /**
-     * @brief Valid strategies for splitting a layer into multiple workloads. Default is all (HW tiling and Z tiling)
-     *
-     */
-    std::vector<VPUSplitStrategy> availableStrategies = {VPUSplitStrategy::HW_TILING, VPUSplitStrategy::Z_TILING};
+    unsigned int maxWorkloads{128U};  ///< Maximum number of workloads available. Default is 128 because of FIFO size
+    unsigned int maxLatencyUs{0};     ///< Number of DPU to optimize for. maxLatencyMs = 0 means full search
+    unsigned int nDPU{0};  ///< Number of DPU to optimize for. Setting nDPU = 0 VPUNN auto-detects the number of DPUs
+                           ///< based on the device
+    unsigned int runtimeOverhead{0};  ///<  Per workload runtime overhead in cycles
+
+    VPUOptimizationTarget target{VPUOptimizationTarget::LATENCY};  ///< Optimization target. Default is LATENCY,USED
+                                                                   ///< only for LATENCY for the moment
+    std::vector<VPUSplitStrategy> availableStrategies{
+            VPUSplitStrategy::HW_TILING,
+            VPUSplitStrategy::Z_TILING};  ///<  Valid strategies for splitting a layer into multiple workloads. Default
+                                          ///<  is all (HW tiling and Z tiling)
 };
 
 /**
  * @brief VPU Power and Performance estimates (cycles and power)
- *
  */
 struct PnPEstimates {
-    /**
-     * @brief execution cycles
-     *
-     */
-    unsigned int cycles;
-    /**
-     * @brief power in mW
-     *
-     */
-    float power;
+    CyclesInterfaceType cycles;  ///< execution cycles
+    float power;                 ///< power in mW
 };
 
-/**
- * @brief List of DPU workloads
- *
- */
-typedef std::vector<VPUNN::DPUWorkload> DPUWorkloads;
+using DPUWorkloads = std::vector<DPUWorkload>;  ///< List of DPU workloads
+
+///  describes a pair of cost and the associated DPUWorkloads
+using DPUWorkloadsCost = std::pair<CyclesInterfaceType, DPUWorkloads>;
 
 /**
  * @brief DPU Tiler interface
- *
  */
 class DPUTiler {
 public:
-    //
     /**
      * @brief Generate the optimal intra-tile split for a specific DPULayer
      * @details This function takes the model, the layer to optimize and the nDPU as a parameter and returns the optimal
@@ -103,37 +76,28 @@ public:
      *
      * @param layer DPULayer to optimize
      * @param options workload splits algorithm configuration options
-     * @return DPUWorkloads the optimal workloads split
+     * @return DPUWorkloadsCost the optimal workloads split
      */
-    virtual DPUWorkloads intraTileSplit(const DPULayer& layer, const SplitOptions& options) = 0;
+    virtual DPUWorkloadsCost intraTileSplit(const DPULayer& layer, const SplitOptions& options) = 0;
 
     /**
      * @brief Get the cycles and power estimate for a list of workloads.
-     * @details Get the cycles and power estimate for a list of workloads. This function does not optimize any workloads
+     * @details This function does not optimize any workloads
      * but simply calculate the cost of that configuration. It is possible to pass an optional runtime overhead in
      * cycles
      *
      * @param workloads a vector of DPUWorkload
-     * @param runtimeOverhead execution runtime overhead in cycles
-     * @return PnPEstimates power and performance estiamte for the workloads
-     */
-    virtual PnPEstimates getLayerPerformance(const DPUWorkloads& workloads, const unsigned int runtimeOverhead = 0) = 0;
-
-    /**
-     * @brief Get the cycles and power estimate for a layer.
-     * @details Get the cycles and power estimate for a layer. This function optimize the layer and returns the optimal
-     * configuration as well as expected PnP estimates
+     * @param runtimeOverhead execution runtime overhead in cycles (per workload)
+     * @param skip_power if true power will be zero, otherwise is calculated
+     * @return PnPEstimates power and performance estimate for the workloads
      *
-     * @param layer DPULayer to optimize
-     * @param options workload splits algorithm configuration options
-     * @return std::pair<DPUWorkloads, PnPEstimates> a pair of workloads and thier power and performance projection
+     * @throws exceptions from inner dependencies. like DPU invocation
      */
-    virtual std::pair<DPUWorkloads, PnPEstimates> getLayerPerformance(const DPULayer& layer,
-                                                                      const SplitOptions& options) = 0;
+    virtual PnPEstimates getLayerPerformance(const DPUWorkloads& workloads, const unsigned int runtimeOverhead = 0,
+                                             const bool skip_power = true) = 0;
 
     /**
      * @brief Destroy the DPUTiler object
-     *
      */
     virtual ~DPUTiler() = default;
 };

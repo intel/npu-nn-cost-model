@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -117,6 +117,12 @@ TEST_F(TestTensor, CreationExternalData) {
         VPUNN::Tensor<float>& t = *pt;
         EXPECT_EQ(t.size(), tst.expected_size) << "size is not matching";
         ASSERT_EQ(t.data(), memory);
+
+        auto data_vector = t.data_vector();
+        EXPECT_EQ(t.size(), data_vector.size()) << "size is not matching";
+        for (unsigned int idx = 0; idx < data_vector.size(); idx++) {
+            ASSERT_EQ(*(t.data() + idx), data_vector[idx]);
+        }
 
         // delete the memory
         delete[] memory;

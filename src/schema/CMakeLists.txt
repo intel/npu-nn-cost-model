@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -9,14 +9,17 @@
 
 if(DEFINED flatc_COMMAND AND DEFINED flatc_TARGET)
     # Use flatc target from vpux-plugin
+    message(STATUS "FLATBUFFERS:Use flatc target from vpux-plugin")
 else()
-    if(CMAKE_GENERATOR MATCHES "Visual Studio" OR NOT (DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN}))
+    message(STATUS "FLATBUFFERS: have to solve them locally, nothing present")
+    if(CMAKE_GENERATOR MATCHES "Visual Studio" OR NOT(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN}))
+        message(STATUS "FLATBUFFERS: Have to fetch the flatbuffers!")
         include(FetchContent)
 
         FetchContent_Declare(
             flatbuffers
             GIT_REPOSITORY https://github.com/google/flatbuffers.git
-            GIT_TAG        v1.12.0
+            GIT_TAG v1.12.0
         )
 
         set_property(DIRECTORY ${flatbuffers_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
@@ -32,11 +35,18 @@ else()
 
         FetchContent_MakeAvailable(flatbuffers)
 
+        set(FLATBUFFERS_SRC_DIR ${flatbuffers_SOURCE_DIR} PARENT_SCOPE)
+
         set(flatc_COMMAND "flatc")
         set(flatc_TARGET "flatc")
+
+        set(flatbuffers_INCLUDE_DIRECTORIES ${flatbuffers_SOURCE_DIR}/include PARENT_SCOPE)
+        message(STATUS "FLATBUFFERS: command and target were set!")
     else()
+        message(STATUS "FLATBUFFERS:Expected FLATC is present!")
         find_program(FLATC flatc)
         message(STATUS "flatc binary found ${FLATC}")
+
         if(NOT FLATC)
             message(FATAL_ERROR "Impossible to find flatc binary... needed for JS binding")
         endif()
@@ -46,20 +56,21 @@ else()
 endif()
 
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/../../include/vpunn_generated.h"
-                  COMMAND ${flatc_COMMAND} --cpp -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "vpunn.fbs"
-                  DEPENDS "vpunn.fbs"
-                  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/schema"
-                  COMMENT "Generating c++ schema files")
+    COMMAND ${flatc_COMMAND} --cpp -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "vpunn.fbs"
+    DEPENDS "vpunn.fbs"
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/schema"
+    COMMENT "Generating c++ schema files")
 
 add_custom_target(cpp_schema
-                  DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/../../include/vpunn_generated.h")
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/../../include/vpunn_generated.h")
 
 add_custom_target(python_schema ALL
-                  COMMAND ${flatc_COMMAND} --python -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "../src/schema/vpunn.fbs"
-                  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/python"
-                  COMMENT "Generating python schema files")
+    COMMAND ${flatc_COMMAND} --python -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "../src/schema/vpunn.fbs"
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/python"
+    COMMENT "Generating python schema files")
 
 if(flatc_TARGET)
+    message(STATUS "FLATBUFFERS: The flatc_TARGET exists, specifying dependencies")
     add_dependencies(cpp_schema ${flatc_TARGET})
     add_dependencies(python_schema ${flatc_TARGET})
 endif()

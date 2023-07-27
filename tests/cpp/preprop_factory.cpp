@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -56,6 +56,12 @@ TEST_F(RuntimeProcessingFactoryTest, SimpleChecks) {
     }
     {
         int v = (int)VPUNN::NNVersions::VERSION_10_ENUMS_SAME;
+        ASSERT_NO_THROW(factory.make_preprocessing(v););
+        auto& pp = factory.make_preprocessing(v);
+        EXPECT_EQ(pp.interface_version(), v);
+    }
+    {
+        int v = (int)VPUNN::NNVersions::VERSION_11_VPU27_BETA;
         ASSERT_NO_THROW(factory.make_preprocessing(v););
         auto& pp = factory.make_preprocessing(v);
         EXPECT_EQ(pp.interface_version(), v);

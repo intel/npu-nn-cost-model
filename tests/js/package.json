@@ -1,0 +1,14 @@
+{
+    "name": "vpunn-test",
+    "version": "1.0.0",
+    "scripts": {
+        "test": "jest --ci --reporters=default --reporters=jest-junit"
+    },
+    "devDependencies": {
+        "jest": "^27.5",
+        "jest-junit": "^13.0.0"
+    },
+    "optionalDependencies": {
+        "vpunn": "file:../../build_wasm/dist/vpunn-*.tgz"
+    }
+}

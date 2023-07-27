@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,6 +10,7 @@
 #ifndef VPUNN_TILER_H
 #define VPUNN_TILER_H
 
+#include <string>
 #include "vpu/optimization/workload_optimization.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
@@ -31,35 +32,29 @@ namespace VPUNN {
  * @param validZTiles valid Z dimension for the splits
  */
 void splitOverZ(const DPULayer& layer, std::list<DPUWorkloads>& splitPool, const ExecutionMode mode,
-                const unsigned int nWorkloads, std::vector<unsigned int>& validZTiles);
+                const unsigned int nWorkloads, const std::vector<unsigned int>& validZTiles);
 
 /**
  * @brief Split a DPULayer over the H and W dimensions, appending the result to the splitPool list
  *
  * @param layer a DPULayer
  * @param splitPool the pool of valid split
+ * @param widthFactor the number of splits in the X dimension
+ * @param heightFactor  the number of splits in the Y dimension
  * @param mode the valid ExecutionMode
- * @param nWorkloads number of splits
  */
 void splitOverHW(const DPULayer& layer, std::list<DPUWorkloads>& splitPool, const unsigned int widthFactor,
                  const unsigned int heightFactor, const ExecutionMode mode);
 
 /**
- * @brief A generic interface for tiling algorithms
+ * @brief A generic interface for tiling algorithms (splitting a tile(Layer) into more workloads)
  *
  */
 class Tiler {
 protected:
-    /**
-     * @brief The layer to optimize
-     *
-     */
-    DPULayer layer;
-    /**
-     * @brief The maximum number of worklaods to generate
-     *
-     */
-    unsigned int maxWorkloads;
+    DPULayer layer_on_tile;     ///< The layer to optimize, should be the Layer that is assigned to a tile and has to be
+                                ///< split in workloads
+    unsigned int maxWorkloads;  ///< The maximum number of workloads to generate
 
     /**
      * @brief Interface for a specific implementation of a multi WL split
@@ -79,7 +74,7 @@ public:
      * @param maxWorkloads_ maximum number of workloads
      */
     explicit Tiler(const DPULayer& layer_, const unsigned int maxWorkloads_ = 50)
-            : layer(layer_), maxWorkloads(maxWorkloads_) {
+            : layer_on_tile(layer_), maxWorkloads(maxWorkloads_) {
     }
 
     /**
@@ -89,20 +84,20 @@ public:
      * - the maximum number of splits available
      *
      * @param numDPU available DPUs
-     * @param valid_execution_modes valid ExecutionMode
+     * @param valid_execution_mode valid ExecutionMode
      * @return std::vector<unsigned int>
      */
     virtual std::set<unsigned int> generateSplitPool(const unsigned int numDPU,
-                                                     const ExecutionMode& valid_execution_modes) const = 0;
+                                                     const ExecutionMode& valid_execution_mode) const = 0;
 
     /**
      * @brief Split a layer based on the algorithm specified in the implementation
      *
-     * @param splitPool the pool of valid split
      * @param mode the selected ExecutionMode
      * @param nWorkloads number of splits to generate
+     * @returns the pool of valid split
      */
-    void tile(std::list<DPUWorkloads>& splitPool, const ExecutionMode mode, const unsigned int nWorkloads);
+    std::list<DPUWorkloads> split_tile_in_workloads(const ExecutionMode mode, const unsigned int nWorkloads);
 
     /**
      * @brief Set the mode for list of workloads
@@ -118,6 +113,9 @@ public:
      *
      */
     virtual ~Tiler() = default;
+
+    ///  @brief name of the actual type, for debug purposes
+    virtual std::string name() const = 0;
 };
 
 /**

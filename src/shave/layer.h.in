@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,22 +10,15 @@
 
 #pragma once
 
-#define KERNEL_NAME @KERNEL_NAME@
-#define KERNEL_TYPE @KERNEL_TYPE@
-#define KERNEL_EFFICIENCY @KERNEL_EFFICIENCY@
-#define KERNEL_LATENCY @KERNEL_LATENCY@
-
 #include "vpu/shave/activation.h"
 #include "vpu/shave/data_movement.h"
 #include "vpu/shave/elementwise.h"
 
 namespace VPUNN {
 
-KERNEL_TYPE(KERNEL_NAME, KERNEL_EFFICIENCY, KERNEL_LATENCY);
+struct @KERNEL_NAME@ : public @KERNEL_TYPE@<int(@KERNEL_EFFICIENCY@ * 1000), @KERNEL_LATENCY@> {
+    using @KERNEL_TYPE@::@KERNEL_TYPE@;
+};
 
-#undef KERNEL_NAME
-#undef KERNEL_TYPE
-#undef KERNEL_EFFICIENCY
-#undef KERNEL_LATENCY
 
 }

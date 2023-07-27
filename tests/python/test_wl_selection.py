@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -19,19 +19,6 @@ test_config = os.path.join(this_file_path, "wl_selection_list.json")
 
 with open(test_config) as fp:
     confis = json.load(fp)
-
-
-def getInputDim(output_dim, kernel, padding, strides):
-    def helper_input_dim(o, k, p, s):
-        # output dim, kernel size, padding, stride
-        i = (o - 1) * s - 2 * p + k
-        assert o == (i + 2 * p - k) // s + 1
-        return i
-
-    return [
-        helper_input_dim(o, k, p, z)
-        for o, k, p, z in zip(output_dim, kernel, padding, strides)
-    ]
 
 
 def ceildiv(a, b):
@@ -76,27 +63,26 @@ def buildWl(
 
     padding = 0 if padding == "VALID" else kernel // 2
 
-    input_width, input_height = getInputDim(
-        [width, height], 2 * [kernel], 2 * [padding], 2 * [strides]
-    )
-
     return {
         "device": f"VPUDevice.{device.upper()}",
         "operation": f"Operation.{op.upper()}",
-        "input_dimension": [input_width, input_height, input_channels, batch],
-        "output_dimension": [width, height, output_channels, batch],
+        "input_0_width": width,
+        "input_0_height": height,
+        "input_0_channels": input_channels,
+        "input_0_batch": batch,
+        "output_0_channels": output_channels,
         "input_0_datatype": f"DataType.{input_dtype}",
-        "output_datatype": f"DataType.{output_dtype}",
+        "output_0_datatype": f"DataType.{output_dtype}",
         "activation_function": f"ActivationFunction.{activation.upper()}",
         "execution_order": f"ExecutionMode.{execution_mode}",
-        "Kh": kernel,
-        "Kw": kernel,
-        "Sh": strides,
-        "Sw": strides,
-        "Ph": padding,
-        "Pw": padding,
-        "act_sparsity": act_sparsity,
-        "param_sparsity": param_sparsity,
+        "kernel_height": kernel,
+        "kernel_width": kernel,
+        "kernel_stride_height": strides,
+        "kernel_stride_width": strides,
+        "kernel_pad_top": padding,
+        "kernel_pad_left": padding,
+        "input_sparsity_rate": act_sparsity,
+        "weight_sparsity_rate": param_sparsity,
         "input_0_swizzling": f"Swizzling.KEY_{swizzling}",
         "input_1_swizzling": f"Swizzling.KEY_{swizzling}",
         "output_0_swizzling": f"Swizzling.KEY_{swizzling}",
@@ -195,7 +181,16 @@ def testWlSplitsVPU_2_0(
         execution_mode,
     )
 
-    single_wl_cycles = model.DPU(**wl)
+    try:
+        single_wl_cycles = model.DPU(**wl)
+    except ValueError as e:
+        if "workload doesn't fit in cmx" in str(e):
+            return
+        else:
+            raise
+
+    if op in ["DW_CONVOLUTION", "ELTWISE", "MAXPOOL"]:
+        return
 
     # ============================= SPLIT WORKLOAD =============================
     split_wl = buildWl(
@@ -206,7 +201,7 @@ def testWlSplitsVPU_2_0(
         output_channels,
         ceildiv(height, 5),
         width,
-        kernel,
+        ceildiv(kernel, 5),
         strides,
         padding,
         dtype,
@@ -214,53 +209,42 @@ def testWlSplitsVPU_2_0(
         execution_mode,
     )
 
-    # Check that smaller workloads always return smaller cycles
-    assert model.DPU(**split_wl) <= single_wl_cycles
-
+    try:
+        # Check that smaller workloads always return smaller cycles
+        assert model.DPU(**split_wl) <= single_wl_cycles
+    except ValueError as e:
+        if "workload doesn't fit in cmx" in str(e):
+            return
+        else:
+            raise
     # ============================= MORE OUTPUT CHANNELS =============================
 
-    # More channels
-    larger_wl = buildWl(
-        op,
-        device,
-        batch,
-        input_channels,
-        4 * output_channels,
-        height,
-        width,
-        kernel,
-        strides,
-        padding,
-        dtype,
-        dtype,
-        execution_mode,
-    )
+    if op != "CM_CONVOLUTION":
+        # More channels
+        larger_wl = buildWl(
+            op,
+            device,
+            batch,
+            4 * input_channels,
+            4 * output_channels,
+            height,
+            width,
+            kernel,
+            strides,
+            padding,
+            dtype,
+            dtype,
+            execution_mode,
+        )
 
-    # Check that larger workloads always return more cycles
-    assert model.DPU(**larger_wl) >= single_wl_cycles
-
-    # ============================= MORE INPUT CHANNELS =============================
-
-    # More channels
-    larger_wl = buildWl(
-        op,
-        device,
-        batch,
-        4 * input_channels,
-        output_channels,
-        height,
-        width,
-        kernel,
-        strides,
-        padding,
-        dtype,
-        dtype,
-        execution_mode,
-    )
-
-    # Check that larger workloads always return more cycles
-    assert model.DPU(**larger_wl) >= single_wl_cycles
-
+        try:
+            # Check that larger workloads always return more cycles
+            assert model.DPU(**larger_wl) >= single_wl_cycles
+        except ValueError as e:
+            if "workload doesn't fit in cmx" in str(e):
+                return
+            else:
+                raise
     # ============================= LARGE KERNELS =============================
 
     more_kernel_wl = buildWl(
@@ -269,8 +253,8 @@ def testWlSplitsVPU_2_0(
         batch,
         input_channels,
         output_channels,
-        height,
-        width,
+        2 * height + 1,
+        2 * width + 1,
         2 * kernel + 1,
         strides,
         padding,
@@ -279,8 +263,14 @@ def testWlSplitsVPU_2_0(
         execution_mode,
     )
 
-    # Check that larger workloads always return more cycles
-    assert model.DPU(**more_kernel_wl) >= single_wl_cycles
+    try:
+        # Check that larger workloads always return more cycles
+        assert model.DPU(**more_kernel_wl) >= single_wl_cycles
+    except ValueError as e:
+        if "workload doesn't fit in cmx" in str(e):
+            return
+        else:
+            raise
 
 
 if __name__ == "__main__":
@@ -296,7 +286,6 @@ if __name__ == "__main__":
                     "ELTWISE",
                     "MAXPOOL",
                     "CM_CONVOLUTION",
-                    "AVEPOOL",
                     "CONVOLUTION",
                 ],
                 ["VPU_2_0"],

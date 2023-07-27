@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -41,18 +41,23 @@ void neighbours_idx(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* activat
     // output is of shape [batch, items] => shape: m, n
     // m = batch, k = embeddings, n = items
     cblas_sgemm(CblasColMajor, CblasNoTrans, CblasTrans, batch_size, items, embedding_shape, -1.0, activations->c_ptr(),
-                batch_size, weights->c_ptr(), items, 1.0, distances.c_ptr(), batch_size);
+                batch_size, weights->c_ptr(), items, 1.0, distances.data(), batch_size);
 
     // This piece of code is hideous, I think it can be parallelized at least for batch exploration
     for (unsigned int b_idx = 0; b_idx < batch_size; b_idx++) {
-        n_index(n_neighbours, &(distances[b_idx * items]), indexes.c_ptr() + b_idx * n_neighbours, items);
+        n_index(n_neighbours, &(distances[b_idx * items]), indexes.data() + b_idx * n_neighbours, items);
     }
 }
 
 void VPUNN::kNN(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* targets, VPUNN::Tensor<float>* activations,
                 VPUNN::Tensor<float>* output, unsigned int n_neighbours) {
-    unsigned int batch_size = activations->shape()[0];
-    unsigned int items = weights->shape()[0];
+    if (n_neighbours < 1) {
+        // precondition not met!
+        return;
+    }
+
+    const unsigned int batch_size = activations->shape()[0];
+    const unsigned int items = weights->shape()[0];
 
     // Tensor containing all the index of
     auto indexes = VPUNN::Tensor<unsigned int>({batch_size, n_neighbours});
@@ -64,10 +69,10 @@ void VPUNN::kNN(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* targets, VP
     for (unsigned int b_idx = 0; b_idx < batch_size; b_idx++) {
         float sum = 0, prediction = 0;
         for (unsigned int idx = 0; idx < n_neighbours; idx++) {
-            float weight = 1.0f / (distances[indexes[idx]] + 1e-12f);
+            const float weight = 1.0f / (distances[indexes[idx]] + 1e-12f);
             prediction += targets->c_ptr()[indexes[idx]] * weight;
             sum += weight;
         }
-        output->c_ptr()[b_idx * n_neighbours] = prediction / sum;
+        output->data()[b_idx * n_neighbours] = prediction / sum;
     }
 }

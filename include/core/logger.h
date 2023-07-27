@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,6 +11,7 @@
 #define VPUNN_LOGGER_H
 
 #include <iostream>
+#include <sstream>  // for error formating
 #include <string>
 #include "vpu/types.h"
 #include "vpu/utils.h"
@@ -51,6 +52,7 @@ const std::string toString(LogLevel level);
 class LoggerStream {
     bool _enabled;
     LogLevel _logLevel;
+    std::ostringstream* pout{nullptr};  ///< second output
 
 public:
     /**
@@ -59,9 +61,13 @@ public:
      * @param level verbosity level
      * @param enabled
      */
-    LoggerStream(LogLevel level, bool enabled): _enabled(enabled), _logLevel(level) {
+    LoggerStream(LogLevel level, bool enabled, std::ostringstream* buff = nullptr)
+            : _enabled(enabled), _logLevel(level), pout(buff) {
         if (_enabled) {
             std::cout << "[VPUNN " << toString(_logLevel) << "]: ";
+        }
+        if (pout) {
+            *pout << "[VPUNN " << toString(_logLevel) << "]: ";
         }
     }
 
@@ -77,6 +83,10 @@ public:
         if (_enabled) {
             std::cout << msg;
         }
+        if (pout) {
+            *pout << msg;
+        }
+
         return *this;
     }
 
@@ -88,6 +98,9 @@ public:
         if (_enabled) {
             std::cout << std::endl;
         }
+        if (pout) {
+            *pout << std::endl;
+        }
     }
 };
 
@@ -98,7 +111,23 @@ public:
 class Logger final {
 private:
     static LogLevel _logLevel;  // = LogLevel::None;
+
+    static std::ostringstream buffer;
+    static std::ostringstream* active_second_logger;  ///< logs into a string , deactivated by default
+
 public:
+    static void clear2ndlog() {
+        buffer.str("");
+    }
+    static std::string get2ndlog() {
+        return buffer.str();
+    }
+    static void activate2ndlog() {
+        active_second_logger = &buffer;
+    }
+    static void deactivate2ndlog() {
+        active_second_logger = nullptr;
+    }
     /**
      * @brief Initialize the Logger
      *
@@ -149,7 +178,7 @@ public:
 private:
     static auto log(LogLevel level) {
         bool enabled = level <= _logLevel;
-        return LoggerStream(level, enabled);
+        return LoggerStream(level, enabled, active_second_logger);
     }
 
 public:

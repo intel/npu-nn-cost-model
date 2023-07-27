@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -48,7 +48,7 @@ public:
      * @param wl the workload descriptor (key)
      * @param value the workload value
      */
-    void add(std::vector<T>& wl, T& value) {
+    void add(const std::vector<T>& wl, const T& value) {
         // If max_size == 0 we effectively disable the cache
         if (max_size == 0)
             return;
@@ -68,6 +68,7 @@ public:
         }
     }
 
+private:
     /**
      * @brief Remove a workload from the cache
      *
@@ -92,13 +93,14 @@ public:
         size--;
     }
 
+public:
     /**
      * @brief Get a workload from the cache.
      *
      * @param wl the workload descriptor
      * @return T* a pointer to the workload value stored in the cache, or NULL if not available
      */
-    T* get(std::vector<T>& wl) {
+    T* get(const std::vector<T>& wl) {
         Map_Iter it = m_table.find(wl);
         if (it != m_table.end()) {
             // Move the workload to the beginning of the list

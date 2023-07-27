@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -21,7 +21,7 @@ namespace VPUNN {
  * @param targets a VPUNN::Tensor containing the kNN layer targets
  * @param activations the input tensor
  * @param output the output tensor
- * @param n_neighbours number of neighbors to consider
+ * @param n_neighbours number of neighbors to consider. must be >=1
  */
 VPUNN_API(void)
 kNN(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* targets, VPUNN::Tensor<float>* activations,

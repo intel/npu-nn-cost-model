@@ -77,29 +77,31 @@ The `example` folder contains few examples on how to build and use the cost mode
   - Choosing the optimal workload split strategy amound multiple ones
 
 ## Using the cost model: Python
-
 You can install the library by typing `pip install .`
 
-Do this in a python virtual environment.
+Do this in a Python virtual environment.
 
 ### VPU cost model
-
 Run the `vpu_cost_model` script to evaluate workloads from the command line
 
 ```bash
-usage: vpu_cost_model [-h] [--model MODEL] [--mode {DPU,DMA,Utilization}]
+usage: vpu_cost_model [-h] [--model MODEL] [--mode {DPU,DMA}] [--target {cycles,power,utilization}]
                       [--device {VPU_2_0,VPU_2_1,VPU_2_7,VPU_4_0}]
                       [--operation {CONVOLUTION,DW_CONVOLUTION,ELTWISE,MAXPOOL,CM_CONVOLUTION}]
-                      [--activation {NOOP,RELU,MULT,LRELU,ADD,SUB}]
-                      [--mpe_mode {4x4,16x1,4x1}] [--nthw-ntk {4x16,8x8,8x4}]
+                      [--mpe_mode {4x4,16x1,4x1}] 
+                      [--nthw-ntk {4x16,8x8,16x4}]
+                      [--activation {NONE,RELU,MULT,LRELU,ADD,SUB}] 
                       [--width WIDTH] [--height HEIGHT]
                       [--input_channels INPUT_CHANNELS]
-                      [--output_channels OUTPUT_CHANNELS] [--batch BATCH]
-                      [--kernel KERNEL] [--padding PADDING]
-                      [--strides STRIDES]
-                      [--input_dtype {UINT8,INT8,FLOAT16,BFLOAT16}]
+                      [--output_channels OUTPUT_CHANNELS] 
+                      [--batch BATCH]
+                      [--kernel KERNEL] [--padding PADDING] [--strides STRIDES]
+                      [--input_dtype {UINT8,INT8,FLOAT16,BFLOAT16}] 
                       [--output_dtype {UINT8,INT8,FLOAT16,BFLOAT16}]
+                      [--output_layout {ZXY,XZY,YXZ,YZX,ZYX,XYZ}]
+                      [--isi_strategy {clustering,split_over_h,split_over_k}]
                       [--act-sparsity ACT_SPARSITY]
+                      [--param-sparsity-enabled PARAM_SPARSITY_ENABLED]
                       [--param-sparsity PARAM_SPARSITY]
                       [--input-swizzling INPUT_SWIZZLING]
                       [--param-swizzling PARAM_SWIZZLING]
@@ -108,21 +110,23 @@ usage: vpu_cost_model [-h] [--model MODEL] [--mode {DPU,DMA,Utilization}]
 
 VPU cost model
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --model MODEL, -m MODEL
                         Model path
-  --mode {DPU,DMA,Utilization}      Profiling mode
+  --mode {DPU,DMA}      Profiling mode
+  --target {cycles,power,utilization}
+                        Target type
   --device {VPU_2_0,VPU_2_1,VPU_2_7,VPU_4_0}, -d {VPU_2_0,VPU_2_1,VPU_2_7,VPU_4_0}
                         The VPU IP device
   --operation {CONVOLUTION,DW_CONVOLUTION,ELTWISE,MAXPOOL,CM_CONVOLUTION}, -op {CONVOLUTION,DW_CONVOLUTION,ELTWISE,MAXPOOL,CM_CONVOLUTION}
                         The operation
-  --activation {NOOP,RELU,MULT,LRELU,ADD,SUB}, -act {NOOP,RELU,MULT,LRELU,ADD,SUB}
-                        The operation activation function
   --mpe_mode {4x4,16x1,4x1}
                         DPU MPE mode
-  --nthw-ntk {4x16,8x8,8x4}
+  --nthw-ntk {4x16,8x8,16x4}
                         DPU nthw-ntk mode
+  --activation {NONE,RELU,MULT,LRELU,ADD,SUB}, -act {NONE,RELU,MULT,LRELU,ADD,SUB}
+                        The operation activation function
   --width WIDTH, -x WIDTH
                         Tensor width
   --height HEIGHT, -y HEIGHT
@@ -143,8 +147,14 @@ optional arguments:
                         The input datatype
   --output_dtype {UINT8,INT8,FLOAT16,BFLOAT16}
                         The output datatype
+  --output_layout {ZXY,XZY,YXZ,YZX,ZYX,XYZ}
+                        The odu layout
+  --isi_strategy {clustering,split_over_h,split_over_k}
+                        ISI Strategy
   --act-sparsity ACT_SPARSITY
-                        Input tensor sparsity
+                        Activation tensor sparsity
+  --param-sparsity-enabled PARAM_SPARSITY_ENABLED
+                        Weight tensor sparsity enabled
   --param-sparsity PARAM_SPARSITY
                         Weight tensor sparsity
   --input-swizzling INPUT_SWIZZLING
@@ -154,12 +164,10 @@ optional arguments:
   --output-swizzling OUTPUT_SWIZZLING
                         output tensor swizzling
   --output-write-tiles OUTPUT_WRITE_TILES
-                        Controls on how many tiles the DPU broadcast (1 = no
-                        broadcast)
+                        Controls on how many tiles the DPU broadcast (1 = no broadcast)
 ```
 
 #### VPUNN builder
-
 Generate a VPUNN model from a tensorflow one
 
 ```bash
@@ -170,7 +178,6 @@ optional arguments:
 ```
 
 ### VPUNN to JSON
-
 Convert a VPUNN model into json for debugging purpose
 
 ```bash
@@ -184,7 +191,6 @@ optional arguments:
 ```
 
 ## Javascript (WASM) support
-
 To compile the Web Assembly (WASM) version of the library, follow the steps below:
 
 1. Install Emscripten (link [here](https://emscripten.org/docs/getting_started/downloads.html))
@@ -196,7 +202,6 @@ The build command produces an `npm` package that can be later installed in any j
 ## Developer guide
 
 ### Git hooks
-
 All developers should install the git hooks that are tracked in the .githooks directory. We use the pre-commit framework for hook management. The recommended way of installing it is using pip:
 
 ```bash
@@ -220,21 +225,19 @@ pre-commit uninstall
 ```
 
 ## Testing the library
-
 ### Cost model test (C++)
-
-Tests uses [Google test suite](https://github.com/google/googletest) for automatizing tests
+Tests use [Google test suite](https://github.com/google/googletest).s
 To run the test suite: `ctest --test-dir build/tests/cpp/`
 
 Example: running only cost model integration test: `./tests/cpp/test_cost_model`
 
 ### E2E Python test
+To run the Python tests you will need to install pytest. There is a further dependency on tensorflow for some tests.
 
-`pytest tests/python/test_e2e.py -v`
-
+Install both in the same Python virtual environment in which you have installed the cost model (as per the instructions above). 
+Example: running only end-to-end tests: `pytest tests/python/test_e2e.py -v`
 
 ### WASM test
-
 Assuming you build VPUNN WASM library in `build_wasm`, install VPUNN locally with all its dependencies.
 
 ```bash
@@ -247,7 +250,6 @@ Start testing by running
 `npm run test --prefix=tests/js`
 
 ### Code coverage
-
 To generate Code coverage report you need to enable it in CMake
 
 ```shell

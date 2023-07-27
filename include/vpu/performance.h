@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -56,6 +56,45 @@ inline unsigned int get_cmx_fclk(VPUDevice device) {
         return 975;
     default:
         return 700;
+    }
+}
+
+/**
+ * @brief Get CMX word size in bytes
+ *
+ * @param device a VPUDevice
+ * @return unsigned int
+ */
+inline unsigned int get_cmx_word_size_bytes(VPUDevice device) {
+    switch (device) {
+    case VPUDevice::VPU_2_0:
+    case VPUDevice::VPU_2_1:
+    case VPUDevice::VPU_2_7:
+        return 16;
+    case VPUDevice::VPU_4_0:
+        return 32;
+    default:
+        return 16;
+    }
+}
+
+/**
+ * @brief Get DPU number of CMX read ports
+ *
+ * @param device a VPUDevice
+ * @return unsigned int
+ */
+inline unsigned int get_dpu_cmx_num_read_ports(VPUDevice device) {
+    switch (device) {
+    case VPUDevice::VPU_2_0:
+    case VPUDevice::VPU_2_1:
+        return 4;  // RO
+    case VPUDevice::VPU_2_7:
+        return 8;  // RO
+    case VPUDevice::VPU_4_0:
+        return 8;  // 4x RO, 4x RW
+    default:
+        return 8;
     }
 }
 
@@ -150,6 +189,7 @@ inline float get_bandwidth_MBps(const VPUTensor& tensor, VPUDevice device, Memor
  * @brief Get the DMA latency in cycles
  *
  * @param device a VPUDevice
+ * @param location what memory is used
  * @return unsigned int
  */
 inline unsigned int get_DMA_latency(VPUDevice device, MemoryLocation location) {
@@ -180,6 +220,22 @@ inline unsigned int get_nr_macs(VPUDevice device) {
 }
 
 /**
+ * @brief Get the ratio of int compute to fp16 compute
+ *
+ * @param device a VPUDevice
+ * @return
+ */
+inline unsigned int get_fp_ratio(VPUDevice device) {
+    switch (device) {
+    case VPUDevice::VPU_2_0:
+    case VPUDevice::VPU_2_1:
+        return 4;
+    default:
+        return 2;
+    }
+}
+
+/**
  * @brief Get the number of PPE
  *
  * @param device a VPUDevice
@@ -195,6 +251,21 @@ inline unsigned int get_nr_ppe(VPUDevice device) {
     default:
         return 64;
     }
+}
+
+/**
+ * @brief Determine whether native computation for workload is floating point or int
+ *
+ * @param DPUWorkload a DPUWorkload
+ * @return bool
+ */
+inline bool native_comp_is_fp(DPUWorkload wl) {
+    // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
+    bool found_at_least_one_float = false;
+    for (const auto& i : wl.inputs) {
+        found_at_least_one_float = found_at_least_one_float || i.is_float();
+    }
+    return found_at_least_one_float;
 }
 
 /**
@@ -236,7 +307,7 @@ inline unsigned int nDPU_per_tile(VPUDevice device) {
  */
 class VPUNN_API(VPUNNPerformanceModel) {
 private:
-    unsigned long int PaddingSkipCycles(DPUWorkload& wl, unsigned long int nr_macs) {
+    unsigned long int PaddingSkipCycles(const DPUWorkload& wl, unsigned long int nr_macs) const {
         // Extract kernels and padding cycles from workload
         unsigned int Kw = wl.kernels[0], Kh = wl.kernels[1];
         unsigned int Sw = wl.strides[0], Sh = wl.strides[1];
@@ -249,7 +320,7 @@ private:
         unsigned int out_channels = wl.outputs[0].channels();
         unsigned int in_channels = wl.inputs[0].channels();
 
-        // PAdding Skip cycles
+        // Padding Skip cycles
         unsigned long int Pt_cycles, Pb_cycles;
         unsigned long int Pl_cycles, Pr_cycles;
 
@@ -281,30 +352,36 @@ private:
      * @param wl a DPUWorkload
      * @return unsigned long theoretical CMX execution cycles
      */
-    unsigned long cmx_reads(DPUWorkload& wl) {
+    unsigned long cmx_reads(const DPUWorkload& wl) const {
         if (wl.device == VPUDevice::VPU_2_0 || wl.device == VPUDevice::VPU_2_1) {
-            // For VPU20 CMX reads are encapsulated into the NN model
+            // For VPU2.0 CMX reads are encapsulated into the NN model
             return 0;
         }
         // Get the MPE model NTHW/NTK grid on X, Y, Z, B
-        auto grid = mpe_mode_to_nthw_ntk_grid(wl.execution_order);
+        const auto grid = mpe_mode_to_nthw_ntk_grid(wl.execution_order);
 
         // Get the number of weights and activation grid reads
-        double num_wt_grids = ceil((double)wl.outputs[0].channels() / (double)grid[2]);
-        double num_act_grids = ceil((double)wl.outputs[0].height() / (double)grid[1]) *
-                               ceil((double)wl.outputs[0].width() / (double)grid[0]);
+        const double num_wt_grids = ceil((double)wl.outputs[0].channels() / (double)grid[Dim::Act::Z]);
+        const double num_act_grids = ceil((double)wl.outputs[0].height() / (double)grid[Dim::Act::Y]) *
+                                     ceil((double)wl.outputs[0].width() / (double)grid[Dim::Act::X]);
 
-        // 16 is the CMX word size
-        auto act_reads = (num_wt_grids * wl.outputs[0].height() * wl.outputs[0].width() * wl.inputs[0].channels() *
-                          wl.kernels[0] * wl.kernels[1]) /
-                         16.0;
-        auto wt_reads =
-                (num_act_grids * wl.outputs[0].channels() * wl.inputs[0].channels() * wl.kernels[0] * wl.kernels[1]) /
-                16.0;
+        const auto kernel_area = wl.kernels[Dim::Grid::W] * wl.kernels[Dim::Grid::H];
+        const auto bytes_per_element = dtype_to_bytes(wl.inputs[0].get_dtype());  // use input zero, wt are not present
+
+        // Compute total number of bytes of activations and weights to read. @todo: review formulas
+        const auto act_reads = num_wt_grids * wl.outputs[0].height() * wl.outputs[0].width() * wl.inputs[0].channels() *
+                               bytes_per_element * kernel_area;
+
+        const auto wt_reads =
+                num_act_grids * wl.outputs[0].channels() * wl.inputs[0].channels() * bytes_per_element * kernel_area;
+
+        // Compute idealized total number of read cycles
+        const auto reads =
+                (act_reads + wt_reads) / (get_cmx_word_size_bytes(wl.device) * get_dpu_cmx_num_read_ports(wl.device));
 
         // Return the number of CMX reads in DPU clock cycles
         return static_cast<unsigned long>(
-                ceil((act_reads + wt_reads) * (double)get_cmx_fclk(wl.device) / (double)get_dpu_fclk(wl.device)));
+                ceil(reads * (double)get_cmx_fclk(wl.device) / (double)get_dpu_fclk(wl.device)));
     }
 
 public:
@@ -314,19 +391,13 @@ public:
      * @param wl a DPUWorkload
      * @return unsigned long int theoretical execution cycles
      */
-    unsigned long int DPUTheoreticalCycles(DPUWorkload& wl) {
+    unsigned long int DPUTheoreticalCycles(const DPUWorkload& wl) const {
         if (wl.outputs.size() == 0) {
             // If it computes no output, its duration is 0 cycles
             return 0;
         }
 
-        if (wl.kernels[0] > wl.inputs[0].width()) {
-            wl.kernels[0] = wl.inputs[0].width();
-        }
-        if (wl.kernels[1] > wl.inputs[0].height()) {
-            wl.kernels[1] = wl.inputs[0].height();
-        }
-        unsigned int mt, nr_macs, nr_ppe;
+        unsigned int mt, nr_macs, nr_ppe, fp_ratio;
         unsigned int inp_channels = wl.inputs[0].channels();
 
         // Get the shape of the MPE grid
@@ -340,9 +411,11 @@ public:
         }
         nr_macs = get_nr_macs(wl.device);
         nr_ppe = get_nr_ppe(wl.device);
-        // As per Bernard David: ELTWISE_ST = (C*H*W)/64 --- ELTWISE_MT = (C*H*W)/(64/2) --- ST = single tile --- MT =
-        // multi tile The 64 is 64 Bytes per clock at the slow CMX frequency – if MC is enabled this reduces to 32 Bytes
-        // per clock on ODU
+        fp_ratio = get_fp_ratio(wl.device);
+
+        // As per Bernard David: ELTWISE_ST = (C*H*W)/64 --- ELTWISE_MT = (C*H*W)/(64/2) --- ST = single tile --- MT
+        // = multi tile The 64 is 64 Bytes per clock at the slow CMX frequency – if MC is enabled this reduces to 32
+        // Bytes per clock on ODU
         if (wl.op == Operation::ELTWISE) {
             cycles = ceil_division(multiply_vector(wl.inputs[0].get_shape()), (nr_ppe / mt));
         }
@@ -355,6 +428,12 @@ public:
         }
 
         cycles = ceil_division(cycles, (unsigned long int)nr_macs);
+
+        // Adjust cycles for ratio of FP to int compute
+        if (native_comp_is_fp(wl)) {
+            cycles *= fp_ratio;
+        }
+
 #ifdef VPUNN_USE_PADDING
         cycles -= PaddingSkipCycles(wl, nr_macs);
 #endif
@@ -371,7 +450,7 @@ public:
      * @param wl a DMAWorkload
      * @return unsigned long int theoretical execution cycles
      */
-    unsigned long int DMATheoreticalCycles(const DMAWorkload& wl) {
+    unsigned long int DMATheoreticalCycles(const DMAWorkload& wl) const {
         // Get if the input is permuted or compressed
         bool is_input_permuted =
                 wl.input.get_layout() != wl.output.get_layout() && wl.input_location == MemoryLocation::CMX;

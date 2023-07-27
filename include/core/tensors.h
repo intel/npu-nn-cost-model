@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -15,6 +15,7 @@
 #include <numeric>
 #include <random>
 #include <sstream>  // for error formating
+#include <stdexcept>
 #include <vector>
 
 #include "core/vpunn_api.h"
@@ -98,7 +99,7 @@ public:
      * @brief Assignment operator overload
      *
      * The source object must be well formed (no null data), otherwise the copy will be bad
-     * @param tensor. a valid tensor
+     * @param tensor a valid tensor
      * @return Tensor& self reference
      */
     Tensor& operator=(const Tensor& tensor) {
@@ -123,7 +124,7 @@ public:
      * @brief Move Assignment operator overload
      *
      * The source object must be well formed (no null data), otherwise the copy will be bad
-     * @param tensor. a valid tensor.
+     * @param tensor a valid tensor.
      * @return Tensor& self reference
      */
     Tensor& operator=(Tensor&& tensor) {
@@ -158,14 +159,23 @@ public:
     }
 
     /**
+     * @brief Return a std::vector<T> copy of the internal data buffer as a std::vector
+     *
+     * @return std::vector<T> the output buffer
+     */
+    std::vector<T> data_vector() {
+        return std::vector<T>{_data, _data + _size};
+    }
+
+    /**
      * @brief Return a pointer to the internal data buffer
      * Ownership is not transferred, pointer is not guaranteed to be preserved by other Tensor operations, like
      * assignment
      *
      * @return T*
      */
-    T* c_ptr() {
-        return data();
+    const T* c_ptr() const {
+        return _data;
     }
 
     /**
@@ -176,7 +186,7 @@ public:
      * @param data a pointer to a source data buffer
      * @param size_in_bytes the size of the data buffer in bytes
      * @throws runtime_error in case the input size is not aligned (not a int number of Ts)
-     * @throws runtime_error in case the input size is equal to available data
+     * @throws runtime_error in case the input size is NOT equal to available data
      * @return Tensor<T>& self reference
      */
     Tensor<T>& assign(const T* data, const unsigned int size_in_bytes) {

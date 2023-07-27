@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -56,21 +56,29 @@ InferenceModel::InferenceModel(const char* data, size_t length, bool with_copy):
 void InferenceModel::allocate_tensors(const unsigned int batch) {
     auto tensors = model->tensors();
     auto buffers = model->buffers();
-    for (auto it = tensors->begin(); it != tensors->end(); ++it) {
+    for (auto flatbuffer_tensor = tensors->begin(); flatbuffer_tensor != tensors->end(); ++flatbuffer_tensor) {
+        const uint32_t buffer_ID = flatbuffer_tensor->buffer();
+        constexpr uint32_t NOT_EXISTING{0};
+        const bool buffer_is_present{buffer_ID != NOT_EXISTING};
         // Batch only activations
-        const int actual_batch = (it->buffer() != 0) ? 1 : batch;
+        // we use the batch only for buffers that are not stored in model (dynamic tensors)
+        const uint32_t forced_batch{(buffer_is_present) ? 1 : batch};
+
+        const auto tensor_shape{parse_vector(flatbuffer_tensor->shape(), forced_batch)};
+
         // Create the new tensor structure
-        auto tensor = std::make_shared<VPUNN::Tensor<float>>(parse_vector(it->shape(), actual_batch));
-        if (it->buffer() != 0) {
-            // in this case, copy the new data
-            auto array = buffers->Get(it->buffer())->data();
-            tensor->assign((const float*)(array->data()), array->Length());
-        } else {
-            // Fill with zeros
+        auto tensor = std::make_shared<VPUNN::Tensor<float>>(tensor_shape);
+        if (buffer_is_present) {  // in this case, copy the existing data(the buffer) into tensor's memory
+            const auto array = buffers->Get(buffer_ID)->data();
+            tensor->assign((const float*)(array->data()),
+                           array->Length());  // will throw if buffer mismatch with tensor shape
+        } else {                              // Fill with zeros the tensor's memory
             tensor->fill(0);
         }
         tensor_map.push_back(tensor);
     }
+
+    bias.reserve_bias_space(this->max_batch_in_tensors());
 }
 
 void InferenceModel::predict() {
@@ -83,7 +91,7 @@ void InferenceModel::predict() {
 }
 
 void InferenceModel::run_layer(const VPUNN_SCHEMA::Layer* layer) {
-    auto inputs = get_tensors_from_index(layer->inputs());
+    const auto inputs = get_tensors_from_index(layer->inputs());
     auto outputs = get_tensors_from_index(layer->outputs());
 
     switch (layer->implementation_type()) {
@@ -92,7 +100,7 @@ void InferenceModel::run_layer(const VPUNN_SCHEMA::Layer* layer) {
         Dense(inputs[1], inputs[0], outputs[0]);
 
         if (inputs.size() > 2) {
-            Bias(inputs[2], outputs[0]);
+            bias.Bias(inputs[2], outputs[0]);
         }
         break;
     case VPUNN_SCHEMA::LayerType_L2NormalizationLayer:

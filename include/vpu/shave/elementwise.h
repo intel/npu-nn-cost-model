@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -29,7 +29,7 @@ struct SHVElementwise : public SWOperation {
      *
      * @param device a VPUDevice element
      * @param inputs array of inputs
-     * @param outputs a single size array of outputs
+     * @param output a single size array of outputs
      */
     SHVElementwise(const VPUDevice& device, const std::vector<VPUTensor>& inputs, const VPUTensor& output)
             : SWOperation(device, inputs, {output}) {
@@ -65,6 +65,7 @@ struct SHVElementwise : public SWOperation {
 };
 
 // Defining a Shave activation kernel
+#define SHV_ELEMENTWISE_CLASS SHVElementwise
 #define SHV_ELEMENTWISE_KERNEL(name, efficiency, latency) typedef SHVElementwise<int(efficiency * 1000), latency> name
 #define SHV_ELEMENTWISE_KERNEL_DEFAULT(name) SHV_ELEMENTWISE_KERNEL(name, 1.0, 0)
 

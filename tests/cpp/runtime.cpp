@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -16,16 +16,9 @@
 #include <iostream>
 #include <numeric>
 #include <vector>
+#include "common_helpers.h"
 
 namespace VPUNN_unit_tests {
-
-#ifndef VPU_2_7_MODEL_PATH
-#define VPU_2_7_MODEL_PATH "../../../models/vpu_2_7.vpunn"
-#endif
-
-#ifndef VPU_2_0_MODEL_PATH
-#define VPU_2_0_MODEL_PATH "../../../models/vpu_2_0.vpunn"
-#endif
 
 class TestRuntime : public ::testing::Test {
 public:

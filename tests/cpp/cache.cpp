@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -15,16 +15,23 @@
 #include <vector>
 #include "vpu_cost_model.h"
 
-auto small_cache_model = VPUNN::VPUCostModel(std::string(""), false, 10);
-auto no_cache_model = VPUNN::VPUCostModel(std::string(""), false, 0);
+/// @brief namespace for Unit tests of the C++ library
+namespace VPUNN_unit_tests {
 
+class VPUNNCacheTest : public testing::Test {
+public:
+protected:
+    void SetUp() override {
+    }
+    VPUNN::VPUCostModel small_cache_model = VPUNN::VPUCostModel(std::string(""), false, 10);
+    VPUNN::VPUCostModel no_cache_model = VPUNN::VPUCostModel(std::string(""), false, 0);
+};
 // Demonstrate some basic assertions.
-TEST(VPUNNCacheTest, BasicAssertions) {
+TEST_F(VPUNNCacheTest, BasicAssertions) {
     VPUNN::DPUWorkload wl = {
             VPUNN::VPUDevice::VPU_2_7,
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
-            //{VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions 1
             {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // output dimensions
             {3, 3},                                                     // kernels
             {1, 1},                                                     // strides
@@ -41,13 +48,11 @@ TEST(VPUNNCacheTest, BasicAssertions) {
         EXPECT_EQ(dpu_cycles, no_cache_model.DPU(wl));
     }
 }
-
-TEST(CacheBasicTest, BasicAssertions) {
+// Demonstrate some basic assertions.
+TEST_F(VPUNNCacheTest, CacheBasicTest) {
     VPUNN::LRUCache<float> cache(1);
-
     std::srand(unsigned(std::time(nullptr)));
     std::vector<float> v1(100), v2(100);
-
     for (auto idx = 0; idx < 100; idx++) {
         // Generate a random vector and val
         std::random_device rd;
@@ -75,3 +80,4 @@ TEST(CacheBasicTest, BasicAssertions) {
         EXPECT_EQ(*cache.get(v2), val2);
     }
 }
+}  // namespace VPUNN_unit_tests

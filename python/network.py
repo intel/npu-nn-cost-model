@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -7,7 +7,7 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-from vpunn import VPUNN
+from vpunn import VPUNN_lib
 import networkx as nx
 import os
 
@@ -20,7 +20,7 @@ class VPUNetwork:
         self.nTiles = nTiles
 
     def add_layer(self, name, layer):
-        strategy = VPUNN.VPULayerStrategy()
+        strategy = VPUNN_lib.VPULayerStrategy()
         strategy.nDPUs = self.nDPUs
         strategy.nSHVs = self.nSHVs
         strategy.nTiles = self.nTiles
@@ -28,7 +28,7 @@ class VPUNetwork:
         self.__g.add_node(
             name,
             type=type(layer),
-            ref=VPUNN.VPUComputeNode(layer),
+            ref=VPUNN_lib.VPUComputeNode(layer),
             strategy=strategy,
         )
 
@@ -45,12 +45,12 @@ class VPUNetwork:
         self.__g.nodes[name]["strategy"].tiling_strategy = strategy
 
     def build(self):
-        dag = VPUNN.VPUComputationDAG()
-        strategy = VPUNN.VPUNetworkStrategy()
+        dag = VPUNN_lib.VPUComputationDAG()
+        strategy = VPUNN_lib.VPUNetworkStrategy()
 
         for name in self.__g.nodes:
             dag.addNode(self.__g.nodes[name]["ref"])
-            strategy[self.__g.nodes[name]["ref"]] = self.__g.nodes[name]["strategy"]
+            strategy.set(self.__g.nodes[name]["ref"], self.__g.nodes[name]["strategy"])
 
         for source, sink in self.__g.edges:
             dag.addEdge(self.__g.nodes[source]["ref"], self.__g.nodes[sink]["ref"])
@@ -62,7 +62,7 @@ class VPUNetworkCostModel:
     def __init__(self, filename, profile=False, verbose=False):
         if not os.path.isfile(filename):
             print(f"WARNING: file {filename} does not exists")
-        self.model = VPUNN.VPUNetworkCostModel(filename, profile, 16384, 1)
+        self.model = VPUNN_lib.VPUNetworkCostModel(filename, profile, 16384, 1)
         if not self.model.nn_initialized():
             print("WARNING: VPUNN model not initialized... using simplistic model")
         self.verbose = verbose

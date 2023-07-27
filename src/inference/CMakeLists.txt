@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -7,29 +7,28 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../include)
 include_directories(${FLATBUFFERS_SRC_DIR}/include)
 
 if(VPUNN_BUILD_SHARED_LIB)
     add_library(inference SHARED model.cpp ../core/logger.cpp)
     add_dependencies(inference cpp_schema)
-    if (CBLAS_LIB STREQUAL "internal")
+
+    if(CBLAS_LIB STREQUAL "internal")
         target_link_libraries(inference flatbuffers kernels vpunn_optimization blas)
     else()
         target_link_libraries(inference flatbuffers kernels vpunn_optimization ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
     endif()
 
     add_custom_target(python ALL
-            DEPENDS python_schema inference
-            COMMENT "Generating python files")
-
+        DEPENDS python_schema inference
+        COMMENT "Generating python files")
 endif()
 
 add_library(inferenceStatic STATIC model.cpp preprop_factory.cpp)
 add_dependencies(inferenceStatic cpp_schema)
 
-if (CBLAS_LIB STREQUAL "internal")
+if(CBLAS_LIB STREQUAL "internal")
     target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization blasStatic)
 else()
     set(BLAS_STATIC ON)
@@ -37,6 +36,3 @@ else()
 endif()
 
 set_target_properties(inferenceStatic PROPERTIES OUTPUT_NAME inference)
-
-
-

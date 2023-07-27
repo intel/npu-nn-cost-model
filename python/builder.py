@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -361,9 +361,7 @@ def serialize_model(model, output_path, name="VPUNN", database=None, verbose=Tru
     if verbose:
         print("Generating model....")
 
-    model = SerialModel(
-        name, tensors, input_tensors, output_tensors, layers, buffers
-    )
+    model = SerialModel(name, tensors, input_tensors, output_tensors, layers, buffers)
 
     fbb = flatbuffers.Builder(1024)
     serial_model = model.build(fbb)

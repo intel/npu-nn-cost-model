@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,10 +10,20 @@
 #include "core/logger.h"
 #include <gtest/gtest.h>
 
+namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
+class VPUNNLoggerTest : public ::testing::Test {
+public:
+protected:
+    void SetUp() override {
+        Logger::clear2ndlog();
+        Logger::deactivate2ndlog();
+    }
+};
+
 // Demonstrate some basic assertions.
-TEST(VPUNNLoggerTest, BasicAssertions) {
+TEST_F(VPUNNLoggerTest, BasicAssertions) {
     Logger::initialize();
 
     std::string output;
@@ -70,3 +80,69 @@ TEST(VPUNNLoggerTest, BasicAssertions) {
     output = testing::internal::GetCapturedStdout();
     EXPECT_EQ(output, "");
 }
+
+TEST_F(VPUNNLoggerTest, Alternative2ndOutput_present) {
+    Logger::initialize();
+
+    {
+        std::string i0 = Logger::get2ndlog();
+        EXPECT_EQ(i0, "");  // nothing  in the beginning
+
+        Logger::error() << "error1";
+
+        std::string i1 = Logger::get2ndlog();
+        EXPECT_EQ(i1, "");  // not active
+    }
+    Logger::activate2ndlog();
+
+    {
+        std::string i0 = Logger::get2ndlog();
+        EXPECT_EQ(i0, "");  // nothing  in the beginning
+
+        Logger::error() << "error2";
+        std::string i1 = Logger::get2ndlog();
+
+        EXPECT_TRUE(i1 != "");
+        EXPECT_EQ(i1, "[VPUNN ERROR]: error2\n");
+    }
+    {
+        Logger::trace() << "error3";
+        std::string i2 = Logger::get2ndlog();
+        EXPECT_EQ(i2, "[VPUNN ERROR]: error2\n[VPUNN TRACE]: error3\n");
+    }
+    // deactivate
+    Logger::deactivate2ndlog();
+
+    {
+        Logger::trace() << "error4";
+        std::string i2 = Logger::get2ndlog();
+        EXPECT_EQ(i2, "[VPUNN ERROR]: error2\n[VPUNN TRACE]: error3\n");  // notlogged, OFF
+    }
+}
+
+TEST_F(VPUNNLoggerTest, Alternative2ndOutput_Reset) {
+    Logger::initialize();
+
+    Logger::activate2ndlog();
+
+    {
+        Logger::error() << "error2";
+        std::string i1 = Logger::get2ndlog();
+
+        EXPECT_TRUE(i1 != "");
+        EXPECT_EQ(i1, "[VPUNN ERROR]: error2\n");
+    }
+    Logger::clear2ndlog();
+    {
+        std::string i2 = Logger::get2ndlog();
+        EXPECT_EQ(i2, "");
+    }
+
+    {
+        Logger::trace() << "error3";
+        std::string i2 = Logger::get2ndlog();
+        EXPECT_EQ(i2, "[VPUNN TRACE]: error3\n");
+    }
+}
+
+}  // namespace VPUNN_unit_tests

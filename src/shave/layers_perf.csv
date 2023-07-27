@@ -2,7 +2,7 @@ Layer Category, Kernel Name, Kernel Efficiency, Kernel Latency
 ACTIVATION, Sigmoid, 4.718, 4715
 ACTIVATION, ELU, 0.441, 5067
 ACTIVATION, HardSigmoid, 0.547, 4956
-ACTIVATION, Softmax, 0.081, 17052
+ACTIVATION, Softmax, 0.836, 10043
 ACTIVATION, HardSwish, null, null
 ACTIVATION, Clamp, 0.855, 3319
 ACTIVATION, FakeQuantize, null, null
@@ -34,6 +34,7 @@ ACTIVATION, ScaleShift, null, null
 ACTIVATION, YuvToRgb, null, null
 ACTIVATION, SoftPlus, null, null
 ACTIVATION, Swish, null, null
+ACTIVATION, MVN, 0.83, 2810
 ACTIVATION, Ceiling, 0.306, 8391
 ELEMENTWISE, Power, 0.004, 15829
 ELEMENTWISE, Add, null, null

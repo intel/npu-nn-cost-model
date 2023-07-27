@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -57,6 +57,7 @@ TEST_F(TestModelVersion, SimpleVersionExtraction) {
             {"VPUNN", "VPUNN", 1, 1},
             {"VPUNN-00-0", "VPUNN", 0, 0},
             {"VPUNN-10-2", "VPUNN", 10, 2},
+            {"VPUNN-10-02", "VPUNN", 10, 2},
             {"VPUNN-01-1", "VPUNN", 1, 1},
             {"VPUNN-01-2", "VPUNN", 1, 2},
             {"VPUNN-44-3", "VPUNN", 44, 3},
@@ -91,4 +92,29 @@ TEST_F(TestModelVersion, SimpleVersionExtraction) {
     }
 }
 
+class PostProcessChecker : public ::testing::Test {
+protected:
+    void SetUp() override {
+    }
+};
+/// @brief Basic test to check the versions that are supported or not
+TEST_F(PostProcessChecker, BasicOutputSupport) {
+    struct Test {
+        std::string info;
+        int output_version;
+        bool support;
+    };
+
+    std::vector<Test> test_vector{
+            {"OUT_LATEST", 0, true},       {"OUT_HW_OVERHEAD_BOUNDED", 1, false},
+            {"OUT_CYCLES", 2, true},       {"OUT_HW_OVERHEAD_UNBOUNDED", 3, false},
+            {"Other versions", 4, false},  {"Other versions", 199, false},
+            {"Other versions", 22, false},
+    };
+
+    for (const auto& tst : test_vector) {
+        VPUNN::PostProcessSupport support_config(tst.output_version);
+        EXPECT_EQ(support_config.is_output_supported(), tst.support) << tst.info << " is expected as " << tst.support;
+    }
+}
 }  // namespace VPUNN_unit_tests

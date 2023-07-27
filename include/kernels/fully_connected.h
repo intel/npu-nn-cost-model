@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -21,7 +21,8 @@ namespace VPUNN {
  * @param activations the input tensor
  * @param output the output tensor
  */
-VPUNN_API(void) Dense(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output);
+VPUNN_API(void)
+Dense(const VPUNN::Tensor<float>* weights, const VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output);
 
 }  // namespace VPUNN
 

@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -22,25 +22,25 @@ namespace VPUNN {
  * @brief Compute the execution time of a vector of workloads on N processors
  *
  * @tparam T datatype
- * @param n_procesors number of processors
+ * @param n_procesors number of processors (parallelism level)
  * @param tasks_cost a vector of workload costs in cycles
  * @param runtime_overhead per-workload runtime overhead
- * @return T overall execution cycle
+ * @return T overall execution cycle, e.g. longest thread
  */
 template <class T>
-T dpu_schedule(const T n_procesors, const std::vector<T>& tasks_cost, T runtime_overhead = 0) {
-    auto initializer = std::vector<T>(n_procesors, 0);
+T dpu_schedule(const unsigned int n_procesors, const std::vector<T>& tasks_cost, T runtime_overhead = 0) {
+    const auto initializer = std::vector<T>(n_procesors, 0);
     // MIN priority queue
     auto queue = std::priority_queue<T, std::vector<T>, std::greater<T>>(initializer.begin(), initializer.end());
 
     for (long unsigned int idx = 0; idx < tasks_cost.size(); idx++) {
         auto smallest_time = queue.top();
         queue.pop();
-        queue.push(smallest_time + tasks_cost[idx] + runtime_overhead);
+        queue.push(smallest_time + tasks_cost[idx] + runtime_overhead);  //@todo: overflow protection mechanism
     }
 
-    // Return the max of the queue -> the execution critical path
-    T result = static_cast<T>(0.0);
+    // Return the max of the queue -> the execution critical path (last in queue)
+    T result = static_cast<T>(0);
     while (!queue.empty()) {
         result = queue.top();
         queue.pop();
@@ -120,7 +120,7 @@ inline unsigned int divide_and_multiply_vectors(const std::vector<unsigned int>&
  * @brief Compute an input tensor dimension from the output dimension and the operation parameters
  *
  * @param output the output dimension
- * @param kernel the kenrel size
+ * @param kernel the kernel size
  * @param total_padding the total padding
  * @param stride the kernel stride
  * @return unsigned int the input dimension
@@ -128,11 +128,17 @@ inline unsigned int divide_and_multiply_vectors(const std::vector<unsigned int>&
 inline unsigned int helper_input_dim(unsigned int output, unsigned int kernel, unsigned int total_padding,
                                      unsigned int stride) {
     // output = floor((input + total_padding - kernel) / stride)) + 1
-    unsigned int input = (output - 1) * stride - total_padding + kernel;
-    assert(output == (input + total_padding - kernel) / stride + 1);
+    int input = ((int)output - 1) * (int)stride - (int)total_padding + (int)kernel;
+    if (input < 0) {
+        input = 0;
+    }
+    if (output > 0) {
+        assert(output == (input + total_padding - kernel) / stride + 1);
+    } else {
+        assert(output == (unsigned int)input);  // zero
+    }
     return input;
 }
-
 }  // namespace VPUNN
 
 #endif  // VPUNN_UTILS_H

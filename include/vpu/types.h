@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -13,10 +13,12 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <limits>
 #include <numeric>
 #include <vector>
 #include "utils.h"
 
+#include <cmath>
 #include <iostream>
 #include <map>
 #include <string>
@@ -36,7 +38,7 @@ EnumMap::value_type link(const T& enum_val, const char* name) {
 /// @brief reverse of EnumMap (from string to value)
 using EnumInverseMap = std::map<const std::string, const int>;
 
-/// @creates and inverse map given a direct map (EnumMap)
+/// @brief creates and inverse map given a direct map (EnumMap)
 inline const EnumInverseMap createInverseMap(const EnumMap& direct_map) {
     EnumInverseMap inverse_map;
     for (auto elem : direct_map) {
@@ -64,13 +66,15 @@ inline std::ostream& operator<<(std::ostream& os, const EnumInverseMap& m) {
     return os;
 }
 
+// when making a new interface version, start copying from here
+
 /// gives the EnumMap for a E enum type
 /// has to be fully implemented for each type we want to cover
 template <typename E>
 inline const EnumMap& mapToText();
 
 /// creates the  EnumInverseMap for a particular E enum type
-/// @precondition the EnumMap<E> must exists
+/// @pre the EnumMap<E> must exists
 template <typename E>
 inline const EnumInverseMap& mapFromText() {
     static auto m = createInverseMap(mapToText<E>());
@@ -164,15 +168,41 @@ inline const EnumMap& mapToText<ExecutionMode>() {
 /**
  * @brief Data layout
  *
+ * ZMAJOR and CMAJOR are coming from VPU2.0, legacy layouts
+ *
+ *  XYZ, XZY, YXZ, YZX, ZXY, ZYX  were introduced for 2.7
+ * They are to interpreted as from  innermost to outermost dimension of the tensor
+ * eg: XYZ  is NCHW;   N=Batch is always outermost,  then channels (Z), height (Y), width (X)
+ *
+ * INVALID is first usage is exposure to VPUNN in some cases where Layout does not matter, is neither good Like (for
+ * input_1 when MAXPOOL).
+ *
+ * Equivalence legacy to xyz permutations:
+ * ZMAJOR is Z,X,Y
+ * CMAJOR is X,Y,Z
+ *
  */
-enum class Layout { ZMAJOR, CMAJOR, __size };
-static const EnumMap Layout_ToText{
-        link(Layout::ZMAJOR, "ZMAJOR"),
-        link(Layout::CMAJOR, "CMAJOR"),
-};
+enum class Layout { ZMAJOR, CMAJOR, XYZ, XZY, YXZ, YZX, ZXY, ZYX, INVALID, __size };
+static const EnumMap Layout_ToText{link(Layout::ZMAJOR, "ZMAJOR"),  link(Layout::CMAJOR, "CMAJOR"),  // legacy
+                                   link(Layout::XYZ, "XYZ"),        link(Layout::XZY, "XZY"),
+                                   link(Layout::YXZ, "YXZ"),        link(Layout::YZX, "YZX"),
+                                   link(Layout::ZXY, "ZXY"),        link(Layout::ZYX, "ZYX"),
+                                   link(Layout::INVALID, "INVALID")};
 template <>
 inline const EnumMap& mapToText<Layout>() {
     return Layout_ToText;
+}
+
+/// @brief ISI_Strategy
+enum class ISIStrategy { CLUSTERING, SPLIT_OVER_H, SPLIT_OVER_K, __size };
+static const EnumMap ISIStrategy_ToText{
+        link(ISIStrategy::CLUSTERING, "Clustering"),
+        link(ISIStrategy::SPLIT_OVER_H, "SplitOverH"),
+        link(ISIStrategy::SPLIT_OVER_K, "SplitOverK"),
+};
+template <>
+inline const EnumMap& mapToText<ISIStrategy>() {
+    return ISIStrategy_ToText;
 }
 
 /**
@@ -206,6 +236,8 @@ inline const EnumMap& mapToText<VPUSubsystem>() {
     return VPUSubsystem_ToText;
 }
 
+// when making a new interface version, Stop copying here
+
 //
 namespace Dim {
 enum Grid { W, H };
@@ -214,13 +246,12 @@ enum Wt { K, C, Ky, Kx };
 enum Padding { TOP, BOTTOM, LEFT, RIGHT };
 }  // namespace Dim
 
-/**
- * @brief Get the size of the dtype
+/** @brief Get the size of the dtype
  *
  * @param dtype a DataType object
- * @return unsigned int
+ * @return size in bytes
  */
-inline unsigned int dtype_to_bytes(DataType dtype) {
+constexpr unsigned int dtype_to_bytes(DataType dtype) noexcept {
     switch (dtype) {
     case DataType::FLOAT16:
     case DataType::BFLOAT16:
@@ -230,18 +261,44 @@ inline unsigned int dtype_to_bytes(DataType dtype) {
     }
 }
 
+/// @brief default Layout that is equivalent with legacy ZMAJOR
+constexpr Layout getDefaultLayout() {
+    return Layout::ZXY;
+}
+
 /**
- * @brief Get the tensor serial order given a layour
+ * @brief Get the tensor serial order given a layout
  *
  * @param layout a Tensor Layout
- * @return std::array<unsigned int, 4>
+ * @return std::array<unsigned int, 4>, order of dimensions from innermost to outermost. values represent Dim::Act
+ *
+ * Invalid will be mapped to the default one : ZMAJOR/ZXY
  */
-inline std::array<unsigned int, 4> layout_to_order(Layout layout) {
+constexpr std::array<unsigned int, 4> layout_to_order(Layout layout) noexcept {
     switch (layout) {
     case Layout::CMAJOR:
-        return {0, 1, 2, 3};
-    default:
-        return {2, 0, 1, 3};
+        return {Dim::Act::X, Dim::Act::Y, Dim::Act::Z, Dim::Act::B};  // X,Y,Z,B  from innermost to outermost dimensions
+    case Layout::ZMAJOR:
+        return {Dim::Act::Z, Dim::Act::X, Dim::Act::Y, Dim::Act::B};  // Z,X,Y,B  from innermost to outermost dimensions
+
+    case Layout::XYZ:
+        return {Dim::Act::X, Dim::Act::Y, Dim::Act::Z, Dim::Act::B};  // X,Y,Z, B
+    case Layout::XZY:
+        return {Dim::Act::X, Dim::Act::Z, Dim::Act::Y, Dim::Act::B};  // X,Z,Y, B
+
+    case Layout::YXZ:
+        return {Dim::Act::Y, Dim::Act::X, Dim::Act::Z, Dim::Act::B};  // Y,X,Z, B
+    case Layout::YZX:
+        return {Dim::Act::Y, Dim::Act::Z, Dim::Act::X, Dim::Act::B};  // Y,Z,X, B
+
+    case Layout::ZXY:
+        return {Dim::Act::Z, Dim::Act::X, Dim::Act::Y, Dim::Act::B};  // Z,X,Y, B
+    case Layout::ZYX:
+        return {Dim::Act::Z, Dim::Act::Y, Dim::Act::X, Dim::Act::B};  // Z,Y,X, B
+
+    case Layout::INVALID:                                             // fall-through
+    default:                                                          // ZMajor like, this is the first in the enum list
+        return {Dim::Act::Z, Dim::Act::X, Dim::Act::Y, Dim::Act::B};  // Z,X,Y,B  from innermost to outermost dimensions
     }
 }
 
@@ -317,15 +374,15 @@ inline std::vector<unsigned int> mpe_mode_to_nthw_ntk_grid(ExecutionMode mode) {
  */
 class VPUTensor {
 private:
-    std::array<unsigned int, 4> shape;  ///< the 4 dimensions of the real tensor
-    DataType dtype;                     ///< datatatype of the described tensor
-    Layout layout;                      ///< memory organization of the tensor
-    bool sparsity;                      ///< is sparsity present?
-    std::array<unsigned int, 4> strides;
+    std::array<unsigned int, 4> shape;    ///< the 4 dimensions of the real tensor in the order Dim::Act XYZC  WHCB
+    DataType dtype;                       ///< datatatype of the described tensor
+    Layout layout;                        ///< memory organization of the tensor
+    bool sparsity;                        ///< is sparsity present?
+    std::array<unsigned int, 4> strides;  ///< strides of the tensor's dimensions. order is the same as for shape
 
     void compute_strides() {
         auto size = dtype_to_bytes(dtype);
-        auto order = layout_to_order(layout);
+        const auto order = layout_to_order(layout);
         for (long unsigned int idx = 0; idx < order.size(); idx++) {
             strides[order[idx]] = size;
             size *= shape[order[idx]];
@@ -338,10 +395,11 @@ public:
      *
      * @param shape VPUTensor shape in width, height, channels, batch format
      * @param dtype VPUTensor datatype
-     * @param layout VPUTensor layout
+     * @param layout VPUTensor layout (default:  Layout::ZXY , ZMAJOR equivalent)
+     * @param sparsity true if sparsity is present
      */
-    VPUTensor(const std::array<unsigned int, 4>& shape = {1, 1, 1, 1}, DataType dtype = DataType::UINT8,
-              Layout layout = Layout::ZMAJOR, bool sparsity = false)
+    explicit VPUTensor(const std::array<unsigned int, 4>& shape = {1, 1, 1, 1}, DataType dtype = DataType::UINT8,
+                       Layout layout = Layout::ZXY /*ZMAJOR equivalent*/, bool sparsity = false)
             : shape(shape), dtype(dtype), layout(layout), sparsity(sparsity) {
         compute_strides();
     };
@@ -354,136 +412,91 @@ public:
      * @param channels VPUTensor channels
      * @param batch VPUTensor batch
      * @param dtype VPUTensor datatype
-     * @param layout VPUTensor layout
+     * @param layout VPUTensor layout (default:  Layout::ZXY , ZMAJOR equivalent)
+     * @param sparsity true if sparsity is present
      */
-    VPUTensor(unsigned int width, unsigned int height, unsigned int channels, unsigned int batch, DataType dtype,
-              Layout layout = Layout::ZMAJOR, bool sparsity = false)
+    explicit VPUTensor(unsigned int width, unsigned int height, unsigned int channels, unsigned int batch,
+                       DataType dtype, Layout layout = Layout::ZXY /*ZMAJOR equivalent*/, bool sparsity = false)
             : VPUTensor({width, height, channels, batch}, dtype, layout, sparsity){};
 
     /**
-     * @brief Get the VPUTensor x dimension
+     * @brief Construct a new VPUTensor object based on a shape , and taken the rest of attributes from another tensor
      *
-     * @return unsigned int
+     * @param shape_ VPUTensor shape in width, height, channels, batch format
+     * @param rest a reference to a tensor that provides all info besides shape
      */
-    unsigned int x() const {
+    explicit VPUTensor(const std::array<unsigned int, 4>& shape_, const VPUTensor& rest)
+            : VPUTensor(shape_, rest.get_dtype(), rest.get_layout(), rest.get_sparsity()){};
+
+    /// @brief Get the x dimension
+    unsigned int x() const noexcept {
         return shape[Dim::Act::X];
     };
 
-    /**
-     * @brief Get the VPUTensor y dimension
-     *
-     * @return unsigned int
-     */
-    unsigned int y() const {
+    /// @brief Get the y dimension
+    unsigned int y() const noexcept {
         return shape[Dim::Act::Y];
     };
 
-    /**
-     * @brief Get the VPUTensor z dimension
-     *
-     * @return unsigned int
-     */
-    unsigned int z() const {
+    /// @brief Get the z dimension
+    unsigned int z() const noexcept {
         return shape[Dim::Act::Z];
     };
 
-    /**
-     * @brief Get the VPUTensor batch dimension
-     *
-     * @return unsigned int
-     */
-    unsigned int b() const {
+    /// @brief Get the batch dimension
+    unsigned int b() const noexcept {
         return shape[Dim::Act::B];
     };
 
-    /**
-     * @brief Get the VPUTensor x dimension stride
-     *
-     * @return unsigned int
-     */
-    unsigned int sx() const {
+    /// @brief Get the x dimension stride
+    unsigned int sx() const noexcept {
         return strides[Dim::Act::X];
     };
 
-    /**
-     * @brief Get the VPUTensor y dimension stride
-     *
-     * @return unsigned int
-     */
-    unsigned int sy() const {
+    /// @brief Get the y dimension stride
+    unsigned int sy() const noexcept {
         return strides[Dim::Act::Y];
     };
 
-    /**
-     * @brief Get the VPUTensor z dimension stride
-     *
-     * @return unsigned int
-     */
-    unsigned int sz() const {
+    /// @brief Get the z dimension stride
+    unsigned int sz() const noexcept {
         return strides[Dim::Act::Z];
     };
 
-    /**
-     * @brief Get the VPUTensor batch dimension stride
-     *
-     * @return unsigned int
-     */
-    unsigned int sb() const {
+    /// @brief Get the batch dimension stride
+    unsigned int sb() const noexcept {
         return strides[Dim::Act::B];
     };
 
-    /**
-     * @brief Get the VPUTensor height
-     *
-     * @return unsigned int
-     */
-    unsigned int height() const {
+    /// @brief Get the height
+    unsigned int height() const noexcept {
         return y();
     };
 
-    /**
-     * @brief Get the VPUTensor width
-     *
-     * @return unsigned int
-     */
-    unsigned int width() const {
+    /// @brief Get the width
+    unsigned int width() const noexcept {
         return x();
     };
 
-    /**
-     * @brief Get the VPUTensor channels
-     *
-     * @return unsigned int
-     */
-    unsigned int channels() const {
+    /// @brief Get the channels
+    unsigned int channels() const noexcept {
         return z();
     };
 
-    /**
-     * @brief Get the VPUTensor batches
-     *
-     * @return unsigned int
-     */
-    unsigned int batches() const {
+    /// @brief Get the batches dimension
+    unsigned int batches() const noexcept {
         return b();
     };
 
-    /**
-     * @brief Get the VPUTensor size
-     *
-     * @return unsigned int
-     */
+    /// @brief Get the size in bytes
+    /// @return size in bytes
     unsigned int size() const {
         return multiply_vector(shape) * dtype_to_bytes(dtype);
     }
 
-    /**
-     * @brief Check if the tensor is floating point
-     *
-     * @return true
-     * @return false
-     */
-    bool is_float() const {
+    /// @brief Check if the tensor is floating point
+    /// @return true if floating point type
+    bool is_float() const noexcept {
         switch (dtype) {
         case DataType::FLOAT16:
         case DataType::BFLOAT16:
@@ -493,181 +506,221 @@ public:
         }
     }
 
-    /**
-     * @brief Check if the tensor is integer
-     *
-     * @return true
-     * @return false
-     */
-    bool is_int() const {
+    /// @brief Check if the tensor is integer
+    /// @return true if integer type
+    bool is_int() const noexcept {
         return !is_float();
     }
 
-    /**
-     * @brief Get the VPUTensor shape
-     *
-     * @return const std::array<unsigned int, 4>&
-     */
-    const std::array<unsigned int, 4>& get_shape() const {
+    /// @brief Get the shape
+    /// @return a 4 vector containing the shape in convention XYZB
+    const std::array<unsigned int, 4>& get_shape() const noexcept {
         return shape;
     }
 
-    /**
-     * @brief Set the VPUTensor shape
-     *
-     * @param in_shape
-     */
+    /// @brief Set the VPUTensor shape
+    /// @param in_shape in convention XYZB
     void set_shape(std::array<unsigned int, 4> in_shape) {
         shape = in_shape;
         compute_strides();
     }
 
-    /**
-     * @brief Get the VPUTensor datatype
-     *
-     * @return DataType
-     */
-    DataType get_dtype() const {
+    /// @brief Get the datatype
+    DataType get_dtype() const noexcept {
         return dtype;
     }
 
-    /**
-     * @brief Get the VPUTensor layout
-     *
-     * @return Layout
-     */
-    Layout get_layout() const {
+    /// @brief changes the underlying data type only if same size new vs old
+    /// @returns newly set type.
+    DataType change_datatype_superficial(DataType new_datatype) {
+        const auto size = dtype_to_bytes(get_dtype());
+        if (size == dtype_to_bytes(new_datatype)) {
+            dtype = new_datatype;
+        }
+        return get_dtype();
+    }
+
+    /// @brief Get the layout
+    Layout get_layout() const noexcept {
         return layout;
     }
 
-    /**
-     * @brief Get the VPUTensor sparsity flag
-     *
-     * @return sparsity flag
-     */
-    bool get_sparsity() const {
+    /// @brief changes the layout type if new one has the same structure as old
+    /// this change must not affect the shape or strides
+    /// @param new_layout the desired layout
+    /// @returns true if new layout set, false otherwise
+    bool set_if_same_layout(Layout new_layout) noexcept {
+        const auto order_now = layout_to_order(layout);
+        const auto order_next = layout_to_order(new_layout);
+        if (order_now == order_next) {
+            layout = new_layout;
+            return true;
+        }
+        return false;  // no change
+    }
+
+    /// @brief Get the sparsity flag
+    bool get_sparsity() const noexcept {
         return sparsity;
+    }
+
+    /// equality test operator
+    bool operator==(const VPUTensor& b) const {
+        bool r{true};
+        r = r && (shape == b.shape);
+        r = r && (dtype == b.dtype);
+        r = r && (layout == b.layout);
+        r = r && (sparsity == b.sparsity);
+
+        return r;
     }
 };
 
-/**
- * @brief The base structure that encodes a DPU workloads
- *
- */
+inline constexpr Swizzling default_init_swizzling() {
+    return Swizzling::KEY_0;
+}
+
+/// @brief The base structure that encodes a DPU workloads
 struct DPUWorkload {
-    /**
-     * @brief The DPUWorkload device
-     *
-     */
-    VPUDevice device;
-    /**
-     * @brief The DPUWorkload operation
-     *
-     */
-    Operation op;
+    VPUDevice device;  ///< device family, VPU2_0, 2_7, ...
+    Operation op;      ///< operation, like convolution, etc
 
-    /// @brief The DPUWorkload input0 tensors
-    std::array<VPUTensor, 1> inputs;
-    /// @brief The DPUWorkload input1 tensors
-    // std::array<VPUTensor, 1> inputs_1; //postponed the introduction of weigths
+    std::array<VPUTensor, 1> inputs;  ///< input0 tensors, the data/activation tensor details
 
-    /**
-     * @brief The DPUWorkload output tensors
-     *
-     */
-    std::array<VPUTensor, 1> outputs;
-    /**
-     * @brief The DPUWorkload kernel sizes
-     *
-     */
-    std::array<unsigned int, 2> kernels;
-    /**
-     * @brief The DPUWorkload kernel strides
-     *
-     */
-    std::array<unsigned int, 2> strides;
-    /**
-     * @brief The DPUWorkload kernel padding
-     *
-     */
-    std::array<unsigned int, 4> padding;
-    /**
-     * @brief The DPUWorkload execution mode
-     *
-     */
-    ExecutionMode execution_order;
-    /**
-     * @brief The DPUWorkload operation activation function
-     *
-     */
-    ActivationFunction activation_function = ActivationFunction::NONE;
-    /**
-     * @brief The DPUWorkload input activation sparsity
-     *
-     */
-    float act_sparsity = 0;
-    /**
-     * @brief The DPUWorkload weight sparsity
-     *
-     */
-    float weight_sparsity = 0;
-    /**
-     * @brief The DPUWorkload input tensors swizzling
-     *
-     */
-    std::array<Swizzling, 2> input_swizzling = {Swizzling::KEY_0, Swizzling::KEY_0};
-    /**
-     * @brief The DPUWorkload output tensors swizzling
-     *
-     */
-    std::array<Swizzling, 1> output_swizzling = {Swizzling::KEY_0};
-    /**
-     * @brief The DPUWorkload broadcast policy
-     *
-     */
-    unsigned int output_write_tiles = 1;
-    /**
-     * @brief The DPUWorkload offsets relative to the parent DPULayer
-     *
-     */
-    std::array<unsigned int, 4> offsets = {0, 0, 0, 0};
+    std::array<VPUTensor, 1> outputs;  ///<   output tensors
+
+    std::array<unsigned int, 2> kernels;  ///< kernel sizes WH
+    std::array<unsigned int, 2> strides;  ///< kernel strides WH
+    std::array<unsigned int, 4> padding;  ///< kernel padding  Top, Bottom, Left,  Right
+
+    ExecutionMode execution_order;  ///< execution mode
+
+    ActivationFunction activation_function = ActivationFunction::NONE;  ///< operation activation function
+
+    float act_sparsity = 0;     ///< input activation sparsity
+    float weight_sparsity = 0;  ///< weight sparsity
+
+    std::array<Swizzling, 2> input_swizzling = {default_init_swizzling(),
+                                                default_init_swizzling()};   ///< input tensors swizzling
+    std::array<Swizzling, 1> output_swizzling = {default_init_swizzling()};  ///< output tensors swizzling
+
+    /// @brief broadcast policy, Split Over K situation , In the SOK tiling strategy, weights are split across
+    /// the tiles over the K dimension. The DPU in each tile compute a K-slice of the output tensors and
+    /// then broadcast the result in each CMX tile, implicitly concatenating the results and having then
+    /// all activations completely replicated
+    unsigned int output_write_tiles{1};
+
+    std::array<unsigned int, 4> offsets = {0, 0, 0, 0};  ///< offsets relative to the parent DPULayer, L2 API
+
+    ISIStrategy isi_strategy{ISIStrategy::CLUSTERING};  ///< inter slice interconnect strategy , from 2.7 onwards
+    bool weight_sparsity_enabled{false};  ///< is sparsity enabled for input_1(weights)? This cannot be deduced,is
+                                          ///< independent(can be true for sparsity rate =0)
+
+    /// equality test operator
+    bool operator==(const DPUWorkload& b) const {
+        bool r{true};
+        r = r && (device == b.device);
+        r = r && (op == b.op);
+        r = r && (inputs == b.inputs);
+        r = r && (outputs == b.outputs);
+
+        r = r && (kernels == b.kernels);
+        r = r && (strides == b.strides);
+        r = r && (padding == b.padding);
+
+        r = r && (execution_order == b.execution_order);
+        r = r && (activation_function == b.activation_function);
+
+        const float EPSILON{0.00001f};
+        auto is_equal = [&EPSILON](float a, float b) {
+            return (std::fabs(a - b) < EPSILON);  // very simple since vals around zero
+        };
+        r = r && (is_equal(act_sparsity, b.act_sparsity));
+        r = r && (is_equal(weight_sparsity, b.weight_sparsity));
+
+        r = r && (input_swizzling == b.input_swizzling);
+        r = r && (output_swizzling == b.output_swizzling);
+
+        r = r && (output_write_tiles == b.output_write_tiles);
+        r = r && (isi_strategy == b.isi_strategy);
+        r = r && (weight_sparsity_enabled == b.weight_sparsity_enabled);
+
+        return r;
+    }
 };
+
+inline std::ostream& operator<<(std::ostream& stream, const VPUNN::VPUTensor& d) {
+    stream << "VPUTensor: \n"                                //
+           << " shape: \t{" << d.x() << "," << d.y() << ","  //
+           << d.z() << "," << d.b() << "} ;\n"               //
+           << " dtype: \t" << (int)d.get_dtype() << " : " << DataType_ToText.at(static_cast<int>(d.get_dtype()))
+           << " ;\n"  //
+           << " layout: \t" << (int)d.get_layout() << " : " << Layout_ToText.at(static_cast<int>(d.get_layout()))
+           << " ;\n"                                                              //
+           << " sparsity: \t" << (d.get_sparsity() ? "true" : "false") << " ;\n"  //
+           << " strides: \t{" << d.sx() << "," << d.sy() << ","                   //
+           << d.sz() << "," << d.sb() << "} ;\n"                                  //
+            ;
+    return stream;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& d) {
+    stream << "Workload: \n"                                                                                        //
+           << " device: \t" << (int)d.device << " : " << VPUDevice_ToText.at(static_cast<int>(d.device)) << " ;\n"  //
+           << " Operation: \t" << (int)d.op << " : " << Operation_ToText.at(static_cast<int>(d.op))
+           << " ;\n"  //
+
+           // inputs and oytputs tensors
+           << " input: \t{\n"
+           << d.inputs[0] << " } ;\n"  //
+           << " output: \t{\n"
+           << d.outputs[0] << " } ;\n"  //
+
+           << " kernels: [W,H]  \t{" << d.kernels[Dim::Grid::W] << "," << d.kernels[Dim::Grid::H] << "} ;\n"  //
+           << " strides: [W,H]  \t{" << d.strides[Dim::Grid::W] << "," << d.strides[Dim::Grid::H] << "} ;\n"  //
+           << " padding: [TBLR] \t{" << d.padding[Dim::TOP] << "," << d.padding[Dim::BOTTOM] << ","           //
+           << d.padding[Dim::LEFT] << "," << d.padding[Dim::RIGHT] << "} ;\n"                                 //
+
+           << " execution_order: \t" << (int)d.execution_order << " : "
+           << ExecutionMode_ToText.at(static_cast<int>(d.execution_order)) << " ;\n"  //
+           << " activation_function: \t" << (int)d.activation_function << " : "
+           << ActivationFunction_ToText.at(static_cast<int>(d.activation_function)) << " ;\n"  //
+
+           << " act_sparsity: \t" << d.act_sparsity << " ;\n"        //
+           << " weight_sparsity: \t" << d.weight_sparsity << " ;\n"  //
+
+           << " input_swizzling: \t{" << (int)d.input_swizzling[0] << "," << (int)d.input_swizzling[1] << "}"
+           << " :  {" << Swizzling_ToText.at(static_cast<int>(d.input_swizzling[0])) << ","
+           << Swizzling_ToText.at(static_cast<int>(d.input_swizzling[1])) << "} ;\n"  //
+
+           << " output_swizzling: \t{" << (int)d.output_swizzling[0] << "}"
+           << " :  {" << Swizzling_ToText.at(static_cast<int>(d.output_swizzling[0])) << "} ;\n"  //
+
+           << " output_write_tiles: \t" << d.output_write_tiles << " ;\n"    //
+           << " offsets: \t{" << d.offsets[0] << "," << d.offsets[1] << ","  //
+           << d.offsets[2] << "," << d.offsets[3] << "} ;\n"                 //
+           << " isi_strategy: \t" << (int)d.isi_strategy << " : "
+           << ISIStrategy_ToText.at(static_cast<int>(d.isi_strategy)) << " ;\n"  //
+           << " weight_sparsity_enabled: \t" << (int)d.weight_sparsity_enabled << " : "
+           << (d.weight_sparsity_enabled ? "true" : "false") << " ;\n"  //
+            ;
+    return stream;
+}
 
 /**
  * @brief The base structure that encodes a DMA workloads
  *
  */
 struct DMAWorkload {
-    /**
-     * @brief The VPU device
-     *
-     */
-    VPUDevice device;
-    /**
-     * @brief The input tensor
-     *
-     */
-    VPUTensor input;
-    /**
-     * @brief The output tensor
-     *
-     */
-    VPUTensor output;
-    /**
-     * @brief Input memory location
-     *
-     */
-    MemoryLocation input_location;
-    /**
-     * @brief Output memory location
-     *
-     */
-    MemoryLocation output_location;
-    /**
-     * @brief The number of CMX tiles to broadcast
-     *
-     */
-    unsigned int output_write_tiles = 1;
+    VPUDevice device;  ///< VPU device
+
+    VPUTensor input;   ///< input tensor
+    VPUTensor output;  ///<  output tensor
+
+    MemoryLocation input_location;   ///< Input memory location
+    MemoryLocation output_location;  ///<  Output memory location
+
+    unsigned int output_write_tiles = 1;  ///< number of CMX tiles to broadcast
 
     /**
      * @brief This function computes the size of the DMAWorkload features to feed to the NN
@@ -714,103 +767,6 @@ struct SWOperation {
      *
      */
     virtual ~SWOperation() = default;
-};
-
-/**
- * @brief Radom sample from the vector with uniform distribution
- *
- * @tparam T usually a numerics type
- * @param vector a std::vector of T
- * @return T a random sample from the vector
- */
-template <class T>
-T sample(const std::vector<T>& vector) {
-    auto idx = std::rand() % vector.size();
-    return vector[idx];
-}
-
-/**
- * @brief Random sample from a class enum type with uniform distribution
- *
- * @tparam T an enum type
- * @return T a random sample from the enum
- */
-template <class T>
-T randomEnum() {
-    auto idx = std::rand() % static_cast<int>(T::__size);
-    return static_cast<T>(idx);
-}
-
-/**
- * @brief A structure to generate random DPU workloads
- * @details Useful to generate random DPU workloads
- * Example: VPUNN::randDPUWorkload(VPUNN::VPUDevice::VPU_2_0)
- *
- */
-struct randDPUWorkload {
-    /**
-     * @brief randDPUWorkload VPUDevice
-     *
-     */
-    VPUNN::VPUDevice device;
-
-public:
-    /**
-     * @brief Construct a new random DPUWorkload object
-     *
-     * @param device a VPUDevice object
-     */
-    randDPUWorkload(VPUNN::VPUDevice device): device(device) {
-    }
-
-    /**
-     * @brief overloaded operator () to enable calling the struct
-     *
-     * @return VPUNN::DPUWorkload
-     */
-    VPUNN::DPUWorkload operator()() {
-        std::vector<unsigned int> random_dim = {1, 4, 7, 16, 32, 64, 128};
-        std::vector<unsigned int> random_channels = {1, 16, 32, 64, 128};
-        std::vector<unsigned int> random_kernels = {1, 3};
-        std::vector<unsigned int> random_strides = {1, 3};
-        std::vector<ExecutionMode> vpu_2_0_modes = {ExecutionMode::MATRIX, ExecutionMode::VECTOR};
-        std::vector<ExecutionMode> vpu_2_7_modes = {ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_4x16,
-                                                    ExecutionMode::CUBOID_8x16};
-
-        auto op = randomEnum<Operation>();
-        unsigned int ic, oc, kx, ky;
-        if (op == Operation::ELTWISE || op == Operation::DW_CONVOLUTION || op == Operation::MAXPOOL ||
-            op == Operation::AVEPOOL) {
-            ic = oc = sample(random_channels);
-        } else {
-            ic = sample(random_channels);
-            oc = sample(random_channels);
-        }
-        auto width = sample(random_channels), height = sample(random_channels);
-
-        if (op == Operation::ELTWISE) {
-            kx = ky = 1;
-        } else {
-            kx = sample(random_kernels);
-            ky = sample(random_kernels);
-        }
-
-        auto mode = device == VPUDevice::VPU_2_0 ? sample(vpu_2_0_modes) : sample(vpu_2_7_modes);
-
-        auto input_tensor = VPUTensor({width, height, ic, 1}, randomEnum<DataType>());
-        // auto input_1_tensor = VPUTensor({width, height, ic, 1}, randomEnum<DataType>());
-        auto output_tensor = VPUTensor({width, height, oc, 1}, randomEnum<DataType>());
-
-        return DPUWorkload({device,
-                            op,
-                            {input_tensor},
-                            //{input_1_tensor},
-                            {output_tensor},
-                            {kx, ky},
-                            {1, 1},
-                            {kx / 2, kx / 2, ky / 2, ky / 2},
-                            mode});
-    }
 };
 
 }  // namespace VPUNN

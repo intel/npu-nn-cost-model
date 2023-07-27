@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -8,7 +8,7 @@
 # Software Package for additional details.
 
 from vpunn.model_input import str2enum, generate_model_input
-from vpunn import VPUNN
+from vpunn import VPUNN_lib
 import argparse
 import os
 
@@ -17,7 +17,7 @@ class VPUCostModel:
     def __init__(self, filename, profile=False, verbose=False):
         if not os.path.isfile(filename):
             print(f"WARNING: file {filename} does not exists")
-        self.model = VPUNN.VPUCostModel(filename, profile)
+        self.model = VPUNN_lib.VPUCostModel(filename, profile)
         if not self.model.nn_initialized():
             print("WARNING: VPUNN model not initialized... using simplistic model")
         self.verbose = verbose
@@ -26,7 +26,7 @@ class VPUCostModel:
         if self.verbose:
             self.describe_input(args)
         # Get DMA cycles
-        return self.model.DMA(generate_model_input(args, VPUNN.DMAWorkload))
+        return self.model.DMA(generate_model_input(args, VPUNN_lib.DMAWorkload))
 
     def describe_input(self, args):
         print("====================== Operation ======================")
@@ -39,12 +39,6 @@ class VPUCostModel:
             self.describe_input(args)
         # Get DPU cycles
         return self.model.DPU(generate_model_input(args))
-
-    def hw_overhead(self, **args):
-        if self.verbose:
-            self.describe_input(args)
-        # Get DPU hw utilization
-        return self.model.compute_hw_overhead(generate_model_input(args))
 
     def hw_utilization(self, **args):
         if self.verbose:
@@ -65,11 +59,10 @@ class VPUCostModel:
         return self.model.DPUPower(generate_model_input(args))
 
     def DMAPower(self, **args):
-
         if self.verbose:
             self.describe_input(args)
         # Get DMA hw utilization
-        return self.model.DMAPower(generate_model_input(args, VPUNN.DMAWorkload))
+        return self.model.DMAPower(generate_model_input(args, VPUNN_lib.DMAWorkload))
 
 
 def getInputDim(output_dim, kernel, padding, strides):
@@ -92,7 +85,7 @@ def define_and_parse_args():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["DPU", "DMA", "Utilization"],
+        choices=["DPU", "DMA"],
         default="DPU",
         help="Profiling mode",
     )
@@ -102,6 +95,7 @@ def define_and_parse_args():
         choices=[
             "cycles",
             "power",
+            "utilization",
         ],
         default="cycles",
         help="Target type",
@@ -122,19 +116,10 @@ def define_and_parse_args():
             "DW_CONVOLUTION",
             "ELTWISE",
             "MAXPOOL",
-            "AVEPOOL",
             "CM_CONVOLUTION",
         ],
         default="CONVOLUTION",
         help="The operation",
-    )
-    parser.add_argument(
-        "--activation",
-        "-act",
-        type=str,
-        choices=["NONE", "RELU", "MULT", "LRELU", "ADD", "SUB"],
-        default="NONE",
-        help="The operation activation function",
     )
     parser.add_argument(
         "--mpe_mode",
@@ -149,6 +134,14 @@ def define_and_parse_args():
         choices=["4x16", "8x8", "16x4"],
         help="DPU nthw-ntk mode",
         default="8x8",
+    )
+    parser.add_argument(
+        "--activation",
+        "-act",
+        type=str,
+        choices=["NONE", "RELU", "MULT", "LRELU", "ADD", "SUB"],
+        default="NONE",
+        help="The operation activation function",
     )
     parser.add_argument("--width", "-x", type=int, help="Tensor width")
     parser.add_argument("--height", "-y", type=int, help="Tensor height")
@@ -182,7 +175,29 @@ def define_and_parse_args():
     )
 
     parser.add_argument(
-        "--act-sparsity", type=float, default=0, help="Input tensor sparsity"
+        "--output_layout",
+        type=str,
+        choices=["ZXY", "XZY", "YXZ", "YZX", "ZYX", "XYZ"],
+        default="ZXY",
+        help="The odu layout",
+    )
+
+    parser.add_argument(
+        "--isi_strategy",
+        type=str,
+        choices=["clustering", "split_over_h", "split_over_k"],
+        default="clustering",
+        help="ISI Strategy",
+    )
+
+    parser.add_argument(
+        "--act-sparsity", type=float, default=0, help="Activation tensor sparsity"
+    )
+    parser.add_argument(
+        "--param-sparsity-enabled",
+        type=bool,
+        default=False,
+        help="Weight tensor sparsity enabled",
     )
     parser.add_argument(
         "--param-sparsity", type=float, default=0, help="Weight tensor sparsity"
@@ -234,86 +249,50 @@ def main():
 
     args = define_and_parse_args()
     model = VPUCostModel(args.model, verbose=True)
-    input_height, input_width = getInputDim(
-        [args.height, args.width],
-        [args.kernel, args.kernel],
-        [args.padding, args.padding],
-        [args.strides, args.strides],
-    )
 
-    if args.mode == "Utilization":
-        call_function = (
-            model.hw_utilization if args.target == "cycles" else model.DPUActivityFactor
-        )
-        hw_utilization = call_function(
+    if args.mode == "DPU":
+        if args.target == "cycles":
+            function_ = model.DPU
+        elif args.target == "power":
+            function_ = model.DPUActivityFactor
+        else:
+            function_ = model.hw_utilization
+        result = function_(
             device=f"VPUDevice.{args.device.upper()}",
             operation=f"Operation.{args.operation.upper()}",
-            input_dimension=[
-                input_width,
-                input_height,
-                args.input_channels,
-                args.batch,
-            ],
-            output_dimension=[
-                args.width,
-                args.height,
-                args.output_channels,
-                args.batch,
-            ],
+            input_0_width=args.width,
+            input_0_height=args.height,
+            input_0_channels=args.input_channels,
+            input_0_batch=args.batch,
+            output_0_channels=args.output_channels,
             input_0_datatype=f"DataType.{args.input_dtype}",
-            output_datatype=f"DataType.{args.output_dtype}",
-            activation_function=f"ActivationFunction.{args.activation.upper()}",
+            output_0_datatype=f"DataType.{args.output_dtype}",
+            output_0_layout=f"Layout.{args.output_layout}",
             execution_order=f"ExecutionMode.{args.execution_mode}",
-            Kh=args.kernel,
-            Kw=args.kernel,
-            Sh=args.strides,
-            Sw=args.strides,
-            Ph=args.padding,
-            Pw=args.padding,
-            act_sparsity=args.act_sparsity,
-            param_sparsity=args.param_sparsity,
+            kernel_height=args.kernel,
+            kernel_width=args.kernel,
+            kernel_stride_height=args.strides,
+            kernel_stride_width=args.strides,
+            kernel_pad_top=args.padding,
+            kernel_pad_left=args.padding,
+            input_sparsity_rate=args.act_sparsity,
+            weight_sparsity_enabled=args.param_sparsity_enabled,
+            weight_sparsity_rate=args.param_sparsity,
             input_0_swizzling=f"Swizzling.KEY_{args.input_swizzling}",
             input_1_swizzling=f"Swizzling.KEY_{args.param_swizzling}",
             output_0_swizzling=f"Swizzling.KEY_{args.output_swizzling}",
             output_write_tiles=args.output_write_tiles,
+            isi_strategy=f"ISIStrategy.{args.isi_strategy.upper()}",
         )
-        print(f"DPU hardware utilization {args.target}: {hw_utilization * 100:.3f}%")
-    elif args.mode == "DPU":
-        function_ = model.DPU if args.target == "cycles" else model.DPUPower
-        cycles = function_(
-            device=f"VPUDevice.{args.device.upper()}",
-            operation=f"Operation.{args.operation.upper()}",
-            input_dimension=[
-                input_width,
-                input_height,
-                args.input_channels,
-                args.batch,
-            ],
-            output_dimension=[
-                args.width,
-                args.height,
-                args.output_channels,
-                args.batch,
-            ],
-            input_0_datatype=f"DataType.{args.input_dtype}",
-            output_datatype=f"DataType.{args.output_dtype}",
-            activation_function=f"ActivationFunction.{args.activation.upper()}",
-            execution_order=f"ExecutionMode.{args.execution_mode}",
-            Kh=args.kernel,
-            Kw=args.kernel,
-            Sh=args.strides,
-            Sw=args.strides,
-            Ph=args.padding,
-            Pw=args.padding,
-            act_sparsity=args.act_sparsity,
-            param_sparsity=args.param_sparsity,
-            input_0_swizzling=f"Swizzling.KEY_{args.input_swizzling}",
-            input_1_swizzling=f"Swizzling.KEY_{args.param_swizzling}",
-            output_0_swizzling=f"Swizzling.KEY_{args.output_swizzling}",
-            output_write_tiles=args.output_write_tiles,
-        )
-        print(f"DPU execution {args.target}: {cycles}")
+        print(f"DPU execution {args.target}: {result}")
     elif args.mode == "DMA":
+        input_height, input_width = getInputDim(
+            [args.height, args.width],
+            [args.kernel, args.kernel],
+            [args.padding, args.padding],
+            [args.strides, args.strides],
+        )
+
         function_ = model.DMA if args.target == "cycles" else model.DMAPower
         cycles = function_(
             device=f"VPUDevice.{args.device.upper()}",

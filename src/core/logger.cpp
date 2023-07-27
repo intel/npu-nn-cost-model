@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -8,10 +8,14 @@
 // Software Package for additional details.
 
 #include "core/logger.h"
+#include "vpu/cycles_interface_types.h"
 
 namespace VPUNN {
 
 LogLevel Logger::_logLevel = LogLevel::None;
+
+std::ostringstream Logger::buffer{};
+std::ostringstream* Logger::active_second_logger{nullptr};
 
 const std::string toString(LogLevel level) {
     switch (level) {
@@ -33,5 +37,8 @@ const std::string toString(LogLevel level) {
         return "NONE";
     }
 }
+
+// allocate also for Cycles
+// CyclesInterfaceType constexpr Cycles::NO_ERROR{};
 
 }  // namespace VPUNN

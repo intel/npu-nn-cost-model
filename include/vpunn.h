@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -14,6 +14,7 @@
 #include "core/profiling.h"
 #include "inference/model.h"
 
+/// @brief top namespace for VPUNN cost model library
 namespace VPUNN {
 
 /**
@@ -23,7 +24,7 @@ namespace VPUNN {
 class Runtime {
 private:
     InferenceModel model;  ///< the NN loaded from a file/buffer (flatbuffer)
-    bool profile;
+    const bool profile;
     ModelVersion model_version;  ///< holds the version info about the loaded model
 
 public:
@@ -37,7 +38,7 @@ public:
     explicit Runtime(const std::string& filename, const unsigned int batch = 1, bool profile = false)
             : model(filename.c_str()), profile(profile), model_version() {
         if (initialized()) {
-            model.allocate_tensors(batch);
+            model.allocate_tensors(batch);  // might throw
             model_version.parse_name(model.network_name());
         }
     }
@@ -57,7 +58,7 @@ public:
      *
      * @param model_data .vpunn model buffer
      * @param model_data_length buffer size
-     * @param copy_model_data enable/disable memcopy of the modle buffer
+     * @param copy_model_data enable/disable memcopy of the module buffer
      * @param batch model batch size
      * @param profile enable/disable profiling
      */
@@ -65,7 +66,7 @@ public:
                      const unsigned int batch = 1, bool profile = false)
             : model(model_data, model_data_length, copy_model_data), profile(profile), model_version() {
         if (initialized()) {
-            model.allocate_tensors(batch);
+            model.allocate_tensors(batch);  // might throw
             model_version.parse_name(model.network_name());
         }
     }
@@ -76,7 +77,7 @@ public:
      * @return true if the NN model is initialized
      * @return false if the NN model is not initialized
      */
-    bool initialized() {
+    bool initialized() const {
         return model.is_initialized();
     }
 
@@ -99,24 +100,69 @@ public:
     }
 
     /**
+     * @brief Get the model input tensors shapes
+     *
+     * @return std::vector<std::vector<unsigned int>>
+     */
+    std::vector<std::vector<unsigned int>> input_shapes() {
+        std::vector<std::vector<unsigned int>> shapes;
+        for (auto tensor : input_tensors()) {
+            shapes.push_back(tensor->shape());
+        }
+        return shapes;
+    }
+
+    /**
+     * @brief Get the model output tensors shapes
+     *
+     * @return std::vector<std::vector<unsigned int>>
+     */
+    std::vector<std::vector<unsigned int>> output_shapes() {
+        std::vector<std::vector<unsigned int>> shapes;
+        for (auto tensor : output_tensors()) {
+            shapes.push_back(tensor->shape());
+        }
+        return shapes;
+    }
+
+    /**
      * @brief Run the inference
      *
      * @tparam T input input_array datatype
      * @param input_array input data
      * @param input_size input data size
-     * @return void*
-     * @todo: why return type void* ?
+     * @return pointer to one or more values containing the inference result
      */
     template <class T>
-    void* predict(T* input_array, const unsigned int input_size) {
-        model.set_inputs(input_array, input_size);
+    const T* predict(const T* input_array, const unsigned int input_size) {
+        model.set_inputs(input_array, input_size);  // might throw if input mismatch
         auto t1 = tick();
         model.predict();
-        auto delta = tock(t1);
         if (profile) {
+            auto delta = tock(t1);
             Logger::info() << "Execution time: " << delta << " ms";
         }
-        return (void*)model.get_outputs<T>();
+        return model.get_outputs<T>();
+    }
+
+    /**
+     * @brief Run the inference
+     *
+     * @tparam T input input_array datatype
+     * @param input_tensor input data
+     * @return one or more values containing the inference result
+     */
+    template <class T>
+    const std::vector<T> predict(const std::vector<T>& input_tensor) {
+        model.set_inputs(input_tensor.data(),
+                         static_cast<unsigned int>(input_tensor.size()));  // might throw if input mismatch
+        auto t1 = tick();
+        model.predict();
+        if (profile) {
+            auto delta = tock(t1);
+            Logger::info() << "Execution time: " << delta << " ms";
+        }
+        return model.get_outputs_vector<T>();
     }
 };
 

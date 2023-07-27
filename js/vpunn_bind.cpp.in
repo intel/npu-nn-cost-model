@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -89,7 +89,7 @@ EMSCRIPTEN_BINDINGS(vpunn) {
     class_<VPUCostModel>("VPUCostModel")
             .constructor<std::string>()
             .function("DPU", select_overload<unsigned int(DPUWorkload)>(&VPUCostModel::DPU))
-            .function("DMA", select_overload<unsigned int(VPUDevice, const VPUTensor&, const VPUTensor&, MemoryLocation, MemoryLocation, unsigned int)>(
+            .function("DMA", select_overload<unsigned int(VPUDevice, const VPUTensor&, const VPUTensor&, MemoryLocation, MemoryLocation, unsigned int) const>(
                                      &VPUCostModel::DMA))
             .function("SHAVE", &VPUCostModel::SHAVE)
             .function("hw_utilization", &VPUCostModel::hw_utilization)

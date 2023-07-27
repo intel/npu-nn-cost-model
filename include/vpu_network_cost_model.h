@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -19,7 +19,26 @@ namespace VPUNN {
  * @brief VPU Network strategy type
  *
  */
-typedef VPUComputeNodeMap<VPULayerStrategy> VPUNetworkStrategy;
+class VPUNetworkStrategy {
+private:
+    VPUComputeNodeMap<VPULayerStrategy> _map;
+
+public:
+    explicit VPUNetworkStrategy(){};
+
+    VPULayerStrategy& operator[](const std::shared_ptr<VPUComputeNode>& _key) {
+        return _map[_key];
+    }
+
+    bool exists(const std::shared_ptr<VPUComputeNode>& _key) {
+        return _map.exists(_key);
+    }
+
+    VPUNetworkStrategy& set(const std::shared_ptr<VPUComputeNode>& _key, const VPULayerStrategy& val) {
+        _map[_key] = val;
+        return *this;
+    }
+};
 
 /**
  * @brief The VPUNN network cost model (also called VPUNN Level3 API)
@@ -43,9 +62,8 @@ public:
     unsigned long int Network(VPUComputationDAG& dag, VPUNetworkStrategy& strategy) {
         unsigned long int cost = 0;
         for (auto layer : dag) {
-            auto layer_strategy = strategy.find(layer);
-            if (layer_strategy != strategy.end()) {
-                cost += layer->cycles(*this, layer_strategy->second);
+            if (strategy.exists(layer)) {
+                cost += layer->cycles(*this, strategy[layer]);
             } else {
                 throw_error<std::runtime_error>("Impossible to find a strategy for a layer");
             }

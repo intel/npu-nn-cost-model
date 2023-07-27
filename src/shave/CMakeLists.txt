@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -9,7 +9,7 @@
 
 function(GENERATE_SHV_KERNEL KERNEL_TYPE KERNEL_NAME)
     set(KERNEL_NAME "SHV${KERNEL_NAME}")
-    set(KERNEL_TYPE "SHV_${KERNEL_TYPE}_KERNEL")
+    set(KERNEL_TYPE "SHV_${KERNEL_TYPE}_CLASS")
 
     if(${ARGC} EQUAL 2)
         set(KERNEL_EFFICIENCY 1.0)
@@ -37,8 +37,9 @@ STRING(REPLACE " " "" config "${config}")
 STRING(REPLACE "\n" ";" config "${config}")
 
 set(SKIP_HEADER TRUE)
+
 foreach(LINE ${config})
-    if (SKIP_HEADER)
+    if(SKIP_HEADER)
         set(SKIP_HEADER FALSE)
     else()
         STRING(REPLACE "," ";" PARAMETERS ${LINE})

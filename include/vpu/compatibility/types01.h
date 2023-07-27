@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -26,8 +26,8 @@
 
 namespace VPUNN {
 
-/** interface for original inputs, named 01
- * in this namespace all the types will be stored exactly like they are required by this interface
+/** @brief interface for original inputs, named 01. This is a convention on what to contain the VPUNN's input descriptor
+ * in this namespace all the types will be stored exactly as they are required by this interface
  */
 namespace intf_01 {
 
@@ -175,9 +175,11 @@ inline const EnumMap& mapToText<VPUSubsystem>() {
     return VPUSubsystem_ToText;
 }
 
-/// @briefconverts the present day interface value to the value corresponding to this interface version
-/// requires the existence of maptToText and mapFromText services for the subjected enums
-/// @throws out_of_range if the conversion is not possible
+/**
+ * @brief converts the present day interface value to the value corresponding to this interface version
+ * requires the existence of mapToText and mapFromText services for the subjected enums
+ * @throws out_of_range if the conversion is not possible
+ */
 template <typename CompatibleEnum, typename PresentEnum>
 CompatibleEnum convert(PresentEnum present_day_value_type) {
     // return static_cast<VPUNN::intf_00::VPUDevice>(present_day_value_type);
@@ -220,7 +222,7 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 /**
  * @brief Preprocessing for original  input interface
  * Has 71 bytes input and populates 67
- * It is used by VPU 2.0, and 2.7 from beginning 2022
+ * It is used by VPU 2.0, and VPU 2.7 from beginning 2022
  * Its NN model has only the name VPUNN and no other info
  */
 template <class T>
@@ -244,12 +246,15 @@ protected:
     /**
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
      *
-     * @param workload a DPUWorkload
      * @tparam only_simulate, if true then no data is actually written, only the offset is computed
+     *
+     * @param workload a DPUWorkload
+     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
+     * written
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
+    const std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
         // Build the vector from the inputs
         size_t offset = 0;
 
@@ -316,7 +321,7 @@ public:
  * Has 67 elements in buffer
  *
  * Its NN model : VPUNN-10-X
- * Since  this interface version uses exctlyteh types of v01. no need to have dedicated new enum conversion
+ * Since this interface version uses exactly the types of v01 no need to have dedicated new enum conversion
  */
 template <class T>
 class Preprocessing_Interface10 : public PreprocessingInserter<T, Preprocessing_Interface10<T>> {
@@ -344,11 +349,13 @@ protected:
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
      *
      * @param workload a DPUWorkload
+     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
+     * written
      * @tparam only_simulate, if true then no data is actually written, only the offset is computed
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
+    const std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
         // Build the vector from the inputs
         size_t offset = 0;
 

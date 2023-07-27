@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -15,7 +15,10 @@
 #include <sstream>  // for error formating
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
+
+#include "vpu/validation/dpu_operations_validator.h"
 
 namespace VPUNN {
 
@@ -30,12 +33,15 @@ protected:
     std::vector<T> processed_output;  ///< descriptor, represents the input to the cost model NN.
     std::vector<T> zero_vector;       ///< zero filled variable with the same size as processed_output
 
+    size_t probable_batch_size{1};          ///< most probable batch size
+    std::vector<T> batch_processed_output;  ///< descriptor like processed_output, but for batch.
+
     /** @brief verifies that the space available to produce results is at least expected_size
      * @param expected_size minimum size to be OK
      * @returns true, otherwise will throw
      * @throws out_of_range if the internal space is not sufficient
      */
-    inline bool check_and_throw_size(size_t expected_size) {
+    inline bool check_and_throw_size(size_t expected_size) const {
         if (output_size() < expected_size) {
             std::stringstream buffer;
             buffer << "[ERROR]:Transformation aborted!, buffer to fill has size:  " << output_size()
@@ -55,12 +61,12 @@ protected:
      * @param debug_offset [out] will store how many elements were actually written
      * @return std::vector<T>& a DPUWorkload descriptor
      */
-    virtual std::vector<T>& transform(const DPUWorkload& workload, size_t& debug_offset) = 0;
+    virtual const std::vector<T>& generate_descriptor(const DPUWorkload& workload, size_t& debug_offset) = 0;
 
 public:
     /// @brief provides the interface number this instance implements
     /// @returns the interface version
-    virtual int interface_version() = 0;
+    virtual int interface_version() const = 0;
 
     /**
      * @brief Construct a new Preprocessing object
@@ -94,14 +100,26 @@ public:
     }
 
     /**
+     * @brief Set the most probable value for batch. WIll ensure cache memory is present according to this
+     *
+     * @param batch_size how many workloads are in a batch
+     */
+    void set_probable_batch(size_t batch_size) {
+        probable_batch_size = batch_size;
+        const auto requested_size = batch_size * output_size();
+        batch_processed_output.reserve(requested_size);
+        batch_processed_output.resize(0);  // keep empty
+    }
+
+    /**
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
      *
      * @param workload the DPUWorkloadto transform
      * @return std::vector<T>& a DPUWorkload descriptor
      */
-    std::vector<T>& transform(const DPUWorkload& workload) {
+    const std::vector<T>& transform(const DPUWorkload& workload) {
         size_t unsused_output_written_offset;
-        return transform(workload, unsused_output_written_offset);
+        return generate_descriptor(workload, unsused_output_written_offset);
     };
 
     /** @brief default virtual destructor, we need this because this class is abstract
@@ -112,23 +130,23 @@ public:
      * @brief Transform DPUWorkloads into a DPUWorkload descriptors
      *
      * @param workloads a vector of DPUWorkloads
-     * @param pad the amount of padding to add (default 1)
-     * @return std::vector<T> DPUWorkload descriptors
+     * @param pad the amount of padding to add (default 1), the batch size
+     * @return reference to DPUWorkload descriptors
      */
-    std::vector<T> transform(const std::vector<DPUWorkload>& workloads, unsigned int pad = 1) {
-        auto size = round_up(static_cast<unsigned int>(workloads.size()), pad);
-        // Initialize a vector of proper size
-        std::vector<std::vector<T>> batch_result = std::vector<std::vector<T>>(size);
-        for (long unsigned int idx = 0; idx < size; idx++) {
-            batch_result[idx] = idx < workloads.size() ? transform(workloads[idx]) : zero_vector;
-        }
-        // Total results
-        std::vector<T> result;
-        for (auto& items : batch_result) {
-            std::move(items.begin(), items.end(), std::back_inserter(result));
-        }
+    const std::vector<T>& transform(const std::vector<DPUWorkload>& workloads, unsigned int pad = 1) {
+        //<all workloads, normalized
+        const auto total_workloads{round_up(static_cast<unsigned int>(workloads.size()), pad)};
 
-        return result;
+        // ensure output is big enough, this will not decrease capacity, but make it empty
+        set_probable_batch(total_workloads);
+
+        for (long unsigned int idx = 0; idx < total_workloads; ++idx) {
+            const auto& one_descriptor{(idx < workloads.size()) ? transform(workloads[idx]) : zero_vector};
+            assert(one_descriptor.size() == output_size());
+            // copy this result into the big batch descriptor
+            std::copy(one_descriptor.begin(), one_descriptor.end(), std::back_inserter(batch_processed_output));
+        }
+        return batch_processed_output;
     }
 };
 
@@ -149,7 +167,7 @@ protected:
      *
      * @param data the enum value
      * @param offset m the index where writing starts
-     * @param category_size , how many values this enum has
+     * @param category_size how many values this enum has
      *
      * @tparam only_simulate, a boolean, if true, the method will do no writing, just computing the size it needs to do
      * the writing
@@ -209,7 +227,14 @@ protected:
     size_t insert(const T& data, size_t offset) {
         if (!only_simulate) {
             if (offset >= this->processed_output.size()) {
-                throw std::out_of_range("[ERROR]: out of range write when building VPUNN input");
+                std::stringstream buffer;
+                buffer << "[ERROR] PreprocessingInserter.insert(),"
+                       << " out of range write (offset) when building VPUNN descriptor, offset:" << offset
+                       << ", this is beyond the allocated descriptor size:  " << this->processed_output.size()
+                       << " Cannot continue! "
+                       << " File: " << __FILE__ << " Line: " << __LINE__;
+                const std::string details = buffer.str();
+                throw std::out_of_range(details);
             }
             this->processed_output[offset] = data;
         }
@@ -236,7 +261,7 @@ public:
     PreprocessingInserter(){};
     virtual ~PreprocessingInserter() = default;
 
-    int interface_version() override {
+    int interface_version() const override {
         return D::getInterfaceVersion();  // expected static method
     }
 
@@ -244,9 +269,11 @@ public:
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
      *
      * @param workload a DPUWorkload
+     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
+     * written
      * @return std::vector<T>& a DPUWorkload descriptor
      */
-    std::vector<T>& transform(const DPUWorkload& workload, size_t& debug_offset) override {
+    const std::vector<T>& generate_descriptor(const DPUWorkload& workload, size_t& debug_offset) override {
         this->reset();                                                          // all on zero
         this->check_and_throw_size(static_cast<D*>(this)->size_of_descriptor);  // will throw in case not enough space
 
@@ -257,7 +284,8 @@ public:
 enum class NNVersions : int {
     VERSION_00_LATEST_NONE = 0,  ///< no version OR last version
     VERSION_01_BASE = 1,         ///< base version, the unnamed one
-    VERSION_10_ENUMS_SAME = 10,  ///< evo of v01, with correct size. est November 2022 VPU27 alpha release
+    VERSION_10_ENUMS_SAME = 10,  ///< evo of v01, with correct size. est November 2022 VPU2.7 alpha release
+    VERSION_11_VPU27_BETA = 11,  ///< input 1 generated, isi strategy, layouts. est Jan 2023 VPU2.7 beta release
 };
 
 /**
@@ -265,6 +293,8 @@ enum class NNVersions : int {
  */
 template <class T>
 class PreprocessingLatest : public PreprocessingInserter<T, PreprocessingLatest<T>> {
+private:
+    const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
     using PreprocessingInserter<T, PreprocessingLatest<T>>::insert;  ///< exposes the non virtual insert methods
     friend class PreprocessingInserter<T, PreprocessingLatest<T>>;
@@ -274,8 +304,8 @@ protected:
     size_t insert(const VPUTensor& data, size_t offset) {
         offset = this->insert<only_simulate>(data.get_shape(), offset);
         offset = this->insert<only_simulate>(data.get_dtype(), offset);
-        // offset = insert(data.get_layout(), offset);
-        // offset = insert(data.get_sparsity(), offset);
+        offset = this->insert<only_simulate>(data.get_layout(), offset);
+        offset = this->insert<only_simulate>(data.get_sparsity(), offset);
         return offset;
     }
 
@@ -284,18 +314,25 @@ protected:
      * Here the concrete descriptor is created/populated according to established convention/interface
      *
      * @param workload a DPUWorkload
+     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
+     * written
      * @tparam only_simulate, if true then no data is actually written, only the offset is computed
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
+    const std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
         // Build the vector from the inputs
         size_t offset = 0;
         offset = this->insert<only_simulate>(workload.device, offset);
         offset = this->insert<only_simulate>(workload.op, offset);
 
         offset = this->insert<only_simulate>(workload.inputs, offset);
-        // offset = insert(workload.inputs_1, offset);
+
+        // input 1 tensor to be generated in place here!
+        {
+            auto input_1 = workload_validator.construct_input_1(workload);
+            offset = this->insert<only_simulate>(input_1, offset);
+        }
         offset = this->insert<only_simulate>(workload.outputs, offset);
 
         offset = this->insert<only_simulate>(workload.kernels, offset);
@@ -303,12 +340,19 @@ protected:
         offset = this->insert<only_simulate>(workload.padding, offset);
 
         offset = this->insert<only_simulate>(workload.execution_order, offset);
-        offset = this->insert<only_simulate>(workload.activation_function, offset);
+        // offset = this->insert<only_simulate>(workload.activation_function, offset);
+
         offset = this->insert<only_simulate>(workload.act_sparsity, offset);
         offset = this->insert<only_simulate>(workload.weight_sparsity, offset);
-        offset = this->insert<only_simulate>(workload.input_swizzling, offset);
-        offset = this->insert<only_simulate>(workload.output_swizzling, offset);
+
+        offset = this->insert<only_simulate>(workload.input_swizzling, offset);   // 2 elements
+        offset = this->insert<only_simulate>(workload.output_swizzling, offset);  // 1 element
+
         offset = this->insert<only_simulate>(workload.output_write_tiles, offset);
+
+        offset = this->insert<only_simulate>(workload.isi_strategy, offset);
+
+        // weight_sparsity_enabled  contributes to the input_1 deduced tensor
 
         debug_offset = offset;
 
@@ -335,7 +379,7 @@ public:
      * @return the version of compatible/equal interface version, 0 otherwise
      */
     static int implements_also_interface() {
-        return static_cast<std::underlying_type_t<NNVersions>>(NNVersions::VERSION_10_ENUMS_SAME);
+        return static_cast<std::underlying_type_t<NNVersions>>(NNVersions::VERSION_00_LATEST_NONE);
     }
 
     /**

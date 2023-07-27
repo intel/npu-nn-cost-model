@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -65,6 +65,7 @@ public:
      * @brief Compute the cycles of the VPUComputeNode
      *
      * @param cost_model a reference to a VPULayerCostModel object
+     * @param strategy the strategy to be used.
      * @return unsigned int execution cycles
      */
     unsigned int cycles(VPULayerCostModel& cost_model, VPULayerStrategy& strategy) const {
@@ -97,12 +98,6 @@ public:
 };
 
 /**
- * @brief A shared pointer to a compute node
- *
- */
-using VPUComputeNodePtr = std::shared_ptr<VPUComputeNode>;
-
-/**
  * @brief An helper class to generate has for VPUComputeNode objects
  *
  */
@@ -113,7 +108,7 @@ struct VPUComputeHash {
      * @param op a VPUComputeNode object
      * @return size_t
      */
-    size_t operator()(VPUComputeNodePtr op) const {
+    size_t operator()(std::shared_ptr<VPUComputeNode> op) const {
         return op->hash();
     }
 };
@@ -124,7 +119,22 @@ struct VPUComputeHash {
  * @tparam T
  */
 template <typename T>
-using VPUComputeNodeMap = std::unordered_map<VPUComputeNodePtr, T, VPUComputeHash>;
+class VPUComputeNodeMap {
+private:
+    std::unordered_map<std::shared_ptr<VPUComputeNode>, T, VPUComputeHash> _map;
+
+public:
+    explicit VPUComputeNodeMap(){};
+
+    T& operator[](const std::shared_ptr<VPUComputeNode>& _key) {
+        return _map[_key];
+    }
+
+    bool exists(const std::shared_ptr<VPUComputeNode>& _key) {
+        auto item = _map.find(_key);
+        return item != _map.end();
+    }
+};
 
 /**
  * @brief Represent the Computation DAG in a VPU device
@@ -132,10 +142,10 @@ using VPUComputeNodeMap = std::unordered_map<VPUComputeNodePtr, T, VPUComputeHas
  */
 class VPUComputationDAG {
 private:
-    std::list<VPUComputeNodePtr> layers;
-    VPUComputeNodeMap<std::vector<VPUComputeNodePtr>> successors;
-    VPUComputeNodeMap<std::vector<VPUComputeNodePtr>> predecessors;
-    std::list<VPUComputeNodePtr> sources_lst;
+    std::list<std::shared_ptr<VPUComputeNode>> layers;
+    VPUComputeNodeMap<std::vector<std::shared_ptr<VPUComputeNode>>> successors;
+    VPUComputeNodeMap<std::vector<std::shared_ptr<VPUComputeNode>>> predecessors;
+    std::list<std::shared_ptr<VPUComputeNode>> sources_lst;
 
 public:
     /**
@@ -150,7 +160,7 @@ public:
      * @param layer
      * @return VPUComputationDAG&
      */
-    VPUComputationDAG& addNode(const VPUComputeNodePtr layer) {
+    VPUComputationDAG& addNode(const std::shared_ptr<VPUComputeNode> layer) {
         layers.push_back(layer);
         successors[layer] = {};
         predecessors[layer] = {};
@@ -165,18 +175,19 @@ public:
      * @return true
      * @return false
      */
-    bool has(const VPUComputeNodePtr layer) const {
+    bool has(const std::shared_ptr<VPUComputeNode> layer) const {
         return std::find(layers.begin(), layers.end(), layer) != layers.end();
     }
 
     /**
      * @brief add and edge to a VPUComputationDAG
      *
-     * @param predecessor the edge source
-     * @param successor the edge sink
+     * @param source the edge predecessor
+     * @param sink the edge successor
      * @return VPUComputationDAG&
      */
-    VPUComputationDAG& addEdge(const VPUComputeNodePtr source, const VPUComputeNodePtr sink) {
+    VPUComputationDAG& addEdge(const std::shared_ptr<VPUComputeNode> source,
+                               const std::shared_ptr<VPUComputeNode> sink) {
         // If source is not present add it
         if (!has(source)) {
             addNode(source);
@@ -220,9 +231,9 @@ public:
     /**
      * @brief Returns the list of DAG sources
      *
-     * @return std::list<VPUComputeNodePtr>
+     * @return std::list<std::shared_ptr<VPUComputeNode>>
      */
-    std::list<VPUComputeNodePtr> sources() {
+    std::list<std::shared_ptr<VPUComputeNode>> sources() {
         return sources_lst;
     }
 
@@ -231,7 +242,7 @@ public:
      *
      * @return std::list<VPUComputeNode>
      */
-    std::list<VPUComputeNodePtr> get_layers() {
+    std::list<std::shared_ptr<VPUComputeNode>> get_layers() {
         return layers;
     }
 
@@ -239,9 +250,9 @@ public:
      * @brief Return a list of successors of a layer
      *
      * @param layer a pointer to a VPUComputeNode
-     * @return std::vector<VPUComputeNodePtr>
+     * @return std::vector<std::shared_ptr<VPUComputeNode>>
      */
-    std::vector<VPUComputeNodePtr> get_successors(const VPUComputeNodePtr layer) {
+    std::vector<std::shared_ptr<VPUComputeNode>> get_successors(const std::shared_ptr<VPUComputeNode> layer) {
         return successors[layer];
     }
 
@@ -249,9 +260,9 @@ public:
      * @brief Return a list of predecessors of a layer
      *
      * @param layer layer a pointer to a VPUComputeNode
-     * @return std::vector<VPUComputeNodePtr>
+     * @return std::vector<std::shared_ptr<VPUComputeNode>>
      */
-    std::vector<VPUComputeNodePtr> get_predecessors(const VPUComputeNodePtr layer) {
+    std::vector<std::shared_ptr<VPUComputeNode>> get_predecessors(const std::shared_ptr<VPUComputeNode> layer) {
         return predecessors[layer];
     }
 
@@ -289,18 +300,18 @@ public:
         /**
          * @brief Dereference operator
          *
-         * @return VPUComputeNodePtr
+         * @return std::shared_ptr<VPUComputeNode>
          */
-        VPUComputeNodePtr operator*() const {
+        std::shared_ptr<VPUComputeNode> operator*() const {
             return current_node_ptr;
         }
 
         /**
          * @brief Arrow operator
          *
-         * @return VPUComputeNodePtr
+         * @return std::shared_ptr<VPUComputeNode>
          */
-        VPUComputeNodePtr operator->() {
+        std::shared_ptr<VPUComputeNode> operator->() {
             return current_node_ptr;
         }
 
@@ -366,7 +377,7 @@ public:
         };
 
     private:
-        VPUComputeNodePtr current_node_ptr;
+        std::shared_ptr<VPUComputeNode> current_node_ptr;
         VPUComputationDAG& dag;
         VPUComputeNodeMap<unsigned int> dependendcies;
         VPUComputeNodeMap<bool> visited;

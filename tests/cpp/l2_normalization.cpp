@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -15,38 +15,49 @@
 #include <vector>
 #include "core/tensors.h"
 
-template <typename Iter_T>
-float vectorNorm(Iter_T iter, size_t size) {
-    float acc = 0;
-    for (unsigned int idx = 0; idx < size; idx++) {
-        acc += iter[idx] * iter[idx];
-    }
-    return std::sqrt(acc);
-}
-
-void l2_test(unsigned int vector_size, unsigned int batch_size = 1) {
-    auto input = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
-    auto output = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
-    for (unsigned int idx = 0; idx < batch_size * vector_size; idx++) {
-        input[idx] = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX));
+/// @brief namespace for Unit tests of the C++ library
+namespace VPUNN_unit_tests {
+class TestL2NormLayer : public testing::Test {
+public:
+protected:
+    void SetUp() override {
     }
 
-    L2Normalization(&input, &output);
+    void l2_test(unsigned int vector_size, unsigned int batch_size = 1) {
+        auto input = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
+        auto output = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
+        for (unsigned int idx = 0; idx < batch_size * vector_size; idx++) {
+            input[idx] = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX));
+        }
 
-    float* output_data = output.c_ptr();
+        L2Normalization(&input, &output);
 
-    for (unsigned int idx = 0; idx < batch_size; idx++) {
-        auto start_idx = output_data + idx * vector_size;
-        float l2_norm = vectorNorm(start_idx, vector_size);
-        EXPECT_NEAR(l2_norm, 1.0, 0.0001);
+        float* output_data = output.data();
+
+        for (unsigned int idx = 0; idx < batch_size; idx++) {
+            auto start_idx = output_data + idx * vector_size;
+            float l2_norm = vectorNorm(start_idx, vector_size);
+            EXPECT_NEAR(l2_norm, 1.0, 0.0001);
+        }
     }
-}
+
+    template <typename Iter_T>
+    float vectorNorm(Iter_T iter, size_t size) {
+        float acc = 0;
+        for (unsigned int idx = 0; idx < size; idx++) {
+            acc += iter[idx] * iter[idx];
+        }
+        return std::sqrt(acc);
+    }
+};
 
 // Demonstrate some basic assertions.
-TEST(TestL2NormLayer, BasicAssertions) {
+TEST_F(TestL2NormLayer, BasicAssertions) {
     for (auto batch_size = 1; batch_size <= 10; batch_size++) {
         for (auto vector_size = batch_size; vector_size <= 500; vector_size += 10) {
             l2_test(vector_size, batch_size);
         }
     }
 }
+
+}  // namespace VPUNN_unit_tests

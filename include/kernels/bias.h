@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -14,13 +14,27 @@
 
 namespace VPUNN {
 
-/**
- * @brief Floating point bias layer (float). The operation is done implace in the output tensor
- *
- * @param bias a VPUNN::Tensor containing the bias
- * @param output the input/output tensor
- */
-VPUNN_API(void) Bias(VPUNN::Tensor<float>* bias, VPUNN::Tensor<float>* output);
+/// @brief Floating point bias layer (float). The instance has a helper memory for the constant buffer
+class VPUNN_API(BiasOp) {
+private:
+    std::vector<float> batch_buffer{1.0F};
+
+public:
+    /**
+     * @brief Floating point bias layer (float). The operation is done implace in the output tensor
+     *
+     * @param bias a VPUNN::Tensor containing the bias
+     * @param output the input/output tensor
+     */
+    void Bias(const VPUNN::Tensor<float>* bias, VPUNN::Tensor<float>* output) const;
+
+    /// @brief ensures a minimim allocated space for the constant bias buffer
+    void reserve_bias_space(int space_required, float fill_value = 1.0F) {
+        batch_buffer.reserve(space_required);
+        batch_buffer.resize(0);  // for ensuring the fill value everywhere
+        batch_buffer.resize(space_required, fill_value);
+    }
+};
 
 }  // namespace VPUNN
 

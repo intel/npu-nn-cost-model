@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -18,8 +18,8 @@ def run(command, path="."):
     return subprocess.check_output(command, cwd=path, shell=True)
 
 
-@pytest.mark.parametrize("mode", ["DPU", "DMA", "Utilization"])
-@pytest.mark.parametrize("target", ["cycles", "power"])
+@pytest.mark.parametrize("mode", ["DPU", "DMA"])
+@pytest.mark.parametrize("target", ["cycles", "power", "utilization"])
 @pytest.mark.parametrize("device", ["VPU_2_0", "VPU_2_7"])
 @pytest.mark.parametrize("operation", ["CONVOLUTION"])
 @pytest.mark.parametrize("width", [56])

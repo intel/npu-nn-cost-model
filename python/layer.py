@@ -1,4 +1,4 @@
-# Copyright © 2022 Intel Corporation
+# Copyright © 2023 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -8,7 +8,7 @@
 # Software Package for additional details.
 
 from vpunn.model_input import str2enum
-from vpunn import VPUNN
+from vpunn import VPUNN_lib
 import argparse
 import os
 
@@ -17,7 +17,7 @@ class VPULayerCostModel:
     def __init__(self, filename, profile=False, verbose=False):
         if not os.path.isfile(filename):
             print(f"WARNING: file {filename} does not exists")
-        self.model = VPUNN.VPULayerCostModel(filename, profile, 16384, 1)
+        self.model = VPUNN_lib.VPULayerCostModel(filename, profile, 16384, 1)
         if not self.model.nn_initialized():
             print("WARNING: VPUNN model not initialized... using simplistic model")
         self.verbose = verbose
@@ -32,21 +32,16 @@ class VPULayerCostModel:
         if self.verbose:
             self.describe_input(args)
         # Get layer cycles
-        layer = VPUNN.DPULayer(
+        layer = VPUNN_lib.DPULayer(
             str2enum(args["device"]),
             str2enum(args["operation"]),
             [
-                VPUNN.VPUTensor(
+                VPUNN_lib.VPUTensor(
                     args["input_dimension"], str2enum(args["input_0_datatype"])
                 )
             ],
-            # [  # input_1 temporarily dummy with zero dimension. TODO: derive the correct dimensions
-            #     VPUNN.VPUTensor(
-            #         [0, 0, 0, 0], str2enum(args["input_0_datatype"])
-            #     )
-            # ],
             [
-                VPUNN.VPUTensor(
+                VPUNN_lib.VPUTensor(
                     args["output_dimension"], str2enum(args["output_datatype"])
                 )
             ],

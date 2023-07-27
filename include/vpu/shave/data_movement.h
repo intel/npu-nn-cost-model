@@ -1,4 +1,4 @@
-// Copyright © 2022 Intel Corporation
+// Copyright © 2023 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -28,8 +28,8 @@ struct SHVDataMovement : public SWOperation {
      * @brief Construct a new SHVDataMovement object
      *
      * @param device a VPUDevice element
-     * @param inputs a single size array of inputs
-     * @param outputs a single size array of outputs
+     * @param input a single size array of inputs
+     * @param output a single size array of outputs
      */
     SHVDataMovement(const VPUDevice& device, const VPUTensor& input, const VPUTensor& output)
             : SWOperation(device, {input}, {output}) {
@@ -65,6 +65,7 @@ struct SHVDataMovement : public SWOperation {
 };
 
 // Defining a Shave activation kernel
+#define SHV_DATA_MOVEMENT_CLASS SHVDataMovement
 #define SHV_DATA_MOVEMENT_KERNEL(name, efficiency, latency) \
     typedef SHVDataMovement<int(efficiency * 1000), latency> name
 #define SHV_DATA_MOVEMENT_KERNEL_DEFAULT(name) SHV_DATA_MOVEMENT_KERNEL(name, 1.0, 0)
