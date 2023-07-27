@@ -226,12 +226,12 @@ pre-commit uninstall
 
 ## Testing the library
 ### Cost model test (C++)
-Tests use [Google test suite](https://github.com/google/googletest).s
+C++ tests use [Google test](https://github.com/google/googletest).
 To run the test suite: `ctest --test-dir build/tests/cpp/`
 
 Example: running only cost model integration test: `./tests/cpp/test_cost_model`
 
-### E2E Python test
+### Python tests
 To run the Python tests you will need to install pytest and some tests may have further dependencies.
 
 Install pytest and any other dependencies in the same Python virtual environment in which you have installed the cost model (as per the instructions above). 
