@@ -232,9 +232,9 @@ To run the test suite: `ctest --test-dir build/tests/cpp/`
 Example: running only cost model integration test: `./tests/cpp/test_cost_model`
 
 ### E2E Python test
-To run the Python tests you will need to install pytest. There is a further dependency on tensorflow for some tests.
+To run the Python tests you will need to install pytest and some tests may have further dependencies.
 
-Install both in the same Python virtual environment in which you have installed the cost model (as per the instructions above). 
+Install pytest and any other dependencies in the same Python virtual environment in which you have installed the cost model (as per the instructions above). 
 Example: running only end-to-end tests: `pytest tests/python/test_e2e.py -v`
 
 ### WASM test
