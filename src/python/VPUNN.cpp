@@ -1,16 +1,24 @@
+// Copyright © 2023 Intel Corporation
+// SPDX-License-Identifier: Apache 2.0
+// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// is subject to the terms and conditions of the software license agreements for the Software Package,
+// which may also include notices, disclaimers, or license terms for third party or open source software
+// included in or with the Software Package, and your use indicates your acceptance of all such terms.
+// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Software Package for additional details.
+
 // File: VPUNN_0.cpp
 #include <exception> // std::exception
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -73,14 +81,13 @@ void bind_VPUNN_0(std::function< pybind11::module &(std::string const &namespace
 #include <system_error> // std::system_error
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -515,14 +522,13 @@ void bind_VPUNN_1(std::function< pybind11::module &(std::string const &namespace
 #include <string> // std::char_traits
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -625,14 +631,13 @@ void bind_VPUNN_2(std::function< pybind11::module &(std::string const &namespace
 #include <string> // std::char_traits
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -849,14 +854,13 @@ void bind_VPUNN_3(std::function< pybind11::module &(std::string const &namespace
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -923,14 +927,13 @@ void bind_VPUNN_4(std::function< pybind11::module &(std::string const &namespace
 #include <vpu/compatibility/types11.h> // VPUNN::intf_11::VPUSubsystem
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -1091,14 +1094,13 @@ void bind_VPUNN_5(std::function< pybind11::module &(std::string const &namespace
 #include <utility> // std::pair
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -1218,14 +1220,13 @@ void bind_VPUNN_6(std::function< pybind11::module &(std::string const &namespace
 // File: VPUNN_7.cpp
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -1292,14 +1293,13 @@ void bind_VPUNN_7(std::function< pybind11::module &(std::string const &namespace
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -1481,14 +1481,13 @@ void bind_VPUNN_8(std::function< pybind11::module &(std::string const &namespace
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -1565,11 +1564,10 @@ void bind_VPUNN_9(std::function< pybind11::module &(std::string const &namespace
 
 		cl.def( pybind11::init( [](VPUNN::DPULayer const &o){ return new VPUNN::DPULayer(o); } ) );
 		cl.def( pybind11::init( [](){ return new VPUNN::DPULayer(); } ) );
-		cl.def("clustering", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(unsigned int) const) &VPUNN::DPULayer::clustering, "Implements the Clustering tiling strategy (inter tile)\n \n\n In the clustering tiling strategy, both activations and weights are fully replicated in all tiles\n isi_strategy set to clustering\n and output_write_tiles are propagated from input\n\n \n number of dpu tiles\n \n\n std::vector<DPULayer> the list of layers\n\nC++: VPUNN::DPULayer::clustering(unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("nTiles"));
-		cl.def("SOH", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(unsigned int) const) &VPUNN::DPULayer::SOH, "Implements the SplitOverH (SOH) tiling strategy (inter tile)\n \n\n In the SOH tiling strategy, activations are split across the tiles over the H dimension\n todo: Cut lines must be without padding\n todo: compute tensors have a halo where the cut is to indicate how many lines are taken from the other tile\n The weights are fully replicated in all tiles\n Populates also ISI strategy with SOH\n output_write_tiles is propagated from inputLayer  to the tiles Layers\n\nif output tiles are less than nTiles , the ISI strategy or output_write_tiles are not adjusted\n\n \n number of CMX tiles\n \n\n std::vector<DPULayer>  the list of split layers. can be smaller than nTiles\n\nC++: VPUNN::DPULayer::SOH(unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("nTiles"));
-		cl.def("SOH_overlapped", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(unsigned int) const) &VPUNN::DPULayer::SOH_overlapped, "Implements the SplitOverH_OVERLAPPED (SOH) tiling strategy (inter tile)\n \n\n In the SOHOVERLAPPED tiling strategy, activations are split across the tiles over the H dimension\n Compute tensors are the same as memory tensors (no halo at cut lines)\n no padding at cut lines\n Internal slices (tiles>2), have 2 borders and may produce more than outside slices.\n Populates also ISI strategy with CLUSTERING,\n output_write_tiles is propagated from inputLayer  to the tiles Layers\n\n if output tiles are less than nTiles , the ISI strategy or output_write_tiles are not adjusted\n\n \n number of CMX tiles\n \n\n std::vector<DPULayer>  the list of split layers. can be smaller than nTiles\n\nC++: VPUNN::DPULayer::SOH_overlapped(unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("nTiles"));
+		cl.def("clustering", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(unsigned int) const) &VPUNN::DPULayer::clustering, "Implements the Clustering tiling strategy (inter tile)\n \n\n In the clustering tiling strategy, both activations and weights are fully replicated in all tiles\n isi_strategy and output_write_tiles are set to clustering and 1\n\n \n number of dpu tiles\n \n\n std::vector<DPULayer> the list of layers\n\nC++: VPUNN::DPULayer::clustering(unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("nTiles"));
+		cl.def("SOH", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(unsigned int) const) &VPUNN::DPULayer::SOH, "Implements the SplitOverH (SOH) tiling strategy (inter tile)\n \n\n In the SOH tiling strategy, activations are split across the tiles over the H dimension\n The weights are fully replicated in all tiles\n Populates also ISI strategy with SOH\n output_write_tiles is set to nTiles\n\n \n number of CMX tiles\n \n\n std::vector<DPULayer>  the list of split layers. can be smaller than nTiles\n\nC++: VPUNN::DPULayer::SOH(unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("nTiles"));
 		cl.def("SOK", [](VPUNN::DPULayer const &o, unsigned int const & a0) -> std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > { return o.SOK(a0); }, "", pybind11::arg("nTiles"));
-		cl.def("SOK", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(unsigned int, unsigned int) const) &VPUNN::DPULayer::SOK, "Implements the SplitOverK (SOK) tiling strategy\n \n\n In the SOK tiling strategy, weights are split across the tiles over the K dimension.\n The DPU in each tile compute a K-slice of the output tensors and then broadcast the result in each\n CMX tile, implicitly concatenating the results and having then all activations completely replicated\n\n Populates also ISI strategy with SOK\n output_write_tiles is set to actual nTiles\n if output tiles are less than nTiles output_write_tiles are adjusted to actual output tiles\n\n \n number of CMX tiles\n \n\n the channel alignment\n \n\n std::vector<DPULayer>\n\nC++: VPUNN::DPULayer::SOK(unsigned int, unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("nTiles"), pybind11::arg("rounding"));
+		cl.def("SOK", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(unsigned int, unsigned int) const) &VPUNN::DPULayer::SOK, "Implements the SplitOverK (SOK) tiling strategy\n \n\n In the SOK tiling strategy, weights are split across the tiles over the K dimension.\n The DPU in each tile compute a K-slice of the output tensors and then broadcast the result in each\n CMX tile, implicitly concatenating the results and having then all activations completely replicated\n\n Populates also ISI strategy with SOK\n output_write_tiles is set to actual nTiles\n\n \n number of CMX tiles\n \n\n the channel alignment\n \n\n std::vector<DPULayer>\n\nC++: VPUNN::DPULayer::SOK(unsigned int, unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("nTiles"), pybind11::arg("rounding"));
 		cl.def("splitAcrossTiles", [](VPUNN::DPULayer const &o, enum VPUNN::VPUTilingStrategy const & a0) -> std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > { return o.splitAcrossTiles(a0); }, "", pybind11::arg("strategy"));
 		cl.def("splitAcrossTiles", (class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> > (VPUNN::DPULayer::*)(enum VPUNN::VPUTilingStrategy, unsigned int) const) &VPUNN::DPULayer::splitAcrossTiles, "Split a DPULayer across N CMX tiles\n\n \n the VPUTilingStrategy to implement\n \n\n number of CMX tiles\n \n\n std::vector<DPULayer>\n\nC++: VPUNN::DPULayer::splitAcrossTiles(enum VPUNN::VPUTilingStrategy, unsigned int) const --> class std::vector<struct VPUNN::DPULayer, class std::allocator<struct VPUNN::DPULayer> >", pybind11::arg("strategy"), pybind11::arg("nTiles"));
 		cl.def_static("mapTilingStrategiesToWorkload", (enum VPUNN::ISIStrategy (*)(enum VPUNN::VPUTilingStrategy)) &VPUNN::DPULayer::mapTilingStrategiesToWorkload, "C++: VPUNN::DPULayer::mapTilingStrategiesToWorkload(enum VPUNN::VPUTilingStrategy) --> enum VPUNN::ISIStrategy", pybind11::arg("strategy"));
@@ -1581,7 +1579,7 @@ void bind_VPUNN_9(std::function< pybind11::module &(std::string const &namespace
 		cl.def("set_weight_sparsity", (void (VPUNN::DPULayer::*)(bool, float)) &VPUNN::DPULayer::set_weight_sparsity, "enables /disables the w sparsity and sets the value. Only combinations that are allowed\n when enabling sparsity_value is limited to [0.0, 1.0]\n when disabling , sparsity will be set to zero\n\n \n true/false\n \n\n , limited to [0.0, 1.0] for enabled and to 0.0 for disabled\n\nC++: VPUNN::DPULayer::set_weight_sparsity(bool, float) --> void", pybind11::arg("enabled"), pybind11::arg("sparsity_value"));
 		cl.def("assign", (struct VPUNN::DPULayer & (VPUNN::DPULayer::*)(const struct VPUNN::DPULayer &)) &VPUNN::DPULayer::operator=, "C++: VPUNN::DPULayer::operator=(const struct VPUNN::DPULayer &) --> struct VPUNN::DPULayer &", pybind11::return_value_policy::automatic, pybind11::arg(""));
 	}
-	{ // VPUNN::DPULayerModes file: line:447
+	{ // VPUNN::DPULayerModes file: line:346
 		pybind11::class_<VPUNN::DPULayerModes, std::shared_ptr<VPUNN::DPULayerModes>> cl(M("VPUNN"), "DPULayerModes", "provides differentiated information for a layer based on its content");
 		cl.def_static("getValidExecutionMode", (class std::vector<enum VPUNN::ExecutionMode, class std::allocator<enum VPUNN::ExecutionMode> > (*)(const struct VPUNN::DPULayer &)) &VPUNN::DPULayerModes::getValidExecutionMode, "Get the valid ExecutionMode for the DPULayer\n\n \n the DPULayer\n \n\n std::vector<ExecutionMode>\n\nC++: VPUNN::DPULayerModes::getValidExecutionMode(const struct VPUNN::DPULayer &) --> class std::vector<enum VPUNN::ExecutionMode, class std::allocator<enum VPUNN::ExecutionMode> >", pybind11::arg("wl"));
 	}
@@ -1603,14 +1601,13 @@ void bind_VPUNN_9(std::function< pybind11::module &(std::string const &namespace
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -1980,7 +1977,6 @@ void bind_VPUNN_10(std::function< pybind11::module &(std::string const &namespac
 		cl.def("get_output_write_tile_Range", (class std::vector<int, class std::allocator<int> > (VPUNN::IDeviceValidValues::*)(const struct VPUNN::DPUOperation &) const) &VPUNN::IDeviceValidValues::get_output_write_tile_Range, "restricts output_write_tile options based on operation.\n\nC++: VPUNN::IDeviceValidValues::get_output_write_tile_Range(const struct VPUNN::DPUOperation &) const --> class std::vector<int, class std::allocator<int> >", pybind11::arg("dpu"));
 		cl.def("get_kernel_range", (class std::vector<int, class std::allocator<int> > (VPUNN::IDeviceValidValues::*)(const struct VPUNN::DPUOperation &) const) &VPUNN::IDeviceValidValues::get_kernel_range, "C++: VPUNN::IDeviceValidValues::get_kernel_range(const struct VPUNN::DPUOperation &) const --> class std::vector<int, class std::allocator<int> >", pybind11::arg("dpu"));
 		cl.def("get_strides_range", (struct std::pair<class std::vector<int, class std::allocator<int> >, class std::vector<int, class std::allocator<int> > > (VPUNN::IDeviceValidValues::*)(const struct VPUNN::DPUOperation &) const) &VPUNN::IDeviceValidValues::get_strides_range, "@ brief strides range , depends on input zero, and operation sometimes\n \n\n a pair of lists of values, one first for  stride Width, second for stride height\n\nC++: VPUNN::IDeviceValidValues::get_strides_range(const struct VPUNN::DPUOperation &) const --> struct std::pair<class std::vector<int, class std::allocator<int> >, class std::vector<int, class std::allocator<int> > >", pybind11::arg("dpu"));
-		cl.def("get_dpu_strides_range", (struct std::pair<class std::vector<int, class std::allocator<int> >, class std::vector<int, class std::allocator<int> > > (VPUNN::IDeviceValidValues::*)(const struct VPUNN::DPUOperation &) const) &VPUNN::IDeviceValidValues::get_dpu_strides_range, "@ brief this function is set to determine the range of strides for the split layers\n \n\n a pair of lists of values, one first for  stride Width, second for stride height\n\nC++: VPUNN::IDeviceValidValues::get_dpu_strides_range(const struct VPUNN::DPUOperation &) const --> struct std::pair<class std::vector<int, class std::allocator<int> >, class std::vector<int, class std::allocator<int> > >", pybind11::arg("dpu"));
 		cl.def("restrict_datatype", (enum VPUNN::DataType (VPUNN::IDeviceValidValues::*)(const enum VPUNN::DataType) const) &VPUNN::IDeviceValidValues::restrict_datatype, "restrict the datatype normally to one per int range and one per float range\n\nC++: VPUNN::IDeviceValidValues::restrict_datatype(const enum VPUNN::DataType) const --> enum VPUNN::DataType", pybind11::arg("in"));
 		cl.def("get_cmx_size", (int (VPUNN::IDeviceValidValues::*)(const enum VPUNN::VPUDevice &) const) &VPUNN::IDeviceValidValues::get_cmx_size, "size of CMX in bytes\n\nC++: VPUNN::IDeviceValidValues::get_cmx_size(const enum VPUNN::VPUDevice &) const --> int", pybind11::arg("device"));
 		cl.def("get_padMax", (int (VPUNN::IDeviceValidValues::*)(int) const) &VPUNN::IDeviceValidValues::get_padMax, "maximum padding required if the kernel is known\n\nC++: VPUNN::IDeviceValidValues::get_padMax(int) const --> int", pybind11::arg("kernel_dim"));
@@ -2004,14 +2000,13 @@ void bind_VPUNN_10(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -2101,14 +2096,13 @@ void bind_VPUNN_11(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -2414,7 +2408,7 @@ struct PyCallBack_VPUNN_VPU2_7_LayerValidValues : public VPUNN::VPU2_7_LayerVali
 	}
 };
 
-// VPUNN::VPU2_0_LayerOnTileValidValues file: line:249
+// VPUNN::VPU2_0_LayerOnTileValidValues file: line:248
 struct PyCallBack_VPUNN_VPU2_0_LayerOnTileValidValues : public VPUNN::VPU2_0_LayerOnTileValidValues {
 	using VPUNN::VPU2_0_LayerOnTileValidValues::VPU2_0_LayerOnTileValidValues;
 
@@ -2488,7 +2482,7 @@ struct PyCallBack_VPUNN_VPU2_0_LayerOnTileValidValues : public VPUNN::VPU2_0_Lay
 	}
 };
 
-// VPUNN::VPU2_7_LayerOnTileValidValues file: line:260
+// VPUNN::VPU2_7_LayerOnTileValidValues file: line:259
 struct PyCallBack_VPUNN_VPU2_7_LayerOnTileValidValues : public VPUNN::VPU2_7_LayerOnTileValidValues {
 	using VPUNN::VPU2_7_LayerOnTileValidValues::VPU2_7_LayerOnTileValidValues;
 
@@ -2614,14 +2608,14 @@ void bind_VPUNN_12(std::function< pybind11::module &(std::string const &namespac
 		cl.def("get_input_channels_range", (const class std::vector<int, class std::allocator<int> > & (VPUNN::VPU2_7_LayerValidValues::*)(const struct VPUNN::DPUOperation &) const) &VPUNN::VPU2_7_LayerValidValues::get_input_channels_range, "C++: VPUNN::VPU2_7_LayerValidValues::get_input_channels_range(const struct VPUNN::DPUOperation &) const --> const class std::vector<int, class std::allocator<int> > &", pybind11::return_value_policy::automatic, pybind11::arg("dpu"));
 		cl.def("get_ISI_Strategy_Range", (class std::vector<enum VPUNN::ISIStrategy, class std::allocator<enum VPUNN::ISIStrategy> > (VPUNN::VPU2_7_LayerValidValues::*)(const struct VPUNN::DPUOperation &) const) &VPUNN::VPU2_7_LayerValidValues::get_ISI_Strategy_Range, "C++: VPUNN::VPU2_7_LayerValidValues::get_ISI_Strategy_Range(const struct VPUNN::DPUOperation &) const --> class std::vector<enum VPUNN::ISIStrategy, class std::allocator<enum VPUNN::ISIStrategy> >", pybind11::arg("dpu"));
 	}
-	{ // VPUNN::VPU2_0_LayerOnTileValidValues file: line:249
+	{ // VPUNN::VPU2_0_LayerOnTileValidValues file: line:248
 		pybind11::class_<VPUNN::VPU2_0_LayerOnTileValidValues, std::shared_ptr<VPUNN::VPU2_0_LayerOnTileValidValues>, PyCallBack_VPUNN_VPU2_0_LayerOnTileValidValues, VPUNN::VPU2_0_WorkloadValidValues> cl(M("VPUNN"), "VPU2_0_LayerOnTileValidValues", "specific VPU2.0 configuration possibilities, for  layer already split on tile.\n channels restrictions are less strict vs workload, since a further split is expected");
 		cl.def( pybind11::init<const class VPUNN::IContainer_OperationsDynamicBehavior &>(), pybind11::arg("op_dynamic_cosntraints") );
 
 		cl.def( pybind11::init( [](PyCallBack_VPUNN_VPU2_0_LayerOnTileValidValues const &o){ return new PyCallBack_VPUNN_VPU2_0_LayerOnTileValidValues(o); } ) );
 		cl.def( pybind11::init( [](VPUNN::VPU2_0_LayerOnTileValidValues const &o){ return new VPUNN::VPU2_0_LayerOnTileValidValues(o); } ) );
 	}
-	{ // VPUNN::VPU2_7_LayerOnTileValidValues file: line:260
+	{ // VPUNN::VPU2_7_LayerOnTileValidValues file: line:259
 		pybind11::class_<VPUNN::VPU2_7_LayerOnTileValidValues, std::shared_ptr<VPUNN::VPU2_7_LayerOnTileValidValues>, PyCallBack_VPUNN_VPU2_7_LayerOnTileValidValues, VPUNN::VPU2_7_WorkloadValidValues> cl(M("VPUNN"), "VPU2_7_LayerOnTileValidValues", "specific VPU 2.7 configuration possibilities for  layer already split on tile.\n channels restrictions are less strict vs workload, since a further split is expected");
 		cl.def( pybind11::init<const class VPUNN::IContainer_OperationsDynamicBehavior &>(), pybind11::arg("op_dynamic_cosntraints") );
 
@@ -2640,14 +2634,13 @@ void bind_VPUNN_12(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -2778,14 +2771,13 @@ void bind_VPUNN_13(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -3375,6 +3367,19 @@ struct PyCallBack_VPUNN_DW_CONVOLUTION_Constraints : public VPUNN::DW_CONVOLUTIO
 		}
 		return DW_CONVOLUTION_Constraints::deduce_input_1(a0, a1, a2, a3, a4);
 	}
+	bool normalize_kernel_dimension(const enum VPUNN::ISIStrategy & a0, struct VPUNN::KernelInfo & a1) const override {
+		pybind11::gil_scoped_acquire gil;
+		pybind11::function overload = pybind11::get_overload(static_cast<const VPUNN::DW_CONVOLUTION_Constraints *>(this), "normalize_kernel_dimension");
+		if (overload) {
+			auto o = overload.operator()<pybind11::return_value_policy::reference>(a0, a1);
+			if (pybind11::detail::cast_is_temporary_value_reference<bool>::value) {
+				static pybind11::detail::override_caster_t<bool> caster;
+				return pybind11::detail::cast_ref<bool>(std::move(o), caster);
+			}
+			else return pybind11::detail::cast_safe<bool>(std::move(o));
+		}
+		return DW_CONVOLUTION_Constraints::normalize_kernel_dimension(a0, a1);
+	}
 	void generate_sparsity(class VPUNN::Sampler & a0, const class VPUNN::IDeviceValidValues & a1, struct VPUNN::DPUOperation & a2) const override {
 		pybind11::gil_scoped_acquire gil;
 		pybind11::function overload = pybind11::get_overload(static_cast<const VPUNN::DW_CONVOLUTION_Constraints *>(this), "generate_sparsity");
@@ -3494,22 +3499,9 @@ struct PyCallBack_VPUNN_DW_CONVOLUTION_Constraints : public VPUNN::DW_CONVOLUTIO
 		}
 		return IOperationDynamicConstraints::filter_output_write_tile_Options(a0);
 	}
-	bool normalize_kernel_dimension(const enum VPUNN::ISIStrategy & a0, struct VPUNN::KernelInfo & a1) const override {
-		pybind11::gil_scoped_acquire gil;
-		pybind11::function overload = pybind11::get_overload(static_cast<const VPUNN::DW_CONVOLUTION_Constraints *>(this), "normalize_kernel_dimension");
-		if (overload) {
-			auto o = overload.operator()<pybind11::return_value_policy::reference>(a0, a1);
-			if (pybind11::detail::cast_is_temporary_value_reference<bool>::value) {
-				static pybind11::detail::override_caster_t<bool> caster;
-				return pybind11::detail::cast_ref<bool>(std::move(o), caster);
-			}
-			else return pybind11::detail::cast_safe<bool>(std::move(o));
-		}
-		return IOperationDynamicConstraints::normalize_kernel_dimension(a0, a1);
-	}
 };
 
-// VPUNN::CM_CONVOLUTION_Constraints file: line:246
+// VPUNN::CM_CONVOLUTION_Constraints file: line:256
 struct PyCallBack_VPUNN_CM_CONVOLUTION_Constraints : public VPUNN::CM_CONVOLUTION_Constraints {
 	using VPUNN::CM_CONVOLUTION_Constraints::CM_CONVOLUTION_Constraints;
 
@@ -3686,7 +3678,7 @@ struct PyCallBack_VPUNN_CM_CONVOLUTION_Constraints : public VPUNN::CM_CONVOLUTIO
 	}
 };
 
-// VPUNN::ELTWISE_Constraints file: line:299
+// VPUNN::ELTWISE_Constraints file: line:309
 struct PyCallBack_VPUNN_ELTWISE_Constraints : public VPUNN::ELTWISE_Constraints {
 	using VPUNN::ELTWISE_Constraints::ELTWISE_Constraints;
 
@@ -3863,7 +3855,7 @@ struct PyCallBack_VPUNN_ELTWISE_Constraints : public VPUNN::ELTWISE_Constraints 
 	}
 };
 
-// VPUNN::MAXPOOL_Constraints file: line:381
+// VPUNN::MAXPOOL_Constraints file: line:391
 struct PyCallBack_VPUNN_MAXPOOL_Constraints : public VPUNN::MAXPOOL_Constraints {
 	using VPUNN::MAXPOOL_Constraints::MAXPOOL_Constraints;
 
@@ -4096,21 +4088,21 @@ void bind_VPUNN_14(std::function< pybind11::module &(std::string const &namespac
 		cl.def( pybind11::init( [](){ return new VPUNN::DW_CONVOLUTION_Constraints(); }, [](){ return new PyCallBack_VPUNN_DW_CONVOLUTION_Constraints(); } ) );
 		cl.def("assign", (class VPUNN::DW_CONVOLUTION_Constraints & (VPUNN::DW_CONVOLUTION_Constraints::*)(const class VPUNN::DW_CONVOLUTION_Constraints &)) &VPUNN::DW_CONVOLUTION_Constraints::operator=, "C++: VPUNN::DW_CONVOLUTION_Constraints::operator=(const class VPUNN::DW_CONVOLUTION_Constraints &) --> class VPUNN::DW_CONVOLUTION_Constraints &", pybind11::return_value_policy::automatic, pybind11::arg(""));
 	}
-	{ // VPUNN::CM_CONVOLUTION_Constraints file: line:246
+	{ // VPUNN::CM_CONVOLUTION_Constraints file: line:256
 		pybind11::class_<VPUNN::CM_CONVOLUTION_Constraints, std::shared_ptr<VPUNN::CM_CONVOLUTION_Constraints>, PyCallBack_VPUNN_CM_CONVOLUTION_Constraints, VPUNN::GenericConvolution_Constraints> cl(M("VPUNN"), "CM_CONVOLUTION_Constraints", "");
 		cl.def( pybind11::init( [](PyCallBack_VPUNN_CM_CONVOLUTION_Constraints const &o){ return new PyCallBack_VPUNN_CM_CONVOLUTION_Constraints(o); } ) );
 		cl.def( pybind11::init( [](VPUNN::CM_CONVOLUTION_Constraints const &o){ return new VPUNN::CM_CONVOLUTION_Constraints(o); } ) );
 		cl.def( pybind11::init( [](){ return new VPUNN::CM_CONVOLUTION_Constraints(); }, [](){ return new PyCallBack_VPUNN_CM_CONVOLUTION_Constraints(); } ) );
 		cl.def("assign", (class VPUNN::CM_CONVOLUTION_Constraints & (VPUNN::CM_CONVOLUTION_Constraints::*)(const class VPUNN::CM_CONVOLUTION_Constraints &)) &VPUNN::CM_CONVOLUTION_Constraints::operator=, "C++: VPUNN::CM_CONVOLUTION_Constraints::operator=(const class VPUNN::CM_CONVOLUTION_Constraints &) --> class VPUNN::CM_CONVOLUTION_Constraints &", pybind11::return_value_policy::automatic, pybind11::arg(""));
 	}
-	{ // VPUNN::ELTWISE_Constraints file: line:299
+	{ // VPUNN::ELTWISE_Constraints file: line:309
 		pybind11::class_<VPUNN::ELTWISE_Constraints, std::shared_ptr<VPUNN::ELTWISE_Constraints>, PyCallBack_VPUNN_ELTWISE_Constraints, VPUNN::Base_Constraints, VPUNN::IOperationDynamicGenerator> cl(M("VPUNN"), "ELTWISE_Constraints", "");
 		cl.def( pybind11::init( [](PyCallBack_VPUNN_ELTWISE_Constraints const &o){ return new PyCallBack_VPUNN_ELTWISE_Constraints(o); } ) );
 		cl.def( pybind11::init( [](VPUNN::ELTWISE_Constraints const &o){ return new VPUNN::ELTWISE_Constraints(o); } ) );
 		cl.def( pybind11::init( [](){ return new VPUNN::ELTWISE_Constraints(); }, [](){ return new PyCallBack_VPUNN_ELTWISE_Constraints(); } ) );
 		cl.def("assign", (class VPUNN::ELTWISE_Constraints & (VPUNN::ELTWISE_Constraints::*)(const class VPUNN::ELTWISE_Constraints &)) &VPUNN::ELTWISE_Constraints::operator=, "C++: VPUNN::ELTWISE_Constraints::operator=(const class VPUNN::ELTWISE_Constraints &) --> class VPUNN::ELTWISE_Constraints &", pybind11::return_value_policy::automatic, pybind11::arg(""));
 	}
-	{ // VPUNN::MAXPOOL_Constraints file: line:381
+	{ // VPUNN::MAXPOOL_Constraints file: line:391
 		pybind11::class_<VPUNN::MAXPOOL_Constraints, std::shared_ptr<VPUNN::MAXPOOL_Constraints>, PyCallBack_VPUNN_MAXPOOL_Constraints, VPUNN::Base_Constraints, VPUNN::IOperationDynamicGenerator> cl(M("VPUNN"), "MAXPOOL_Constraints", "");
 		cl.def( pybind11::init( [](PyCallBack_VPUNN_MAXPOOL_Constraints const &o){ return new PyCallBack_VPUNN_MAXPOOL_Constraints(o); } ) );
 		cl.def( pybind11::init( [](VPUNN::MAXPOOL_Constraints const &o){ return new VPUNN::MAXPOOL_Constraints(o); } ) );
@@ -4152,14 +4144,13 @@ void bind_VPUNN_14(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -4225,14 +4216,13 @@ void bind_VPUNN_15(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -4369,14 +4359,13 @@ void bind_VPUNN_16(std::function< pybind11::module &(std::string const &namespac
 #include <vpu/compatibility/types11.h> // VPUNN::Preprocessing_Interface11
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -4560,14 +4549,13 @@ void bind_VPUNN_17(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -4671,14 +4659,13 @@ void bind_VPUNN_18(std::function< pybind11::module &(std::string const &namespac
 #include <vpu/compatibility/types01.h> // VPUNN::intf_01::mapToText
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -4862,14 +4849,13 @@ void bind_VPUNN_19(std::function< pybind11::module &(std::string const &namespac
 #include <vpu/compatibility/types01.h> // VPUNN::Preprocessing_Interface10
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -5019,14 +5005,13 @@ void bind_VPUNN_20(std::function< pybind11::module &(std::string const &namespac
 #include <vpu/compatibility/types11.h> // VPUNN::intf_11::mapToText
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -5219,14 +5204,13 @@ void bind_VPUNN_21(std::function< pybind11::module &(std::string const &namespac
 #include <vpu/compatibility/types11.h> // VPUNN::intf_11::convert
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -5259,14 +5243,13 @@ void bind_VPUNN_22(std::function< pybind11::module &(std::string const &namespac
 #include <vpu/compatibility/types11.h> // VPUNN::Preprocessing_Interface11
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -5413,7 +5396,7 @@ void bind_VPUNN_23(std::function< pybind11::module &(std::string const &namespac
 		pybind11::class_<VPUNN::RuntimeProcessingFactory, std::shared_ptr<VPUNN::RuntimeProcessingFactory>> cl(M("VPUNN"), "RuntimeProcessingFactory", "Provides processing related objects based on context\n\n The provided objects may be bounded(lifespan) to this instance");
 		cl.def( pybind11::init( [](VPUNN::RuntimeProcessingFactory const &o){ return new VPUNN::RuntimeProcessingFactory(o); } ) );
 		cl.def( pybind11::init( [](){ return new VPUNN::RuntimeProcessingFactory(); } ) );
-		cl.def("exists_preprocessing", (bool (VPUNN::RuntimeProcessingFactory::*)(int) const) &VPUNN::RuntimeProcessingFactory::exists_preprocessing, "True if a preprocessor exists for required/interrogated version\n\nC++: VPUNN::RuntimeProcessingFactory::exists_preprocessing(int) const --> bool", pybind11::arg("input_version"));
+		cl.def("exists_preprocessing", (bool (VPUNN::RuntimeProcessingFactory::*)(int) const) &VPUNN::RuntimeProcessingFactory::exists_preprocessing, "True if a preprocessor exists for required/interrogated version\n\nC++: VPUNN::RuntimeProcessingFactory::exists_preprocessing(int) const --> bool", pybind11::arg("version"));
 		cl.def("make_preprocessing", (class VPUNN::Preprocessing<float> & (VPUNN::RuntimeProcessingFactory::*)(int) const) &VPUNN::RuntimeProcessingFactory::make_preprocessing, "provides a preprocessor for the required interface\n The provided preprocessor is owned by this class.\n For NOW multiple requests for the same version will provide the same object, the factory just shares the\n preprocessors , does not create a new one for each request\n \n\n desired interface version\n \n\n the preprocessor object to be used (shared)\n \n\n out_of_range in case the version is not supported\n\nC++: VPUNN::RuntimeProcessingFactory::make_preprocessing(int) const --> class VPUNN::Preprocessing<float> &", pybind11::return_value_policy::automatic, pybind11::arg("version"));
 	}
 	{ // VPUNN::SHVActivation file: line:26
@@ -5488,14 +5471,13 @@ void bind_VPUNN_23(std::function< pybind11::module &(std::string const &namespac
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -5760,14 +5742,13 @@ void bind_VPUNN_24(std::function< pybind11::module &(std::string const &namespac
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -6035,14 +6016,13 @@ void bind_VPUNN_25(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -6310,14 +6290,13 @@ void bind_VPUNN_26(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -6757,14 +6736,13 @@ void bind_VPUNN_27(std::function< pybind11::module &(std::string const &namespac
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -7296,14 +7274,13 @@ void bind_VPUNN_28(std::function< pybind11::module &(std::string const &namespac
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -7781,14 +7758,13 @@ void bind_VPUNN_29(std::function< pybind11::module &(std::string const &namespac
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -8266,14 +8242,13 @@ void bind_VPUNN_30(std::function< pybind11::module &(std::string const &namespac
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -8485,14 +8460,13 @@ void bind_VPUNN_31(std::function< pybind11::module &(std::string const &namespac
 #include <sstream> // __str__
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -8547,14 +8521,13 @@ void bind_VPUNN_32(std::function< pybind11::module &(std::string const &namespac
 #include <ratio> // std::ratio
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -8587,14 +8560,13 @@ void bind_VPUNN_33(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -8662,14 +8634,13 @@ void bind_VPUNN_34(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -8708,22 +8679,6 @@ void bind_VPUNN_35(std::function< pybind11::module &(std::string const &namespac
 		cl.def("get_raw_name", (std::string (VPUNN::ModelVersion::*)() const) &VPUNN::ModelVersion::get_raw_name, "initial, raw name of the VPUNN model. contains version info\n\nC++: VPUNN::ModelVersion::get_raw_name() const --> std::string");
 		cl.def("parse_name", (void (VPUNN::ModelVersion::*)(const std::string &)) &VPUNN::ModelVersion::parse_name, "parsed the name and extracts the information\n get the name based on separator \"-\", template: NNNNNNN-VI-VO\n VI and VO must be integers, and only the integers part will be considered when converting\n NNNNNN cannot be empty, it will be replaced with \"none\" if empty\n Only first three parts of the name are considered, rest are ignored.\n Missing pars will be considered default: none-1-1\n\n \n invalid_argument, out_of_range\n\nC++: VPUNN::ModelVersion::parse_name(const std::string &) --> void", pybind11::arg("raw_NN_name"));
 	}
-	// VPUNN::NNOutputVersions file: line:295
-	pybind11::enum_<VPUNN::NNOutputVersions>(M("VPUNN"), "NNOutputVersions", "enum for NN output versions")
-		.value("OUT_LATEST", VPUNN::NNOutputVersions::OUT_LATEST)
-		.value("OUT_HW_OVERHEAD_BOUNDED", VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_BOUNDED)
-		.value("OUT_CYCLES", VPUNN::NNOutputVersions::OUT_CYCLES)
-		.value("OUT_HW_OVERHEAD_UNBOUNDED", VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_UNBOUNDED);
-
-;
-
-	{ // VPUNN::PostProcessSupport file: line:308
-		pybind11::class_<VPUNN::PostProcessSupport, std::shared_ptr<VPUNN::PostProcessSupport>> cl(M("VPUNN"), "PostProcessSupport", "Configuration options concerning the interpretation and post processing of inferred values\n This class have the goal to check if we know something about the output version of the model and if we don't know we\n will not support the output for the CostModel. We are going to use the output version parsed by the ModelVersion and\n use it to determine based on known output version if we support it or not. In case that we don't know the version we\n are going to not supprt the output.");
-		cl.def( pybind11::init<int>(), pybind11::arg("output_version") );
-
-		cl.def( pybind11::init( [](VPUNN::PostProcessSupport const &o){ return new VPUNN::PostProcessSupport(o); } ) );
-		cl.def("is_output_supported", (bool (VPUNN::PostProcessSupport::*)() const) &VPUNN::PostProcessSupport::is_output_supported, "a method to see if we support the output\n\nC++: VPUNN::PostProcessSupport::is_output_supported() const --> bool");
-	}
 	{ // VPUNN::Runtime file: line:24
 		pybind11::class_<VPUNN::Runtime, std::shared_ptr<VPUNN::Runtime>> cl(M("VPUNN"), "Runtime", "VPUNN runtime model\n\n ");
 		cl.def( pybind11::init( [](const std::string & a0){ return new VPUNN::Runtime(a0); } ), "doc" , pybind11::arg("filename"));
@@ -8750,50 +8705,59 @@ void bind_VPUNN_35(std::function< pybind11::module &(std::string const &namespac
 	// VPUNN::get_cmx_fclk(enum VPUNN::VPUDevice) file: line:47
 	M("VPUNN").def("get_cmx_fclk", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_cmx_fclk, "Get the CMX default frequency in MHz\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::get_cmx_fclk(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
 
-	// VPUNN::get_cmx_word_size_bytes(enum VPUNN::VPUDevice) file: line:68
-	M("VPUNN").def("get_cmx_word_size_bytes", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_cmx_word_size_bytes, "Get CMX word size in bytes\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::get_cmx_word_size_bytes(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
-
-	// VPUNN::get_dpu_cmx_num_read_ports(enum VPUNN::VPUDevice) file: line:87
-	M("VPUNN").def("get_dpu_cmx_num_read_ports", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_dpu_cmx_num_read_ports, "Get DPU number of CMX read ports\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::get_dpu_cmx_num_read_ports(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
-
-	// VPUNN::get_dram_bandwidth_MBps(enum VPUNN::VPUDevice) file: line:107
+	// VPUNN::get_dram_bandwidth_MBps(enum VPUNN::VPUDevice) file: line:68
 	M("VPUNN").def("get_dram_bandwidth_MBps", (float (*)(enum VPUNN::VPUDevice)) &VPUNN::get_dram_bandwidth_MBps, "Get the DRAM bandwidth in MB/s for a specific VPU IP\n\n \n a VPUDevice\n \n\n float\n\nC++: VPUNN::get_dram_bandwidth_MBps(enum VPUNN::VPUDevice) --> float", pybind11::arg("device"));
 
-	// VPUNN::get_sram_word_size(bool) file: line:127
+	// VPUNN::get_sram_word_size(bool) file: line:88
 	M("VPUNN").def("get_sram_word_size", (unsigned int (*)(bool)) &VPUNN::get_sram_word_size, "Get the sram word size\n\n \n if compression is enabled or not\n \n\n unsigned int\n\nC++: VPUNN::get_sram_word_size(bool) --> unsigned int", pybind11::arg("compression"));
 
-	// VPUNN::get_sram_word_size(const class VPUNN::VPUTensor &, bool, bool) file: line:139
+	// VPUNN::get_sram_word_size(const class VPUNN::VPUTensor &, bool, bool) file: line:100
 	M("VPUNN").def("get_sram_word_size", (unsigned int (*)(const class VPUNN::VPUTensor &, bool, bool)) &VPUNN::get_sram_word_size, "Get the sram word size\n\n \n a VPUTensor\n \n\n if compression is enabled or not\n \n\n if a permute operation is required\n \n\n  unsigned int\n\nC++: VPUNN::get_sram_word_size(const class VPUNN::VPUTensor &, bool, bool) --> unsigned int", pybind11::arg("tensor"), pybind11::arg("compression"), pybind11::arg("permute"));
 
-	// VPUNN::get_bandwidth_cycles_per_bytes(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool) file: line:158
+	// VPUNN::get_bandwidth_cycles_per_bytes(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool) file: line:119
 	M("VPUNN").def("get_bandwidth_cycles_per_bytes", [](const class VPUNN::VPUTensor & a0, enum VPUNN::VPUDevice const & a1, enum VPUNN::MemoryLocation const & a2) -> float { return VPUNN::get_bandwidth_cycles_per_bytes(a0, a1, a2); }, "", pybind11::arg("tensor"), pybind11::arg("device"), pybind11::arg("location"));
 	M("VPUNN").def("get_bandwidth_cycles_per_bytes", [](const class VPUNN::VPUTensor & a0, enum VPUNN::VPUDevice const & a1, enum VPUNN::MemoryLocation const & a2, bool const & a3) -> float { return VPUNN::get_bandwidth_cycles_per_bytes(a0, a1, a2, a3); }, "", pybind11::arg("tensor"), pybind11::arg("device"), pybind11::arg("location"), pybind11::arg("compression"));
 	M("VPUNN").def("get_bandwidth_cycles_per_bytes", (float (*)(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool)) &VPUNN::get_bandwidth_cycles_per_bytes, "Get the DMA bandwidth in DPU cycles/bytes for a specific VPU IP\n\n \n a VPUTensor\n \n\n a VPUDevice\n \n\n a memory location\n \n\n is compression enabled\n \n\n if a permute operation is required\n \n\n float\n\nC++: VPUNN::get_bandwidth_cycles_per_bytes(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool) --> float", pybind11::arg("tensor"), pybind11::arg("device"), pybind11::arg("location"), pybind11::arg("compression"), pybind11::arg("permute"));
 
-	// VPUNN::get_bandwidth_MBps(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool) file: line:181
+	// VPUNN::get_bandwidth_MBps(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool) file: line:142
 	M("VPUNN").def("get_bandwidth_MBps", [](const class VPUNN::VPUTensor & a0, enum VPUNN::VPUDevice const & a1, enum VPUNN::MemoryLocation const & a2) -> float { return VPUNN::get_bandwidth_MBps(a0, a1, a2); }, "", pybind11::arg("tensor"), pybind11::arg("device"), pybind11::arg("location"));
 	M("VPUNN").def("get_bandwidth_MBps", [](const class VPUNN::VPUTensor & a0, enum VPUNN::VPUDevice const & a1, enum VPUNN::MemoryLocation const & a2, bool const & a3) -> float { return VPUNN::get_bandwidth_MBps(a0, a1, a2, a3); }, "", pybind11::arg("tensor"), pybind11::arg("device"), pybind11::arg("location"), pybind11::arg("compression"));
 	M("VPUNN").def("get_bandwidth_MBps", (float (*)(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool)) &VPUNN::get_bandwidth_MBps, "Get the DMA bandwidth in MB/s for a specific VPU IP\n\n \n a VPUTensor\n \n\n a VPUDevice\n \n\n a memory location\n \n\n is compression enabled\n \n\n if a permute operation is required\n \n\n float\n\nC++: VPUNN::get_bandwidth_MBps(const class VPUNN::VPUTensor &, enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation, bool, bool) --> float", pybind11::arg("tensor"), pybind11::arg("device"), pybind11::arg("location"), pybind11::arg("compression"), pybind11::arg("permute"));
+
+	// VPUNN::get_DMA_latency(enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation) file: line:156
+	M("VPUNN").def("get_DMA_latency", (unsigned int (*)(enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation)) &VPUNN::get_DMA_latency, "Get the DMA latency in cycles\n\n \n a VPUDevice\n \n\n what memory is used\n \n\n unsigned int\n\nC++: VPUNN::get_DMA_latency(enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation) --> unsigned int", pybind11::arg("device"), pybind11::arg("location"));
+
+	// VPUNN::get_nr_macs(enum VPUNN::VPUDevice) file: line:171
+	M("VPUNN").def("get_nr_macs", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_nr_macs, "Get the DPU number of MACs\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::get_nr_macs(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
+
+	// VPUNN::get_nr_ppe(enum VPUNN::VPUDevice) file: line:189
+	M("VPUNN").def("get_nr_ppe", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_nr_ppe, "Get the number of PPE\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::get_nr_ppe(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
+
+	// VPUNN::input_channels_mac(enum VPUNN::VPUDevice) file: line:207
+	M("VPUNN").def("input_channels_mac", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::input_channels_mac, "Get the MAC/input channels/cycles for a specific VPU IP\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::input_channels_mac(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
 
 }
 
 
 // File: VPUNN_36.cpp
 #include <array> // std::array
+#include <iterator> // __gnu_cxx::__normal_iterator
 #include <list> // std::list
 #include <memory> // std::allocator
 #include <sstream> // __str__
+#include <string> // std::basic_string
+#include <string> // std::char_traits
+#include <utility> // std::pair
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -8805,28 +8769,10 @@ void bind_VPUNN_35(std::function< pybind11::module &(std::string const &namespac
 
 void bind_VPUNN_36(std::function< pybind11::module &(std::string const &namespace_) > &M)
 {
-	// VPUNN::get_DMA_latency(enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation) file: line:195
-	M("VPUNN").def("get_DMA_latency", (unsigned int (*)(enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation)) &VPUNN::get_DMA_latency, "Get the DMA latency in cycles\n\n \n a VPUDevice\n \n\n what memory is used\n \n\n unsigned int\n\nC++: VPUNN::get_DMA_latency(enum VPUNN::VPUDevice, enum VPUNN::MemoryLocation) --> unsigned int", pybind11::arg("device"), pybind11::arg("location"));
-
-	// VPUNN::get_nr_macs(enum VPUNN::VPUDevice) file: line:210
-	M("VPUNN").def("get_nr_macs", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_nr_macs, "Get the DPU number of MACs\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::get_nr_macs(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
-
-	// VPUNN::get_fp_ratio(enum VPUNN::VPUDevice) file: line:228
-	M("VPUNN").def("get_fp_ratio", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_fp_ratio, "Get the ratio of int compute to fp16 compute\n\n \n a VPUDevice\n \n\n\n\n\nC++: VPUNN::get_fp_ratio(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
-
-	// VPUNN::get_nr_ppe(enum VPUNN::VPUDevice) file: line:244
-	M("VPUNN").def("get_nr_ppe", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::get_nr_ppe, "Get the number of PPE\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::get_nr_ppe(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
-
-	// VPUNN::native_comp_is_fp(struct VPUNN::DPUWorkload) file: line:262
-	M("VPUNN").def("native_comp_is_fp", (bool (*)(struct VPUNN::DPUWorkload)) &VPUNN::native_comp_is_fp, "Determine whether native computation for workload is floating point or int\n\n \n a DPUWorkload\n \n\n bool\n\nC++: VPUNN::native_comp_is_fp(struct VPUNN::DPUWorkload) --> bool", pybind11::arg("wl"));
-
-	// VPUNN::input_channels_mac(enum VPUNN::VPUDevice) file: line:277
-	M("VPUNN").def("input_channels_mac", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::input_channels_mac, "Get the MAC/input channels/cycles for a specific VPU IP\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::input_channels_mac(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
-
-	// VPUNN::nDPU_per_tile(enum VPUNN::VPUDevice) file: line:294
+	// VPUNN::nDPU_per_tile(enum VPUNN::VPUDevice) file: line:224
 	M("VPUNN").def("nDPU_per_tile", (unsigned int (*)(enum VPUNN::VPUDevice)) &VPUNN::nDPU_per_tile, "Get the MAC/input channels/cycles for a specific VPU IP\n\n \n a VPUDevice\n \n\n unsigned int\n\nC++: VPUNN::nDPU_per_tile(enum VPUNN::VPUDevice) --> unsigned int", pybind11::arg("device"));
 
-	{ // VPUNN::VPUNNPerformanceModel file: line:308
+	{ // VPUNN::VPUNNPerformanceModel file: line:238
 		pybind11::class_<VPUNN::VPUNNPerformanceModel, std::shared_ptr<VPUNN::VPUNNPerformanceModel>> cl(M("VPUNN"), "VPUNNPerformanceModel", "VPUNN performance model\n\n ");
 		cl.def( pybind11::init( [](VPUNN::VPUNNPerformanceModel const &o){ return new VPUNN::VPUNNPerformanceModel(o); } ) );
 		cl.def( pybind11::init( [](){ return new VPUNN::VPUNNPerformanceModel(); } ) );
@@ -8850,9 +8796,9 @@ void bind_VPUNN_36(std::function< pybind11::module &(std::string const &namespac
 		cl.def( pybind11::init<unsigned int, enum VPUNN::Operation, enum VPUNN::VPUDevice>(), pybind11::arg("input_ch"), pybind11::arg("op_type"), pybind11::arg("vpu_device") );
 
 		cl.def( pybind11::init( [](VPUNN::VPUPowerFactorLUT const &o){ return new VPUNN::VPUPowerFactorLUT(o); } ) );
-		cl.def("getValue", (float (VPUNN::VPUPowerFactorLUT::*)(bool) const) &VPUNN::VPUPowerFactorLUT::getValue, "Get the the value from the LUT for a specific datatype\n\n \n true if floating point native compute required for workload\n \n\n float the LUT value for that datatype\n\nC++: VPUNN::VPUPowerFactorLUT::getValue(bool) const --> float", pybind11::arg("fp_comp"));
+		cl.def("getValue", (float (VPUNN::VPUPowerFactorLUT::*)(enum VPUNN::DataType)) &VPUNN::VPUPowerFactorLUT::getValue, "Get the the value from the LUT for a specific datatype\n\n \n a VPUNN::Datatype\n \n\n float the LUT value for that datatype\n\nC++: VPUNN::VPUPowerFactorLUT::getValue(enum VPUNN::DataType) --> float", pybind11::arg("dtype"));
 	}
-	{ // VPUNN::VPUNNPowerModel file: line:213
+	{ // VPUNN::VPUNNPowerModel file: line:180
 		pybind11::class_<VPUNN::VPUNNPowerModel, std::shared_ptr<VPUNN::VPUNNPowerModel>> cl(M("VPUNN"), "VPUNNPowerModel", "VPUNN power model\n\n ");
 		cl.def( pybind11::init( [](VPUNN::VPUNNPowerModel const &o){ return new VPUNN::VPUNNPowerModel(o); } ) );
 		cl.def( pybind11::init( [](){ return new VPUNN::VPUNNPowerModel(); } ) );
@@ -8881,39 +8827,6 @@ void bind_VPUNN_36(std::function< pybind11::module &(std::string const &namespac
 		cl.def("getLeakage_4_0", (float (VPUNN::VPUNNPowerModel::*)(enum VPUNN::VPUSubsystem)) &VPUNN::VPUNNPowerModel::getLeakage_4_0, "Get the leakage for VPU_2_0\n\n \n VPUSubsystem\n \n\n float\n\nC++: VPUNN::VPUNNPowerModel::getLeakage_4_0(enum VPUNN::VPUSubsystem) --> float", pybind11::arg("hw"));
 		cl.def("assign", (class VPUNN::VPUNNPowerModel & (VPUNN::VPUNNPowerModel::*)(const class VPUNN::VPUNNPowerModel &)) &VPUNN::VPUNNPowerModel::operator=, "C++: VPUNN::VPUNNPowerModel::operator=(const class VPUNN::VPUNNPowerModel &) --> class VPUNN::VPUNNPowerModel &", pybind11::return_value_policy::automatic, pybind11::arg(""));
 	}
-}
-
-
-// File: VPUNN_37.cpp
-#include <array> // std::array
-#include <iterator> // __gnu_cxx::__normal_iterator
-#include <memory> // std::allocator
-#include <sstream> // __str__
-#include <string> // std::basic_string
-#include <string> // std::char_traits
-#include <utility> // std::pair
-#include <vector> // std::vector
-
-#include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <vpu_cost_model.h>
-#include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
-
-
-#ifndef BINDER_PYBIND11_TYPE_CASTER
-	#define BINDER_PYBIND11_TYPE_CASTER
-	PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>)
-	PYBIND11_DECLARE_HOLDER_TYPE(T, T*)
-	PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>)
-#endif
-
-void bind_VPUNN_37(std::function< pybind11::module &(std::string const &namespace_) > &M)
-{
 	{ // VPUNN::DPU_OperationSanitizer file: line:25
 		pybind11::class_<VPUNN::DPU_OperationSanitizer, std::shared_ptr<VPUNN::DPU_OperationSanitizer>> cl(M("VPUNN"), "DPU_OperationSanitizer", "Sanitizes a Workload  based on device rules");
 		cl.def( pybind11::init( [](VPUNN::DPU_OperationSanitizer const &o){ return new VPUNN::DPU_OperationSanitizer(o); } ) );
@@ -8940,7 +8853,7 @@ void bind_VPUNN_37(std::function< pybind11::module &(std::string const &namespac
 		cl.def("run_NN", (const class std::vector<float, class std::allocator<float> > & (VPUNN::VPUCostModel::*)(const class std::vector<struct VPUNN::DPUWorkload, class std::allocator<struct VPUNN::DPUWorkload> > &)) &VPUNN::VPUCostModel::run_NN, "Compute the NN Output of multiple DPUWorkloads\n NOT taking in consideration the cache\n no sanitation is done\n no check if network exists\n\n \n a std::vector of DPUWorkloads\n \n\n a reference to the results vector. Do not store, will be invalid after next call to this method.\n\nC++: VPUNN::VPUCostModel::run_NN(const class std::vector<struct VPUNN::DPUWorkload, class std::allocator<struct VPUNN::DPUWorkload> > &) --> const class std::vector<float, class std::allocator<float> > &", pybind11::return_value_policy::automatic, pybind11::arg("workloads"));
 		cl.def("nn_initialized", (bool (VPUNN::VPUCostModel::*)() const) &VPUNN::VPUCostModel::nn_initialized, "Check if the internal VPUNN is initialized\n\n \n true the VPUNN neural network is initialized\n \n\n false the VPUNN neural network is not initialized\n\nC++: VPUNN::VPUCostModel::nn_initialized() const --> bool");
 		cl.def("DPU", (unsigned int (VPUNN::VPUCostModel::*)(struct VPUNN::DPUWorkload)) &VPUNN::VPUCostModel::DPU, "Return the number of cycles needed to compute a workload\n\n Important: If no NN is available it will return Theoretical cycles for the workload. Check if NN is loaded with\n nn_initialized()\n\n A sanity check will be performed on the workload and in case it is not suitable the method will return an error\n code without running the inference on the NN. \n\n DPU_OperationSanitizer::check_and_sanitize() explanations.\n Some checks examples:\n - if the device is supported\n - if workload fits in CMX memory\n - if the operation is supported\n\n List of Error codes is available in CyclesInterfaceType doc.\n\n A sanity check will be performed also on the NN output, in case the NN  raw value is not reliable it will not be\n returned but an error code will be given, e.g. ERROR_INVALID_OUTPUT_RANGE\n\n To see the limits of valid NN values interval , use \n get_NN_Valid_interval().  Zero is a value that will NOT\n be filtered out.\n\n Behind the DPU computation is a trained Neural Network that might give unexpected results in case is asked about\n a workload that is odd/(not well formed) or was not trained in that area or workloads.\n The workload passed as parameter for inference should be a valid one, a one that makes sense, we are checking\n some sanity, but ,for now, not a strict/extensive sanity check is performed. A workload with unrealistic\n combinations of  parameters (eg DW_CONV with 7 input/output channels ) will not be detected.\n\n In case the wl configuration is unrealistic the network will give undefined(aberrant) results (it was not trained\n on invalid data). The NN raw output is filtered for  generic valid interval (no negatives, no huge , e.g. 4bilion\n cycles) but the user can also be aware of this behavior and use its own narrower ranges\n\n e.g.  Depending on the wl a cycle values of 10 might be unrealistic, also a value of 100milion cycles (@1Ghz is\n ~100ms),  The user should be aware that not all aberrant/unrealistic NN outputs are handled inside.\n\n \n a DPUWorkload to be evaluated.\n \n\n unsigned int DPUWorkload execution cycles or an error code.\n\n \n out_of_range : cache problems, cannot pre-process data , generate the NN descriptor due to data unknown\n \n\n runtime_error: cannot generate the NN descriptor, e.g expected sizes do not match\n\n     \n\nC++: VPUNN::VPUCostModel::DPU(struct VPUNN::DPUWorkload) --> unsigned int", pybind11::arg("wl"));
-		cl.def("DPU", (unsigned int (VPUNN::VPUCostModel::*)(struct VPUNN::DPUWorkload, std::string &)) &VPUNN::VPUCostModel::DPU, "same like  \n DPU(DPUWorkload wl) , the extra param is to have as output the textual errors/findings\n discovered when handling the workload\n \n\n the workload to infer on\n \n\n [out] will collect error info regarding wl checking.\n\nC++: VPUNN::VPUCostModel::DPU(struct VPUNN::DPUWorkload, std::string &) --> unsigned int", pybind11::arg("wl"), pybind11::arg("info"));
+		cl.def("DPU", (unsigned int (VPUNN::VPUCostModel::*)(struct VPUNN::DPUWorkload, std::string &)) &VPUNN::VPUCostModel::DPU, "DPU(DPUWorkload wl)\n\nC++: VPUNN::VPUCostModel::DPU(struct VPUNN::DPUWorkload, std::string &) --> unsigned int", pybind11::arg("wl"), pybind11::arg("info"));
 		cl.def("DPU", (class std::vector<unsigned int, class std::allocator<unsigned int> > (VPUNN::VPUCostModel::*)(class std::vector<struct VPUNN::DPUWorkload, class std::allocator<struct VPUNN::DPUWorkload> >)) &VPUNN::VPUCostModel::DPU, "Return the number of cycles needed to compute multiple workloads\n\n \n a std::vector of DPUWorkload\n \n\n std::vector<CyclesInterfaceType> the DPUWorklaods execution cycles, \n DPU for single wl for more\n explanations\n\nC++: VPUNN::VPUCostModel::DPU(class std::vector<struct VPUNN::DPUWorkload, class std::allocator<struct VPUNN::DPUWorkload> >) --> class std::vector<unsigned int, class std::allocator<unsigned int> >", pybind11::arg("workloads"));
 		cl.def("hw_utilization", (float (VPUNN::VPUCostModel::*)(struct VPUNN::DPUWorkload &)) &VPUNN::VPUCostModel::hw_utilization, "Compute DPUWorkload hw utilization\n\n \n a DPUWorkload\n \n\n float DPUWorkload hardware utilization\n\nC++: VPUNN::VPUCostModel::hw_utilization(struct VPUNN::DPUWorkload &) --> float", pybind11::arg("workload"));
 		cl.def("DMA", [](VPUNN::VPUCostModel const &o, enum VPUNN::VPUDevice const & a0, const class VPUNN::VPUTensor & a1, const class VPUNN::VPUTensor & a2) -> unsigned int { return o.DMA(a0, a1, a2); }, "", pybind11::arg("device"), pybind11::arg("input"), pybind11::arg("output"));
@@ -8949,7 +8862,7 @@ void bind_VPUNN_37(std::function< pybind11::module &(std::string const &namespac
 		cl.def("DMA", (unsigned int (VPUNN::VPUCostModel::*)(enum VPUNN::VPUDevice, const class VPUNN::VPUTensor &, const class VPUNN::VPUTensor &, enum VPUNN::MemoryLocation, enum VPUNN::MemoryLocation, unsigned int) const) &VPUNN::VPUCostModel::DMA, "Return the number of cycles needed to compute a DMA transfer\n\n \n DMA VPUDevice\n \n\n DMA input Tensor\n \n\n DMA output Tensor\n \n\n where is the source memory\n \n\n where is the destination memory\n \n\n how many CMX tiles the DMA broadcast\n \n\n unsigned int the number of cycles of the DMA transfer\n\nC++: VPUNN::VPUCostModel::DMA(enum VPUNN::VPUDevice, const class VPUNN::VPUTensor &, const class VPUNN::VPUTensor &, enum VPUNN::MemoryLocation, enum VPUNN::MemoryLocation, unsigned int) const --> unsigned int", pybind11::arg("device"), pybind11::arg("input"), pybind11::arg("output"), pybind11::arg("input_location"), pybind11::arg("output_location"), pybind11::arg("output_write_tiles"));
 		cl.def("DMA", (unsigned int (VPUNN::VPUCostModel::*)(const struct VPUNN::DMAWorkload &) const) &VPUNN::VPUCostModel::DMA, "Return the number of cycles needed to compute a DMA transfer\n\n \n a DMAWorkload\n \n\n unsigned int the number of cycles of the DMA transfer\n\nC++: VPUNN::VPUCostModel::DMA(const struct VPUNN::DMAWorkload &) const --> unsigned int", pybind11::arg("wl"));
 		cl.def("SHAVE", (unsigned int (VPUNN::VPUCostModel::*)(struct VPUNN::SWOperation &)) &VPUNN::VPUCostModel::SHAVE, "Return the number of cycles needed to compute a Shave kernel\n\n \n a Shave Kernel\n \n\n unsigned int the number of cycles of the Shave kernel\n\nC++: VPUNN::VPUCostModel::SHAVE(struct VPUNN::SWOperation &) --> unsigned int", pybind11::arg("swl"));
-		cl.def("DPUActivityFactor", (float (VPUNN::VPUCostModel::*)(struct VPUNN::DPUWorkload &)) &VPUNN::VPUCostModel::DPUActivityFactor, "Compute the activity factor of a DPUWorkload.\n \n\n Activity factor is an estimation of the dynamic power of the DPUWorkload\n          relative to the worst case (highest dynamic power) DPUWorkload.\n\n \n a DPUWorkload\n \n\n float the DPUWorkload activity factor\n\nC++: VPUNN::VPUCostModel::DPUActivityFactor(struct VPUNN::DPUWorkload &) --> float", pybind11::arg("wl"));
+		cl.def("DPUActivityFactor", (float (VPUNN::VPUCostModel::*)(struct VPUNN::DPUWorkload &)) &VPUNN::VPUCostModel::DPUActivityFactor, "Compute the activity factor of a DPUWorkload\n\n \n a DPUWorkload\n \n\n float the DPUWorkload activity factor\n\nC++: VPUNN::VPUCostModel::DPUActivityFactor(struct VPUNN::DPUWorkload &) --> float", pybind11::arg("wl"));
 		cl.def("DPUPower", (float (VPUNN::VPUCostModel::*)(struct VPUNN::DPUWorkload &)) &VPUNN::VPUCostModel::DPUPower, "Compute the power (in mW) of a DPUWorkload\n\n \n a DPUWorkload\n \n\n float DPUWorkload consumed power in mW\n\nC++: VPUNN::VPUCostModel::DPUPower(struct VPUNN::DPUWorkload &) --> float", pybind11::arg("wl"));
 		cl.def("DMAPower", (float (VPUNN::VPUCostModel::*)(struct VPUNN::DMAWorkload &)) &VPUNN::VPUCostModel::DMAPower, "Compute the power (in mW) of a DMAWorkload\n\n \n a DMAWorkload\n \n\n float DMAWorkload consumed power in mW\n\nC++: VPUNN::VPUCostModel::DMAPower(struct VPUNN::DMAWorkload &) --> float", pybind11::arg("wl"));
 		cl.def("SHAVEPower", (float (VPUNN::VPUCostModel::*)(struct VPUNN::SWOperation &)) &VPUNN::VPUCostModel::SHAVEPower, "Compute the power (in mW) of a Shave Kernel\n\n \n a SWOperation describing a Shave Kernel\n \n\n float Shave Kernel consumed power in mW\n\nC++: VPUNN::VPUCostModel::SHAVEPower(struct VPUNN::SWOperation &) --> float", pybind11::arg("wl"));
@@ -8963,7 +8876,7 @@ void bind_VPUNN_37(std::function< pybind11::module &(std::string const &namespac
 }
 
 
-// File: VPUNN_38.cpp
+// File: VPUNN_37.cpp
 #include <array> // std::array
 #include <ios> // std::_Ios_Seekdir
 #include <iterator> // __gnu_cxx::__normal_iterator
@@ -8984,14 +8897,13 @@ void bind_VPUNN_37(std::function< pybind11::module &(std::string const &namespac
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -9254,6 +9166,19 @@ struct PyCallBack_VPUNN_DW_CONVOLUTION_Constraints_Layer : public VPUNN::DW_CONV
 		}
 		return DW_CONVOLUTION_Constraints::deduce_input_1(a0, a1, a2, a3, a4);
 	}
+	bool normalize_kernel_dimension(const enum VPUNN::ISIStrategy & a0, struct VPUNN::KernelInfo & a1) const override {
+		pybind11::gil_scoped_acquire gil;
+		pybind11::function overload = pybind11::get_overload(static_cast<const VPUNN::DW_CONVOLUTION_Constraints_Layer *>(this), "normalize_kernel_dimension");
+		if (overload) {
+			auto o = overload.operator()<pybind11::return_value_policy::reference>(a0, a1);
+			if (pybind11::detail::cast_is_temporary_value_reference<bool>::value) {
+				static pybind11::detail::override_caster_t<bool> caster;
+				return pybind11::detail::cast_ref<bool>(std::move(o), caster);
+			}
+			else return pybind11::detail::cast_safe<bool>(std::move(o));
+		}
+		return DW_CONVOLUTION_Constraints::normalize_kernel_dimension(a0, a1);
+	}
 	void generate_sparsity(class VPUNN::Sampler & a0, const class VPUNN::IDeviceValidValues & a1, struct VPUNN::DPUOperation & a2) const override {
 		pybind11::gil_scoped_acquire gil;
 		pybind11::function overload = pybind11::get_overload(static_cast<const VPUNN::DW_CONVOLUTION_Constraints_Layer *>(this), "generate_sparsity");
@@ -9372,19 +9297,6 @@ struct PyCallBack_VPUNN_DW_CONVOLUTION_Constraints_Layer : public VPUNN::DW_CONV
 			else return pybind11::detail::cast_safe<_binder_ret_1>(std::move(o));
 		}
 		return IOperationDynamicConstraints::filter_output_write_tile_Options(a0);
-	}
-	bool normalize_kernel_dimension(const enum VPUNN::ISIStrategy & a0, struct VPUNN::KernelInfo & a1) const override {
-		pybind11::gil_scoped_acquire gil;
-		pybind11::function overload = pybind11::get_overload(static_cast<const VPUNN::DW_CONVOLUTION_Constraints_Layer *>(this), "normalize_kernel_dimension");
-		if (overload) {
-			auto o = overload.operator()<pybind11::return_value_policy::reference>(a0, a1);
-			if (pybind11::detail::cast_is_temporary_value_reference<bool>::value) {
-				static pybind11::detail::override_caster_t<bool> caster;
-				return pybind11::detail::cast_ref<bool>(std::move(o), caster);
-			}
-			else return pybind11::detail::cast_safe<bool>(std::move(o));
-		}
-		return IOperationDynamicConstraints::normalize_kernel_dimension(a0, a1);
 	}
 };
 
@@ -9919,7 +9831,7 @@ struct PyCallBack_VPUNN_MAXPOOL_Constraints_Layer : public VPUNN::MAXPOOL_Constr
 	}
 };
 
-void bind_VPUNN_38(std::function< pybind11::module &(std::string const &namespace_) > &M)
+void bind_VPUNN_37(std::function< pybind11::module &(std::string const &namespace_) > &M)
 {
 	// VPUNN::VPUOptimizationTarget file: line:27
 	pybind11::enum_<VPUNN::VPUOptimizationTarget>(M("VPUNN"), "VPUOptimizationTarget", "Available VPU workload generation optimization targets\n\n ")
@@ -10042,23 +9954,21 @@ void bind_VPUNN_38(std::function< pybind11::module &(std::string const &namespac
 }
 
 
-// File: VPUNN_39.cpp
+// File: VPUNN_38.cpp
 #include <array> // std::array
 #include <iterator> // __gnu_cxx::__normal_iterator
 #include <memory> // std::allocator
-#include <memory> // std::shared_ptr
 #include <sstream> // __str__
 #include <vector> // std::vector
 
 #include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
 #include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
 #include <vpu_cost_model.h>
 #include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
 
 
 #ifndef BINDER_PYBIND11_TYPE_CASTER
@@ -10068,7 +9978,7 @@ void bind_VPUNN_38(std::function< pybind11::module &(std::string const &namespac
 	PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>)
 #endif
 
-void bind_VPUNN_39(std::function< pybind11::module &(std::string const &namespace_) > &M)
+void bind_VPUNN_38(std::function< pybind11::module &(std::string const &namespace_) > &M)
 {
 	{ // VPUNN::VPULayerCostModel file: line:68
 		pybind11::class_<VPUNN::VPULayerCostModel, std::shared_ptr<VPUNN::VPULayerCostModel>, VPUNN::VPUCostModel> cl(M("VPUNN"), "VPULayerCostModel", "The VPUNN layer cost model (also called VPUNN Level2 API)");
@@ -10085,30 +9995,71 @@ void bind_VPUNN_39(std::function< pybind11::module &(std::string const &namespac
 		cl.def( pybind11::init( [](const std::string & a0, bool const & a1, const unsigned int & a2){ return new VPUNN::VPULayerCostModel(a0, a1, a2); } ), "doc" , pybind11::arg("filename"), pybind11::arg("profile"), pybind11::arg("cache_size"));
 		cl.def( pybind11::init<const std::string &, bool, const unsigned int, const unsigned int>(), pybind11::arg("filename"), pybind11::arg("profile"), pybind11::arg("cache_size"), pybind11::arg("batch_size") );
 
-		cl.def("set_maxWorkloadsPerIntraTileSplit", (void (VPUNN::VPULayerCostModel::*)(unsigned int)) &VPUNN::VPULayerCostModel::set_maxWorkloadsPerIntraTileSplit, "limits the split of a tile (intra-tile split) to this number of individual workloads\n\nC++: VPUNN::VPULayerCostModel::set_maxWorkloadsPerIntraTileSplit(unsigned int) --> void", pybind11::arg("new_value"));
+		cl.def("set_maxWorkloadsPerIntraTileSplit", (void (VPUNN::VPULayerCostModel::*)(unsigned int)) &VPUNN::VPULayerCostModel::set_maxWorkloadsPerIntraTileSplit, "C++: VPUNN::VPULayerCostModel::set_maxWorkloadsPerIntraTileSplit(unsigned int) --> void", pybind11::arg("new_value"));
 		cl.def("get_maxWorkloadsPerIntraTileSplit", (unsigned int (VPUNN::VPULayerCostModel::*)() const) &VPUNN::VPULayerCostModel::get_maxWorkloadsPerIntraTileSplit, "C++: VPUNN::VPULayerCostModel::get_maxWorkloadsPerIntraTileSplit() const --> unsigned int");
-		cl.def("Layer", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, struct VPUNN::VPULayerStrategy)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a DPULayer given a strategy and context\n\n \n the DPULayer\n \n\n the layer strategy, shaves do not matter\n \n\n  measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::DPULayer &, struct VPUNN::VPULayerStrategy) --> unsigned int", pybind11::arg("layer"), pybind11::arg("strategy"));
+		cl.def("Layer", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, struct VPUNN::VPULayerStrategy)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a DPULayer\n\n \n the DPULayer\n \n\n the layer strategy, shaves do not matter\n \n\n  measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::DPULayer &, struct VPUNN::VPULayerStrategy) --> unsigned int", pybind11::arg("layer"), pybind11::arg("strategy"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1) -> unsigned int { return o.Layer(a0, a1); }, "", pybind11::arg("layer"), pybind11::arg("strategy"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2) -> unsigned int { return o.Layer(a0, a1, a2); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2, unsigned int const & a3) -> unsigned int { return o.Layer(a0, a1, a2, a3); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2, unsigned int const & a3, bool const & a4) -> unsigned int { return o.Layer(a0, a1, a2, a3, a4); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2, unsigned int const & a3, bool const & a4, bool const & a5) -> unsigned int { return o.Layer(a0, a1, a2, a3, a4, a5); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"));
-		cl.def("Layer", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a DPULayer using a specific strategy and context\n\n It splits on tiles(between tiles, using the strategy), then, for each tile , makes the intra-tile split on\n workloads and choses the best one\n\n \n the DPULayer\n \n\n the inter-tile tiling strategy to use\n \n\n the number of DPU (for each tile)\n \n\n the number of CMX tiles\n \n\n enable/disable input in DDR (require extra DMA to fetch data in CMX)\n \n\n enable/disable output in DDR (require extra DMA to spill data in CMX)\n \n\n enable/disable weight prefetching (require extra DMA to fetch weighs in CMX if disabled)\n \n\n measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool) --> unsigned int", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"), pybind11::arg("prefetching"));
+		cl.def("Layer", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a DPULayer using a specific strategy and execution mode\n\n It splits on tiles(between tiles, using the strategy), then, for each tile , makes the intra-tile split on\n workloads and choses the best one\n\n \n the DPULayer\n \n\n the inter-tile tiling strategy to use\n \n\n the number of DPU (for each tile)\n \n\n the number of CMX tiles\n \n\n enable/disable input in DDR (require extra DMA to fetch data in CMX)\n \n\n enable/disable output in DDR (require extra DMA to spill data in CMX)\n \n\n enable/disable weight prefetching\n \n\n measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool) --> unsigned int", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"), pybind11::arg("prefetching"));
 		cl.def("Layer", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool, class std::vector<struct VPUNN::OneTileLayerInfo, class std::allocator<struct VPUNN::OneTileLayerInfo> > &)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a DPULayer using a specific strategy and execution mode\n\n It splits on tiles(between tiles, using the strategy), then, for each tile , makes the intra-tile split on\n workloads and choses the best one\n\n \n the DPULayer\n \n\n the inter-tile tiling strategy to use\n \n\n the number of DPU (for each tile)\n \n\n the number of CMX tiles\n \n\n enable/disable input in DDR (require extra DMA to fetch data in CMX)\n \n\n enable/disable output in DDR (require extra DMA to spill data in CMX)\n \n\n enable/disable weight prefetching\n \n\n [out] gives as output the information on how was split this layer and what is the best\n split on workloads\n \n\n measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool, class std::vector<struct VPUNN::OneTileLayerInfo, class std::allocator<struct VPUNN::OneTileLayerInfo> > &) --> unsigned int", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"), pybind11::arg("prefetching"), pybind11::arg("detailed_split"));
+		cl.def("layer_cycles", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1) -> unsigned int { return o.layer_cycles(a0, a1); }, "", pybind11::arg("layer"), pybind11::arg("strategy"));
+		cl.def("layer_cycles", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2) -> unsigned int { return o.layer_cycles(a0, a1, a2); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"));
+		cl.def("layer_cycles", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2, unsigned int const & a3) -> unsigned int { return o.layer_cycles(a0, a1, a2, a3); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"));
+		cl.def("layer_cycles", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2, unsigned int const & a3, bool const & a4) -> unsigned int { return o.layer_cycles(a0, a1, a2, a3, a4); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"));
+		cl.def("layer_cycles", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2, unsigned int const & a3, bool const & a4, bool const & a5) -> unsigned int { return o.layer_cycles(a0, a1, a2, a3, a4, a5); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"));
+		cl.def("layer_cycles", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1, unsigned int const & a2, unsigned int const & a3, bool const & a4, bool const & a5, bool const & a6) -> unsigned int { return o.layer_cycles(a0, a1, a2, a3, a4, a5, a6); }, "", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"), pybind11::arg("prefetching"));
+		cl.def("layer_cycles", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool, class std::vector<struct VPUNN::OneTileLayerInfo, class std::allocator<struct VPUNN::OneTileLayerInfo> > *)) &VPUNN::VPULayerCostModel::layer_cycles, "Compute the optimal cost of a DPULayer using a specific strategy and execution mode\n\n It splits on tiles(between tiles, using the strategy), then, for each tile , makes the intra-tile split on\n workloads and choses the best one\n\n \n the DPULayer\n \n\n the inter-tile tiling strategy to use\n \n\n the number of DPU (for each tile)\n \n\n the number of CMX tiles\n \n\n enable/disable input in DDR (require extra DMA to fetch data in CMX)\n \n\n enable/disable output in DDR (require extra DMA to spill data in CMX)\n \n\n enable/disable weight prefetching\n \n\n [out] gives as output the information on how was split this layer and what is the best\n split on workloads. ignored if null\n \n\n measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::layer_cycles(struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int, unsigned int, bool, bool, bool, class std::vector<struct VPUNN::OneTileLayerInfo, class std::allocator<struct VPUNN::OneTileLayerInfo> > *) --> unsigned int", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"), pybind11::arg("prefetching"), pybind11::arg("detailed_split"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0) -> unsigned int { return o.Layer(a0); }, "", pybind11::arg("layer"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, unsigned int const & a1) -> unsigned int { return o.Layer(a0, a1); }, "", pybind11::arg("layer"), pybind11::arg("nDPU"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, unsigned int const & a1, unsigned int const & a2) -> unsigned int { return o.Layer(a0, a1, a2); }, "", pybind11::arg("layer"), pybind11::arg("nDPU"), pybind11::arg("nTiles"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, unsigned int const & a1, unsigned int const & a2, bool const & a3) -> unsigned int { return o.Layer(a0, a1, a2, a3); }, "", pybind11::arg("layer"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::DPULayer & a0, unsigned int const & a1, unsigned int const & a2, bool const & a3, bool const & a4) -> unsigned int { return o.Layer(a0, a1, a2, a3, a4); }, "", pybind11::arg("layer"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"));
-		cl.def("Layer", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, unsigned int, unsigned int, bool, bool, bool)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a DPULayer, given a context but no strategy\n\n Analyses all strategies and selects the time o the fastest one\n\n \n the DPULayer\n \n\n the number of DPU\n \n\n the number of CMX tiles\n \n\n enable/disable input in DDR (require extra DMA to fetch data in CMX)\n \n\n enable/disable output in DDR (require extra DMA to spill data in CMX)\n \n\n enable/disable weight prefetching\n \n\n measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::DPULayer &, unsigned int, unsigned int, bool, bool, bool) --> unsigned int", pybind11::arg("layer"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"), pybind11::arg("prefetching"));
+		cl.def("Layer", (unsigned int (VPUNN::VPULayerCostModel::*)(struct VPUNN::DPULayer &, unsigned int, unsigned int, bool, bool, bool)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a DPULayer\n\n Analyses all strategies and selects the time o the fastest one\n\n \n the DPULayer\n \n\n the number of DPU\n \n\n the number of CMX tiles\n \n\n enable/disable input in DDR (require extra DMA to fetch data in CMX)\n \n\n enable/disable output in DDR (require extra DMA to spill data in CMX)\n \n\n enable/disable weight prefetching\n \n\n measured best cycles or error code . \n Cycles for error codes\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::DPULayer &, unsigned int, unsigned int, bool, bool, bool) --> unsigned int", pybind11::arg("layer"), pybind11::arg("nDPU"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"), pybind11::arg("prefetching"));
 		cl.def("Layer", (unsigned long (VPUNN::VPULayerCostModel::*)(struct VPUNN::SWOperation &, const struct VPUNN::VPULayerStrategy &)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a SWOperation\n\n \n the SHV kernel\n \n\n the layer strategy\n \n\n unsigned long int\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::SWOperation &, const struct VPUNN::VPULayerStrategy &) --> unsigned long", pybind11::arg("layer"), pybind11::arg("strategy"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::SWOperation & a0) -> unsigned long { return o.Layer(a0); }, "", pybind11::arg("layer"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::SWOperation & a0, unsigned int const & a1) -> unsigned long { return o.Layer(a0, a1); }, "", pybind11::arg("layer"), pybind11::arg("nSHV"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::SWOperation & a0, unsigned int const & a1, unsigned int const & a2) -> unsigned long { return o.Layer(a0, a1, a2); }, "", pybind11::arg("layer"), pybind11::arg("nSHV"), pybind11::arg("nTiles"));
 		cl.def("Layer", [](VPUNN::VPULayerCostModel &o, struct VPUNN::SWOperation & a0, unsigned int const & a1, unsigned int const & a2, bool const & a3) -> unsigned long { return o.Layer(a0, a1, a2, a3); }, "", pybind11::arg("layer"), pybind11::arg("nSHV"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"));
 		cl.def("Layer", (unsigned long (VPUNN::VPULayerCostModel::*)(struct VPUNN::SWOperation &, unsigned int, unsigned int, bool, bool)) &VPUNN::VPULayerCostModel::Layer, "Compute the optimal cost of a SHV kernel\n\n \n the SHV kernel\n \n\n the number of SHV/tile\n \n\n the number of CMX tiles\n \n\n enable/disable input in DDR (require extra DMA to fetch data in CMX)\n \n\n enable/disable output in DDR (require extra DMA to spill data in CMX)\n \n\n unsigned long int\n\nC++: VPUNN::VPULayerCostModel::Layer(struct VPUNN::SWOperation &, unsigned int, unsigned int, bool, bool) --> unsigned long", pybind11::arg("layer"), pybind11::arg("nSHV"), pybind11::arg("nTiles"), pybind11::arg("input_in_ddr"), pybind11::arg("output_in_ddr"));
+		cl.def("WeightsPrefetching", [](VPUNN::VPULayerCostModel &o, const struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1) -> unsigned long { return o.WeightsPrefetching(a0, a1); }, "", pybind11::arg("layer"), pybind11::arg("strategy"));
+		cl.def("WeightsPrefetching", (unsigned long (VPUNN::VPULayerCostModel::*)(const struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int)) &VPUNN::VPULayerCostModel::WeightsPrefetching, "The cycles it takes to prefetch the weights\n\n \n the DPULayer\n \n\n the tiling strategy to use\n \n\n the number of CMX tiles\n \n\n unsigned long int\n\nC++: VPUNN::VPULayerCostModel::WeightsPrefetching(const struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int) --> unsigned long", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nTiles"));
+		cl.def("MemoryFootprint", [](VPUNN::VPULayerCostModel &o, const struct VPUNN::DPULayer & a0, enum VPUNN::VPUTilingStrategy const & a1) -> unsigned long { return o.MemoryFootprint(a0, a1); }, "", pybind11::arg("layer"), pybind11::arg("strategy"));
+		cl.def("MemoryFootprint", (unsigned long (VPUNN::VPULayerCostModel::*)(const struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int)) &VPUNN::VPULayerCostModel::MemoryFootprint, "Overall memory footprint of a layer\n\n \n the DPULayer\n \n\n the tiling strategy to use\n \n\n the number of CMX tiles\n \n\n unsigned long int\n\nC++: VPUNN::VPULayerCostModel::MemoryFootprint(const struct VPUNN::DPULayer &, enum VPUNN::VPUTilingStrategy, unsigned int) --> unsigned long", pybind11::arg("layer"), pybind11::arg("strategy"), pybind11::arg("nTiles"));
 		cl.def_static("getValidTilingStrategies", (class std::vector<enum VPUNN::VPUTilingStrategy, class std::allocator<enum VPUNN::VPUTilingStrategy> > (*)(const enum VPUNN::VPUDevice &)) &VPUNN::VPULayerCostModel::getValidTilingStrategies, "Get the valid tiling strategy for a device\n\n \n the VPUDevice\n \n\n std::vector<VPUTilingStrategy>\n\nC++: VPUNN::VPULayerCostModel::getValidTilingStrategies(const enum VPUNN::VPUDevice &) --> class std::vector<enum VPUNN::VPUTilingStrategy, class std::allocator<enum VPUNN::VPUTilingStrategy> >", pybind11::arg("device"));
 	}
+}
+
+
+// File: VPUNN_39.cpp
+#include <iterator> // __gnu_cxx::__normal_iterator
+#include <list> // std::list
+#include <memory> // std::allocator
+#include <memory> // std::shared_ptr
+#include <sstream> // __str__
+#include <vector> // std::vector
+
+#include <functional>
+#include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
+#include <vpu_cost_model.h>
+#include <vpu_network_cost_model.h>
+
+
+#ifndef BINDER_PYBIND11_TYPE_CASTER
+	#define BINDER_PYBIND11_TYPE_CASTER
+	PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>)
+	PYBIND11_DECLARE_HOLDER_TYPE(T, T*)
+	PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>)
+#endif
+
+void bind_VPUNN_39(std::function< pybind11::module &(std::string const &namespace_) > &M)
+{
 	{ // VPUNN::VPUComputeNode file: line:25
 		pybind11::class_<VPUNN::VPUComputeNode, std::shared_ptr<VPUNN::VPUComputeNode>> cl(M("VPUNN"), "VPUComputeNode", "Base class that represent\n\n ");
 		cl.def( pybind11::init<const class std::shared_ptr<struct VPUNN::DPULayer>>(), pybind11::arg("dpu_op") );
@@ -10140,39 +10091,6 @@ void bind_VPUNN_39(std::function< pybind11::module &(std::string const &namespac
 		cl.def("exists", (bool (VPUNN::VPUComputeNodeMap<std::vector<std::shared_ptr<VPUNN::VPUComputeNode>, std::allocator<std::shared_ptr<VPUNN::VPUComputeNode> > >>::*)(const class std::shared_ptr<class VPUNN::VPUComputeNode> &)) &VPUNN::VPUComputeNodeMap<std::vector<std::shared_ptr<VPUNN::VPUComputeNode>, std::allocator<std::shared_ptr<VPUNN::VPUComputeNode> > > >::exists, "C++: VPUNN::VPUComputeNodeMap<std::vector<std::shared_ptr<VPUNN::VPUComputeNode>, std::allocator<std::shared_ptr<VPUNN::VPUComputeNode> > > >::exists(const class std::shared_ptr<class VPUNN::VPUComputeNode> &) --> bool", pybind11::arg("_key"));
 		cl.def("assign", (class VPUNN::VPUComputeNodeMap<class std::vector<class std::shared_ptr<class VPUNN::VPUComputeNode>, class std::allocator<class std::shared_ptr<class VPUNN::VPUComputeNode> > > > & (VPUNN::VPUComputeNodeMap<std::vector<std::shared_ptr<VPUNN::VPUComputeNode>, std::allocator<std::shared_ptr<VPUNN::VPUComputeNode> > >>::*)(const class VPUNN::VPUComputeNodeMap<class std::vector<class std::shared_ptr<class VPUNN::VPUComputeNode>, class std::allocator<class std::shared_ptr<class VPUNN::VPUComputeNode> > > > &)) &VPUNN::VPUComputeNodeMap<std::vector<std::shared_ptr<VPUNN::VPUComputeNode>, std::allocator<std::shared_ptr<VPUNN::VPUComputeNode> > > >::operator=, "C++: VPUNN::VPUComputeNodeMap<std::vector<std::shared_ptr<VPUNN::VPUComputeNode>, std::allocator<std::shared_ptr<VPUNN::VPUComputeNode> > > >::operator=(const class VPUNN::VPUComputeNodeMap<class std::vector<class std::shared_ptr<class VPUNN::VPUComputeNode>, class std::allocator<class std::shared_ptr<class VPUNN::VPUComputeNode> > > > &) --> class VPUNN::VPUComputeNodeMap<class std::vector<class std::shared_ptr<class VPUNN::VPUComputeNode>, class std::allocator<class std::shared_ptr<class VPUNN::VPUComputeNode> > > > &", pybind11::return_value_policy::automatic, pybind11::arg(""));
 	}
-}
-
-
-// File: VPUNN_40.cpp
-#include <iterator> // __gnu_cxx::__normal_iterator
-#include <list> // std::list
-#include <memory> // std::allocator
-#include <memory> // std::shared_ptr
-#include <sstream> // __str__
-#include <vector> // std::vector
-#include <vpu_network_cost_model.h> // VPUNN::VPUNetworkCostModel
-#include <vpu_network_cost_model.h> // VPUNN::VPUNetworkStrategy
-
-#include <functional>
-#include <pybind11/pybind11.h>
-#include <string>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <vpu_cost_model.h>
-#include <vpu_network_cost_model.h>
-#include <vpu/shave/layers.h>
-#include <pybind11/stl.h>
-
-
-#ifndef BINDER_PYBIND11_TYPE_CASTER
-	#define BINDER_PYBIND11_TYPE_CASTER
-	PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>)
-	PYBIND11_DECLARE_HOLDER_TYPE(T, T*)
-	PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>)
-#endif
-
-void bind_VPUNN_40(std::function< pybind11::module &(std::string const &namespace_) > &M)
-{
 	{ // VPUNN::VPUComputeNodeMap file: line:122
 		pybind11::class_<VPUNN::VPUComputeNodeMap<unsigned int>, std::shared_ptr<VPUNN::VPUComputeNodeMap<unsigned int>>> cl(M("VPUNN"), "VPUComputeNodeMap_unsigned_int_t", "");
 		cl.def( pybind11::init( [](){ return new VPUNN::VPUComputeNodeMap<unsigned int>(); } ) );
@@ -10228,6 +10146,37 @@ void bind_VPUNN_40(std::function< pybind11::module &(std::string const &namespac
 		}
 
 	}
+}
+
+
+// File: VPUNN_40.cpp
+#include <list> // std::list
+#include <memory> // std::allocator
+#include <memory> // std::shared_ptr
+#include <sstream> // __str__
+#include <vector> // std::vector
+#include <vpu_network_cost_model.h> // VPUNN::VPUNetworkCostModel
+#include <vpu_network_cost_model.h> // VPUNN::VPUNetworkStrategy
+
+#include <functional>
+#include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include <vpu/shave/layers.h>
+#include <vpu_cost_model.h>
+#include <vpu_network_cost_model.h>
+
+
+#ifndef BINDER_PYBIND11_TYPE_CASTER
+	#define BINDER_PYBIND11_TYPE_CASTER
+	PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>)
+	PYBIND11_DECLARE_HOLDER_TYPE(T, T*)
+	PYBIND11_MAKE_OPAQUE(std::shared_ptr<void>)
+#endif
+
+void bind_VPUNN_40(std::function< pybind11::module &(std::string const &namespace_) > &M)
+{
 	{ // VPUNN::VPUNetworkStrategy file:vpu_network_cost_model.h line:22
 		pybind11::class_<VPUNN::VPUNetworkStrategy, std::shared_ptr<VPUNN::VPUNetworkStrategy>> cl(M("VPUNN"), "VPUNetworkStrategy", "VPU Network strategy type\n\n ");
 		cl.def( pybind11::init( [](){ return new VPUNN::VPUNetworkStrategy(); } ) );
@@ -10257,9 +10206,9 @@ void bind_VPUNN_40(std::function< pybind11::module &(std::string const &namespac
 }
 
 
-#include <map>
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>

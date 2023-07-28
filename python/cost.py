@@ -85,7 +85,7 @@ def define_and_parse_args():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["DPU", "DMA"],
+        choices=["DPU", "DMA", "Utilization"],
         default="DPU",
         help="Profiling mode",
     )
@@ -95,7 +95,6 @@ def define_and_parse_args():
         choices=[
             "cycles",
             "power",
-            "utilization",
         ],
         default="cycles",
         help="Target type",
@@ -251,13 +250,8 @@ def main():
     model = VPUCostModel(args.model, verbose=True)
 
     if args.mode == "DPU":
-        if args.target == "cycles":
-            function_ = model.DPU
-        elif args.target == "power":
-            function_ = model.DPUActivityFactor
-        else:
-            function_ = model.hw_utilization
-        result = function_(
+        function_ = model.DPU if args.target == "cycles" else model.DPUPower
+        cycles = function_(
             device=f"VPUDevice.{args.device.upper()}",
             operation=f"Operation.{args.operation.upper()}",
             input_0_width=args.width,
@@ -284,7 +278,7 @@ def main():
             output_write_tiles=args.output_write_tiles,
             isi_strategy=f"ISIStrategy.{args.isi_strategy.upper()}",
         )
-        print(f"DPU execution {args.target}: {result}")
+        print(f"DPU execution {args.target}: {cycles}")
     elif args.mode == "DMA":
         input_height, input_width = getInputDim(
             [args.height, args.width],

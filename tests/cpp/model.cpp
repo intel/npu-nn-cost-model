@@ -92,29 +92,4 @@ TEST_F(TestModelVersion, SimpleVersionExtraction) {
     }
 }
 
-class PostProcessChecker : public ::testing::Test {
-protected:
-    void SetUp() override {
-    }
-};
-/// @brief Basic test to check the versions that are supported or not
-TEST_F(PostProcessChecker, BasicOutputSupport) {
-    struct Test {
-        std::string info;
-        int output_version;
-        bool support;
-    };
-
-    std::vector<Test> test_vector{
-            {"OUT_LATEST", 0, true},       {"OUT_HW_OVERHEAD_BOUNDED", 1, false},
-            {"OUT_CYCLES", 2, true},       {"OUT_HW_OVERHEAD_UNBOUNDED", 3, false},
-            {"Other versions", 4, false},  {"Other versions", 199, false},
-            {"Other versions", 22, false},
-    };
-
-    for (const auto& tst : test_vector) {
-        VPUNN::PostProcessSupport support_config(tst.output_version);
-        EXPECT_EQ(support_config.is_output_supported(), tst.support) << tst.info << " is expected as " << tst.support;
-    }
-}
 }  // namespace VPUNN_unit_tests

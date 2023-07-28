@@ -168,7 +168,7 @@ public:
             }
             {  // stride , depends on input zero, and operation sometimes
                 const auto k{w.kernel};
-                const auto stride_options{config.get_dpu_strides_range(w)};
+                const auto stride_options{config.get_strides_range(w)};
 
                 checker.check_is_in_list(k.stride_width, stride_options.first, "kernel.stride_width");
                 checker.check_is_in_list(k.stride_height, stride_options.second, "kernel.stride_height");

@@ -128,17 +128,11 @@ inline unsigned int divide_and_multiply_vectors(const std::vector<unsigned int>&
 inline unsigned int helper_input_dim(unsigned int output, unsigned int kernel, unsigned int total_padding,
                                      unsigned int stride) {
     // output = floor((input + total_padding - kernel) / stride)) + 1
-    int input = ((int)output - 1) * (int)stride - (int)total_padding + (int)kernel;
-    if (input < 0) {
-        input = 0;
-    }
-    if (output > 0) {
-        assert(output == (input + total_padding - kernel) / stride + 1);
-    } else {
-        assert(output == (unsigned int)input);  // zero
-    }
+    unsigned int input = (output - 1) * stride - total_padding + kernel;
+    assert(output == (input + total_padding - kernel) / stride + 1);
     return input;
 }
+
 }  // namespace VPUNN
 
 #endif  // VPUNN_UTILS_H

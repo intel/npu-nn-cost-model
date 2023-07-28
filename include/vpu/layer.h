@@ -36,8 +36,7 @@ struct DPULayer : public DPUWorkload {
     /**
      * @brief Implements the Clustering tiling strategy (inter tile)
      * @details In the clustering tiling strategy, both activations and weights are fully replicated in all tiles
-     * isi_strategy set to clustering
-     * and output_write_tiles are propagated from input
+     * isi_strategy and output_write_tiles are set to clustering and 1
      *
      * @param nTiles number of dpu tiles
      * @return std::vector<DPULayer> the list of layers
@@ -47,9 +46,8 @@ struct DPULayer : public DPUWorkload {
 
         // ensure that  the Layer/workloads in each tile is marked as clustering and output tiles =1
         for (auto& tile : tiles) {
-            tile.isi_strategy = ISIStrategy::CLUSTERING;         // in order to propagate to workloads
-            tile.output_write_tiles = this->output_write_tiles;  // in order to propagate to workloads. CLUSTERING  does
-                                                                 // not force to any particular value
+            tile.isi_strategy = ISIStrategy::CLUSTERING;  // in order to propagate to workloads
+            tile.output_write_tiles = 1;                  // in order to propagate to workloads.
         }
         return tiles;
     }
@@ -57,13 +55,9 @@ struct DPULayer : public DPUWorkload {
     /**
      * @brief Implements the SplitOverH (SOH) tiling strategy (inter tile)
      * @details In the SOH tiling strategy, activations are split across the tiles over the H dimension
-     * todo: Cut lines must be without padding
-     * todo: compute tensors have a halo where the cut is to indicate how many lines are taken from the other tile
      * The weights are fully replicated in all tiles
      * Populates also ISI strategy with SOH
-     * output_write_tiles is propagated from inputLayer  to the tiles Layers
-     *
-     *if output tiles are less than nTiles , the ISI strategy or output_write_tiles are not adjusted
+     * output_write_tiles is set to nTiles
      *
      * @param nTiles number of CMX tiles
      * @return std::vector<DPULayer>  the list of split layers. can be smaller than nTiles
@@ -88,101 +82,13 @@ struct DPULayer : public DPUWorkload {
             tile.outputs[0].set_shape({output_shape[0], output_tile_height, output_shape[2], output_shape[3]});
             tile.inputs[0].set_shape({input_shape[0], input_tile_height, input_shape[2], input_shape[3]});
 
-            tile.isi_strategy = ISIStrategy::SPLIT_OVER_H;       // in order to propagate to workloads
-            tile.output_write_tiles = this->output_write_tiles;  // in order to propagate to workloads. SOH does not
-                                                                 // force to any particular value
+            tile.isi_strategy = ISIStrategy::SPLIT_OVER_H;  // in order to propagate to workloads
+            tile.output_write_tiles = 1U;                   // in order to propagate to workloads. SOH forces to 1
         }
         // Remove tiles that are of zero size
         remove_empty_tiles(tiles);
 
-        return tiles;
-    }
-    /**
-     * @brief Implements the SplitOverH_OVERLAPPED (SOH) tiling strategy (inter tile)
-     * @details In the SOHOVERLAPPED tiling strategy, activations are split across the tiles over the H dimension
-     * Compute tensors are the same as memory tensors (no halo at cut lines)
-     * no padding at cut lines
-     * Internal slices (tiles>2), have 2 borders and may produce more than outside slices.
-     * Populates also ISI strategy with CLUSTERING,
-     * output_write_tiles is propagated from inputLayer  to the tiles Layers
-     *
-     * if output tiles are less than nTiles , the ISI strategy or output_write_tiles are not adjusted
-     *
-     * @param nTiles number of CMX tiles
-     * @return std::vector<DPULayer>  the list of split layers. can be smaller than nTiles
-     */
-    std::vector<DPULayer> SOH_overlapped(unsigned int nTiles) const {
-        const unsigned int output_size = outputs[0].height();
-        const unsigned int input_size = inputs[0].height();
-        const auto dimKernel{Dim::Grid::H};
-        const auto pad_begin{Dim::TOP};
-        const auto pad_end{Dim::BOTTOM};
-
-        const auto k = kernels[dimKernel];
-        const auto s = strides[dimKernel];
-        const auto layer_pad_begin = padding[pad_begin];
-        const auto layer_pad_end = padding[pad_end];
-
-        const unsigned int desired_tile_dim = ceil_division(output_size, nTiles);  // non uniform
-
-        std::vector<DPULayer> tiles(nTiles, *this);  // initial split , just copy to nTiles
-
-        // first tile will keep the external padding from parent
-        // last tile will keep the external padding from parent
-        // internal tiles (internal cuts) must have padding = 0
-
-        int available_in = input_size + (int)(padding[pad_begin]);  // positive or 0
-
-        unsigned int remaining_to_split = output_size;
-        for (size_t i = 0; i < tiles.size(); ++i) {
-            const bool first_pad_inherited{(i == 0) ? true : false};  // is top tile
-            const auto output_tile_dim{(remaining_to_split >= desired_tile_dim) ? desired_tile_dim
-                                                                                : remaining_to_split};
-            remaining_to_split -= output_tile_dim;                                      // no underflow possible
-            const bool second_pad_inherited{(remaining_to_split == 0) ? true : false};  // is last/bottom tile
-
-            auto& tile = tiles[i];
-            // set correct padding of this tile based on position vs borders
-            tile.padding[pad_begin] = first_pad_inherited ? layer_pad_begin : 0;
-            tile.padding[pad_end] = second_pad_inherited ? layer_pad_end : 0;
-
-            // ho much input this output needs!
-            const int input_max_required_size = helper_input_dim(output_tile_dim, k, 0 /*pad=0*/, s);
-
-            const int need_more_size =
-                    input_max_required_size -
-                    available_in;  // if positive we need more space, we have to take from second padding
-
-            auto input_tile = input_max_required_size - (int)tile.padding[pad_begin];  // padding start is used first;
-            if (need_more_size > 0) {  // will rely also on a part of second padding (but maybe not all)
-                input_tile = input_tile - std::min(need_more_size /*take from padding*/,
-                                                   (int)tile.padding[pad_end] /*take all padding*/);
-            }
-
-            if (input_tile < 0) {
-                input_tile = 0;
-            }
-
-            const unsigned int input_tile_dim = input_tile;
-
-            {
-                const auto& output_shape = outputs[0].get_shape();
-                const auto& input_shape = inputs[0].get_shape();
-                // Set input and output shape, specific for H
-                tile.outputs[0].set_shape(
-                        {output_shape[Dim::X], output_tile_dim, output_shape[Dim::Z], output_shape[Dim::B]});
-                tile.inputs[0].set_shape(
-                        {input_shape[Dim::X], input_tile_dim, input_shape[Dim::Z], input_shape[Dim::B]});
-            }
-            tile.isi_strategy = ISIStrategy::CLUSTERING;         // in order to propagate to workloads
-            tile.output_write_tiles = this->output_write_tiles;  // in order to propagate to workloads. SOH overlapped
-                                                                 // does not force to any particular value
-
-            available_in = available_in - output_tile_dim * s;  // consumed at input
-        }
-
-        // Remove tiles that are of zero size
-        remove_empty_tiles(tiles);
+        // @todo: maybe here we should normalize in case of only 1 layer=> clustering + out tile = n=1
         return tiles;
     }
 
@@ -194,7 +100,6 @@ struct DPULayer : public DPUWorkload {
      *
      * Populates also ISI strategy with SOK
      * output_write_tiles is set to actual nTiles
-     * if output tiles are less than nTiles output_write_tiles are adjusted to actual output tiles
      *
      * @param nTiles number of CMX tiles
      * @param rounding the channel alignment
@@ -218,18 +123,12 @@ struct DPULayer : public DPUWorkload {
             tile.recomputeInputTensorShape();
 
             tile.isi_strategy = ISIStrategy::SPLIT_OVER_K;  // in order to propagate to workloads
-            tile.output_write_tiles = nTiles;  // in order to propagate to workloads. Might mbe less in practice
+            tile.output_write_tiles = nTiles;  // in order to propagate to workloads. Might me less in practice
         }
         // Remove tiles that are of zero size
         remove_empty_tiles(tiles);
-        // in case the actual number of tiles <nTiles, limit the propagated value to number of
-        // actual tiles
-        if (tiles.size() < nTiles) {
-            const unsigned int n_broadcast{static_cast<unsigned int>(tiles.size())};
-            std::for_each(tiles.begin(), tiles.end(), [n_broadcast](auto& t) {
-                t.output_write_tiles = n_broadcast;
-            });
-        }
+
+        // @todo: maybe here we should normalize in case of only 1 layer=> clustering + out tile = n=1
         return tiles;
     }
 
@@ -311,7 +210,6 @@ public:
         switch (strategy) {
         case VPUTilingStrategy::SOH:
             return SOH(nTiles);
-            // return SOH_overlapped(nTiles);  // make it  SOH Overlapped (also for VPU 2.0?)
         case VPUTilingStrategy::SOK:
             return SOK(nTiles);
         case VPUTilingStrategy::SOHK:

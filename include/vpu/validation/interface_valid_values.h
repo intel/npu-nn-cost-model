@@ -128,12 +128,22 @@ public:
     /// restricts ISI options based on output write tile value.
     virtual Values<ISIStrategy> get_ISI_Strategy_Range(const DPUOperation& dpu) const noexcept {
         Values<ISIStrategy> v{isi_stategy_options};
-
-        if (dpu.output_write_tiles <= 1) {  // SOK must have broadcasting, not allowed without
+        if (dpu.output_write_tiles <= 1) {
+            // v = {ISIStrategy::CLUSTERING, ISIStrategy::SPLIT_OVER_H};
             //   Erase–remove idiom
             v.erase(std::remove_if(v.begin(), v.end(),
-                                   [](const ISIStrategy& x) {                  // SOK not allowed, remove it
-                                       return x == ISIStrategy::SPLIT_OVER_K;  // true =remove
+                                   [](const ISIStrategy& x) {
+                                       // SOK not allowed for <=1
+                                       return x == ISIStrategy::SPLIT_OVER_K;
+                                   }),
+                    v.cend());
+        } else {
+            // eliminate  if not SOK
+            //    Erase–remove idiom
+            v.erase(std::remove_if(v.begin(), v.end(),
+                                   [](const ISIStrategy& x) {
+                                       // SOK only  allowed for >1
+                                       return x != ISIStrategy::SPLIT_OVER_K;
                                    }),
                     v.cend());
         }
@@ -158,19 +168,8 @@ public:
     /// @returns a pair of lists of values, one first for  stride Width, second for stride height
     std::pair<Values<int>, Values<int>> get_strides_range(const DPUOperation& dpu) const {
         auto max_stride_op = get_maximum_kernel_stride(dpu.operation);
-        const auto max_stride_w = std::min(
-                {max_stride_op, (int)dpu.input_0.width + (int)dpu.kernel.pad_left + (int)dpu.kernel.pad_right});
-        const auto max_stride_h = std::min(
-                {max_stride_op, (int)dpu.input_0.height + (int)dpu.kernel.pad_top + (int)dpu.kernel.pad_bottom});
-        return std::make_pair(makeList(1, max_stride_w), makeList(1, max_stride_h));
-    }
-
-    /// @ brief this function is set to determine the range of strides for the split layers
-    /// @returns a pair of lists of values, one first for  stride Width, second for stride height
-    std::pair<Values<int>, Values<int>> get_dpu_strides_range(const DPUOperation& dpu) const {
-        auto max_stride_op = get_maximum_kernel_stride(dpu.operation);
-        const auto max_stride_w = max_stride_op;
-        const auto max_stride_h = max_stride_op;
+        const auto max_stride_w = std::min({max_stride_op, (int)dpu.input_0.width});
+        const auto max_stride_h = std::min({max_stride_op, (int)dpu.input_0.height});
         return std::make_pair(makeList(1, max_stride_w), makeList(1, max_stride_h));
     }
 
@@ -224,13 +223,13 @@ public:
     int input_heigth_start_factor_SOH{1};  ///<  to be set in derived implementations
 
 protected:
-    static constexpr int input_spatial_dim_max{8192};  ///< 1-8K. MAX HW dim
+    static constexpr int input_spatial_dim_max{8192 - 1};  ///< 1-8K. MAX HW dim
 
-    static constexpr int channels_max{512};         ///< 128,512, etc: influences channels range,
-    static constexpr int cm_conv_channels_max{16};  ///< CM convolution is limited to C<=16 ,
+    static constexpr int channels_max{512 - 1};         ///< 128,512, etc: influences channels range,
+    static constexpr int cm_conv_channels_max{16 - 1};  ///< CM convolution is limited to C<16 ,
 
     static constexpr int kernel_max{11};  ///< max nominal kernel size (hardware)
-    static constexpr int stride_max{8};   ///< hardware limit to 8
+    static constexpr int stride_max{7};   ///< hardware limit to 7
 
     static constexpr DataType default_quantized{DataType::UINT8};
     static constexpr DataType default_float{DataType::FLOAT16};

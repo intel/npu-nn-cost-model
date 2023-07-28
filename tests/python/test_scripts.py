@@ -18,8 +18,8 @@ def run(command, path="."):
     return subprocess.check_output(command, cwd=path, shell=True)
 
 
-@pytest.mark.parametrize("mode", ["DPU", "DMA"])
-@pytest.mark.parametrize("target", ["cycles", "power", "utilization"])
+@pytest.mark.parametrize("mode", ["DPU", "DMA", "Utilization"])
+@pytest.mark.parametrize("target", ["cycles", "power"])
 @pytest.mark.parametrize("device", ["VPU_2_0", "VPU_2_7"])
 @pytest.mark.parametrize("operation", ["CONVOLUTION"])
 @pytest.mark.parametrize("width", [56])

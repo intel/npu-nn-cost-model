@@ -15,37 +15,27 @@
 #include <vector>
 #include "core/tensors.h"
 
-/// @brief namespace for Unit tests of the C++ library
-namespace VPUNN_unit_tests {
-class TestSigmoidLayer : public testing::Test {
-public:
-protected:
-    void SetUp() override {
+void sigmoid_test(unsigned int input_channels, unsigned int batch_size = 1) {
+    auto input = VPUNN::random_uniform<float>({batch_size, input_channels}, -10.0, 10.0);
+    auto expected_output = VPUNN::Tensor<float>({batch_size, input_channels}, 0);
+
+    // Compute the expected output
+    for (unsigned int idx = 0; idx < batch_size * input_channels; idx++) {
+        expected_output[idx] = 1 / (1 + std::exp(-input[idx]));
     }
-    void sigmoid_test(unsigned int input_channels, unsigned int batch_size = 1) {
-        auto input = VPUNN::random_uniform<float>({batch_size, input_channels}, -10.0, 10.0);
-        auto expected_output = VPUNN::Tensor<float>({batch_size, input_channels}, 0);
 
-        // Compute the expected output
-        for (unsigned int idx = 0; idx < batch_size * input_channels; idx++) {
-            expected_output[idx] = 1 / (1 + std::exp(-input[idx]));
-        }
+    Sigmoid(&input);
 
-        Sigmoid(&input);
-
-        for (unsigned int idx = 0; idx < batch_size * input_channels; idx++) {
-            EXPECT_FLOAT_EQ(input[idx], expected_output[idx]);
-        }
+    for (unsigned int idx = 0; idx < batch_size * input_channels; idx++) {
+        EXPECT_FLOAT_EQ(input[idx], expected_output[idx]);
     }
-};
+}
 
 // Demonstrate some basic assertions.
-TEST_F(TestSigmoidLayer, BasicAssertions) {
+TEST(TestSigmoidLayer, BasicAssertions) {
     for (auto batch_size = 1; batch_size <= 10; batch_size++) {
         for (auto input_channels = 1; input_channels <= 500; input_channels += 10) {
             sigmoid_test(input_channels, batch_size);
         }
     }
 }
-
-}  // namespace VPUNN_unit_tests

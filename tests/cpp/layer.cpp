@@ -13,9 +13,8 @@
 #include "vpu_layer_cost_model.h"
 
 namespace VPUNN_unit_tests {
-using namespace VPUNN;
 
-class VPULayerCostModelTest : public ::testing::Test {
+class DPULayerTest : public ::testing::Test {
 public:
 protected:
     VPUNN::VPULayerCostModel model_2_7{VPU_2_7_MODEL_PATH};
@@ -30,6 +29,111 @@ protected:
         VPUNN::Logger::deactivate2ndlog();
     }
 
+    using ModelDescriptor =
+            VPUNNModelsFiles::ModelDescriptor;  ///< make this type directly visible inside of this class
+    const VPUNNModelsFiles& the_NN_models{VPUNNModelsFiles::getModels()};  ///< the paths to available NN models
+
+    VPUNN::DPULayer generate_helper_layer(const unsigned int dim, const unsigned int channels) {
+        return VPUNN::DPULayer(
+                VPUNN::VPUDevice::VPU_2_0,                                            // VPU device
+                VPUNN::Operation::CONVOLUTION,                                        // Operation
+                {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
+                {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
+                {3, 3},                                                               // kernels
+                {1, 1},                                                               // strides
+                {1, 1, 1, 1}                                                          // padding
+        );
+    }
+
+    VPUNN::SHVSigmoid generate_helper_sw_layer(const unsigned int dim, const unsigned int channels) {
+        return VPUNN::SHVSigmoid(VPUNN::VPUDevice::VPU_2_0,                                          // VPU device
+                                 VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16),  // Input tensor
+                                 VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)   // Output tensor
+        );
+    }
+};
+
+TEST_F(DPULayerTest, LayerLoadModels) {
+    EXPECT_EQ(model_2_7.nn_initialized(), true);
+    EXPECT_EQ(model_2_0.nn_initialized(), true);
+}
+
+TEST_F(DPULayerTest, SplitAcrossTileSOH) {
+    auto wl = generate_helper_layer(16, 64);
+
+    auto SOH_single_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOH, 1);
+    auto SOH_two_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOH, 2);
+    auto SOH_four_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOH, 4);
+
+    // Basic expectations
+    EXPECT_EQ(SOH_single_tile.size(), 1);
+    EXPECT_EQ(SOH_two_tile.size(), 2);
+    EXPECT_EQ(SOH_four_tile.size(), 4);
+
+    // The shape of the single split must be equal to the origial layer
+    EXPECT_EQ(SOH_single_tile[0].outputs[0].get_shape(), wl.outputs[0].get_shape());
+
+    EXPECT_EQ(SOH_two_tile[0].outputs[0].size(), wl.outputs[0].size() / 2);
+    EXPECT_EQ(SOH_two_tile[0].outputs[0].get_shape()[1] * 2, wl.outputs[0].get_shape()[1]);
+
+    EXPECT_EQ(SOH_four_tile[0].outputs[0].size(), wl.outputs[0].size() / 4);
+    EXPECT_EQ(SOH_four_tile[0].outputs[0].get_shape()[1] * 4, wl.outputs[0].get_shape()[1]);
+}
+
+TEST_F(DPULayerTest, SplitAcrossTileSOK) {
+    auto wl = generate_helper_layer(16, 64);
+
+    auto SOK_single_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOK, 1);
+    auto SOK_two_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOK, 2);
+    auto SOK_four_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOK, 4);
+
+    // Basic expectations
+    EXPECT_EQ(SOK_single_tile.size(), 1);
+    EXPECT_EQ(SOK_two_tile.size(), 2);
+    EXPECT_EQ(SOK_four_tile.size(), 4);
+
+    // The shape of the single split must be equal to the origial layer
+    EXPECT_EQ(SOK_single_tile[0].outputs[0].get_shape(), wl.outputs[0].get_shape());
+
+    EXPECT_EQ(SOK_two_tile[0].outputs[0].size(), wl.outputs[0].size() / 2);
+    EXPECT_EQ(SOK_two_tile[0].outputs[0].get_shape()[2] * 2, wl.outputs[0].get_shape()[2]);
+
+    EXPECT_EQ(SOK_four_tile[0].outputs[0].size(), wl.outputs[0].size() / 4);
+    EXPECT_EQ(SOK_four_tile[0].outputs[0].get_shape()[2] * 4, wl.outputs[0].get_shape()[2]);
+}
+
+TEST_F(DPULayerTest, SplitAcrossTileSOKAsymmetric) {
+    auto wl = generate_helper_layer(16, 64);
+
+    auto SOK_asymmetric = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOK, 5);
+
+    // Basic expectations
+    EXPECT_EQ(SOK_asymmetric.size(), 4);
+
+    for (unsigned int idx = 0; idx < SOK_asymmetric.size(); idx++) {
+        EXPECT_EQ(SOK_asymmetric[idx].outputs[0].get_shape()[2], 16u);
+    }
+
+    auto wl_2 = generate_helper_layer(16, 48);
+
+    auto SOK_asymmetric_2 = wl_2.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOK, 5);
+
+    // Basic expectations
+    EXPECT_EQ(SOK_asymmetric_2.size(), 3);
+
+    for (unsigned int idx = 0; idx < SOK_asymmetric_2.size(); idx++) {
+        EXPECT_EQ(SOK_asymmetric_2[idx].outputs[0].get_shape()[2], 16u);
+    }
+}
+
+using namespace VPUNN;
+
+class VPULayerCostModelTest : /* public ::testing::Test,*/ public DPULayerTest {
+public:
+protected:
+    void SetUp() override {
+        DPULayerTest::SetUp();
+    }
     const unsigned int MAX_COST{10000000};  // ten million
     static constexpr unsigned int NO_ERROR_EXPECTED{VPUNN::Cycles::NO_ERROR};
 
@@ -115,30 +219,7 @@ protected:
             ++test_index;
         }
     }
-
-    VPUNN::DPULayer generate_helper_layer(const unsigned int dim, const unsigned int channels) {
-        return VPUNN::DPULayer(
-                VPUNN::VPUDevice::VPU_2_0,                                            // VPU device
-                VPUNN::Operation::CONVOLUTION,                                        // Operation
-                {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-                {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-                {3, 3},                                                               // kernels
-                {1, 1},                                                               // strides
-                {1, 1, 1, 1}                                                          // padding
-        );
-    }
-
-    VPUNN::SHVSigmoid generate_helper_sw_layer(const unsigned int dim, const unsigned int channels) {
-        return VPUNN::SHVSigmoid(VPUNN::VPUDevice::VPU_2_0,                                          // VPU device
-                                 VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16),  // Input tensor
-                                 VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)   // Output tensor
-        );
-    }
 };
-TEST_F(VPULayerCostModelTest, LayerLoadModels) {
-    EXPECT_EQ(model_2_7.nn_initialized(), true);
-    EXPECT_EQ(model_2_0.nn_initialized(), true);
-}
 
 TEST_F(VPULayerCostModelTest, LayerCostModelVPU_2_0) {
     auto layer = generate_helper_layer(16, 64);
@@ -200,7 +281,7 @@ TEST_F(VPULayerCostModelTest, ELTWISE_Concrete_Add14_VPU27) {
         TestInput tin{tst_layer, tst_strategy};
         tin.strategy.tiling_strategy = VPUNN::VPUTilingStrategy::SOH;
 
-        TestExpectations texp{NO_ERROR_EXPECTED, false, 6000, 6000 + 1000U};  // SOHO 10000
+        TestExpectations texp{NO_ERROR_EXPECTED, false, 6100, 6200U};  // before isistrategy fix:  10000U, 11000U
 
         DoRegularTest(tin, texp, "SOH");
     }
@@ -387,7 +468,7 @@ TEST_F(VPULayerCostModelTest, MAXPOOL_avgpoolBased_172_VPU27_SOH) {  // SOH Spli
              {NO_ERROR_EXPECTED, false, 10100, 10100 + 100},
              "SOK , no mem"},
             {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-             {NO_ERROR_EXPECTED, false, 45000, 45000 + 1000},  // SOHO 46500
+             {NO_ERROR_EXPECTED, false, 45000, 45000 + 1000},
              "SOH ,output H ?"},
     };
 
@@ -547,14 +628,14 @@ TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply6326_FLOAT_FLOAT_VPU2
                  {VPUNN::Cycles::NO_ERROR, false, 128000, 128000 + 1000},
                  "SOK , no memmove, sparse"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 327500, 327500 + 1000},  // SOHO ERROR_INPUT_TOO_BIG
+                 {VPUNN::Cycles::NO_ERROR, true, 327500, 327500 + 1000},
                  "SOH , no memmove, sparse"},
         };
 
         executeTests(tests);
     }
 }
-TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply6326_FLOAT_INT_VPU27_EISW_76882) {
+TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply6326_FLOAT_INT_VPU27) {
     const VPUNN::DPULayer tst_layer_ref(
             VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(60, 7, 512, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
@@ -592,7 +673,7 @@ TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply6326_FLOAT_INT_VPU27_
                  {VPUNN::Cycles::NO_ERROR, false, 128000, 128000 + 1000},
                  "SOK , no memmove, sparse"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, false, 329300, 329300 + 1000},  // MAIN TEST CASE, SOHO 340000
+                 {VPUNN::Cycles::NO_ERROR, false, 329000, 329000 + 1000},
                  "SOH , no memmove, sparse"},
         };
 
@@ -622,7 +703,7 @@ TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply6326_INT_FLOAT_VPU27)
                  {VPUNN::Cycles::NO_ERROR, false, 68000, 68000 + 1000},
                  "SOK , no memmove, sparse"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, false, 168000, 168000 + 1000},  // SOHO 171000
+                 {VPUNN::Cycles::NO_ERROR, false, 168000, 168000 + 1000},
                  "SOH , no memmove, sparse"},
         };
 
@@ -667,7 +748,7 @@ TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply6326_INT_INT_VPU27) {
                  {NO_ERROR_EXPECTED, false, 68000, 68000 + 1000},
                  "SOK , no memmove"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, false, 167000, 167000 + 1000},  // SOHO 171000
+                 {VPUNN::Cycles::NO_ERROR, false, 167000, 167000 + 1000},
                  "SOH , no memmove"},
         };
 
@@ -713,7 +794,7 @@ TEST_F(VPULayerCostModelTest, CONVOLUTION_Multiply_6326_FI_VPU27) {
                 // {VPUNN::Cycles::NO_ERROR, false, 132000, 132000 + 1000},//132831
                 // "SOK , no memmove, sparse"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 330000, 330000 + 1000},  // SOHO 340000
+                 {VPUNN::Cycles::NO_ERROR, true, 330000, 330000 + 1000},  // due to cmx overhead
                  "SOH , no memmove, sparse"},
         };
 
@@ -772,7 +853,7 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE) {
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 24000, 24000 + 1000},  // SOHO 48500
+                 {VPUNN::Cycles::NO_ERROR, true, 24000, 24000 + 1000},  // 24324
                  t + "SOH ,0m"},
         };
         executeTests(tests);
@@ -789,7 +870,7 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE) {
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 12000, 12000 + 1000},  // SOHO 23000
+                 {VPUNN::Cycles::NO_ERROR, true, 12000, 12000 + 1000},  // 12380
                  t + "SOH ,0m"},
         };
         executeTests(tests);
@@ -806,7 +887,7 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE) {
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 25000, 25000 + 1000},  // SOHO 50500
+                 {VPUNN::Cycles::NO_ERROR, true, 25000, 25000 + 1000},  // 25140
                  t + "SOH ,0m"},
         };
         executeTests(tests);
@@ -823,7 +904,7 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE) {
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 12000, 12000 + 1000},  // SOHO 23500
+                 {VPUNN::Cycles::NO_ERROR, true, 12000, 12000 + 1000},  // 12491
                  t + "SOH ,0m"},
         };
         executeTests(tests);
@@ -840,7 +921,7 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE) {
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 12000, 12000 + 1000},  // SOHO 23000
+                 {VPUNN::Cycles::NO_ERROR, true, 12000, 12000 + 1000},  // 12220
                  t + "SOH ,0m"},
         };
         executeTests(tests);
@@ -1008,7 +1089,7 @@ TEST_F(VPULayerCostModelTest, 01_C03_ConvolutionBackpropData_1055) {
                 // {VPUNN::Cycles::NO_ERROR, true, 132000, 132000 + 1000},  //
                 // "SOK , no memmove, sparse"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 182300, 182300 + 1000},  // 294000 for SOHO
+                 {VPUNN::Cycles::NO_ERROR, true, 182000, 182000 + 1000},  //
                  "SOH , no memmove, sparse"},
         };
 
@@ -1038,7 +1119,7 @@ TEST_F(VPULayerCostModelTest, 01_C04_ConvolutionBackpropData_1183) {
                 // {VPUNN::Cycles::NO_ERROR, true, 132000, 132000 + 1000},  //
                 // "SOK , no memmove, sparse"},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 122000, 122000 + 1000},  // 196000 for SOHO
+                 {VPUNN::Cycles::NO_ERROR, true, 122000, 122000 + 1000},  //
                  "SOH , no memmove, sparse"},
         };
 
@@ -1067,7 +1148,7 @@ TEST_F(VPULayerCostModelTest, DW_Convolution_AsymetricKernel_1) {
                  {VPUNN::Cycles::NO_ERROR, true, 13300, 13300 + 1000},  //
                  "SOK , no memmove, "},
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 7400, 7400 + 1000},  // SOHO 15000
+                 {VPUNN::Cycles::NO_ERROR, true, 7900, 7900 + 1000},  //
                  "SOH , no memmove, "},
         };
 
@@ -1075,472 +1156,4 @@ TEST_F(VPULayerCostModelTest, DW_Convolution_AsymetricKernel_1) {
     }
 }
 
-TEST_F(VPULayerCostModelTest, DW_Convolution_K8Stride8_H32) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-            {VPUNN::VPUTensor(32, 32, 64, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(4, 4, 64, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
-            {8, 8},                                                       // kernels
-            {8, 8},                                                       // strides
-            {0, 0, 0, 0}                                                  // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 4500, 4500 + 1000},
-                 "CLUSTERING , ,  "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 3100, 3100 + 1000},  //
-                 "SOK , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 4300, 4300 + 1000},  //
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, DW_Convolution_K8Stride8_H8) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-            {VPUNN::VPUTensor(8, 8, 128, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(1, 1, 128, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {8, 8},                                                      // kernels
-            {8, 8},                                                      // strides
-            {0, 0, 0, 0}                                                 // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 5400, 5400 + 1000},
-                 "CLUSTERING , ,  "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 1300, 1300 + 500},  //
-                 "SOK , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 7900,
-                  7900 + 1000},  // H=8 with K=8 , no padding cannot be split on h
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, Model_C1_v2_a_0_int8_NCHW_FP16_LATENCY_API10_MLIR) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(1, 1, 16, 1, VPUNN::DataType::UINT8)},      // input dimensions
-            {VPUNN::VPUTensor(1, 1, 8192, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {1, 1},                                                       // kernels
-            {1, 1},                                                       // strides
-            {0, 0, 0, 0}                                                  // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 1000, 1000 + 1000},
-                 "SOK , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, Model_G_v1_a_0_fp16_NCHW_FP16_LATENCY_API10_MLIR) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(4, 1, 8192, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(4, 1, 176, 1, VPUNN::DataType::FLOAT16)},   // output dimensions
-            {1, 1},                                                       // kernels
-            {1, 1},                                                       // strides
-            {0, 0, 0, 0}                                                  // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 15000, 15000 + 1000},
-                 "SOK , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, Model_L_v1_a_1_int8_NCHW_FP16_LATENCY_API10_MLIR) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(256, 129, 4, 1, VPUNN::DataType::UINT8)},     // input dimensions
-            {VPUNN::VPUTensor(256, 128, 16, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {3, 3},                                                         // kernels
-            {1, 1},                                                         // strides
-            {1, 0, 1, 1}                                                    // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 95000, 95000 + 1000},
-                 "CLUSTERING , ,  "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, Model_L_v1_a_1_int8_NCHW_FP16_LATENCY_API10_MLIR_Set_2) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(256, 256, 4, 1, VPUNN::DataType::UINT8)},     // input dimensions
-            {VPUNN::VPUTensor(256, 256, 16, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {3, 3},                                                         // kernels
-            {1, 1},                                                         // strides
-            {1, 1, 1, 1}                                                    // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 49000, 49000 + 1000},  // SOHO 95000
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_LATENCY_MLIR_MORE_MEMORY) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-            {VPUNN::VPUTensor(65, 16, 960, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(65, 8, 960, 1, VPUNN::DataType::FLOAT16)},   // output dimensions
-            {9, 9},                                                        // kernels
-            {1, 1},                                                        // strides
-            {0, 0, 4, 4}                                                   // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1, VPUNN::Cycles::START_ERROR_RANGE - 1},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_INT8_LATENCY_MLIR_Set_1) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(513, 130, 4, 1, VPUNN::DataType::UINT8)},  // input dimensions
-            {VPUNN::VPUTensor(257, 65, 32, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {3, 3},                                                      // kernels
-            {2, 2},                                                      // strides
-            {1, 0, 1, 1}                                                 // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 57700, 57700 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_INT8_LATENCY_MLIR_Set_2) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(513, 513, 4, 1, VPUNN::DataType::UINT8)},   // input dimensions
-            {VPUNN::VPUTensor(257, 257, 32, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {3, 3},                                                       // kernels
-            {2, 2},                                                       // strides
-            {1, 1, 1, 1}                                                  // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 56600, 56600 + 1000},  // SOHO 110000
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, scale_mobilenet_ssd_FP16_MLIR) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(5, 5, 128, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(3, 3, 256, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {3, 3},                                                      // kernels
-            {2, 2},                                                      // strides
-            {1, 1, 1, 1}                                                 // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 7300, 7300 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, scale_Sphereface_FP16_INT8_MLIR) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(1, 1, 8192, 1, VPUNN::DataType::UINT8)},   // input dimensions
-            {VPUNN::VPUTensor(1, 1, 256, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {1, 1},                                                      // kernels
-            {1, 1},                                                      // strides
-            {0, 0, 0, 0}                                                 // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 6000, 6000 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest,
-       face_detection_adas_0001_caffe_dense_IRv11_FP16_INT8_THROUGHPUT_NCHW_NCHW_U8_FP16_API20_MLIR_Set_1) {
-    const VPUNN::DPULayer tst_layer_ref(VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-                                        {VPUNN::VPUTensor(6, 3, 128, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                                        {VPUNN::VPUTensor(3, 2, 128, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                                        {3, 3},                                                    // kernels
-                                        {2, 2},                                                    // strides
-                                        {1, 1, 1, 0}                                               // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 500, 500 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest,
-       face_detection_adas_0001_caffe_dense_IRv11_FP16_INT8_THROUGHPUT_NCHW_NCHW_U8_FP16_API20_MLIR_Set_2) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(672, 96, 4, 1, VPUNN::DataType::UINT8)},   // input dimensions
-            {VPUNN::VPUTensor(336, 48, 32, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {3, 3},                                                      // kernels
-            {2, 2},                                                      // strides
-            {1, 0, 1, 0}                                                 // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 57000, 57000 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, midas_672x384_onnx_dense_IRv10_INT8_NHWC_NHWC_U8_FP16_LATENCY_API10_MLIR_Set_1) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(672, 97, 4, 1, VPUNN::DataType::UINT8)},   // input dimensions
-            {VPUNN::VPUTensor(336, 48, 32, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {3, 3},                                                      // kernels
-            {2, 2},                                                      // strides
-            {0, 0, 0, 1}                                                 // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 57000, 57000 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, midas_672x384_onnx_dense_IRv10_INT8_NHWC_NHWC_U8_FP16_LATENCY_API10_MLIR_Set_2) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(672, 384, 4, 1, VPUNN::DataType::UINT8)},   // input dimensions
-            {VPUNN::VPUTensor(336, 192, 32, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {3, 3},                                                       // kernels
-            {2, 2},                                                       // strides
-            {0, 1, 0, 1}                                                  // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 58300, 58300 + 1000},  // SOHO 114200
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP16_NCHW_NCHW_FP16_FP16_MLIR_Set_1) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-            {VPUNN::VPUTensor(17, 17, 96, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(3, 3, 96, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
-            {6, 6},                                                       // kernels
-            {6, 6},                                                       // strides
-            {0, 1, 0, 1}                                                  // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 3000, 3000 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP16_NCHW_NCHW_FP16_FP16_MLIR_Set_2) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-            {VPUNN::VPUTensor(17, 17, 240, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(3, 3, 240, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
-            {6, 6},                                                        // kernels
-            {6, 6},                                                        // strides
-            {0, 1, 0, 1}                                                   // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 8000, 8000 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP16_NCHW_NCHW_FP16_FP16_MLIR_Set_3) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-            {VPUNN::VPUTensor(17, 17, 128, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(3, 3, 128, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
-            {6, 6},                                                        // kernels
-            {6, 6},                                                        // strides
-            {0, 1, 0, 1}                                                   // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 4000, 4000 + 1000},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
-
-TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP16_NCHW_NCHW_FP16_FP16_MLIR_Set_4) {
-    const VPUNN::DPULayer tst_layer_ref(
-            VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::DW_CONVOLUTION,
-            {VPUNN::VPUTensor(17, 17, 576, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(3, 3, 576, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
-            {6, 6},                                                        // kernels
-            {6, 6},                                                        // strides
-            {0, 1, 0, 1}                                                   // padding
-    );
-    {
-        auto tst_layer = tst_layer_ref;
-        tst_layer.weight_sparsity_enabled = false;
-        tst_layer.weight_sparsity = 0.0f;
-
-        const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
-                 {VPUNN::Cycles::NO_ERROR, true, 1, VPUNN::Cycles::START_ERROR_RANGE - 1},
-                 "SOH , no memmove, "},
-        };
-
-        executeTests(tests);
-    }
-}
 }  // namespace VPUNN_unit_tests

@@ -73,7 +73,6 @@ private:
 public:
     using VPUCostModel::VPUCostModel;  ///< exposing/Using the same VPUCostModel constructor (base class)
 
-    /// @brief limits the split of a tile (intra-tile split) to this number of individual workloads
     void set_maxWorkloadsPerIntraTileSplit(unsigned int new_value) noexcept {
         maxWorkloadsPerIntraTileSplit = new_value;
     }
@@ -82,7 +81,7 @@ public:
     }
 
     /**
-     * @brief Compute the optimal cost of a DPULayer given a strategy and context
+     * @brief Compute the optimal cost of a DPULayer
      *
      * @param layer the DPULayer
      * @param strategy the layer strategy, shaves do not matter
@@ -94,7 +93,7 @@ public:
     }
 
     /**
-     * @brief Compute the optimal cost of a DPULayer using a specific strategy and context
+     * @brief Compute the optimal cost of a DPULayer using a specific strategy and execution mode
      *
      * It splits on tiles(between tiles, using the strategy), then, for each tile , makes the intra-tile split on
      * workloads and choses the best one
@@ -105,7 +104,7 @@ public:
      * @param nTiles the number of CMX tiles
      * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX)
      * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX)
-     * @param prefetching enable/disable weight prefetching (require extra DMA to fetch weighs in CMX if disabled)
+     * @param prefetching enable/disable weight prefetching
      * @return measured best cycles or error code . \see Cycles for error codes
      */
     CyclesInterfaceType Layer(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU = 1,
@@ -135,7 +134,6 @@ public:
         return layer_cycles(layer, strategy, nDPU, nTiles, input_in_ddr, output_in_ddr, prefetching, &detailed_split);
     }
 
-protected:
     /**
      * @brief Compute the optimal cost of a DPULayer using a specific strategy and execution mode
      *
@@ -279,9 +277,8 @@ protected:
         return cost;
     }
 
-public:
     /**
-     * @brief Compute the optimal cost of a DPULayer, given a context but no strategy
+     * @brief Compute the optimal cost of a DPULayer
      *
      * Analyses all strategies and selects the time o the fastest one
      *
@@ -356,7 +353,6 @@ public:
         return cost;
     }
 
-protected:
     /**
      * @brief The cycles it takes to prefetch the weights
      *
@@ -430,7 +426,6 @@ protected:
 
     void operation_sanitisation(DPULayer& wl) const {
         avgpool_replace_by(wl);
-        compressConv_replace_by_CM_CONV_VPU27(wl);
     }
 
     // static members

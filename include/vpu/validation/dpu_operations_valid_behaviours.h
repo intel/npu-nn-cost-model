@@ -241,6 +241,16 @@ protected:
 
         // swizzling and sparsity are not deduced.
     }
+
+    /// @brief changes kernels in case a stricter constraint must be used
+    /// @returns true if normalization was done (kernel changed)
+    //bool normalize_kernel_dimension(const ISIStrategy& isi, KernelInfo& kernel) const override {
+    //    if ((isi == ISIStrategy::SPLIT_OVER_H) && (kernel.height != kernel.width)) {
+    //        kernel.height = kernel.width;  // make  them equal
+    //        return true;                   // kernel was adjusted
+    //    }
+    //    return false;
+    //}
 };
 
 class CM_CONVOLUTION_Constraints : public GenericConvolution_Constraints {

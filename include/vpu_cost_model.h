@@ -46,8 +46,6 @@ private:
     Runtime vpunn_runtime;                ///< the loaded inference model is here, used for FW propagation
     Preprocessing<float>& preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
     LRUCache<float> cache;                ///< cache for inferred values, used only for single workload, not for batches
-    const PostProcessSupport results_config;  ///< in case we have a deprecated version with hw_overhead, the ouptut
-                                              ///< support should false and the response should be unused
 
     DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
 
@@ -55,19 +53,35 @@ private:
     std::vector<float> workloads_results_buffer;  ///< buffer dedicated for workloads. avoids reallocation.
     const float default_NN_output{-1.0F};  ///< this is the value used in no NN output is present (like not loaded).
 
+    /// @brief Configuration options concerning the interpretation and post processing of inferred values
+    struct PostProcessConfig {
+        bool cycles_not_hw_overhead;  ///< true: cycles network output, false: hw_overhead  NN output
+        bool may_limit_hw_overhead;   ///< true: sometimes extra limitations are done on hw_overhead
+    };
+
+    /// output versions
+    static constexpr int OUT_LATEST = 0;
+    static constexpr int OUT_HW_OVERHEAD_BOUNDED = 1;
+    static constexpr int OUT_CYCLES = 2;
+    static constexpr int OUT_HW_OVERHEAD_UNBOUNDED = 3;
+
+    const PostProcessConfig latest_results_config{true, false};  ///< will be use in case latest(00) version
+    const PostProcessConfig
+            results_config;  ///< active config, must be set up accordingly in the constructor, based on loaded NN
+
     /// @brief obtains the actual preprocessing instance from factory. The factory must live longer than the instance
     /// created. warning: Throws if not possible
     static Preprocessing<float>& init_preproc(const RuntimeProcessingFactory& factory,
                                               const ModelVersion& version_service, const std::string& filename) {
-        // let's initialize the preproc aspects based on input version
-        const int input_version = version_service.get_input_interface_version();
-        //  checking if either we have some preprocess or we have a unsupported version
-        if (factory.exists_preprocessing(input_version)) {
-            auto& preproc = factory.make_preprocessing(input_version);
+        // let's initialize the preproc aspects based on version
+        const int version = version_service.get_input_interface_version();
+        if (factory.exists_preprocessing(version)) {
+            auto& preproc = factory.make_preprocessing(version);
             return preproc;
+
         } else {
             std::stringstream buffer;
-            buffer << "Cannot create preprocessing stage!.Preprocessing with version (" << input_version
+            buffer << "Cannot create preprocessing stage!.Preprocessing with version (" << version
                    << ") is not known/supported. Filename: " << filename
                    << " , Version info (raw): " << version_service.get_raw_name();
             std::string details = buffer.str();
@@ -77,37 +91,31 @@ private:
         }
     }
 
-    /**
-     * @brief check post config will check if we either have an empty model, or the output version is supported
-     *
-     * If we have an empty ideal model or we got the output version supported this function will be exited with
-     * no errors. In case that we got a model with an unsupported output version this function will throw a runtime
-     * error specifying the output version and the full raw name of it.
-     *
-     * @throws std::runtime_error In case that we got a model with an unsupported output version you will get a runtime
-     * error
-     *
-     * @param v is the model version we took info about the full_raw_name in case we have an empty model
-     */
-    void check_post_config(const ModelVersion& v) {
-        const auto raw_name_intf = v.get_raw_name();
-
-        // in case we have an empty ideal model the raw_name is defaulted to none and we should contiune the run
-        if (raw_name_intf == "none") {
-            return;
+    ///@brief establish what o do at post-processing (cycles versus hw_overhaed)
+    static PostProcessConfig init_post_config(const ModelVersion& v, const PostProcessConfig& latest_config) {
+        PostProcessConfig config{latest_config};
+        const auto out_intf = v.get_output_interface_version();
+        switch (out_intf) {
+        case OUT_LATEST: {
+            config = latest_config;
+        } break;
+        case OUT_HW_OVERHEAD_BOUNDED: {
+            config.cycles_not_hw_overhead = false;  // hw overhead
+            config.may_limit_hw_overhead = true;    // some limitations will apply, this is old mode
+        } break;
+        case OUT_CYCLES: {
+            config.cycles_not_hw_overhead = true;  // cycles
+            config.may_limit_hw_overhead = false;  // no limitations
+        } break;
+        case OUT_HW_OVERHEAD_UNBOUNDED: {
+            config.cycles_not_hw_overhead = false;  // hw overhead
+            config.may_limit_hw_overhead = false;   // no limitations
+        } break;
+        default:
+            config = latest_config;
+            break;
         }
-        // in case we want a deprecated version with hw_overhead we will put config to unsupported
-        // the NN model will have a unknown output and it should be thrown
-        if (!results_config.is_output_supported()) {
-            std::stringstream buffer;
-            buffer << "Cannot load/handle Models output version. The output version: ("
-                   << v.get_output_interface_version()
-                   << ") is not known/supported. Version info (raw):" << v.get_raw_name();
-            std::string details = buffer.str();
-            Logger::error() << details;
-
-            throw std::runtime_error(details);
-        }
+        return config;
     }
 
     /**
@@ -137,20 +145,21 @@ protected:
         }
     }
 
-    /// @brief Presumes any VPU27++ CONV with IC <16 to be compressed CONV. This is known by NN as CM_CONV
-    ///
-    /// @param workload [in, out] that will be changed in case the input is presumed compressed CONV
-    void compressConv_replace_by_CM_CONV_VPU27(DPUWorkload& workload) const {
-        if (workload.device >= VPUDevice::VPU_2_7) {
-            if ((workload.op == Operation::CONVOLUTION) &&
-                ((workload.inputs[0].channels() > 1) && (workload.inputs[0].channels() < 16))) {
-                Logger::warning() << "Workload with CONVOLUTION compressed IC[2..15] transformed to CM_CONV ";
-                workload.op = Operation::CM_CONVOLUTION;
+private:
+    ///@brief changes the hw_overhead value according to some limits
+    void sanitize_hw_overhead_result(float& hw_overhead, const DPUWorkload& workload) const {
+        if (results_config.may_limit_hw_overhead) {
+            if (hw_overhead < 1.0F && workload.act_sparsity == 0 && workload.weight_sparsity == 0) {
+                // This makes sense only when NN output is NOT cycles, but real HW overhead that means
+                // RealCycles/TheoreticalBestCase
+                // If there is no sparsity, hw_overhead should be > 1. This check avoid
+                // edge cases where NN predicts a smaller than 1 overhead. In that case, the network is obviously wrong.
+                // This check fall-backs the cost to the theoretical cost model by forcing hw_overhead = 1
+                hw_overhead = 1.0F;
             }
         }
     }
 
-private:
     /// @brief  check and try to make the preprocessing output to be the same as what model expects
     /// This mechanism is unsafe at this moment and lets you change the preprocessing output to a bigger or smaller size
     /// The result may be impossibility to run (if smaller) or leaving empty zeros at the end (only partial fill)
@@ -207,10 +216,8 @@ public:
             : vpunn_runtime(filename, batch_size, profile),
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), filename)),
               cache(cache_size),
-              results_config(vpunn_runtime.model_version_info().get_output_interface_version()) {
+              results_config(init_post_config(vpunn_runtime.model_version_info(), latest_results_config)) {
         Logger::initialize();
-        check_post_config(vpunn_runtime.model_version_info());
-
         if (!vpunn_runtime.initialized()) {
             return;
         }
@@ -235,10 +242,8 @@ public:
             : vpunn_runtime(model_data, model_data_length, copy_model_data, batch_size, profile),
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), "ConstCharInit")),
               cache(cache_size),
-              results_config(vpunn_runtime.model_version_info().get_output_interface_version()) {
+              results_config(init_post_config(vpunn_runtime.model_version_info(), latest_results_config)) {
         Logger::initialize();
-        check_post_config(vpunn_runtime.model_version_info());
-
         if (!vpunn_runtime.initialized()) {
             return;
         }
@@ -258,7 +263,6 @@ protected:
     /// @returns true if checks were OK, false if this wl is not to be used
     bool sanitize_workload(DPUWorkload& workload, SanityReport& result) const {
         avgpool_replace_by(workload);  // AVEPOOL will be transformed to something equivalent
-        compressConv_replace_by_CM_CONV_VPU27(workload);
 
         channels_preserving_operations_consistency_check(workload);  // old style sanitation
 
@@ -389,10 +393,7 @@ public:
         return DPU(wl, dummy_info);
     }
 
-    /// @brief same like  @see DPU(DPUWorkload wl) , the extra param is to have as output the textual errors/findings
-    /// discovered when handling the workload
-    /// @param wl the workload to infer on
-    /// @param info [out] will collect error info regarding wl checking.
+    /// @brief @see DPU(DPUWorkload wl)
     CyclesInterfaceType DPU(DPUWorkload wl, std::string& info) {
         // sanitize and check the input.
         const auto is_inference_posible = nn_initialized();
@@ -406,13 +407,22 @@ public:
         CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
         if (is_inference_relevant) {
             if (is_inference_posible) {
-                const auto nn_output_cycles = run_NN(wl);
-                if (is_NN_value_invalid(nn_output_cycles)) {
-                    cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
-                    // std::cout << "\n Problematic inf response: "<<nn_output_cycles<<std::endl<<wl<<"\n";
-                } else {
-                    cycles = static_cast<CyclesInterfaceType>(ceil(nn_output_cycles));  // NORMAL CASE
+                if (results_config.cycles_not_hw_overhead) {  // just cycles
+                    const auto nn_output_cycles = run_NN(wl);
+                    if (is_NN_value_invalid(nn_output_cycles)) {
+                        cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
+                        // std::cout << "\n Problematic inf response: "<<nn_output_cycles<<std::endl<<wl<<"\n";
+                    } else {
+                        cycles = static_cast<CyclesInterfaceType>(ceil(nn_output_cycles));  // NORMAL CASE
+                    }
+
+                } else {  // output cycles are the theoretical ones times the hw overhead, old mode
+                    auto hw_overhead = run_NN(wl);
+                    sanitize_hw_overhead_result(hw_overhead, wl);  // old style
+                    const auto cycles_computed = (theoretical_cycles * hw_overhead);
+                    cycles = static_cast<CyclesInterfaceType>(ceil(cycles_computed));  // NORMAL CASE
                 }
+
             } else {  // NN not available, use theoretical cycles
                 cycles = theoretical_cycles;
             }
@@ -460,11 +470,19 @@ public:
             CyclesInterfaceType cycles{problems.value()};  // neutral value or sanitization error
             if (is_inference_relevant) {
                 if (is_inference_posible) {
-                    const auto nn_output_cycles = NN_results[idx];
-                    if (is_NN_value_invalid(nn_output_cycles)) {
-                        cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
-                    } else {
-                        cycles = static_cast<CyclesInterfaceType>(ceil(nn_output_cycles));  // NORMAL CASE
+                    if (results_config.cycles_not_hw_overhead) {  // just cycles
+                        const auto nn_output_cycles = NN_results[idx];
+                        if (is_NN_value_invalid(nn_output_cycles)) {
+                            cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
+                        } else {
+                            cycles = static_cast<CyclesInterfaceType>(ceil(nn_output_cycles));  // NORMAL CASE
+                        }
+
+                    } else {  // output cycles are the theoretical ones times the hw overhead, old mode
+                        auto hw_overhead = NN_results[idx];
+                        sanitize_hw_overhead_result(hw_overhead, wl);  // old style
+                        const auto cycles_computed = (theoretical_cycles * hw_overhead);
+                        cycles = static_cast<CyclesInterfaceType>(ceil(cycles_computed));
                     }
 
                 } else {  // NN not available, use theoretical cycles
@@ -497,18 +515,24 @@ public:
         // first priority is given to NN existence. No matter the WL if NN not available use ideal/theoretical
         if (is_inference_posible) {
             if (is_inference_relevant) {
-                const auto theoretical_cycles = DPUTheoreticalCycles(workload);
-                const auto nn_output_cycles = run_NN(workload);
-                if (is_NN_value_invalid(nn_output_cycles)) {
-                    utilization = 0.0;
-                } else {
-                    if (nn_output_cycles != 0.0F) {
-                        utilization = theoretical_cycles / nn_output_cycles;  // NORMAL CASE
+                if (results_config.cycles_not_hw_overhead) {  // just cycles as output
+                    const auto theoretical_cycles = DPUTheoreticalCycles(workload);
+                    const auto nn_output_cycles = run_NN(workload);
+                    if (is_NN_value_invalid(nn_output_cycles)) {
+                        utilization = 0.0;
                     } else {
-                        utilization = 0.0F;
+                        if (nn_output_cycles != 0.0F) {
+                            utilization = theoretical_cycles / nn_output_cycles;  // NORMAL CASE
+                        } else {
+                            utilization = 0.0F;
+                        }
                     }
-                }
 
+                } else {  // inverse of overhead, old mode, overhead from NN
+                    auto hw_overhead = run_NN(workload);
+                    sanitize_hw_overhead_result(hw_overhead, workload);  // old style
+                    utilization = (1.0F / (hw_overhead + 0.001f));       // NORMAL CASE
+                }
             }  // if not relevant keep the default value for utilization
 
         } else {  // NN not available, use theoretical utilization =1
@@ -516,6 +540,10 @@ public:
             // special formula from legacy code, not returning exactly one
         }
 
+        if (results_config.may_limit_hw_overhead) {
+            // Clamp the utilization between 0 and 1 only if we are also clamping the hw overhead
+            utilization = std::max(0.0f, std::min(utilization, 1.0f));
+        }
         return utilization;
     }
 
@@ -559,19 +587,21 @@ public:
     }
 
     /**
-     * @brief Compute the activity factor of a DPUWorkload.
-     * @details Activity factor is an estimation of the dynamic power of the DPUWorkload
-     *          relative to the worst case (highest dynamic power) DPUWorkload.
+     * @brief Compute the activity factor of a DPUWorkload
      *
      * @param wl a DPUWorkload
      * @return float the DPUWorkload activity factor
      */
     float DPUActivityFactor(DPUWorkload& wl) {
-        const VPUPowerFactorLUT power_factor_lut(wl.inputs[0].channels(), wl.op, wl.device);
-        const float pf_value = power_factor_lut.getValue(native_comp_is_fp(wl));
+        VPUDevice device = wl.device;
+        Operation operation = wl.op;
+        unsigned int input_ch = wl.inputs[0].channels();
+        VPUPowerFactorLUT power_factor_lut = VPUPowerFactorLUT(input_ch, operation, device);
 
-        const float hw_util = hw_utilization(wl);  // to do: what if wl is invalid and utilization is zero
-        const float power_af = std::min(hw_util * pf_value, 1.0f);
+        float pf_value = power_factor_lut.getValue(wl.inputs[0].get_dtype());
+        float hw_util = hw_utilization(wl);
+
+        float power_af = hw_util * pf_value;
 
         return power_af;
     }

@@ -10,7 +10,7 @@
 #ifndef VPUNN_POWER_H
 #define VPUNN_POWER_H
 
-#include <cmath>
+#include <math.h>
 #include <list>
 #include <map>
 #include <tuple>
@@ -60,108 +60,71 @@ private:
         lut_t vpu_2_0_values;
         lut_t vpu_4_0_values;
 
-        // VPU2.0 values (Op type: {log2(input_channels): power_factor}))
+        // VPU2.0 values (Op type: {input_channels: power_factor}))
         vpu_2_0_values.push_back({Operation::CONVOLUTION,
-                                  {
-                                          {4, 0.87f},
-                                          {5, 0.92f},
-                                          {6, 1.0f},
-                                          {7, 0.95f},
-                                          {8, 0.86f},
-                                          {9, 0.87f},
-                                  }});
-        vpu_2_0_values.push_back({Operation::DW_CONVOLUTION,
-                                  {
-                                          {6, 5.84f},
-                                  }});
-        vpu_2_0_values.push_back({Operation::AVEPOOL,
-                                  {
-                                          {6, 32.60f},
-                                  }});
-        vpu_2_0_values.push_back({Operation::MAXPOOL,
-                                  {
-                                          {6, 5.29f},
-                                  }});
-        vpu_2_0_values.push_back({Operation::ELTWISE,
-                                  {
-                                          {7, 232.71f},
-                                  }});
+                                  {{16, 0.87f}, {32, 0.92f}, {64, 1.0f}, {128, 0.95f}, {256, 0.86f}, {512, 0.87f}}});
+        vpu_2_0_values.push_back({Operation::DW_CONVOLUTION, {{64, 5.84f}}});
+        vpu_2_0_values.push_back({Operation::MAXPOOL, {{64, 5.29f}}});
+        vpu_2_0_values.push_back({Operation::AVEPOOL, {{2048, 32.60f}}});
+        vpu_2_0_values.push_back({Operation::ELTWISE, {{96, 232.71f}}});
 
-        // VPU2.7 values (Op type: {log2(input_channels): power_factor}))
+        // VPU2.7 values (Op type: {input_channels: power_factor}))
         vpu_2_7_values.push_back({Operation::CONVOLUTION,
-                                  {
-                                          {4, 1.97f},
-                                          //{5, 1.11f},
-                                          //{6, 1.16f},
-                                          {7, 1.20f},
-                                          {8, 1.08f},
-                                          {9, 1.07f},
-                                          {10, 1.01f},
-                                          {11, 0.97f},
-                                  }});
-        vpu_2_7_values.push_back({Operation::DW_CONVOLUTION,
-                                  {
-                                          {6, 1.43f},
-                                  }});
-        vpu_2_7_values.push_back({Operation::AVEPOOL,
-                                  {
-                                          {6, 0.29f},
-                                  }});
-        vpu_2_7_values.push_back({Operation::MAXPOOL,
-                                  {
-                                          {6, 1.15f},
-                                  }});
-        vpu_2_7_values.push_back({Operation::ELTWISE,
-                                  {
-                                          {8, 0.11f},
-                                  }});
+                                  {{16, 2.7409f},
+                                   {32, 1.4682f},
+                                   {64, 1.6358f},
+                                   {128, 1.4199f},
+                                   {256, 1.2623f},
+                                   {512, 1.1466f},
+                                   {1024, 1.3641f},
+                                   {2048, 12.9022f}}});
+        vpu_2_7_values.push_back({Operation::DW_CONVOLUTION, {{64, 1.9603f}}});
+        vpu_2_7_values.push_back({Operation::MAXPOOL, {{64, 1.8111f}}});
+        vpu_2_7_values.push_back({Operation::AVEPOOL, {{2048, 1.0889f}}});
+        vpu_2_7_values.push_back({Operation::ELTWISE, {{256, 112.5513f}}});
 
         // TODO: add VPU 4.0 values
         pf_lut.push_back({VPUDevice::VPU_2_0, vpu_2_0_values});
         pf_lut.push_back({VPUDevice::VPU_2_7, vpu_2_7_values});
     }
 
-    float getScaledValue(float value, bool fp_comp, VPUDevice device) const {
+    float getScaledValue(float value, DataType dtype, VPUDevice device) {
         float scaled_value = value;
-        if ((device == VPUDevice::VPU_2_0) && fp_comp)
+        if ((device == VPUDevice::VPU_2_0) && (dtype == DataType::FLOAT16))
             scaled_value = value * 0.87f;
-        else if ((device == VPUDevice::VPU_2_7) && !fp_comp)
+        else if ((device == VPUDevice::VPU_2_7) && (dtype == DataType::UINT8))
             scaled_value = value * 0.79f;
         return scaled_value;
     }
 
-    float getValueInterpolation(const std::map<unsigned int, float>& table) const {
+    float getValueInterpolation(std::map<unsigned int, float> table) {
         float interp_value = 0;
 
         // Get the smaller and greater neighbour
-        const unsigned int max_ch_log2 = (unsigned int)ceil(log2(8192));  // Max input channels
         unsigned int smaller = 0;
-        unsigned int greater = max_ch_log2;
-
-        float input_ch_log2 = log2((float)input_ch);
+        unsigned int greater = 8192;  // Max value supported for input channels
 
         for (auto it = table.begin(); it != table.end(); ++it) {
-            // Find the index below or at input_ch
-            if (((float)it->first <= input_ch_log2) && (it->first > smaller))
-                smaller = it->first;
-
-            // Find the index above or at input_ch
-            if (((float)it->first >= input_ch_log2) && (it->first < greater))
+            // if element is greater than input_ch but smaller than present greater
+            if ((it->first > input_ch) && (it->first < greater))
                 greater = it->first;
 
-            if (smaller == greater)
-                break;
+            // if element is smaller than input_ch but smaller than present smaller
+            if ((it->first < input_ch) && (smaller < it->first))
+                smaller = it->first;
         }
 
-        const float interval = (float)(greater - smaller);
-        if (interval > 0) {
-            // Logarithmic interpolation between entries
-            interp_value = ((float)greater - input_ch_log2) / interval * table.at(smaller) +
-                           (input_ch_log2 - (float)smaller) / interval * table.at(greater);
-        } else {
-            // Direct hit
-            interp_value = table.at(smaller);
+        if (smaller == 0)
+            interp_value = table[greater];
+        else if (greater == 8192)
+            interp_value = table[smaller];
+        else {
+            float smaller_pf = table[smaller];
+            float greater_pf = table[greater];
+            interp_value = (float)ceil(
+                    (double)(((input_ch - smaller) * (greater_pf - smaller_pf) / (greater - smaller)) + smaller_pf));
         }
+
         return interp_value;
     }
 
@@ -182,24 +145,28 @@ public:
     /**
      * @brief Get the the value from the LUT for a specific datatype
      *
-     * @param fp_comp true if floating point native compute required for workload
+     * @param dtype a VPUNN::Datatype
      * @return float the LUT value for that datatype
      */
-    float getValue(bool fp_comp) const {
+    float getValue(DataType dtype) {
         float pf_value = 0;
-        lut_t device_table{};  // empty vector
+        std::vector<std::tuple<Operation, std::map<unsigned int, float>>> device_table;
         // Get values table for the device
         for (auto i = pf_lut.begin(); i != pf_lut.end(); ++i)
             if (std::get<0>(*i) == vpu_device)
-                device_table = std::get<1>(*i);  // makes a copy(optimization possible!)
+                device_table = std::get<1>(*i);
 
         // Get the power factor value
         for (auto i = device_table.begin(); i != device_table.end(); ++i) {
-            const Operation operation = std::get<0>(*i);
-            const std::map<unsigned int, float>& op_values_map = std::get<1>(*i);
+            Operation operation = std::get<0>(*i);
+            std::map<unsigned int, float> op_values_map = std::get<1>(*i);
 
             if (operation == op_type) {
-                pf_value = getScaledValue(getValueInterpolation(op_values_map), fp_comp, vpu_device);
+                bool is_entry = true ? op_values_map.find(input_ch) != op_values_map.end() : false;
+                if (is_entry)
+                    pf_value = getScaledValue(op_values_map.find(input_ch)->second, dtype, vpu_device);
+                else
+                    pf_value = getScaledValue(getValueInterpolation(op_values_map), dtype, vpu_device);
             }
         }
         return pf_value;

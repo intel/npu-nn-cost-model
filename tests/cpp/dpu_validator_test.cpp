@@ -321,7 +321,7 @@ TEST_F(DPU_WorkloadValidatorTest, convolution_8641_Test) {
     {  // SOH->
         auto wl{wl_ref};
         wl.isi_strategy = VPUNN::ISIStrategy::SPLIT_OVER_H;
-        wl.output_write_tiles = 1;
+        wl.output_write_tiles = 1;  // SOK not allows !=1
 
         dut.check_data_consistency(wl, sane);
 

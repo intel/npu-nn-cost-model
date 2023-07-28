@@ -125,7 +125,7 @@ public:
         devices = {
                 VPUDevice::VPU_2_7,
         };
-        cmx_KB_sizes = {{devices[0], (2 * 1024 * 100) / 100}};  // memory increased with 0%
+        cmx_KB_sizes = {{devices[0], 2 * 1024}};
         output_write_tile_options = {1, 2};
         isi_stategy_options = {
                 ISIStrategy::CLUSTERING,
@@ -162,11 +162,11 @@ protected:
 
     // can be changed in derived constructor
     std::unordered_map<Operation, Channels> valid_input_channels{
-            {Operation::CONVOLUTION, makeList(1, channels_max, 16)},             //
-            {Operation::DW_CONVOLUTION, {16, 32, 64}},                           // {16, 32, 64}    //C=K
-            {Operation::CM_CONVOLUTION, makeList(2, cm_conv_channels_max - 1)},  // CM_Conv is ConvCompressed for VPU2.7
-            {Operation::ELTWISE, makeList(1, channels_max, 16)},                 // C=K
-            {Operation::MAXPOOL, {16, 32, 64}},                                  // {16, 32, 64}    //C=K
+            {Operation::CONVOLUTION, makeList(1, channels_max, 16)},         //
+            {Operation::DW_CONVOLUTION, {16, 32, 64}},                       // {16, 32, 64}    //C=K
+            {Operation::CM_CONVOLUTION, makeList(2, cm_conv_channels_max)},  //
+            {Operation::ELTWISE, makeList(1, channels_max, 16)},             // C=K
+            {Operation::MAXPOOL, {16, 32, 64}},                              // {16, 32, 64}    //C=K
     };
 };
 
@@ -202,12 +202,11 @@ public:
 
         // at layer level we are not limited like for workload level
         valid_input_channels = std::unordered_map<Operation, Channels>{
-                {Operation::CONVOLUTION, makeList(1, channels_max, 16)},     //
-                {Operation::DW_CONVOLUTION, makeList(1, channels_max, 16)},  // {16, 32, 64}    //C=K
-                {Operation::CM_CONVOLUTION,
-                 makeList(2, cm_conv_channels_max - 1)},              // CM_Conv is ConvCompressed for VPU2.7
-                {Operation::ELTWISE, makeList(1, channels_max, 16)},  // C=K
-                {Operation::MAXPOOL, makeList(1, channels_max, 16)},  // {16, 32, 64}    //C=K
+                {Operation::CONVOLUTION, makeList(1, channels_max, 16)},         //
+                {Operation::DW_CONVOLUTION, makeList(1, channels_max, 16)},      // {16, 32, 64}    //C=K
+                {Operation::CM_CONVOLUTION, makeList(2, cm_conv_channels_max)},  //
+                {Operation::ELTWISE, makeList(1, channels_max, 16)},             // C=K
+                {Operation::MAXPOOL, makeList(1, channels_max, 16)},             // {16, 32, 64}    //C=K
         };
     }
     const Channels& get_output_channels_range(const DPUOperation& dpu) const override {
@@ -234,11 +233,11 @@ protected:
 
     // alternative in case ISI ==SOK, limited to be split by K
     const std::unordered_map<Operation, Channels> valid_input_channels_SOK{
-            {Operation::CONVOLUTION, makeList(1, channels_max, 16)},             //
-            {Operation::DW_CONVOLUTION, makeList(2, channels_max, 16)},          // min 32 channels   //C=K
-            {Operation::CM_CONVOLUTION, makeList(2, cm_conv_channels_max - 1)},  // CM_Conv is ConvCompressed for VPU2.7
-            {Operation::ELTWISE, makeList(2, channels_max, 16)},                 // min 32 channels    //C=K
-            {Operation::MAXPOOL, makeList(1, channels_max, 16)},                 // min 32 channels    //C=K
+            {Operation::CONVOLUTION, makeList(1, channels_max, 16)},         //
+            {Operation::DW_CONVOLUTION, makeList(2, channels_max, 16)},      // min 32 channels   //C=K
+            {Operation::CM_CONVOLUTION, makeList(2, cm_conv_channels_max)},  //
+            {Operation::ELTWISE, makeList(2, channels_max, 16)},             // min 32 channels    //C=K
+            {Operation::MAXPOOL, makeList(1, channels_max, 16)},             // min 32 channels    //C=K
     };
 };
 
@@ -265,12 +264,11 @@ public:
             : VPU2_7_WorkloadValidValues(op_dynamic_cosntraints) {
         // at layer level we are not limited like for workload level
         valid_input_channels = std::unordered_map<Operation, Channels>{
-                {Operation::CONVOLUTION, makeList(1, channels_max, 16)},     //
-                {Operation::DW_CONVOLUTION, makeList(1, channels_max, 16)},  // {16, 32, 64}    //C=K
-                {Operation::CM_CONVOLUTION,
-                 makeList(2, cm_conv_channels_max - 1)},              // CM_Conv is ConvCompressed for VPU2.7
-                {Operation::ELTWISE, makeList(1, channels_max, 16)},  // C=K
-                {Operation::MAXPOOL, makeList(1, channels_max, 16)},  // {16, 32, 64}    //C=K
+                {Operation::CONVOLUTION, makeList(1, channels_max, 16)},         //
+                {Operation::DW_CONVOLUTION, makeList(1, channels_max, 16)},      // {16, 32, 64}    //C=K
+                {Operation::CM_CONVOLUTION, makeList(2, cm_conv_channels_max)},  //
+                {Operation::ELTWISE, makeList(1, channels_max, 16)},             // C=K
+                {Operation::MAXPOOL, makeList(1, channels_max, 16)},             // {16, 32, 64}    //C=K
         };
     }
 

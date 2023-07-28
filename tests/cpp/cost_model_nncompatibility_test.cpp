@@ -73,58 +73,60 @@ TEST_F(TestNNModelCompatibility, Ideal_Empty_Model) {
         float theoretical_hw_util = ideal_model.hw_utilization(wl);  // a float
         EXPECT_NEAR(theoretical_hw_util, 1.0F, epsilon);
 
-        EXPECT_EQ(theoretical_dpu_cycles, 3528);
+        EXPECT_EQ(theoretical_dpu_cycles, 22896);
     }
 }
 
-/// Test VPU2.0 exists, this version is using hw_overhead which is deprecated
+/// Test VPU2.0 exists
 TEST_F(TestNNModelCompatibility, VPU20_default_01) {
-    EXPECT_THROW(VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(VPU20_default_), std::runtime_error);
+    VPUNN::DPUWorkload wl{wl_20};
+    VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(VPU20_default_);
+    ASSERT_TRUE(vpunn_model.nn_initialized())
+            << "Model not loaded, might be due to file location: " << VPU20_default_ << std::endl;
 
-    // making sure that the error came from the output version:
-    VPUNN::Runtime vpunn_runtime(VPU20_default_);
+    float nn_out1 = vpunn_model.run_NN(wl);  // VPU2.0 has mode hw overhead
+    unsigned int dpu_cycles = vpunn_model.DPU(wl);
+    float hw_util = vpunn_model.hw_utilization(wl);  // a float
 
-    EXPECT_EQ(vpunn_runtime.model_version_info().get_output_interface_version(),
-              (int)(VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_BOUNDED))
-            << "Expected:" << (int)(VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_BOUNDED);
+    // this version uses hw_overhead at exit, limits it to 1.0
+    EXPECT_GE(nn_out1, 0.0F);
+    EXPECT_NEAR(std::max(nn_out1, 1.0F), 1 / hw_util, epsilon);
+    EXPECT_GE(dpu_cycles, 20000);
 
-    EXPECT_FALSE((vpunn_runtime.model_version_info().get_raw_name() == "none"))
-            << "An empty/ideal model will return theoretical cycles even if output version is "
-               "defaulted to 1";
+    unsigned int theoretical_dpu_cycles = ideal_model.DPU(wl);  // will be computed based o
 
-    // checking error message to contain key words:
-    try {
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(VPU20_default_);
-    } catch (const std::exception& e) {
-        std::string err_message = e.what();
-        EXPECT_TRUE((err_message.find("Cannot load/handle Models output version. The output version", 0) !=
-                     std::string::npos));
-    }
+    EXPECT_NEAR(dpu_cycles / (theoretical_dpu_cycles / hw_util), 1.0F, epsilon)
+            << " info: " << dpu_cycles << " " << theoretical_dpu_cycles << " " << hw_util << std::endl;
+
+    std::cout << "VPU2.0 original, default wl. "
+              << "NN output: " << nn_out1 << ", DPU cycles: " << dpu_cycles << ", hw_utilization: " << hw_util
+              << ", Theoretical DPU cycles: " << theoretical_dpu_cycles << std::endl;
 }
 
-/// Test VPU2.7 1 exists, this version is using hw_overhead which is deprecated
+/// Test VPU2.7 1 exists
 TEST_F(TestNNModelCompatibility, VPU27_default_01) {
-    EXPECT_THROW(VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(VPU27_default_), std::runtime_error);
+    VPUNN::DPUWorkload wl{wl_27};
+    VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(VPU27_default_);
+    ASSERT_TRUE(vpunn_model.nn_initialized())
+            << "Model not loaded, might be due to file location: " << VPU27_default_ << std::endl;
 
-    // making sure that the error came from the output version:
-    VPUNN::Runtime vpunn_runtime(VPU27_default_);
+    float nn_out1 = vpunn_model.run_NN(wl);  //
+    unsigned int dpu_cycles = vpunn_model.DPU(wl);
+    float hw_util = vpunn_model.hw_utilization(wl);  // a float
 
-    EXPECT_EQ(vpunn_runtime.model_version_info().get_output_interface_version(),
-              (int)(VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_BOUNDED))
-            << "Expected:" << (int)(VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_BOUNDED);
+    // this version uses hw_overhead at exit, limits it to 1.0
+    EXPECT_GE(nn_out1, 0.0F);
+    EXPECT_NEAR(std::max(nn_out1, 1.0F), 1 / hw_util, epsilon);
+    EXPECT_GE(dpu_cycles, 20000);
 
-    EXPECT_FALSE((vpunn_runtime.model_version_info().get_raw_name() == "none"))
-            << "An empty/ideal model will return theoretical cycles even if output version is "
-               "defaulted to 1";
+    unsigned int theoretical_dpu_cycles = ideal_model.DPU(wl);  // will be computed based o
 
-    // checking error message to contain key words:
-    try {
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(VPU27_default_);
-    } catch (const std::exception& e) {
-        std::string err_message = e.what();
-        EXPECT_TRUE((err_message.find("Cannot load/handle Models output version. The output version", 0) !=
-                     std::string::npos));
-    }
+    EXPECT_NEAR(dpu_cycles / (theoretical_dpu_cycles / hw_util), 1.0F, epsilon)
+            << " info: " << dpu_cycles << " " << theoretical_dpu_cycles << " " << hw_util << std::endl;
+
+    std::cout << "VPU2.7 original, default wl. "
+              << "NN output: " << nn_out1 << ", DPU cycles: " << dpu_cycles << ", hw_utilization: " << hw_util
+              << ", Theoretical DPU cycles: " << theoretical_dpu_cycles << std::endl;
 }
 
 /// Test VPU2.7 v 10 exists
@@ -143,7 +145,7 @@ TEST_F(TestNNModelCompatibility, VPU_10_2) {
     EXPECT_GE(dpu_cycles, 10000);
     EXPECT_NEAR(dpu_cycles, nn_out1, 1.0F);
 
-    EXPECT_GE(hw_util, 0.35F);
+    EXPECT_GE(hw_util, 2.0F);  // Strange but is like that
 
     unsigned int theoretical_dpu_cycles = ideal_model.DPU(wl);  // will be computed based o
 
@@ -171,7 +173,7 @@ TEST_F(TestNNModelCompatibility, VPU_11_2) {
     EXPECT_GE(dpu_cycles, 9450);
     EXPECT_NEAR(dpu_cycles, nn_out1, 1.0F);
 
-    EXPECT_GE(hw_util, 0.37F);
+    EXPECT_GE(hw_util, 2.0F);  // Strange but is like that
 
     unsigned int theoretical_dpu_cycles = ideal_model.DPU(wl);  // will be computed based o
 
