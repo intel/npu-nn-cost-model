@@ -9,7 +9,7 @@ If you find this work useful, please cite the following paper:
   doi = {10.48550/ARXIV.2205.04586},
   url = {https://arxiv.org/abs/2205.04586},
   author = {Hunter, Ian Frederick Vigogne Goodbody and Palla, Alessandro and Nagy, Sebastian Eusebiu and Richmond, Richard and McAdoo, Kyle},
-  title = {Towards Optimal NPU Compiler Cost Modeling by using Neural Networks to Infer Hardware Performances},
+  title = {Towards Optimal VPU Compiler Cost Modeling by using Neural Networks to Infer Hardware Performances},
   publisher = {arXiv},
   year = {2022},
   copyright = {arXiv.org perpetual, non-exclusive license}
