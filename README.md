@@ -1,6 +1,6 @@
-# VPUNN cost model
+# NPUNN cost model
 
-A NN-Based Cost Model for VPU Devices. For additional information about model setup and training, please refer [this paper](https://arxiv.org/abs/2205.04586)
+A NN-Based Cost Model for NPU Devices. For additional information about model setup and training, please refer [this paper](https://arxiv.org/abs/2205.04586)
 
 If you find this work useful, please cite the following paper:
 
@@ -9,7 +9,7 @@ If you find this work useful, please cite the following paper:
   doi = {10.48550/ARXIV.2205.04586},
   url = {https://arxiv.org/abs/2205.04586},
   author = {Hunter, Ian Frederick Vigogne Goodbody and Palla, Alessandro and Nagy, Sebastian Eusebiu and Richmond, Richard and McAdoo, Kyle},
-  title = {Towards Optimal VPU Compiler Cost Modeling by using Neural Networks to Infer Hardware Performances},
+  title = {Towards Optimal NPU Compiler Cost Modeling by using Neural Networks to Infer Hardware Performances},
   publisher = {arXiv},
   year = {2022},
   copyright = {arXiv.org perpetual, non-exclusive license}
@@ -41,7 +41,7 @@ You can select which BLAS library to use (assume you have MKL installed) and the
 
 ## Using the cost model: C++
 
-To use the VPUN cost model in a cmake project is quite simple. An example of a CMakeLists.txt file is shown below
+To use the NPUNN cost model in a cmake project is quite simple. An example of a CMakeLists.txt file is shown below
 
 ```cmake
 include_directories(${CMAKE_BINARY_DIR}/include)
@@ -57,9 +57,9 @@ The following example code explains how to instantiate the cost model and how to
 ```c++
 #include "vpu_cost_model.h"
 
-auto model = VPUNN::VPUCostModel(model_path);
+auto model = NPUNN::NPUCostModel(model_path);
 
-auto dpu_cycles = model.DPU({VPUNN::VPUDevice::VPU_2_7,
+auto dpu_cycles = model.DPU({VPUNN::VPUDevice::NPU_2_7,
                              VPUNN::Operation::CONVOLUTION,
                              {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)}, // input dimensions
                              {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)}, // output dimensions
@@ -81,7 +81,7 @@ You can install the library by typing `pip install .`
 
 Do this in a Python virtual environment.
 
-### VPU cost model
+### NPU cost model
 Run the `vpu_cost_model` script to evaluate workloads from the command line
 
 ```bash
@@ -238,7 +238,7 @@ Install pytest and any other dependencies in the same Python virtual environment
 Example: running only end-to-end tests: `pytest tests/python/test_e2e.py -v`
 
 ### WASM test
-Assuming you build VPUNN WASM library in `build_wasm`, install VPUNN locally with all its dependencies.
+Assuming you build NPUNN WASM library in `build_wasm`, install NPUNN locally with all its dependencies.
 
 ```bash
 npm install --prefix tests/js
