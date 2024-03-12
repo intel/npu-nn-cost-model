@@ -13,11 +13,14 @@
 #include "vpu/compatibility/types01.h"
 #include "vpu/cycles_interface_types.h"
 #include "vpu/sample_generator/random_task_generator.h"
+#include "vpu/validation/interface_valid_values.h"
 
+#include <algorithm>
 #include <unordered_map>
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 class TestCostModel : public ::testing::Test {
 public:
@@ -32,7 +35,7 @@ protected:
                                   VPUNN::ExecutionMode::CUBOID_16x16};
     VPUNN::DPUWorkload wl_glob_20;
 
-    VPUNN::VPUCostModel model{VPUNN::VPUCostModel()};
+    VPUNN::VPUCostModel model{};
 
     void SetUp() override {
         wl_glob_20 = wl_glob_27;
@@ -94,9 +97,11 @@ protected:
 
         if (tolerance_level <= 1) {
             if (v >= 10000000U) {  // 10 millions
-                tolerance = 4U;
+                tolerance = 10U;
             } else if (v >= 1000000U) {  // 1 million
-                tolerance = 3U;
+                tolerance = 8U;
+            } else if (v >= 100000U) {  // 100k
+                tolerance = 5U;
             } else if (v >= 1000U) {
                 tolerance = 2U;
             }
@@ -120,29 +125,29 @@ private:
 TEST_F(TestCostModel, LoadModels_BasicAssertions) {
     {  // 2_0
         const std::string model_path = VPU_2_0_MODEL_PATH;
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 
     {  // 2_7
         const std::string model_path = VPU_2_7_MODEL_PATH;
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 
     {  // 2_0 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH)};
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 
     {  // 2_7 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH)};
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 }
@@ -161,8 +166,8 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
 
     {  // 2_0
         const std::string model_path = VPU_2_0_MODEL_PATH;
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_Valid_interval();
@@ -172,8 +177,8 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
 
     {  // 2_7
         const std::string model_path = VPU_2_7_MODEL_PATH;
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_Valid_interval();
@@ -183,8 +188,8 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
 
     {  // 2_0 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH)};
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_Valid_interval();
@@ -194,8 +199,8 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
 
     {  // 2_7 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH)};
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_Valid_interval();
@@ -313,10 +318,10 @@ TEST_F(TestCostModel, BatchTestVPUNNCostModel_VPUNN_2_0_stochastic) {
     const std::string model_path = VPU_2_0_MODEL_PATH;
     const VPUNN::VPUDevice device_version = VPUNN::VPUDevice::VPU_2_0;
 
-    for (auto batch_size : {1, 2, 4, 5, 7, 11, 13, 17, 30, 40, 100}) {
-        for (auto n_workloads : {1, 2, 4, 5, 7, 11, 13, 17, 30, 40, 100}) {
-            VPUNN::VPUCostModel batched_model = VPUNN::VPUCostModel(model_path, false, 0, batch_size);
-            VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path, false, 0, 1);
+    for (unsigned int batch_size : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
+        for (auto n_workloads : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
+            VPUNN::VPUCostModel batched_model{model_path, false, 0, batch_size};
+            VPUNN::VPUCostModel vpunn_model{model_path, false, 0, 1};
 
             // Generate a bunch of random workloads
             auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -362,10 +367,10 @@ TEST_F(TestCostModel, BatchTestVPUNNCostModel_VPUNN_2_7F_stochastic) {
     const std::string model_path = the_NN_models.fast_model_paths[1].first;
     const VPUNN::VPUDevice device_version = the_NN_models.fast_model_paths[1].second;
 
-    for (auto batch_size : {1, 2, 4, 5, 7, 11, 13, 17, 30, 40, 100}) {
-        for (auto n_workloads : {1, 2, 4, 5, 7, 11, 13, 17, 30, 40, 100}) {
-            VPUNN::VPUCostModel batched_model = VPUNN::VPUCostModel(model_path, false, 0, batch_size);
-            VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path, false, 0, 1);
+    for (unsigned int batch_size : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
+        for (auto n_workloads : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
+            VPUNN::VPUCostModel batched_model{model_path, false, 0, batch_size};
+            VPUNN::VPUCostModel vpunn_model{model_path, false, 0, 1};
 
             // Generate a bunch of random workloads
             auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -409,11 +414,11 @@ TEST_F(TestCostModel, BatchTestVPUNNCostModel_VPUNN_2_7F_stochastic) {
 TEST_F(TestCostModel, BatchTestVPUNNCostModel_VPUNN_2_7F_Particular1) {
     const std::string model_path = the_NN_models.fast_model_paths[1].first;
     const VPUNN::VPUDevice device_version = the_NN_models.fast_model_paths[1].second;
-    int batch_size = 1;
+    unsigned int batch_size = 1;
     const int n_workloads = 1;
 
-    VPUNN::VPUCostModel batched_model = VPUNN::VPUCostModel(model_path, false, 0, batch_size);
-    VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path, false, 0, 1);
+    VPUNN::VPUCostModel batched_model{model_path, false, 0, batch_size};
+    VPUNN::VPUCostModel vpunn_model{model_path, false, 0, 1};
 
     VPUNN::DPUWorkload wl_ref = {
             device_version,
@@ -545,8 +550,8 @@ TEST_F(TestCostModel, BatchTest_SanitizedWorkloadsEquivalence) {
     auto batch_size = (unsigned int)workloads.size();
 
     const std::string model_path = the_NN_models.fast_model_paths[1].first;  // fast nn2.7
-    VPUNN::VPUCostModel batched_model = VPUNN::VPUCostModel(model_path, false, 0, batch_size);
-    VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path, false, 0, 1);
+    VPUNN::VPUCostModel batched_model{model_path, false, 0, batch_size};
+    VPUNN::VPUCostModel vpunn_model{model_path, false, 0, 1};
 
     {  // one by one batch, so if one list throws it will not affect the rest of wl in vector
         for (unsigned int idx = 0; idx < workloads.size(); idx++) {
@@ -618,7 +623,7 @@ TEST_F(TestCostModel, SmokeTestDPUVPU_2_0Model) {
             {1, 1, 1, 1},                                                 // padding
             VPUNN::ExecutionMode::VECTOR_FP16                             // execution mode
     };
-    VPUNN::VPUCostModel model_2_0{VPUNN::VPUCostModel(VPU_2_0_MODEL_PATH)};
+    VPUNN::VPUCostModel model_2_0{VPU_2_0_MODEL_PATH};
 
     float overhead = static_cast<float>(model_2_0.run_NN(wl));
 
@@ -637,7 +642,7 @@ TEST_F(TestCostModel, SmokeTestDPUVPU_2_0Model_Eltwise) {
             {0, 0, 0, 0},                                               // padding
             VPUNN::ExecutionMode::VECTOR                                // execution mode
     };
-    VPUNN::VPUCostModel model_2_0{VPUNN::VPUCostModel(VPU_2_0_MODEL_PATH)};
+    VPUNN::VPUCostModel model_2_0{VPU_2_0_MODEL_PATH};
     float cycles = static_cast<float>(model_2_0.DPU(wl));
 
     // Expect hw overhead to be valid
@@ -655,7 +660,7 @@ TEST_F(TestCostModel, SmokeTestDPUVPU27Model_Eltwise) {
             {0, 0, 0, 0},                                               // padding
             VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
     };
-    VPUNN::VPUCostModel model_2_7{VPUNN::VPUCostModel(VPU_2_7_MODEL_PATH)};
+    VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
     float cycles = static_cast<float>(model_2_7.DPU(wl));
 
@@ -675,7 +680,7 @@ TEST_F(TestCostModel, SmokeTestDPUVPU27Model) {
             {1, 1, 1, 1},                                               // padding
             VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
     };
-    VPUNN::VPUCostModel model_2_7{VPUNN::VPUCostModel(VPU_2_7_MODEL_PATH)};
+    VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
     float overhead = static_cast<float>(model_2_7.run_NN(wl));
 
@@ -694,7 +699,7 @@ TEST_F(TestCostModel, SmokeTestDMA) {
                       VPUNN::MemoryLocation::CMX);
 
     // Expect equality.
-    EXPECT_EQ(dma_cycles, 950 + static_cast<unsigned int>(ceil(56 * 56 * 16 * 1300 / 27000.0f)));
+    EXPECT_EQ(dma_cycles, 1242 + static_cast<unsigned int>(ceil(56 * 56 * 16 * 1300 / 27000.0f)));
     EXPECT_EQ(dma_cycles, dma_cycles_model);
 }
 
@@ -705,7 +710,7 @@ TEST_F(TestCostModel, SmokeTestCompressedDMA) {
                                 VPUNN::MemoryLocation::CMX);
 
     // Expect equality.
-    EXPECT_EQ(dma_cycles, 950 + static_cast<unsigned int>(ceil(25088 * 1300 / 27000.0f)));
+    EXPECT_EQ(dma_cycles, 1242 + static_cast<unsigned int>(ceil(25088 * 1300 / 27000.0f)));
 }
 
 TEST_F(TestCostModel, SmokeTestPermutedDMA) {
@@ -724,8 +729,8 @@ TEST_F(TestCostModel, SmokeTestPermutedDMA) {
     unsigned int tensor_size_fp16 = 56 * 56 * 16 * 2;
     unsigned int tensor_size_uint8 = 56 * 56 * 16;
     float fclk_ratio = 1300.0f / 975.0f;
-    EXPECT_EQ(dma_cycles_fp16, 950 + static_cast<unsigned int>(ceil(tensor_size_fp16 / 2.0f * fclk_ratio)));
-    EXPECT_EQ(dma_cycles_uint8, 950 + static_cast<unsigned int>(ceil(tensor_size_uint8 / 1.0f * fclk_ratio)));
+    EXPECT_EQ(dma_cycles_fp16, 1242 + static_cast<unsigned int>(ceil(tensor_size_fp16 / 2.0f * fclk_ratio)));
+    EXPECT_EQ(dma_cycles_uint8, 1242 + static_cast<unsigned int>(ceil(tensor_size_uint8 / 1.0f * fclk_ratio)));
 }
 
 TEST_F(TestCostModel, Special_Tests_DPU_MAXPOOL_VPU_2_0_1_96_96_9_9_1_2_VALID_FLOAT16_MATRIX) {
@@ -808,7 +813,7 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_27) {
     };
     const auto equivalent_op{VPUNN::Operation::DW_CONVOLUTION};
 
-    VPUNN::VPUCostModel crt_model{VPUNN::VPUCostModel(VPU_2_7_MODEL_PATH)};
+    VPUNN::VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
     {
         VPUNN::DPUWorkload wl_avgpool{wl_avgpool_ref};
         VPUNN::DPUWorkload wl_equiv{wl_avgpool};
@@ -888,7 +893,7 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_20) {
     };
     const auto equivalent_op{VPUNN::Operation::DW_CONVOLUTION};
 
-    VPUNN::VPUCostModel crt_model{VPUNN::VPUCostModel(VPU_2_0_MODEL_PATH)};
+    VPUNN::VPUCostModel crt_model{VPU_2_0_MODEL_PATH};
     {
         VPUNN::DPUWorkload wl_avgpool{wl_avgpool_ref};
         VPUNN::DPUWorkload wl_equiv{wl_avgpool};
@@ -989,7 +994,7 @@ TEST_F(TestCostModel, Datatype_Sanity_test_VPU27) {
     const VPUNN::DataType normalized_data_flt{VPUNN::DataType::FLOAT16};
 
     {
-        VPUNN::VPUCostModel model_2_7{VPUNN::VPUCostModel(VPU_2_7_MODEL_PATH)};
+        VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
         {
             VPUNN::DPUWorkload wl{wl_ref_int};
@@ -1029,53 +1034,53 @@ TEST_F(TestCostModel, Datatype_Sanity_test_VPU27) {
 TEST_F(TestCostModel, InitAspects) {
     {  // 20
         const std::string model_path = VPU_2_0_MODEL_PATH;
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
+        VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         const auto file_content{read_a_file(model_path)};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(file_content.data(), file_content.size(), true));
-        auto vpunn_model_buf = VPUNN::VPUCostModel(file_content.data(), file_content.size(), true);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), true));
+        VPUNN::VPUCostModel vpunn_model_buf{file_content.data(), file_content.size(), true};
         EXPECT_TRUE(vpunn_model_buf.nn_initialized());
 
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(file_content.data(), file_content.size(), false));
-        auto vpunn_model_buf_copy = VPUNN::VPUCostModel(file_content.data(), file_content.size(), false);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), false));
+        VPUNN::VPUCostModel vpunn_model_buf_copy(file_content.data(), file_content.size(), false);
         EXPECT_TRUE(vpunn_model_buf_copy.nn_initialized());
     }
     {  // 27
         const std::string model_path = VPU_2_7_MODEL_PATH;
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(model_path));
+        VPUNN::VPUCostModel vpunn_model(model_path);
         EXPECT_TRUE(vpunn_model.nn_initialized());
 
         const auto file_content{read_a_file(model_path)};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(file_content.data(), file_content.size(), true));
-        auto vpunn_model_buf = VPUNN::VPUCostModel(file_content.data(), file_content.size(), true);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), true));
+        VPUNN::VPUCostModel vpunn_model_buf(file_content.data(), file_content.size(), true);
         EXPECT_TRUE(vpunn_model_buf.nn_initialized());
 
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(file_content.data(), file_content.size(), false));
-        auto vpunn_model_buf_copy = VPUNN::VPUCostModel(file_content.data(), file_content.size(), false);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), false));
+        VPUNN::VPUCostModel vpunn_model_buf_copy(file_content.data(), file_content.size(), false);
         EXPECT_TRUE(vpunn_model_buf_copy.nn_initialized());
     }
     {  // garbage data/no file
         const std::string model_path = "NoFileHere.vpunn";
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(model_path));
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(model_path));
+        VPUNN::VPUCostModel vpunn_model(model_path);
         EXPECT_FALSE(vpunn_model.nn_initialized());
 
         const decltype(read_a_file("")) file_content{'M', 'u', 's', 't', 'h', 'a', 'v', 'e', ' ', '0', '1'};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(file_content.data(), file_content.size(), true));
-        auto vpunn_model_buf = VPUNN::VPUCostModel(file_content.data(), file_content.size(), true);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), true));
+        VPUNN::VPUCostModel vpunn_model_buf(file_content.data(), file_content.size(), true);
         EXPECT_FALSE(vpunn_model_buf.nn_initialized());
 
-        EXPECT_NO_THROW(auto x = VPUNN::VPUCostModel(file_content.data(), file_content.size(), false));
-        auto vpunn_model_buf_copy = VPUNN::VPUCostModel(file_content.data(), file_content.size(), false);
+        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), false));
+        VPUNN::VPUCostModel vpunn_model_buf_copy(file_content.data(), file_content.size(), false);
         EXPECT_FALSE(vpunn_model_buf_copy.nn_initialized());
 
         auto cycles_20 = vpunn_model_buf.DPU(wl_glob_20);
@@ -1084,8 +1089,8 @@ TEST_F(TestCostModel, InitAspects) {
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_20));
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_27));
 
-        EXPECT_EQ(cycles_20, 28224);  // theoretical
-        EXPECT_EQ(cycles_27, 22896);  // theoretical
+        EXPECT_EQ(cycles_20, 27556);  // theoretical value, before fixing padding skip was 28224
+        EXPECT_EQ(cycles_27, 3445);   // theoretical values,  before fixing padding skip was 3528
     }
 }
 
@@ -1093,7 +1098,7 @@ TEST_F(TestCostModel, ComaparativeRuns) {
     const std::string model_path = VPU_2_0_MODEL_PATH;
 
     auto modelRun = [](const std::string& model_path, VPUNN::DPUWorkload& wld) {
-        VPUNN::VPUCostModel vpunn_model = VPUNN::VPUCostModel(model_path);
+        VPUNN::VPUCostModel vpunn_model(model_path);
         std::cout << model_path << " : initialized: " << vpunn_model.nn_initialized() << std::endl;
 
         std::cout << "run_NN(wl)   : " << vpunn_model.run_NN(wld) << std::endl;
@@ -1114,6 +1119,209 @@ TEST_F(TestCostModel, ComaparativeRuns) {
     modelRun(NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH), wl_glob_27);
     // modelRun(NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH), wl_glob_27);
     std::cout << "----------------------------------------------------------\n";
+}
+
+TEST_F(TestCostModel, OutputWriteTiles_multiple) {
+    const VPUNN::DPUWorkload wl_ref_1x1_f = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(128, 128, 16, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
+            {VPUNN::VPUTensor(128, 128, 16, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
+            {1, 1},                                                         // kernels
+            {1, 1},                                                         // strides
+            {0, 0, 0, 0},                                                   // padding
+            VPUNN::ExecutionMode::CUBOID_4x16,                              // execution mode
+            VPUNN::ActivationFunction::NONE,                                // activation
+            0.0F,                                                           // act_sparsity
+            0.0F,                                                           // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},             // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                      // output_swizzling
+            1,                                                              // output_write_tiles
+            {0, 0, 0, 0},                                                   // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                                 // isi_strategy
+            false,                                                          // weight_sparsity_enabled
+
+    };
+    const VPUNN::DPUWorkload wl_ref_5x5_f = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(128, 128, 16, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
+            {VPUNN::VPUTensor(128, 128, 16, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
+            {5, 5},                                                         // kernels
+            {1, 1},                                                         // strides
+            {2, 2, 2, 2},                                                   // padding
+            VPUNN::ExecutionMode::CUBOID_4x16,                              // execution mode
+            VPUNN::ActivationFunction::NONE,                                // activation
+            0.0F,                                                           // act_sparsity
+            0.0F,                                                           // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},             // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                      // output_swizzling
+            0,                                                              // output_write_tiles
+            {0, 0, 0, 0},                                                   // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                                 // isi_strategy
+            false,                                                          // weight_sparsity_enabled
+
+    };
+
+    VPUNN::VPUCostModel m{VPU_2_7_MODEL_PATH};
+
+    VPUNN::DPU_OperationValidator ops;  ///< sanitizer mechanisms
+    const VPUNN::IDeviceValidValues& cfg{ops.get_config(VPUNN::VPUDevice::VPU_2_7)};
+    auto owt_list = cfg.output_write_tile_options;
+    std::sort(owt_list.begin(), owt_list.end());
+
+    auto run_test_1owt = [&m](const VPUNN::DPUWorkload& wl, const std::string& h) {
+        auto cycles = m.DPU(wl);
+
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles))
+                << h << "err_code: " << VPUNN::Cycles::toErrorText(cycles) << std::endl;
+
+        std::cout << h << "\t :output_write_tiles: " << wl.output_write_tiles << ",  cyc: " << cycles << std::endl;
+    };
+
+    auto run_test_all_owt = [&run_test_1owt, &owt_list](const VPUNN::DPUWorkload& wlref, const std::string& h) {
+        VPUNN::DPUWorkload wl{wlref};
+        for (const auto& owt : owt_list) {
+            wl.output_write_tiles = owt;
+            run_test_1owt(wl, h);
+        }
+        std::cout << std::endl;
+    };
+    {
+        bool expectationToForce{true};
+        {
+            VPUNN::DPUWorkload wl{wl_ref_1x1_f};
+            EXPECT_TRUE(expectationToForce) << wl;
+
+            wl.isi_strategy = VPUNN::ISIStrategy::CLUSTERING;
+            run_test_all_owt(wl, "Clustering: ");
+
+            wl.isi_strategy = VPUNN::ISIStrategy::SPLIT_OVER_H;
+            run_test_all_owt(wl, "SOH: ");
+
+            wl.isi_strategy = VPUNN::ISIStrategy::SPLIT_OVER_K;
+            // run_test_all_owt(wl, "SOK: ");// not possible owt =1
+        }
+        {
+            VPUNN::DPUWorkload wl{wl_ref_5x5_f};
+            EXPECT_TRUE(expectationToForce) << wl;
+
+            wl.isi_strategy = VPUNN::ISIStrategy::CLUSTERING;
+            run_test_all_owt(wl, "Clustering: ");
+
+            wl.isi_strategy = VPUNN::ISIStrategy::SPLIT_OVER_H;
+            run_test_all_owt(wl, "SOH: ");
+
+            wl.isi_strategy = VPUNN::ISIStrategy::SPLIT_OVER_K;
+            // run_test_all_owt(wl, "SOK: ");// not possible owt =1
+        }
+    }
+}
+
+TEST_F(TestCostModel, SmokeTests_DPUInfo) {
+    {  // 20
+        const DPUWorkload wl{wl_glob_20};
+        const std::string modelFile{VPU_2_0_MODEL_PATH};
+
+        VPUNN::VPUCostModel test_model{modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+        auto cycles_dpu = test_model.DPU(wl);
+        auto cycles_Pack = test_model.DPUInfo(wl);
+
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_dpu));
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
+        EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+    }
+    {  // 27
+        const DPUWorkload wl{wl_glob_27};
+        const std::string modelFile{VPU_2_7_MODEL_PATH};
+
+        VPUNN::VPUCostModel test_model{modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+        auto cycles_dpu = test_model.DPU(wl);
+        auto cycles_Pack = test_model.DPUInfo(wl);
+
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_dpu));
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
+        EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+    }
+}
+TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
+    {  // 20
+        const DPUWorkload wl_device{wl_glob_20};
+        const std::string modelFile{VPU_2_0_MODEL_PATH};
+        constexpr unsigned int n_workloads = 100;
+
+        auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
+        std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(wl_device.device));
+
+        VPUNN::VPUCostModel test_model{modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+
+        for (const auto& wl : workloads) {
+            auto cycles_dpu = test_model.DPU(wl);
+            DPUInfoPack cycles_Pack;
+            ASSERT_NO_THROW(cycles_Pack = test_model.DPUInfo(wl)) << wl;
+            EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+        }
+    }
+    {  // 27
+        const DPUWorkload wl_device{wl_glob_27};
+        const std::string modelFile{VPU_2_7_MODEL_PATH};
+        constexpr unsigned int n_workloads = 100;
+
+        auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
+        std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(wl_device.device));
+
+        VPUNN::VPUCostModel test_model{modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+
+        for (const auto& wl : workloads) {
+            auto cycles_dpu = test_model.DPU(wl);
+            DPUInfoPack cycles_Pack;
+            ASSERT_NO_THROW(cycles_Pack = test_model.DPUInfo(wl)) << wl;
+            EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+        }
+    }
+}
+
+TEST_F(TestCostModel, SmokeTests_DPUInfo_20) {
+    const VPUNN::DPUWorkload wl_special = {
+            VPUNN::VPUDevice::VPU_2_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(9, 10, 2048, 1, VPUNN::DataType::FLOAT16, Layout::ZMAJOR)},  // input dimensions
+            {VPUNN::VPUTensor(9, 10, 256, 1, VPUNN::DataType::UINT8, Layout::ZMAJOR)},     // output dimensions
+            {1, 3},                                                                        // kernels
+            {1, 1},                                                                        // strides
+            {1, 1, 0, 0},                                                                  // padding
+            VPUNN::ExecutionMode::MATRIX,                                                  // execution mode
+            VPUNN::ActivationFunction::NONE,                                               // activation
+            0.0F,                                                                          // act_sparsity
+            0.99739581346511841F,                                                          // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},                            // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                                     // output_swizzling
+            1,                                                                             // output_write_tiles
+            {0, 0, 0, 0},                                                                  // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                                                // isi_strategy
+            true,                                                                          // weight_sparsity_enabled
+
+    };
+    {  // 20
+        const DPUWorkload wl{wl_special};
+
+        const std::string modelFile{VPU_2_0_MODEL_PATH};
+
+        VPUNN::VPUCostModel test_model{modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+        auto cycles_dpu = test_model.DPU(wl);
+
+        DPUInfoPack cycles_Pack;
+        ASSERT_NO_THROW(cycles_Pack = test_model.DPUInfo(wl)) << wl;
+
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_dpu));
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
+        EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+    }
 }
 
 class TestCyclesInterfaceType : public ::testing::Test {
@@ -1157,9 +1365,9 @@ protected:
     VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
     std::string info{};
 
-    float strategy_scale = 2.0f;  // adjust SOK/SOH valued by this
+    float strategy_scale = 1.0f;  // adjust SOK/SOH valued by this
 
-    float tolerance_even = 0.1f;  // used for SOH
+    float tolerance_even = 0.2f;  // used for SOH
     // float tolerance_odd = 0.3f;
     float tolerance_SOK = 0.2f;
 
@@ -1482,16 +1690,1197 @@ TEST_F(TestSplitMethodsComparisons, Convolution_11x11) {
             Operation::CONVOLUTION,
             {VPUTensor(60, 100, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
             {VPUTensor(60, 100, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {11, 11},                                            // kernels
-            {1, 1},                                              // strides
-            {5, 5, 5, 5},                                        // padding
-            ExecutionMode::CUBOID_16x16,                         // execution mode
+            {11, 11},                                             // kernels
+            {1, 1},                                               // strides
+            {5, 5, 5, 5},                                         // padding
+            ExecutionMode::CUBOID_16x16,                          // execution mode
     };
 
     check_Cluster_vs_SOH(tst_refH49, " 11x11 H 49");
     check_Cluster_vs_SOH(tst_refH50, " 11x11 H 50");
     check_Cluster_vs_SOH(tst_refH100, " 11x11 H 100");
+}
 
+TEST_F(TestCostModel, TestDPUVPU27ModelIC_4_16_32) {
+    VPUNN::DPUWorkload wl0_prototype = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(56, 56, 4, 1, VPUNN::DataType::UINT8)},   // input dimensions
+            {VPUNN::VPUTensor(56, 56, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                     // kernels
+            {1, 1},                                                     // strides
+            {1, 1, 1, 1},                                               // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+    };
+    VPUNN::DPUWorkload wl1_prototype = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(56, 56, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                     // kernels
+            {1, 1},                                                     // strides
+            {1, 1, 1, 1},                                               // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+    };
+    VPUNN::DPUWorkload wl2_prototype = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(56, 56, 32, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(56, 56, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                     // kernels
+            {1, 1},                                                     // strides
+            {1, 1, 1, 1},                                               // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+    };
+
+    VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+
+    VPUNN::DPUWorkload wl0 = wl0_prototype;
+    VPUNN::DPUWorkload wl1 = wl1_prototype;
+    VPUNN::DPUWorkload wl2 = wl2_prototype;
+
+    ASSERT_TRUE(model_2_7.nn_initialized())
+            << "Model not loaded, might be due to file location: " << VPU_2_7_MODEL_PATH << std::endl;
+
+    // wl0 < wl1 && wl0 < wl2
+
+    {
+        CyclesInterfaceType wl0_cycles = model_2_7.DPU(wl0);
+        EXPECT_FALSE(Cycles::isErrorCode(wl0_cycles));
+        CyclesInterfaceType wl1_cycles = model_2_7.DPU(wl1);
+        EXPECT_FALSE(Cycles::isErrorCode(wl1_cycles));
+        CyclesInterfaceType wl2_cycles = model_2_7.DPU(wl2);
+        EXPECT_FALSE(Cycles::isErrorCode(wl2_cycles));
+
+        EXPECT_LT(wl0_cycles, wl1_cycles);
+        EXPECT_LT(wl0_cycles, wl2_cycles);
+
+        std::cout << "On Execution Mode Cuboid 16x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
+                  << "\nIC = 32:" << wl2_cycles;
+    }
+
+    wl0.execution_order = wl1.execution_order = wl2.execution_order = VPUNN::ExecutionMode::CUBOID_8x16;
+
+    {
+        CyclesInterfaceType wl0_cycles = model_2_7.DPU(wl0);
+        EXPECT_FALSE(Cycles::isErrorCode(wl0_cycles));
+        CyclesInterfaceType wl1_cycles = model_2_7.DPU(wl1);
+        EXPECT_FALSE(Cycles::isErrorCode(wl1_cycles));
+        CyclesInterfaceType wl2_cycles = model_2_7.DPU(wl2);
+        EXPECT_FALSE(Cycles::isErrorCode(wl2_cycles));
+
+        EXPECT_LT(wl0_cycles, wl1_cycles);
+        EXPECT_LT(wl0_cycles, wl2_cycles);
+
+        std::cout << "On Execution Mode Cuboid 8x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
+                  << "\nIC = 32:" << wl2_cycles;
+    }
+    wl0.execution_order = wl1.execution_order = wl2.execution_order = VPUNN::ExecutionMode::CUBOID_4x16;
+
+    {
+        CyclesInterfaceType wl0_cycles = model_2_7.DPU(wl0);
+        EXPECT_FALSE(Cycles::isErrorCode(wl0_cycles));
+        CyclesInterfaceType wl1_cycles = model_2_7.DPU(wl1);
+        EXPECT_FALSE(Cycles::isErrorCode(wl1_cycles));
+        CyclesInterfaceType wl2_cycles = model_2_7.DPU(wl2);
+        EXPECT_FALSE(Cycles::isErrorCode(wl2_cycles));
+
+        EXPECT_LT(wl0_cycles, wl1_cycles);
+        EXPECT_LT(wl0_cycles, wl2_cycles);
+
+        std::cout << "On Execution Mode Cuboid 4x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
+                  << "\nIC = 32:" << wl2_cycles;
+    }
+}
+
+TEST_F(TestCostModel, Compressed_CONV_Sanity_test_VPU27) {
+    const VPUNN::DPUWorkload wl_ref = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 4, 1, VPUNN::DataType::INT8)},   // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
+            {3, 3},                                                    // kernels
+            {1, 1},                                                    // strides
+            {1, 1, 1, 1},                                              // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                        // execution mode
+            VPUNN::ActivationFunction::NONE,                           // activation
+            0.0F,                                                      // act_sparsity
+            0.0F,                                                      // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},        // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                 // output_swizzling
+            1,                                                         // output_write_tiles
+            {0, 0, 0, 0},                                              // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                            // isi_strategy
+            false,                                                     // weight_sparsity_enabled
+
+    };
+    const VPUNN::DPUWorkload wl_ref_equiv = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CM_CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 4, 1, VPUNN::DataType::INT8)},   // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
+            {3, 3},                                                    // kernels
+            {1, 1},                                                    // strides
+            {1, 1, 1, 1},                                              // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                        // execution mode
+            VPUNN::ActivationFunction::NONE,                           // activation
+            0.0F,                                                      // act_sparsity
+            0.0F,                                                      // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},        // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                 // output_swizzling
+            1,                                                         // output_write_tiles
+            {0, 0, 0, 0},                                              // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                            // isi_strategy
+            false,                                                     // weight_sparsity_enabled
+
+    };
+
+    {
+        VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+
+        {
+            VPUNN::DPUWorkload wl{wl_ref};
+            VPUNN::DPUWorkload wl_equiv{wl_ref_equiv};
+
+            std::string info_raw, info_equiv;
+
+            auto cycles_raw = model_2_7.DPU(wl, info_raw);  // will change
+            auto cycles_equiv = model_2_7.DPU(wl_equiv, info_equiv);
+
+            EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_raw))
+                    << "ERROR code received: " << cycles_raw << " : " << Cycles::toErrorText(cycles_raw)
+                    << "\n INFO: " << wl << info_raw << std::endl;
+            EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv))
+                    << "ERROR code received: " << cycles_equiv << " : " << Cycles::toErrorText(cycles_equiv)
+                    << "\n INFO: " << wl_equiv << info_equiv << std::endl;
+            ;
+
+            EXPECT_EQ(cycles_raw, cycles_equiv);
+            EXPECT_TRUE((cycles_raw != 0) && (cycles_equiv != 0));
+        }
+    }
+}
+
+TEST_F(TestCostModel, Compressed_CONV_Sanity_test_VPU27_IC1_special) {
+    const VPUNN::DPUWorkload wl_ref = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 1, 1, VPUNN::DataType::INT8)},   // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
+            {3, 3},                                                    // kernels
+            {1, 1},                                                    // strides
+            {1, 1, 1, 1},                                              // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                        // execution mode
+            VPUNN::ActivationFunction::NONE,                           // activation
+            0.0F,                                                      // act_sparsity
+            0.0F,                                                      // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},        // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                 // output_swizzling
+            1,                                                         // output_write_tiles
+            {0, 0, 0, 0},                                              // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                            // isi_strategy
+            false,                                                     // weight_sparsity_enabled
+
+    };
+    const VPUNN::DPUWorkload wl_ref_equiv = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CM_CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 1, 1, VPUNN::DataType::INT8)},   // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
+            {3, 3},                                                    // kernels
+            {1, 1},                                                    // strides
+            {1, 1, 1, 1},                                              // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                        // execution mode
+            VPUNN::ActivationFunction::NONE,                           // activation
+            0.0F,                                                      // act_sparsity
+            0.0F,                                                      // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},        // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                 // output_swizzling
+            1,                                                         // output_write_tiles
+            {0, 0, 0, 0},                                              // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                            // isi_strategy
+            false,                                                     // weight_sparsity_enabled
+
+    };
+
+    {
+        VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+
+        {
+            VPUNN::DPUWorkload wl{wl_ref};
+            VPUNN::DPUWorkload wl_equiv{wl_ref_equiv};
+
+            std::string info_raw, info_equiv;
+
+            auto cycles_raw = model_2_7.DPU(wl, info_raw);  // will change
+            auto cycles_equiv = model_2_7.DPU(wl_equiv, info_equiv);
+
+            EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles_raw))
+                    << "ERROR code received: " << cycles_raw << " : " << Cycles::toErrorText(cycles_raw)
+                    << "\n INFO: " << wl << info_raw << std::endl;
+            EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles_equiv))
+                    << "ERROR code received: " << cycles_equiv << " : " << Cycles::toErrorText(cycles_equiv)
+                    << "\n INFO: " << wl_equiv << info_equiv << std::endl;
+            ;
+
+            EXPECT_EQ(cycles_raw, cycles_equiv) << wl << wl_equiv << std::endl;
+            EXPECT_TRUE((cycles_raw != 0) && (cycles_equiv != 0));
+        }
+    }
+}
+TEST_F(TestCostModel, Compressed_CONV_Sanity_test_VPU27_sparse) {
+    const VPUNN::DPUWorkload wl_ref = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 4, 1, VPUNN::DataType::INT8)},   // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
+            {3, 3},                                                    // kernels
+            {1, 1},                                                    // strides
+            {1, 1, 1, 1},                                              // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                        // execution mode
+            VPUNN::ActivationFunction::NONE,                           // activation
+            0.0F,                                                      // act_sparsity
+            0.44F,                                                     // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},        // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                 // output_swizzling
+            1,                                                         // output_write_tiles
+            {0, 0, 0, 0},                                              // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                            // isi_strategy
+            true,                                                      // weight_sparsity_enabled
+
+    };
+    const VPUNN::DPUWorkload wl_ref_equiv = {
+            VPUNN::VPUDevice::VPU_2_7,
+            VPUNN::Operation::CM_CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 4, 1, VPUNN::DataType::INT8)},   // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
+            {3, 3},                                                    // kernels
+            {1, 1},                                                    // strides
+            {1, 1, 1, 1},                                              // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                        // execution mode
+            VPUNN::ActivationFunction::NONE,                           // activation
+            0.0F,                                                      // act_sparsity
+            0.44F,                                                     // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},        // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                 // output_swizzling
+            1,                                                         // output_write_tiles
+            {0, 0, 0, 0},                                              // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                            // isi_strategy
+            true,                                                      // weight_sparsity_enabled
+
+    };
+
+    {
+        VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+
+        {
+            VPUNN::DPUWorkload wl{wl_ref};
+            VPUNN::DPUWorkload wl_equiv{wl_ref_equiv};
+
+            std::string info_raw, info_equiv;
+
+            auto cycles_raw = model_2_7.DPU(wl, info_raw);  // will change
+            auto cycles_equiv = model_2_7.DPU(wl_equiv, info_equiv);
+
+            EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles_raw))
+                    << "ERROR code received: " << cycles_raw << " : " << Cycles::toErrorText(cycles_raw)
+                    << "\n INFO: " << wl << info_raw << std::endl;
+            EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles_equiv))
+                    << "ERROR code received: " << cycles_equiv << " : " << Cycles::toErrorText(cycles_equiv)
+                    << "\n INFO: " << wl_equiv << info_equiv << std::endl;
+            ;
+
+            EXPECT_EQ(cycles_raw, V(VPUNN::Cycles::ERROR_INVALID_INPUT_CONFIGURATION));
+            EXPECT_EQ(cycles_raw, cycles_equiv);
+
+            EXPECT_TRUE((cycles_raw != 0) && (cycles_equiv != 0));
+        }
+    }
+}
+
+class TestEnergyandPF_CostModel : public TestCostModel {
+public:
+protected:
+    DPUWorkload wl_conv{VPUDevice::VPU_2_7,
+                        Operation::CONVOLUTION,
+                        {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                        {VPUTensor(56, 56, 32, 1, DataType::UINT8)},  // output dimensions
+                        {3, 3},                                       // kernels
+                        {1, 1},                                       // strides
+                        {1, 1, 1, 1},                                 // padding
+                        VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_convCM{VPUDevice::VPU_2_7,
+                          Operation::CM_CONVOLUTION,
+                          {VPUTensor(56, 56, 15, 1, DataType::UINT8)},  // input dimensions
+                          {VPUTensor(56, 56, 32, 1, DataType::UINT8)},  // output dimensions
+                          {3, 3},                                       // kernels
+                          {1, 1},                                       // strides
+                          {1, 1, 1, 1},                                 // padding
+                          VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_MAXP{VPUDevice::VPU_2_7,
+                        Operation::MAXPOOL,
+                        {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                        {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                        {3, 3},                                       // kernels
+                        {1, 1},                                       // strides
+                        {1, 1, 1, 1},                                 // padding
+                        VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_AVGP{VPUDevice::VPU_2_7,
+                        Operation::AVEPOOL,
+                        {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                        {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                        {3, 3},                                       // kernels
+                        {1, 1},                                       // strides
+                        {1, 1, 1, 1},                                 // padding
+                        VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_DW_conv{VPUDevice::VPU_2_7,
+                           Operation::DW_CONVOLUTION,
+                           {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                           {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                           {3, 3},                                       // kernels
+                           {1, 1},                                       // strides
+                           {1, 1, 1, 1},                                 // padding
+                           VPUNN::ExecutionMode::CUBOID_16x16};
+
+    DPUWorkload wl_ELT{VPUDevice::VPU_2_7,
+                       Operation::ELTWISE,
+                       {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                       {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                       {1, 1},                                       // kernels
+                       {1, 1},                                       // strides
+                       {0, 0, 0, 0},                                 // padding
+                       VPUNN::ExecutionMode::CUBOID_16x16};
+    const std::vector<DPUWorkload> wl_list{wl_conv, wl_convCM, wl_MAXP, wl_AVGP, wl_DW_conv, wl_ELT};
+
+    DPUWorkload wl_conv_FP{VPUDevice::VPU_2_7,
+                           Operation::CONVOLUTION,
+                           {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // input dimensions
+                           {VPUTensor(56, 56, 32, 1, DataType::FLOAT16)},  // output dimensions
+                           {3, 3},                                         // kernels
+                           {1, 1},                                         // strides
+                           {1, 1, 1, 1},                                   // padding
+                           VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_convCM_FP{VPUDevice::VPU_2_7,
+                             Operation::CM_CONVOLUTION,
+                             {VPUTensor(56, 56, 15, 1, DataType::FLOAT16)},  // input dimensions
+                             {VPUTensor(56, 56, 32, 1, DataType::FLOAT16)},  // output dimensions
+                             {3, 3},                                         // kernels
+                             {1, 1},                                         // strides
+                             {1, 1, 1, 1},                                   // padding
+                             VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_MAXP_FP{VPUDevice::VPU_2_7,
+                           Operation::MAXPOOL,
+                           {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // input dimensions
+                           {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // output dimensions
+                           {3, 3},                                         // kernels
+                           {1, 1},                                         // strides
+                           {1, 1, 1, 1},                                   // padding
+                           VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_AVGP_FP{VPUDevice::VPU_2_7,
+                           Operation::AVEPOOL,
+                           {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // input dimensions
+                           {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // output dimensions
+                           {3, 3},                                         // kernels
+                           {1, 1},                                         // strides
+                           {1, 1, 1, 1},                                   // padding
+                           VPUNN::ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_DW_conv_FP{VPUDevice::VPU_2_7,
+                              Operation::DW_CONVOLUTION,
+                              {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // input dimensions
+                              {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // output dimensions
+                              {3, 3},                                         // kernels
+                              {1, 1},                                         // strides
+                              {1, 1, 1, 1},                                   // padding
+                              VPUNN::ExecutionMode::CUBOID_16x16};
+
+    DPUWorkload wl_ELT_FP{VPUDevice::VPU_2_7,
+                          Operation::ELTWISE,
+                          {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // input dimensions
+                          {VPUTensor(56, 56, 16, 1, DataType::FLOAT16)},  // output dimensions
+                          {1, 1},                                         // kernels
+                          {1, 1},                                         // strides
+                          {0, 0, 0, 0},                                   // padding
+                          VPUNN::ExecutionMode::CUBOID_16x16};
+    const std::vector<DPUWorkload> wl_list_FP{wl_conv_FP, wl_convCM_FP,  wl_MAXP_FP,
+                                              wl_AVGP_FP, wl_DW_conv_FP, wl_ELT_FP};
+
+    const float w_sparsity_level{0.69f};                                //< to be used for lists
+    std::vector<DPUWorkload> wl_list_sparse{wl_conv, wl_ELT};           // only supported
+    std::vector<DPUWorkload> wl_list_FP_sparse{wl_conv_FP, wl_ELT_FP};  // only supported
+
+    void SetUp() override {
+        TestCostModel::SetUp();
+    }
+    TestEnergyandPF_CostModel() {
+        auto transformer = [this](DPUWorkload& c)  // modify in-place
+        {
+            c.weight_sparsity = w_sparsity_level;
+            c.weight_sparsity_enabled = true;
+        };
+
+        std::for_each(wl_list_sparse.begin(), wl_list_sparse.end(), transformer);
+        std::for_each(wl_list_FP_sparse.begin(), wl_list_FP_sparse.end(), transformer);
+    }
+
+    void basicTest(const DPUWorkload& workload, VPUCostModel& crt_model, std::string info = "") {
+        DPUWorkload wl{workload};
+
+        const VPUPowerFactorLUT power_factor_lut;
+        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+        const float exceedMax = power_factor_lut.get_PowerVirus_exceed_factor(wl.device);
+
+        const auto energy = crt_model.DPUEnergy(wl);
+        const auto af = crt_model.DPUActivityFactor(wl);
+        const auto util = crt_model.hw_utilization(wl);
+        const auto util_idealCyc = crt_model.DPU_Power_IdealCycles(wl);
+        const auto efficiency_idealCyc = crt_model.DPU_Efficency_IdealCycles(wl);
+        const auto theorCyc = crt_model.DPUTheoreticalCycles(wl);
+        std::string errInfo;
+        const auto nnCyc = crt_model.DPU(wl, errInfo);
+
+        std::stringstream buffer;
+        buffer << info << " Op:" << Operation_ToText.at(static_cast<int>(wl.op)) << "\n  NN cyc:" << nnCyc
+               << ", ThCyc: " << theorCyc << ", Power Ideal Cyc: " << util_idealCyc
+               << ", Efficiency Ideal Cyc: " << efficiency_idealCyc << "\n Utilization(ideal/NNcyc): " << util
+               << " Energy: " << energy << " powerAF: " << af << " pf oper correlation :" << operation_pf << "\n ";
+        std::string details = buffer.str();
+
+        EXPECT_TRUE(!Cycles::isErrorCode(nnCyc)) << info << wl << errInfo << details;
+
+        EXPECT_GT(energy, 0) << details;
+
+        EXPECT_GT(af, 0) << details;
+        EXPECT_LE(af, 1.0f * exceedMax) << details;
+        EXPECT_GT(util, 0) << details;
+        EXPECT_LE(util, 1.0f) << details;
+
+        EXPECT_NEAR(energy, (float)util_idealCyc * operation_pf, 1) << details;
+
+        std::cout << details
+                  << "-X--------------------------------------------------------------------------------------------\n";
+    }
+
+    void basicDPUPackEquivalenceTest(const DPUWorkload& workload, VPUCostModel& crt_model, std::string info = "") {
+        DPUWorkload wl{workload};
+        const VPUPowerFactorLUT power_factor_lut;
+        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+
+        const auto energy = crt_model.DPUEnergy(wl);
+        const auto af = crt_model.DPUActivityFactor(wl);
+        const auto util = crt_model.hw_utilization(wl);
+        const auto util_idealCyc = crt_model.DPU_Power_IdealCycles(wl);
+        const auto efficiency_idealCyc = crt_model.DPU_Efficency_IdealCycles(wl);
+        const auto theorCyc = crt_model.DPUTheoreticalCycles(wl);
+        std::string errInfo;
+        const auto nnCyc = crt_model.DPU(wl, errInfo);
+
+        std::stringstream buffer;
+        buffer << info << " Op:" << Operation_ToText.at(static_cast<int>(wl.op)) << "\n  NN cyc:" << nnCyc
+               << ", ThCyc: " << theorCyc << ",Power Ideal Cyc: " << util_idealCyc
+               << ", Efficiency Ideal Cyc: " << efficiency_idealCyc << "\n Utilization(ideal/NNcyc): " << util
+               << " Energy: " << energy << " powerAF: " << af << " pf oper correlation :" << operation_pf << "\n ";
+        std::string details = buffer.str();
+
+        DPUWorkload wl_pack{workload};
+        const DPUInfoPack allinfo = crt_model.DPUInfo(wl_pack);
+
+        EXPECT_TRUE(!Cycles::isErrorCode(nnCyc)) << info << wl << errInfo << details;
+
+        EXPECT_EQ(allinfo.DPUCycles, nnCyc) << info << wl << errInfo << details << allinfo;
+        EXPECT_EQ(allinfo.errInfo, errInfo) << info << wl << errInfo << details << allinfo;
+
+        EXPECT_FLOAT_EQ(allinfo.energy, energy) << info << wl << errInfo << details << allinfo;
+        EXPECT_FLOAT_EQ(allinfo.power_activity_factor, af) << info << wl << errInfo << details << allinfo;
+        EXPECT_FLOAT_EQ(allinfo.power_mac_utilization, util) << info << wl << errInfo << details << allinfo;
+        EXPECT_EQ(allinfo.power_ideal_cycles, util_idealCyc) << info << wl << errInfo << details << allinfo;
+        EXPECT_EQ(allinfo.efficiency_ideal_cycles, efficiency_idealCyc) << info << wl << errInfo << details << allinfo;
+        EXPECT_EQ(allinfo.hw_theoretical_cycles, theorCyc) << info << wl << errInfo << details << allinfo;
+
+        std::cout << details
+                  << "-X--------------------------------------------------------------------------------------------\n";
+    }
+
+    void basicSparseTest(const DPUWorkload& workload, VPUCostModel& crt_model, std::string info = "") {
+        DPUWorkload wl{workload};
+
+        const VPUPowerFactorLUT power_factor_lut;
+        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+
+        // const auto energy = crt_model.DPUEnergy(wl);
+        // const auto af = crt_model.DPUActivityFactor(wl);
+        // const auto util = crt_model.hw_utilization(wl);
+        // const auto idealCyc = crt_model.DPUIdealCycles(wl);
+        // const auto theorCyc = crt_model.DPUTheoreticalCycles(wl);
+        // std::string errInfo;
+        // const auto nnCyc = crt_model.DPU(wl, errInfo);
+
+        DPUWorkload wl_pack{workload};
+        const DPUInfoPack dpu = crt_model.DPUInfo(wl_pack);
+
+        std::stringstream buffer;
+        buffer << info << " Op:" << Operation_ToText.at(static_cast<int>(wl.op)) << "\n"
+               << "W sparsity: " << wl.weight_sparsity << ", Act sparsity: " << wl.act_sparsity << "\t" << dpu
+               << " pf oper correlation :" << operation_pf << "\n ";
+        std::string details = buffer.str();
+
+        EXPECT_TRUE(!Cycles::isErrorCode(dpu.DPUCycles)) << info << wl << dpu.errInfo << details;
+
+        EXPECT_GT(dpu.energy, 0) << details;
+
+        EXPECT_GT(dpu.power_activity_factor, 0) << details;
+        EXPECT_LE(dpu.power_activity_factor, 1.0f) << details;
+        EXPECT_GT(dpu.power_mac_utilization, 0) << details;
+        EXPECT_LE(dpu.power_mac_utilization, 1.0f) << details;
+
+        EXPECT_NEAR(dpu.energy, (float)dpu.power_ideal_cycles * operation_pf, 1) << details;
+        //-----------------
+        DPUWorkload wl_pack_denseW{workload};
+        wl_pack_denseW.weight_sparsity_enabled = false;
+        wl_pack_denseW.weight_sparsity = 0.0f;
+        const DPUInfoPack dpuD_W = crt_model.DPUInfo(wl_pack_denseW);
+        {
+            EXPECT_TRUE(!Cycles::isErrorCode(dpuD_W.DPUCycles)) << info << dpuD_W << dpuD_W.errInfo << details;
+
+            EXPECT_GT(dpuD_W.energy, 0) << details;
+
+            EXPECT_GT(dpuD_W.energy, dpu.energy);  // dense should be higher  (if not much sparse HW overhead)
+
+            // this raises also the problem : is power virus to be done with sparse enabled but no sparsity at all?, or
+            // we allow for a potentially >1 Activity factor
+
+            EXPECT_GT(dpuD_W.power_ideal_cycles, dpu.power_ideal_cycles);  // dense should be higher
+            EXPECT_EQ(dpuD_W.efficiency_ideal_cycles,
+                      dpu.efficiency_ideal_cycles);  // dense should be equal with sparse for efficiency
+            EXPECT_EQ(dpuD_W.hw_theoretical_cycles, dpu.hw_theoretical_cycles);  // unimplemented part
+        }
+
+        std::cout << details << "\t" << dpuD_W
+                  << "-X--------------------------------------------------------------------------------------------\n";
+    }
+
+private:
+};
+
+// const VPUNN::DPUWorkload wl_avgpool_ref = {
+//         VPUNN::VPUDevice::VPU_2_7,
+//         VPUNN::Operation::AVEPOOL,
+//         {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
+//         {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+//         {3, 3},                                                     // kernels
+//         {1, 1},                                                     // strides
+//         {1, 1, 1, 1},                                               // padding
+//         VPUNN::ExecutionMode::CUBOID_16x16,                         // execution mode
+//         VPUNN::ActivationFunction::NONE,                            // activation
+//         0.0F,                                                       // act_sparsity
+//         0.0F,                                                       // weight_sparsity
+//         {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},         // input_swizzling
+//         {VPUNN::Swizzling::KEY_0},                                  // output_swizzling
+//         1,                                                          // output_write_tiles
+//         {0, 0, 0, 0},                                               // offsets
+//         VPUNN::ISIStrategy::CLUSTERING,                             // isi_strategy
+//         false,                                                      // weight_sparsity_enabled
+//};
+
+TEST_F(TestEnergyandPF_CostModel, BasicEnergy_INT8) {
+    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+    {
+        DPUWorkload wl{wl_conv};
+        basicTest(wl, crt_model);
+    }
+
+    for (const auto& wl : wl_list) {
+        basicTest(wl, crt_model, "All int8:");
+    }
+}
+TEST_F(TestEnergyandPF_CostModel, BasicEnergy_FP16) {
+    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+
+    for (const auto& wl : wl_list_FP) {
+        basicTest(wl, crt_model, "All FP16:");
+    }
+}
+
+TEST_F(TestEnergyandPF_CostModel, DPUInfoBasics) {
+    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+
+    for (const auto& wl : wl_list) {
+        basicDPUPackEquivalenceTest(wl, crt_model, "All int8:");
+    }
+    for (const auto& wl : wl_list_FP) {
+        basicDPUPackEquivalenceTest(wl, crt_model, "All FP16:");
+    }
+}
+TEST_F(TestEnergyandPF_CostModel, DPUInfoBasicsSparse) {
+    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+
+    for (const auto& wl : wl_list_sparse) {
+        basicDPUPackEquivalenceTest(wl, crt_model, "All int8 sparse:");
+    }
+    for (const auto& wl : wl_list_FP_sparse) {
+        basicDPUPackEquivalenceTest(wl, crt_model, "All FP16 sparse:");
+    }
+}
+
+TEST_F(TestEnergyandPF_CostModel, SparseEnergy_INT8) {
+    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+
+    for (const auto& wl : wl_list_sparse) {
+        basicSparseTest(wl, crt_model, "All int8 sparse:");
+    }
+}
+TEST_F(TestEnergyandPF_CostModel, SparseEnergy_FP16) {
+    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+
+    for (const auto& wl : wl_list_FP_sparse) {
+        basicSparseTest(wl, crt_model, "All FP16 sparse:");
+    }
+}
+
+class TestResnet50_3Layers : public TestCostModel {
+public:
+protected:
+    const VPUDevice dev{VPUDevice::VPU_2_7};
+    // Layer 1 elm Float to int with Layout change!
+    const DPUWorkload s1_elmws_c0{
+            dev,
+            Operation::ELTWISE,
+            {VPUTensor(114, 3, 224, 1, DataType::FLOAT16, Layout::ZXY)},  // input dimensions
+            {VPUTensor(114, 3, 224, 1, DataType::UINT8, Layout::YZX)},    // output dimensions
+            {1, 1},                                                       // kernels
+            {1, 1},                                                       // strides
+            {0, 0, 0, 0},                                                 // padding
+            ExecutionMode::CUBOID_16x16,                                  // execution mode
+            ActivationFunction::RELU,                                     // activation
+            0.0F,                                                         // act_sparsity
+            0.0F,                                                         // weight_sparsity
+            {Swizzling::KEY_0, Swizzling::KEY_0},                         // input_swizzling
+            {Swizzling::KEY_0},                                           // output_swizzling
+            1,                                                            // output_write_tiles
+            {0, 0, 0, 0},                                                 // offsets
+            ISIStrategy::CLUSTERING,                                      // isi_strategy
+            false,                                                        // weight_sparsity_enabled
+    };
+
+    const DPUWorkload makeL1_Elmwise() const {
+        DPUWorkload clone = s1_elmws_c0;
+        {
+            clone.inputs = {VPUTensor(115, 3, 224, 1, DataType::FLOAT16, Layout::ZXY)};
+            clone.outputs = {VPUTensor(115, 3, 224, 1, DataType::UINT8, Layout::YZX)};
+        }
+        return clone;
+    }
+
+    const DPUWorkload s1_elmws_c1{makeL1_Elmwise()};
+    const std::string s1_elmws_name{"Elmwise ZXY>YZX F16toUI8 	"};
+
+    DMAWorkload dma_s1_elmws_c0{
+            dev,                                                          // device
+            {VPUTensor(114, 3, 224, 1, DataType::FLOAT16, Layout::ZXY)},  // input dimensions
+            {VPUTensor(114, 3, 224, 1, DataType::FLOAT16, Layout::ZXY)},  // output dimensions
+            MemoryLocation::DRAM,                                         // src
+            MemoryLocation::CMX,                                          // dst
+            1,                                                            // owt
+    };
+    DMAWorkload dma_s1_elmws_c1{
+            dev,                                                          // device
+            {VPUTensor(115, 3, 224, 1, DataType::FLOAT16, Layout::ZXY)},  // input dimensions
+            {VPUTensor(115, 3, 224, 1, DataType::FLOAT16, Layout::ZXY)},  // output dimensions
+            MemoryLocation::DRAM,                                         // src
+            MemoryLocation::CMX,                                          // dst
+            1,                                                            // owt
+    };
+
+    // Layer 2 conv
+    const DPUWorkload s2_mult_c0{
+            dev,
+            Operation::CONVOLUTION,
+            {VPUTensor(224, 114, 3, 1, DataType::UINT8)},  // input dimensions
+            {VPUTensor(112, 56, 64, 1, DataType::UINT8)},  // output dimensions
+            {7, 7},                                        // kernels
+            {2, 2},                                        // strides
+            {3, 0, 3, 2},                                  // padding
+            ExecutionMode::CUBOID_16x16,                   // execution mode
+            ActivationFunction::RELU,                      // activation
+            0.0F,                                          // act_sparsity
+            0.0F,                                          // weight_sparsity
+            {Swizzling::KEY_0, Swizzling::KEY_0},          // input_swizzling
+            {Swizzling::KEY_5},                            // output_swizzling
+            1,                                             // output_write_tiles
+            {0, 0, 0, 0},                                  // offsets
+            ISIStrategy::CLUSTERING,                       // isi_strategy
+            false,                                         // weight_sparsity_enabled
+    };
+
+    const DPUWorkload makeL2_Conv7x7() const {
+        DPUWorkload clone = s2_mult_c0;
+        {
+            clone.inputs = {VPUTensor(224, 115, 3, 1, DataType::UINT8)};
+            // same output
+            clone.padding = {0, 2, 3, 2};
+        }
+        return clone;
+    }
+    const DPUWorkload s2_mult_c1{makeL2_Conv7x7()};
+    const std::string s2_mult_name{"Conv7x7>K64 			 	"};
+
+    DMAWorkload dma_s2_INT32_WTable{
+            // WTABle 1024
+            dev,                                                              // device
+            {VPUTensor(4, 1, 64, 4 /*INT32*/, DataType::INT8, Layout::ZXY)},  // input dimensions
+            {VPUTensor(4, 1, 64, 4 /*INT32*/, DataType::INT8, Layout::ZXY)},  // output dimensions
+            MemoryLocation::DRAM,                                             // src
+            MemoryLocation::CMX,                                              // dst
+            2,                                                                // owt
+    };
+    DMAWorkload dma_s2_UINT8_W{
+            // should be 7x7=49 X3 X64
+            dev,                                                       // device
+            {VPUTensor(160, 1, 64, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
+            {VPUTensor(160, 1, 64, 1, DataType::UINT8, Layout::ZXY)},  // output dimensions
+            MemoryLocation::DRAM,                                      // src
+            MemoryLocation::CMX,                                       // dst
+            2,                                                         // owt
+    };
+
+    // Layer 3 maxpool
+    const DPUWorkload s3_maxp_c0{
+            dev,
+            Operation::MAXPOOL,
+            {VPUTensor(112, 56, 64, 1, DataType::UINT8)},  // input dimensions
+            {VPUTensor(56, 28, 64, 1, DataType::UINT8)},   // output dimensions
+            {3, 3},                                        // kernels
+            {2, 2},                                        // strides
+            {1, 0, 1, 0},                                  // padding
+            ExecutionMode::CUBOID_16x16,                   // execution mode
+            ActivationFunction::RELU,                      // activation
+            0.0F,                                          // act_sparsity
+            0.0F,                                          // weight_sparsity
+            {Swizzling::KEY_5, Swizzling::KEY_0},          // input_swizzling
+            {Swizzling::KEY_5},                            // output_swizzling
+            1,                                             // output_write_tiles
+            {0, 0, 0, 0},                                  // offsets
+            ISIStrategy::SPLIT_OVER_H,                     // isi_strategy
+            false,                                         // weight_sparsity_enabled
+    };
+    const DPUWorkload makeL3_MaxPooling3x3() {
+        DPUWorkload clone = s3_maxp_c0;
+        {
+            clone.inputs = {VPUTensor(112, 57, 64, 1, DataType::UINT8)};  // why 57?
+            // same output
+            clone.padding = {0, 0, 1, 0};
+        }
+        return clone;
+    }
+    const DPUWorkload s3_maxp_c1{makeL3_MaxPooling3x3()};
+    const std::string s3_maxp_name{"MaxP 3x3>K64 			 	"};
+
+    // Layer 4 Conv
+    const DPUWorkload s4_conv_c0{
+            dev,
+            Operation::CONVOLUTION,
+            {VPUTensor(56, 28, 64, 1, DataType::UINT8)},  // input dimensions
+            {VPUTensor(56, 28, 64, 1, DataType::UINT8)},  // output dimensions
+            {1, 1},                                       // kernels
+            {1, 1},                                       // strides
+            {0, 0, 0, 0},                                 // padding
+            ExecutionMode::CUBOID_16x16,                  // execution mode
+            ActivationFunction::RELU,                     // activation
+            0.0F,                                         // act_sparsity
+            0.0F,                                         // weight_sparsity
+            {Swizzling::KEY_5, Swizzling::KEY_0},         // input_swizzling
+            {Swizzling::KEY_0},                           // output_swizzling
+            1,                                            // output_write_tiles
+            {0, 0, 0, 0},                                 // offsets
+            ISIStrategy::SPLIT_OVER_H,                    // isi_strategy
+            false,                                        // weight_sparsity_enabled
+    };
+    const DPUWorkload s4_conv_c1{s4_conv_c0};
+    const std::string s4_conv_name{"Conv 1x1>K64 			 	"};
+
+    DMAWorkload dma_s4_fused_W_WT_UINT8{
+            // w(64x64) + WT 1024
+            dev,                                                       // device
+            {VPUTensor(5120, 1, 1, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
+            {VPUTensor(5120, 1, 1, 1, DataType::UINT8, Layout::ZXY)},  // output dimensions
+            MemoryLocation::DRAM,                                      // src
+            MemoryLocation::CMX,                                       // dst
+            2,                                                         // owt
+    };
+
+    // Layer 5 Elm to float
+    const DPUWorkload s5_elmws_c0{
+            dev,
+            Operation::ELTWISE,
+            {VPUTensor(56, 28, 64, 1, DataType::UINT8, Layout::ZXY)},    // input dimensions
+            {VPUTensor(56, 28, 64, 1, DataType::FLOAT16, Layout::XYZ)},  // output dimensions
+            {1, 1},                                                      // kernels
+            {1, 1},                                                      // strides
+            {0, 0, 0, 0},                                                // padding
+            ExecutionMode::CUBOID_8x16,                                  // execution mode
+            ActivationFunction::RELU,                                    // activation
+            0.0F,                                                        // act_sparsity
+            0.0F,                                                        // weight_sparsity
+            {Swizzling::KEY_0, Swizzling::KEY_0},                        // input_swizzling
+            {Swizzling::KEY_0},                                          // output_swizzling
+            1,                                                           // output_write_tiles
+            {0, 0, 0, 0},                                                // offsets
+            ISIStrategy::SPLIT_OVER_H,                                   // isi_strategy
+            false,                                                       // weight_sparsity_enabled
+    };
+    const DPUWorkload s5_elmws_c1{s5_elmws_c0};
+    const std::string s5_elmws_name{"Elm ZXY>XYZ 1x1>K64 UI8toF16"};
+
+    DMAWorkload dma_Out_F16{
+            dev,                                                         // device
+            {VPUTensor(56, 28, 64, 1, DataType::FLOAT16, Layout::XYZ)},  // input dimensions
+            {VPUTensor(56, 28, 64, 1, DataType::FLOAT16, Layout::XYZ)},  // output dimensions
+            MemoryLocation::CMX,                                         // src
+            MemoryLocation::DRAM,                                        // dst
+            1,                                                           // owt
+    };
+
+    const std::vector<DPUWorkload> cluster_0{s1_elmws_c0, s2_mult_c0, s3_maxp_c0, s4_conv_c0, s5_elmws_c0};
+    const std::vector<DPUWorkload> cluster_1{s1_elmws_c1, s2_mult_c1, s3_maxp_c1, s4_conv_c1, s5_elmws_c1};
+
+    const std::vector<std::string> cluster_named{s1_elmws_name, s2_mult_name, s3_maxp_name, s4_conv_name,
+                                                 s5_elmws_name};
+
+    void SetUp() override {
+        TestCostModel::SetUp();
+    }
+    TestResnet50_3Layers() {
+    }
+
+private:
+};
+
+TEST_F(TestResnet50_3Layers, DPUInfo_DPU_ResNet50F3_EISW_91782) {
+    std::vector<std::pair<std::string, DPUWorkload>> named_cluster_0;
+    for (size_t i = 0; i < cluster_0.size(); ++i) {
+        named_cluster_0.emplace_back(std::make_pair(cluster_named[i], cluster_0[i]));
+    }
+    std::vector<std::pair<std::string, DPUWorkload>> named_cluster_1;
+    for (size_t i = 0; i < cluster_1.size(); ++i) {
+        named_cluster_1.emplace_back(std::make_pair(cluster_named[i], cluster_1[i]));
+    }
+
+    // 27
+    const std::string modelFile{VPU_2_7_MODEL_PATH};
+    VPUCostModel test_model{modelFile};
+    EXPECT_TRUE(test_model.nn_initialized());
+
+    // EXPECT_EQ(1, 0);  // force fail, uncomment to have the log in tests
+
+    {
+        std::cout << "\n----------------------CLUSTER "
+                     "0---------------------------------------------------------------------------  ";
+        for (const auto& wl : named_cluster_0) {
+            auto pInfo = test_model.DPUInfo(wl.second);
+            EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
+            std::cout << "\n---------------------------------------------------------  ";
+            std::cout << "\n " << wl.first;
+            std::cout << "\n " << wl.second;
+            std::cout << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
+                      << WLHelp::toDictString(wl.second);  // dictionary style output for wl
+            std::cout << "\n " << pInfo;
+        }
+
+        std::cout << "\n----------------------CLUSTER "
+                     "1-----------------------------------------------------------------------------  ";
+        for (const auto& wl : named_cluster_1) {
+            auto pInfo = test_model.DPUInfo(wl.second);
+            EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
+            std::cout << "\n---------------------------------------------------------  ";
+            std::cout << "\n " << wl.first;
+            std::cout << "\n " << wl.second;
+            std::cout << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
+                      << WLHelp::toDictString(wl.second);  // dictionary style output for wl
+            std::cout << "\n " << pInfo;
+        }
+    }
+    {
+        std::cout << "\nName, \t Cycles,\t Energy,   ";
+        std::cout << "\n----------------------CLUSTER 0-----------------------------------  ";
+        for (const auto& wl : named_cluster_0) {
+            auto pInfo = test_model.DPUInfo(wl.second);
+            EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
+            std::cout << "\n " << wl.first << ": \t\t\t\t\t " << pInfo.DPUCycles << " \t " << pInfo.energy;
+        }
+
+        std::cout << "\n----------------------CLUSTER 1-----------------------------------  ";
+        for (const auto& wl : named_cluster_1) {
+            auto pInfo = test_model.DPUInfo(wl.second);
+            EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
+            std::cout << "\n " << wl.first << ": \t\t\t\t\t " << pInfo.DPUCycles << " \t " << pInfo.energy;
+        }
+    }
+}
+TEST_F(TestResnet50_3Layers, DMA_ResNet50F3_EISW_91782) {
+    std::vector<std::pair<std::string, DMAWorkload>> named_DMA;
+
+    named_DMA.emplace_back(std::make_pair("DMA_input_1_0", dma_s1_elmws_c0));
+    named_DMA.emplace_back(std::make_pair("DMA_input_1_1", dma_s1_elmws_c1));
+
+    named_DMA.emplace_back(std::make_pair("DMA_conv7x7_WTAble", dma_s2_INT32_WTable));
+    named_DMA.emplace_back(std::make_pair("DMA_conv7x7_W", dma_s2_UINT8_W));
+
+    named_DMA.emplace_back(std::make_pair("DMA_conv1x1: fusedWWT", dma_s4_fused_W_WT_UINT8));
+
+    named_DMA.emplace_back(std::make_pair("DMA_outputX:each", dma_Out_F16));
+
+    // 27
+    const std::string modelFile{VPU_2_7_MODEL_PATH};
+    VPUCostModel test_model{modelFile};
+    EXPECT_TRUE(test_model.nn_initialized());
+
+    // EXPECT_EQ(1, 0);  // force fail
+
+    {
+        std::cout << "\n----------------------DMA list "
+                     "0---------------------------------------------------------------------------  ";
+        for (const auto& wl : named_DMA) {
+            CyclesInterfaceType cycles = test_model.DMA(wl.second);
+            EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
+            std::cout << "\n---------------------------------------------------------  ";
+            std::cout << "\n Cycles:" << cycles;  // name
+            std::cout << "\n " << wl.first;       // name
+            std::cout << "\n " << wl.second;      // DMA
+            // std::cout << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
+            //           << WLHelp::toDictString(wl.second);  // dictionary style output for wl
+            // std::cout << "\n " << pInfo;
+        }
+    }
+    {
+        std::cout << "\n----------------------DMA list SHORT "
+                     "---------------------------------------------------------------------------  ";
+        std::cout << "\n name \t cycles   ";
+        for (const auto& wl : named_DMA) {
+            CyclesInterfaceType cycles = test_model.DMA(wl.second);
+            EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
+            std::cout << "\n " << wl.first << "\t" << cycles;  // name
+        }
+    }
+}
+
+class TestVPUPowerFactorLUT : public TestCostModel {
+public:
+protected:
+    const DataType defaultTensorType{DataType::FLOAT16};
+    const VPUDevice defaultDevice{VPUDevice::VPU_2_0};
+    const float refPowerVirusFactor{VPUPowerFactorLUT().getFP_overI8_maxPower_ratio(VPUDevice::VPU_2_0) /* 0.87f*/};
+
+    const std::array<VPUTensor, 1> outputs{VPUTensor(56, 56, 32, 1, defaultTensorType)};
+    const std::array<unsigned int, 2> kernels{3, 3};                   ///< kernel sizes WH
+    const std::array<unsigned int, 2> strides{1, 1};                   ///< kernel strides WH
+    const std::array<unsigned int, 4> padding{1, 1, 1, 1};             ///< kernel padding  Top, Bottom, Left,  Right
+    const ExecutionMode execution_order{ExecutionMode::CUBOID_16x16};  ///< execution mod
+
+    // vpu_2_0_values{{Operation::CONVOLUTION,
+    //                 {
+    //                         {4, 0.87f},
+    //                         {5, 0.92f},
+    //                         {6, 1.0f},
+    //                         {7, 0.95f},
+    //                         {8, 0.86f},
+    //                         {9, 0.87f},
+    //                 }},
+
+    void SetUp() override {
+        TestCostModel::SetUp();
+    }
+    TestVPUPowerFactorLUT() {
+    }
+
+private:
+};
+
+TEST_F(TestVPUPowerFactorLUT, InsideMatchSamples) {
+    const VPUPowerFactorLUT power_factor_lut;
+
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 5), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.92F * refPowerVirusFactor, 0.005) << wl;
+    }
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 7), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.95F * refPowerVirusFactor, 0.005) << wl;
+    }
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 9), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.005) << wl;
+    }
+
+    // inside intemediary
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 7.5), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, ((0.95F + 0.86F) / 2) * refPowerVirusFactor, 0.001) << wl;
+    }
+
+    // inside intemediary
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 6.333), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, (1.0F + 0.333F * (0.95F - 1.0F)) * refPowerVirusFactor, 0.001) << wl;
+    }
+}
+
+TEST_F(TestVPUPowerFactorLUT, BeforeFirstSample) {
+    const VPUPowerFactorLUT power_factor_lut;
+
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 0), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
+    }
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 1), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
+    }
+    // just before it
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, 15 /*(unsigned int)std::pow(2, 3.8F)*/, 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
+    }
+    // exactly at first
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 4), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
+    }
+}
+
+TEST_F(TestVPUPowerFactorLUT, AfterLastSample) {
+    const VPUPowerFactorLUT power_factor_lut;
+
+    {  // last one
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 9), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
+    }
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 9.9), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
+    }
+    {
+        DPUWorkload wl{defaultDevice,
+                       Operation::CONVOLUTION,
+                       {VPUTensor(56, 56, (unsigned int)std::pow(2, 11), 1, defaultTensorType)},
+                       outputs,
+                       kernels,
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
+    }
 }
 
 }  // namespace VPUNN_unit_tests

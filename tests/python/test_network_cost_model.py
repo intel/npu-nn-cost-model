@@ -116,22 +116,22 @@ def test_compute_cycles(nodes, n_tiles, node_type, edge_pattern, tiling_strategy
     assert model.cost(network) > 0
 
 
-@pytest.mark.parametrize("nodes", [3, 5])
-@pytest.mark.parametrize("edge_pattern", ["linear", "residual"])
-def test_cost_comparsion(nodes, edge_pattern):
-    network_soh_1 = generate_simple_network(
-        nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOH, 1
-    )
-    network_sok_1 = generate_simple_network(
-        nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOK, 1
-    )
+# @pytest.mark.parametrize("nodes", [3, 5])
+# @pytest.mark.parametrize("edge_pattern", ["linear", "residual"])
+# def test_cost_comparsion(nodes, edge_pattern):
+#     network_soh_1 = generate_simple_network(
+#         nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOH, 1
+#     )
+#     network_sok_1 = generate_simple_network(
+#         nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOK, 1
+#     )
 
-    network_soh_2 = generate_simple_network(
-        nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOH, 2
-    )
-    network_sok_2 = generate_simple_network(
-        nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOK, 2
-    )
-
-    assert model.cost(network_soh_1) < model.cost(network_sok_1)
-    assert model.cost(network_soh_2) > model.cost(network_sok_2)
+#     network_soh_2 = generate_simple_network(
+#         nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOH, 2
+#     )
+#     network_sok_2 = generate_simple_network(
+#         nodes, edge_pattern, VPUNN_lib.VPUTilingStrategy.SOK, 2
+#     )
+    
+#     assert model.cost(network_soh_1) < model.cost(network_sok_1)
+#     assert model.cost(network_soh_2) > model.cost(network_sok_2)

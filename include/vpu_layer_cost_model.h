@@ -19,6 +19,7 @@
 #include "vpu/performance.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
+#include "vpu/validation/interface_valid_values.h"
 #include "vpu/validation/layer_sanitizer.h"
 #include "vpu_cost_model.h"
 
@@ -35,7 +36,8 @@ struct VPULayerStrategy {
     bool input_fetching{false};   ///< true if the layer input is in DDR
     bool output_spilling{false};  ///< true if the layer output is in DDR
 
-    bool prefetching{true};  ///< If layer parameters are prefetched with previous layers
+    bool prefetching{true};  ///< If layer parameters are prefetched with previous layers. If true it considers the
+                             ///< weights are prefetched, if false will fetch the weights considering also sparsity
 };
 
 inline std::ostream& operator<<(std::ostream& stream, const VPULayerStrategy& d) {
@@ -54,16 +56,6 @@ inline std::ostream& operator<<(std::ostream& stream, const VPULayerStrategy& d)
     return stream;
 }
 
-/// details about a tile split strategy
-struct OneTileLayerInfo {
-    DPULayer inter_tile_split_layer;  ///<  layer resulted by splitting the orginalLayer to one tile using requested
-                                      ///<  strategy
-    DPUWorkloadsCost best_intra_tile_split;  ///< the cost and list of workloads that were inferred to be the best
-};
-
-/// info on how were the splits on each tile
-using LayerSplitInfo = std::vector<OneTileLayerInfo>;
-
 /// @brief The VPUNN layer cost model (also called VPUNN Level2 API)
 class VPUNN_API(VPULayerCostModel): public VPUCostModel {
 private:
@@ -73,6 +65,7 @@ private:
 public:
     using VPUCostModel::VPUCostModel;  ///< exposing/Using the same VPUCostModel constructor (base class)
 
+    /// @brief limits the split of a tile (intra-tile split) to this number of individual workloads
     void set_maxWorkloadsPerIntraTileSplit(unsigned int new_value) noexcept {
         maxWorkloadsPerIntraTileSplit = new_value;
     }
@@ -81,7 +74,7 @@ public:
     }
 
     /**
-     * @brief Compute the optimal cost of a DPULayer
+     * @brief Compute the optimal cost of a DPULayer given a strategy and context
      *
      * @param layer the DPULayer
      * @param strategy the layer strategy, shaves do not matter
@@ -93,7 +86,7 @@ public:
     }
 
     /**
-     * @brief Compute the optimal cost of a DPULayer using a specific strategy and execution mode
+     * @brief Compute the optimal cost of a DPULayer using a specific strategy and context
      *
      * It splits on tiles(between tiles, using the strategy), then, for each tile , makes the intra-tile split on
      * workloads and choses the best one
@@ -104,7 +97,9 @@ public:
      * @param nTiles the number of CMX tiles
      * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX)
      * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX)
-     * @param prefetching enable/disable weight prefetching
+     * @param prefetching If true it considers the weights are prefetched, if false
+     * will fetch the weights considering also sparsity
+     * takes in consideration the sparsity(enabled and value)
      * @return measured best cycles or error code . \see Cycles for error codes
      */
     CyclesInterfaceType Layer(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU = 1,
@@ -122,9 +117,13 @@ public:
      * @param strategy the inter-tile tiling strategy to use
      * @param nDPU the number of DPU (for each tile)
      * @param nTiles the number of CMX tiles
-     * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX)
-     * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX)
-     * @param prefetching enable/disable weight prefetching
+     * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX). Data fetch time is
+     * computed considering the full layer input tensor not he split ones
+     * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX). Data fetch time is
+     * computed considering the full layer output tensor not he split ones
+     * @param prefetching  If true it considers the weights are prefetched, if false
+     * will fetch the weights considering also sparsity. Data fetch time is computed considering the split layers
+     * weights tensors, that are pipelined on all available DMA channels.
      * @param detailed_split [out] gives as output the information on how was split this layer and what is the best
      * split on workloads
      * @return measured best cycles or error code . \see Cycles for error codes
@@ -135,6 +134,43 @@ public:
     }
 
     /**
+     * @brief Compute the optimal cost of a pre split layer. Layer is already split on tiles, only the intratile split
+     * si performed.
+     *
+     * For each tile , makes the intra-tile split on workloads and choses the best one
+     *
+     * @param layers_pre_split the list of layers split on tiles, their number indicates the tiles. Full info has to be
+     * specified, as it is for a DPUWorkload
+     * @param nDPU the number of DPU (for each tile)
+     *
+     * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX). Data fetch time is
+     * computed considering the split layers input tensors, that are summed up.
+     * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX). Data fetch time is
+     * computed considering the split layers output tensors, that are summed up.
+     * @param prefetching  If true it considers the weights are prefetched, if false
+     * will fetch the weights considering also sparsity. Data fetch time is computed considering the split layers
+     * weights tensors, that are pipelined on all available DMA channels.
+     *
+     * @param detailed_split [out] gives as output the information on how was split this layer and what is the best
+     * split on workloads
+     *
+     * @return measured best cycles for the overall vector of layers or error code . \see Cycles for error codes
+     */
+    CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
+                                       bool input_in_ddr, bool output_in_ddr, bool prefetching,
+                                       LayerSplitInfo& detailed_split) {
+        return layer_pre_split_cycles(layers_pre_split, nDPU, input_in_ddr, output_in_ddr, prefetching,
+                                      &detailed_split);
+    }
+
+    /// version without detailed split output parameter.
+    CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
+                                       bool input_in_ddr, bool output_in_ddr, bool prefetching) {
+        return layer_pre_split_cycles(layers_pre_split, nDPU, input_in_ddr, output_in_ddr, prefetching, nullptr);
+    }
+
+protected:
+    /**
      * @brief Compute the optimal cost of a DPULayer using a specific strategy and execution mode
      *
      * It splits on tiles(between tiles, using the strategy), then, for each tile , makes the intra-tile split on
@@ -144,9 +180,13 @@ public:
      * @param strategy the inter-tile tiling strategy to use
      * @param nDPU the number of DPU (for each tile)
      * @param nTiles the number of CMX tiles
-     * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX)
-     * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX)
-     * @param prefetching enable/disable weight prefetching
+     * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX). Data fetch time is
+     * computed considering the full layer input tensor not he split ones
+     * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX). Data fetch time is
+     * computed considering the full layer output tensor not he split ones
+     * @param prefetching  If true it considers the weights are prefetched, if false
+     * will fetch the weights considering also sparsity. Data fetch time is computed considering the split layers
+     * weights tensors, that are pipelined on all available DMA channels.
      * @param detailed_split [out] gives as output the information on how was split this layer and what is the best
      * split on workloads. ignored if null
      * @return measured best cycles or error code . \see Cycles for error codes
@@ -155,14 +195,16 @@ public:
                                      unsigned int nTiles = 1, bool input_in_ddr = false, bool output_in_ddr = false,
                                      bool prefetching = true, LayerSplitInfo* detailed_split = nullptr) {
         std::vector<CyclesInterfaceType> tiles_cost;  // cost of each tile
+        std::vector<DPULayer> tiles_layer;            //< layer list after split
         {
             operation_sanitisation(layer);  // AVEPOOL will be transformed to something equivalent
             const SplitOptions options{maxWorkloadsPerIntraTileSplit /*maxWorkloads*/, 0,
                                        nDPU};  // here always for LATENCY => cycles
 
             // Create a new instance of the cost model
-            std::shared_ptr<VPUCostModel> model = std::make_shared<VPUCostModel>(
-                    *this);  // why? and how does this work properly since CostMOdel does not have a proper copy ctor
+            // std::shared_ptr<VPUCostModel> model{std::make_shared<VPUCostModel>(
+            //         *this)};  // why? and how does this work properly since CostMOdel does not have a proper copy
+            //         ctor
 
             {  // the layer must be verified to be valid
                 SanityReport unsplit_result;
@@ -184,7 +226,7 @@ public:
             }
 
             // split the layer across multiple tiles
-            std::vector<DPULayer> tiles_layer = layer.splitAcrossTiles(strategy, nTiles);  // max each tile a layer
+            tiles_layer = layer.splitAcrossTiles(strategy, nTiles);  // max each tile a layer
 
             {  // tile-layers must be verified to be valid
                 SanityReport post_result;
@@ -213,7 +255,7 @@ public:
                 }
             }
 
-            auto tiler = getDPUTiler(model);
+            auto tiler = getDPUTiler(*this);
             for (auto& one_tile_layer : tiles_layer) {
                 try {
                     // obtains the best DPU workloads split
@@ -249,23 +291,47 @@ public:
         if (!Cycles::isErrorCode(cost)) {
             if (!prefetching) {
                 // in case of non-overlappable prefetching the cost is the sum of DPU + weights DMA
-                auto prefetching_cost = WeightsPrefetching(layer, strategy, nTiles);
-                cost = cost + prefetching_cost;
+                // each tile-layer has its own transfer (eg for SOK the w size might be  half or less).
+                // we have multiple DMA channels, so we can have pipelining of tile memory
+                //  still the naive/simple assumption is that DPU will start after all tile memory is copies (no overlap
+                //  tx with DPU)
+                std::vector<CyclesInterfaceType> w_costs;
+                for (auto& one_tile_layer : tiles_layer) {
+                    auto one_tile_w_cost = OneTileWeightsPrefetching(one_tile_layer);  // contains latency
+                    w_costs.push_back(one_tile_w_cost);
+                }
+                const auto pipelined_cost =
+                        dpu_schedule(get_dma_ports(layer.device), w_costs);  // pipelines on dma channels
+                const auto prefetching_cost = pipelined_cost;
+                cost = Cycles::cost_adder(cost, prefetching_cost);
+
+                // add details on layers DMA info
+                if (detailed_split) {
+                    const auto tile_count{detailed_split->size()};
+                    if (tile_count == w_costs.size()) {
+                        for (size_t i = 0; i < tile_count; ++i) {
+                            (*detailed_split)[i].DMA_info.w_tensor.cycles = w_costs[i];
+                        }
+                    }
+                }
             }
 
             if (input_in_ddr) {
                 // Add cost of loading input activation from DDR to CMX
                 for (auto& inT : layer.inputs) {
-                    cost += DMA(layer.device, inT, inT);
+                    auto in_ddr_dma = DMA(layer.device, inT, inT, MemoryLocation::DRAM, MemoryLocation::CMX);
+                    cost = Cycles::cost_adder(cost, in_ddr_dma);
                 }
             }
 
             if (output_in_ddr) {
-                // Add cost of spilling output activation from DDR to CMX
+                // Add cost of spilling output activation from CMX to DDR
                 for (auto& outT : layer.outputs) {
-                    cost += DMA(layer.device, outT, outT);
+                    auto out_ddr_dma = DMA(layer.device, outT, outT, MemoryLocation::CMX, MemoryLocation::DRAM);
+                    cost = Cycles::cost_adder(cost, out_ddr_dma);
                 }
             }
+
         } else {
             Logger::error() << "\n Layer cost has an error, skipping DMA/memory time computation: "
                             << "ERROR code: " << cost << " : " << Cycles::toErrorText(cost) << "\n"
@@ -277,8 +343,211 @@ public:
         return cost;
     }
 
+    CyclesInterfaceType layer_pre_split_cycles(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU = 1,
+                                               bool input_in_ddr = false, bool output_in_ddr = false,
+                                               bool prefetching = true, LayerSplitInfo* detailed_split = nullptr) {
+        // add missing info by deducing it (not anymore received by params)
+        unsigned int nTiles{(unsigned int)layers_pre_split.size()};
+        VPUTilingStrategy strategy{VPUTilingStrategy::__size};  //< unknown
+        VPUDevice device{nTiles ? layers_pre_split[0].device : VPUDevice::__size};
+        // end of missing info
+
+        std::vector<CyclesInterfaceType> tiles_cost;          // cost of each tile
+        std::vector<DPULayer> tiles_layer{layers_pre_split};  //< layer list after split
+        {
+            // operation_sanitisation(layer);  // AVEPOOL will be transformed to something equivalent
+            const SplitOptions options{maxWorkloadsPerIntraTileSplit /*maxWorkloads*/, 0,
+                                       nDPU};  // here always for LATENCY => cycles
+
+            // Create a new instance of the cost model
+            // std::shared_ptr<VPUCostModel> model = std::make_shared<VPUCostModel>(
+            //        *this);  // why? and how does this work properly since CostMOdel does not have a proper copy ctor
+
+            //{  // the layer must be verified to be valid
+            //    SanityReport unsplit_result;
+            //    the_layer_validator.sanitize_preconditions(
+            //            layer);  // this might change the layer. eg: siwzzlings for VPU2.0
+            //    the_layer_validator.check_completeLayer_consistency(
+            //            layer, unsplit_result, DPULayer::mapTilingStrategiesToWorkload(strategy), nTiles);
+
+            //    if (!unsplit_result.is_usable()) {
+            //        Logger::warning() << "\n Layer is NOT Valid \n *** INFO from LayerValidator:\n "
+            //                          << unsplit_result.info << "\n"
+            //                          << "\n *** LAYER: "
+            //                          << "\n " << layer << " \n strategy: " << (int)strategy << ", nDPU: " << nDPU
+            //                          << ", nTiles: " << nTiles
+            //                          << "\n Result: Early termination with Error code: " << unsplit_result.value()
+            //                          << " : " << Cycles::toErrorText(unsplit_result.value()) << "\n";
+            //        return unsplit_result.value();  // EARLY RETURN
+            //    }
+            //}
+
+            // split the layer across multiple tiles
+            // tiles_layer = layer.splitAcrossTiles(strategy, nTiles);  // max each tile a layer
+
+            {  // tile-layers must be verified to be valid
+                SanityReport post_result;
+                for (auto& one_tile_layer : tiles_layer) {
+                    operation_sanitisation(one_tile_layer);  // AVEPOOL will be transformed to something equivalent
+                    the_layer_validator.sanitize_preconditions(
+                            one_tile_layer);  // this might change the layer. eg: siwzzlings for VPU2.0
+
+                    the_layer_validator.check_splitLayer_consistency(one_tile_layer, post_result);
+                    if (!post_result.is_usable()) {
+                        Logger::warning() << "\n Split Layer is NOT Valid \n *** INFO from LayerValidator: \n"
+                                          << post_result.info << "\n *** This LAYER: "
+                                          << "\n " << one_tile_layer << " \n strategy: " << (int)strategy << " = "
+                                          << VPUTilingStrategy_ToText.at(static_cast<int>(strategy))
+                                          << ", nDPU: " << nDPU << ", nTiles: " << nTiles
+                                          << "\nResult: Early termination with Error code:  " << post_result.value()
+                                          << " : " << Cycles::toErrorText(post_result.value()) << "\n";
+                        break;  // EARLY LOOP exit, otherwise it will be overwritten by next tile check
+                    }
+                }
+
+                if (!post_result.is_usable()) {
+                    if (detailed_split) {  // add all tile layers for info
+                        for (const auto& one_tile_layer : tiles_layer) {
+                            detailed_split->emplace_back(
+                                    OneTileLayerInfo{one_tile_layer, {0, {}}});  // no workloads. no info if good/bad
+                        }
+                    }
+                    return post_result.value();  // EARLY RETURN
+                }
+            }  // inter tile layers sanitized and validated
+
+            auto tiler = getDPUTiler(*this);  // intra-tile tiler
+            for (auto& one_tile_layer : tiles_layer) {
+                try {
+                    // obtains the best DPU workloads split
+                    const DPUWorkloadsCost cost_and_workloads = tiler->intraTileSplit(one_tile_layer, options);
+                    const auto cycles = cost_and_workloads.first;
+                    tiles_cost.push_back(cycles);
+
+                    if (detailed_split) {
+                        detailed_split->emplace_back(OneTileLayerInfo{one_tile_layer, cost_and_workloads});
+                    }
+                } catch (const std::exception& e) {
+                    Logger::warning() << "\n Exception thrown while performing intra tile split "
+                                      << "\n Exception: " << e.what() << "\n *** This LAYER: "
+                                      << "\n " << one_tile_layer << " \n strategy: " << (int)strategy << " = "
+                                      << VPUTilingStrategy_ToText.at(static_cast<int>(strategy)) << ", nDPU: " << nDPU
+                                      << ", nTiles: " << nTiles
+                                      << "\nResult: this tile will have error result ERROR_TILE_SPLIT_EXCEPTION: "
+                                      << (CyclesInterfaceType)Cycles::ERROR_TILE_SPLIT_EXCEPTION << " \n";
+
+                    // add the error result
+                    tiles_cost.push_back((CyclesInterfaceType)Cycles::ERROR_TILE_SPLIT_EXCEPTION);  // big value
+                    if (detailed_split) {
+                        detailed_split->emplace_back(
+                                OneTileLayerInfo{one_tile_layer, {tiles_cost.back(), {}}});  // no workloads info
+                    }
+                }
+            }
+        }
+
+        // The cost of the worst case in the tiles (since error codes are large the largest error code will dominate
+        // any regular value)
+        CyclesInterfaceType cost = extractLargestTime(tiles_cost);
+
+        if (!Cycles::isErrorCode(cost)) {
+            if (!prefetching) {
+                // in case of non-overlappable prefetching the cost is the sum of DPU + weights DMA
+                // each tile-layer has its own transfer (eg for SOK the w size might be  half or less).
+                // we have multiple DMA channels, so we can have pipelining of tile memory
+                //  still the naive/simple assumption is that DPU will start after all tile memory is copies (no overlap
+                //  tx with DPU)
+                std::vector<CyclesInterfaceType> w_costs;
+                for (auto& one_tile_layer : tiles_layer) {
+                    auto one_tile_w_cost = OneTileWeightsPrefetching(one_tile_layer);  // contains latency
+                    w_costs.push_back(one_tile_w_cost);
+                }
+                const auto pipelined_cost = dpu_schedule(get_dma_ports(device), w_costs);  // pipelines on dma channels
+                const auto prefetching_cost = pipelined_cost;
+                cost = Cycles::cost_adder(cost, prefetching_cost);
+
+                // add details on layers DMA info
+                if (detailed_split) {
+                    const auto tile_count{detailed_split->size()};
+                    if (tile_count == w_costs.size()) {
+                        for (size_t i = 0; i < tile_count; ++i) {
+                            (*detailed_split)[i].DMA_info.w_tensor.cycles = w_costs[i];
+                        }
+                    }
+                }
+            }
+            // Data fetch time is computed considering the split layers input tensors, that are summed up.
+            if (input_in_ddr) {
+                // Add cost of loading input activation from DDR to CMX
+                std::vector<CyclesInterfaceType> dma_costs;
+                for (auto& one_tile_layer : tiles_layer) {
+                    static_assert(std::tuple_size<decltype(one_tile_layer.inputs)>::value == 1,
+                                  "one input restriction");
+
+                    const auto& inT{one_tile_layer.inputs[0]};
+                    CyclesInterfaceType one_tile_cost =
+                            DMA(device, inT, inT, MemoryLocation::DRAM, MemoryLocation::CMX);
+
+                    dma_costs.push_back(one_tile_cost);
+                }
+
+                const auto sum_dma_layers = std::accumulate(dma_costs.begin(), dma_costs.end(), 0u, Cycles::cost_adder);
+                cost = Cycles::cost_adder(cost, sum_dma_layers);
+
+                // add details on layers DMA info
+                if (detailed_split) {
+                    const auto tile_count{detailed_split->size()};
+                    if (tile_count == dma_costs.size()) {
+                        for (size_t i = 0; i < tile_count; ++i) {
+                            (*detailed_split)[i].DMA_info.input_tensor.cycles = dma_costs[i];
+                        }
+                    }
+                }
+            }
+
+            // Data fetch time is computed considering the split layers output tensors, that are summed up.
+            if (output_in_ddr) {
+                // Add cost of spilling output activation from CMX to DDR
+                std::vector<CyclesInterfaceType> dma_costs;
+                for (auto& one_tile_layer : tiles_layer) {
+                    static_assert(std::tuple_size<decltype(one_tile_layer.outputs)>::value == 1,
+                                  "one input restriction");
+
+                    const auto& outT{one_tile_layer.outputs[0]};
+                    CyclesInterfaceType one_tile_cost =
+                            DMA(device, outT, outT, MemoryLocation::CMX, MemoryLocation::DRAM);
+
+                    dma_costs.push_back(one_tile_cost);
+                }
+
+                const auto sum_dma_layers = std::accumulate(dma_costs.begin(), dma_costs.end(), 0u, Cycles::cost_adder);
+                cost = Cycles::cost_adder(cost, sum_dma_layers);
+
+                // add details on layers DMA info
+                if (detailed_split) {
+                    const auto tile_count{detailed_split->size()};
+                    if (tile_count == dma_costs.size()) {
+                        for (size_t i = 0; i < tile_count; ++i) {
+                            (*detailed_split)[i].DMA_info.output_tensor.cycles = dma_costs[i];
+                        }
+                    }
+                }
+            }
+
+        } else {
+            Logger::error() << "\n Layer cost has an error, skipping DMA/memory time computation: "
+                            << "ERROR code: " << cost << " : " << Cycles::toErrorText(cost) << "\n"
+                            << " \n strategy: " << (int)strategy << " = "
+                            << VPUTilingStrategy_ToText.at(static_cast<int>(strategy)) << ", nDPU: " << nDPU
+                            << ", nTiles: " << nTiles << "\n";
+        }
+
+        return cost;
+    }
+
+public:
     /**
-     * @brief Compute the optimal cost of a DPULayer
+     * @brief Compute the optimal cost of a DPULayer, given a context but no strategy
      *
      * Analyses all strategies and selects the time o the fastest one
      *
@@ -339,34 +608,44 @@ public:
         if (input_in_ddr) {
             // Add cost of loading input activation from DDR to CMX
             for (auto& inT : layer.inputs) {
-                cost += DMA(layer.device, inT, inT);
+                auto in_ddr_dma = DMA(layer.device, inT, inT);
+                cost = Cycles::cost_adder(cost, in_ddr_dma);
+                // cost += DMA(layer.device, inT, inT);
             }
         }
 
         if (output_in_ddr) {
             // Add cost of spilling output activation from DDR to CMX
             for (auto& outT : layer.outputs) {
-                cost += DMA(layer.device, outT, outT);
+                auto out_ddr_dma = DMA(layer.device, outT, outT);
+                cost = Cycles::cost_adder(cost, out_ddr_dma);
+                // cost += DMA(layer.device, outT, outT);
             }
         }
 
         return cost;
     }
 
+protected:
+    const IDeviceValidValues& getDeviceConfiguratorForTiles(VPUDevice device) const {
+        return the_layer_validator.getDeviceConfiguratorForTiles(device);
+    }
     /**
-     * @brief The cycles it takes to prefetch the weights
+     * @brief The cycles it takes to prefetch the weights of one tile, not considering any pipelining
+     * Takes in consideration sparsity (enabled and value) for this transfer
      *
-     * @param layer the DPULayer
-     * @param strategy the tiling strategy to use
-     * @param nTiles the number of CMX tiles
-     * @return unsigned long int
+     * @param layer the DPULayer, expected to be a layer allocated to this tile
+     * @return CyclesInterfaceType
      */
-    unsigned long int WeightsPrefetching(const DPULayer& layer, VPUTilingStrategy strategy, unsigned int nTiles = 1) {
-        auto weight_plus_table_tensor =
-                VPUTensor({layer.weight_footprint(), 1, 1, 1}, DataType::UINT8);  // WHY assumed int?
-        auto output_write_tiles = ((strategy == VPUTilingStrategy::SOK) ? nTiles : 1);
+    CyclesInterfaceType OneTileWeightsPrefetching(const DPULayer& layer) {
+        const auto& config = getDeviceConfiguratorForTiles(layer.device);
+
+        const auto in_1_movable_size = layer.weight_footprint(config);
+
+        const VPUTensor weight_plus_table_tensor{{static_cast<unsigned int>(in_1_movable_size), 1, 1, 1},
+                                                 DataType::UINT8};  // weight_footprint is in bytes
         return DMA(layer.device, weight_plus_table_tensor, weight_plus_table_tensor, MemoryLocation::DRAM,
-                   MemoryLocation::CMX, output_write_tiles);
+                   MemoryLocation::CMX, 1);
     }
 
     /**
@@ -381,10 +660,11 @@ public:
         // split the layer across multiple tiles, for now it uses clustering
         std::vector<DPULayer> tile_workloads = layer.splitAcrossTiles(strategy, nTiles);
         std::vector<unsigned long int> tile_footprints;
+        const auto& config = getDeviceConfiguratorForTiles(layer.device);
 
         for (auto& wl : tile_workloads) {
             // Get the tile footprint
-            auto tile_footprint = wl.footprint();
+            auto tile_footprint = wl.footprint(config);
             // Compute the cost of executing those workload on 1 tile
             tile_footprints.push_back(tile_footprint);
         }
@@ -426,6 +706,7 @@ protected:
 
     void operation_sanitisation(DPULayer& wl) const {
         avgpool_replace_by(wl);
+        compressConv_replace_by_CM_CONV_VPU27(wl);
     }
 
     // static members
@@ -442,7 +723,7 @@ public:
         case VPUDevice::VPU_2_1:
         case VPUDevice::VPU_2_7:
             return {VPUTilingStrategy::NONE, VPUTilingStrategy::SOH, VPUTilingStrategy::SOK};
-        case VPUDevice::VPU_4_0:
+        case VPUDevice::VPU_RESERVED:
             return {VPUTilingStrategy::NONE, VPUTilingStrategy::SOH,  VPUTilingStrategy::SOK,
                     VPUTilingStrategy::SOW,  VPUTilingStrategy::SOHW, VPUTilingStrategy::SOHK};
         default:

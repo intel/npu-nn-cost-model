@@ -15,34 +15,41 @@
 #include "core/tensors.h"
 #include "kernels/fully_connected.h"
 
-void fc_test(unsigned int input_channels, unsigned int output_channels, unsigned int batch_size = 1) {
-    auto weights = VPUNN::random_uniform<float>({output_channels, input_channels}, -10.0f, 10.0f);
-    auto input = VPUNN::random_uniform<float>({batch_size, input_channels}, -10.0f, 10.0f);
-    auto output = VPUNN::zeros<float>({batch_size, output_channels});
-    auto expected_output = VPUNN::zeros<float>({batch_size, output_channels});
+/// @brief namespace for Unit tests of the C++ library
+namespace VPUNN_unit_tests {
+class TestFCLayer : public testing::Test {
+public:
+protected:
+    void SetUp() override {
+    }
+    void fc_test(unsigned int input_channels, unsigned int output_channels, unsigned int batch_size = 1) {
+        auto weights = VPUNN::random_uniform<float>({output_channels, input_channels}, -10.0f, 10.0f);
+        auto input = VPUNN::random_uniform<float>({batch_size, input_channels}, -10.0f, 10.0f);
+        auto output = VPUNN::zeros<float>({batch_size, output_channels});
+        auto expected_output = VPUNN::zeros<float>({batch_size, output_channels});
 
-    VPUNN::Dense(&weights, &input, &output);
+        VPUNN::Dense(&weights, &input, &output);
 
-    for (unsigned int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
-        for (unsigned int outC = 0; outC < output_channels; outC++) {
-            for (unsigned int inC = 0; inC < input_channels; inC++) {
-                expected_output[outC + batch_idx * output_channels] +=
-                        weights[inC + input_channels * outC] * input[inC + batch_idx * input_channels];
-            }
-            // Check
-            auto idx = outC + batch_idx * output_channels;
-            if (output[idx] != 0) {
-                // Relative error less than 1%
-                EXPECT_LE(std::abs(expected_output[idx] - output[idx]) / output[idx], 0.01f);
-            } else {
-                EXPECT_FLOAT_EQ(output[idx], 0.0);
+        for (unsigned int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
+            for (unsigned int outC = 0; outC < output_channels; outC++) {
+                for (unsigned int inC = 0; inC < input_channels; inC++) {
+                    expected_output[outC + batch_idx * output_channels] +=
+                            weights[inC + input_channels * outC] * input[inC + batch_idx * input_channels];
+                }
+                // Check
+                auto idx = outC + batch_idx * output_channels;
+                if (output[idx] != 0) {
+                    // Relative error less than 1%
+                    EXPECT_LE(std::abs(expected_output[idx] - output[idx]) / output[idx], 0.01f);
+                } else {
+                    EXPECT_FLOAT_EQ(output[idx], 0.0);
+                }
             }
         }
     }
-}
-
+};
 // Demonstrate some basic assertions.
-TEST(TestFCLayer, BasicAssertions) {
+TEST_F(TestFCLayer, BasicAssertions) {
     for (auto batch_size = 1; batch_size <= 10; batch_size++) {
         for (auto output_channels : {1, 10, 20, 50, 100, 250, 500}) {
             for (auto input_channels : {1, 10, 20, 50, 100, 250, 500}) {
@@ -51,3 +58,4 @@ TEST(TestFCLayer, BasicAssertions) {
         }
     }
 }
+}  // namespace VPUNN_unit_tests

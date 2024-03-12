@@ -66,16 +66,17 @@ void InferenceModel::allocate_tensors(const unsigned int batch) {
 
         const auto tensor_shape{parse_vector(flatbuffer_tensor->shape(), forced_batch)};
 
-        // Create the new tensor structure
-        auto tensor = std::make_shared<VPUNN::Tensor<float>>(tensor_shape);
-        if (buffer_is_present) {  // in this case, copy the existing data(the buffer) into tensor's memory
-            const auto array = buffers->Get(buffer_ID)->data();
-            tensor->assign((const float*)(array->data()),
-                           array->Length());  // will throw if buffer mismatch with tensor shape
-        } else {                              // Fill with zeros the tensor's memory
-            tensor->fill(0);
+        {  // Create/Fill the new tensor structure
+            Tensor<float> tensor{tensor_shape};
+            if (buffer_is_present) {  // in this case, copy the existing data(the buffer) into tensor's memory
+                const auto array = buffers->Get(buffer_ID)->data();
+                tensor.assign((const float*)(array->data()),
+                              array->size());  // will throw if buffer mismatch with tensor shape
+            } else {
+                tensor.fill(0);  // Fill with zeros the tensor's memory
+            }
+            tensor_map.emplace_back(std::move(tensor));
         }
-        tensor_map.push_back(tensor);
     }
 
     bias.reserve_bias_space(this->max_batch_in_tensors());
@@ -84,7 +85,7 @@ void InferenceModel::allocate_tensors(const unsigned int batch) {
 void InferenceModel::predict() {
     auto layers = model->operators();
 
-    for (flatbuffers::uoffset_t idx = 0; idx < layers->Length(); idx++) {
+    for (flatbuffers::uoffset_t idx = 0; idx < layers->size(); idx++) {
         // Create the new tensor structure
         run_layer(layers->Get(idx));
     }

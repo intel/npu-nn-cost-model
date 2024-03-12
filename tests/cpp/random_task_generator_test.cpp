@@ -24,6 +24,8 @@
 
 namespace VPUNN_unit_tests {
 
+using namespace VPUNN;
+
 class SamplerTest : public ::testing::Test {
 public:
 protected:
@@ -152,7 +154,6 @@ TEST_F(DPU_OperationCreatorTest, checkOcupiedMemoryTest_stochastic) {
     VPUNN::DPU_OperationSanitizer sanitizer;
     {
         VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_0};
-        VPUNN::randDPUWorkload dut(device_req);
 
         ASSERT_TRUE(validator.is_supported(device_req));
 
@@ -160,7 +161,7 @@ TEST_F(DPU_OperationCreatorTest, checkOcupiedMemoryTest_stochastic) {
 
         // Generate N workloads
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
-        EXPECT_NO_THROW(std::generate_n(workloads.begin(), n_workloads, dut));
+        EXPECT_NO_THROW(std::generate_n(workloads.begin(), n_workloads, randDPUWorkload(device_req)));
 
         int i{0};  // increments at every error
         int index{0};
@@ -183,14 +184,13 @@ TEST_F(DPU_OperationCreatorTest, checkOcupiedMemoryTest_stochastic) {
 
     {
         VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_7};
-        VPUNN::randDPUWorkload dut(device_req);
         ASSERT_TRUE(validator.is_supported(device_req));
 
         const auto& config{validator.get_config(device_req)};
 
         // Generate N workloads
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
-        EXPECT_NO_THROW(std::generate_n(workloads.begin(), n_workloads, dut));
+        EXPECT_NO_THROW(std::generate_n(workloads.begin(), n_workloads, randDPUWorkload(device_req)));
 
         int i{0};  // increments at every error
         int index{0};

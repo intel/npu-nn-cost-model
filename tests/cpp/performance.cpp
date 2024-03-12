@@ -47,7 +47,7 @@ TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
     for (auto& model_info : the_NN_models.all_model_paths) {
         const auto& model_path = model_info.first;
         // Use no cache
-        auto model = VPUNN::VPUCostModel(model_path, false, 0);  // no cache, batch =1
+        VPUNN::VPUCostModel model{model_path, false, 0};  // no cache, batch =1
 
         // Check device
         const VPUNN::VPUDevice device = model_info.second;
@@ -64,7 +64,7 @@ TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
             {  // separate execution
                 std::vector<double> individual_latencies;
                 individual_latencies.reserve(n_workloads);
-                for (auto wl : workloads) {
+                for (const auto& wl : workloads) {
                     const auto t0 = VPUNN::tick();
                     model.DPU(wl);
                     // Total latency in ms
@@ -113,7 +113,7 @@ TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
     for (auto& model_info : the_NN_models.fast_model_paths) {
         const auto& model_path = model_info.first;
         // Use no cache
-        auto model = VPUNN::VPUCostModel(model_path, false, 0);  // no cache, batch =1
+        VPUNN::VPUCostModel model{model_path, false, 0};  // no cache, batch =1
 
         // Check device
         const VPUNN::VPUDevice device = model_info.second;
@@ -131,7 +131,7 @@ TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
             {  // separate execution
                 std::vector<double> individual_latencies;
                 individual_latencies.reserve(n_workloads);
-                for (auto wl : workloads) {
+                for (const auto& wl : workloads) {
                     const auto t0 = VPUNN::tick();
                     model.DPU(wl);
                     // Total latency in ms

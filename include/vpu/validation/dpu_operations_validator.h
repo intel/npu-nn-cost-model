@@ -110,10 +110,11 @@ public:
         // weights sparsity should not be present  if not enabled (assumed sanitation)
 
         auto& in = op.input_1;
-        const VPUTensor weights =
-                VPUTensor({static_cast<unsigned int>(in.width), static_cast<unsigned int>(in.height),
-                           static_cast<unsigned int>(in.channels), static_cast<unsigned int>(in.batch)},
-                          config.restrict_datatype(in.datatype), in.layout, in.sparsity_enabled);
+        const VPUTensor weights{{static_cast<unsigned int>(in.width), static_cast<unsigned int>(in.height),
+                                 static_cast<unsigned int>(in.channels), static_cast<unsigned int>(in.batch)},
+                                config.restrict_datatype(in.datatype),
+                                in.layout,
+                                in.sparsity_enabled};
 
         return weights;
     }
@@ -157,8 +158,9 @@ public:
             {  // input/activation dimensions and tensor properties
                 const auto& in0{w.input_0};
                 // what to do with batch??
-                checker.check_is_in_list((int)in0.height, config.get_input_height_range(w), "input_0.height");
-                checker.check_is_in_list((int)in0.width, config.get_input_width_range(w), "input_0.width");
+
+                checker.check_is_in_interval((int)in0.height, config.get_input_height_interval(w), "input_0.height");
+                checker.check_is_in_interval((int)in0.width, config.get_input_width_interval(w), "input_0.width");
 
                 checker.check_is_in_list((int)in0.channels, config.get_input_channels_range(w), "input_0.channels");
 
@@ -168,7 +170,7 @@ public:
             }
             {  // stride , depends on input zero, and operation sometimes
                 const auto k{w.kernel};
-                const auto stride_options{config.get_strides_range(w)};
+                const auto stride_options{config.get_dpu_strides_range(w)};
 
                 checker.check_is_in_list(k.stride_width, stride_options.first, "kernel.stride_width");
                 checker.check_is_in_list(k.stride_height, stride_options.second, "kernel.stride_height");
@@ -182,12 +184,25 @@ public:
                 const auto expected_out_width =
                         config.compute_output_dim((int)w.input_0.width, w.kernel.pad_left, w.kernel.pad_right,
                                                   w.kernel.width, w.kernel.stride_width);
-                const auto expected_out_height =
+                checker.check_is_in_interval((int)w.output_0.width,
+                                             std::make_pair(expected_out_width, expected_out_width), "output_0.width");
+
+                const auto HALO_max{w.kernel.height};  // full kernel
+                const auto SOH_H_input_Halo_extension{
+                        (w.isi_strategy == ISIStrategy::SPLIT_OVER_H)
+                                ? (((w.kernel.pad_top == 0) ? HALO_max : 0) +    // top contribution
+                                   ((w.kernel.pad_bottom == 0) ? HALO_max : 0))  // bottom contribution
+                                : 0};
+
+                const auto expected_out_height_minimum =
                         config.compute_output_dim((int)w.input_0.height, w.kernel.pad_top, w.kernel.pad_bottom,
                                                   w.kernel.height, w.kernel.stride_height);
+                const auto expected_out_height_maximum =
+                        config.compute_output_dim((int)w.input_0.height + SOH_H_input_Halo_extension, w.kernel.pad_top,
+                                                  w.kernel.pad_bottom, w.kernel.height, w.kernel.stride_height);
 
-                checker.check_is_in_list(w.output_0.width, {expected_out_width}, "output_0.width");
-                checker.check_is_in_list(w.output_0.height, {expected_out_height}, "output_0.height");
+                const auto allowed_heights{std::make_pair(expected_out_height_minimum, expected_out_height_maximum)};
+                checker.check_is_in_interval((int)w.output_0.height, allowed_heights, "output_0.height");
 
                 // channels, do not check? (maybe in op specific area)
 
@@ -241,8 +256,9 @@ protected:
 };
 
 /// configuration bundle for Workloads at the most atomic level. workloads that are to be subjected to DPU
-using OperationsContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations
-                                                  VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues>;
+using OperationsContext =
+        Behavior_Device_Mapping<OperationsBehaviour,  // operations
+                                VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues, VPU_RESERVED_WorkloadValidValues>;
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;
 

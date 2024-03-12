@@ -80,14 +80,24 @@ def buildWl(
         "kernel_stride_height": strides,
         "kernel_stride_width": strides,
         "kernel_pad_top": padding,
+        "kernel_pad_bottom": padding,
         "kernel_pad_left": padding,
+        "kernel_pad_right": padding,
+        "input_sparsity_enabled": act_sparsity>0.0,
+        "output_sparsity_enabled": False,
+        "weight_sparsity_enabled": param_sparsity>0.0,
         "input_sparsity_rate": act_sparsity,
         "weight_sparsity_rate": param_sparsity,
         "input_0_swizzling": f"Swizzling.KEY_{swizzling}",
         "input_1_swizzling": f"Swizzling.KEY_{swizzling}",
         "output_0_swizzling": f"Swizzling.KEY_{swizzling}",
         "output_write_tiles": output_write_tiles,
+        "input_0_layout": f"Layout.ZXY",
+        "input_1_layout": f"Layout.ZXY",
+        "output_0_layout": f"Layout.ZXY",
+        "isi_strategy": f"ISIStrategy.CLUSTERING",
     }
+
 
 
 # Check if it is a valid combination

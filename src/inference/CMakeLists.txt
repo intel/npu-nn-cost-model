@@ -15,9 +15,9 @@ if(VPUNN_BUILD_SHARED_LIB)
     add_dependencies(inference cpp_schema)
 
     if(CBLAS_LIB STREQUAL "internal")
-        target_link_libraries(inference flatbuffers kernels vpunn_optimization blas)
+        target_link_libraries(inference flatbuffers kernels vpunn_optimization blas vpunn_vpu vpunn_shave)
     else()
-        target_link_libraries(inference flatbuffers kernels vpunn_optimization ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
+        target_link_libraries(inference flatbuffers kernels vpunn_optimization vpunn_vpu vpunn_shave ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
     endif()
 
     add_custom_target(python ALL
@@ -29,10 +29,10 @@ add_library(inferenceStatic STATIC model.cpp preprop_factory.cpp)
 add_dependencies(inferenceStatic cpp_schema)
 
 if(CBLAS_LIB STREQUAL "internal")
-    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization blasStatic)
+    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization blasStatic vpunn_vpu vpunn_shave)
 else()
     set(BLAS_STATIC ON)
-    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
+    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization vpunn_vpu vpunn_shave ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
 endif()
 
 set_target_properties(inferenceStatic PROPERTIES OUTPUT_NAME inference)

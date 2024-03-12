@@ -12,6 +12,7 @@
 
 #define UNUSED(expr) (void)(expr)
 
+#include <vpu/cycles_interface_types.h>
 #include <cassert>
 #include <queue>
 #include "types.h"
@@ -28,7 +29,7 @@ namespace VPUNN {
  * @return T overall execution cycle, e.g. longest thread
  */
 template <class T>
-T dpu_schedule(const unsigned int n_procesors, const std::vector<T>& tasks_cost, T runtime_overhead = 0) {
+inline T dpu_schedule(const unsigned int n_procesors, const std::vector<T>& tasks_cost, const T runtime_overhead = 0) {
     const auto initializer = std::vector<T>(n_procesors, 0);
     // MIN priority queue
     auto queue = std::priority_queue<T, std::vector<T>, std::greater<T>>(initializer.begin(), initializer.end());
@@ -36,11 +37,35 @@ T dpu_schedule(const unsigned int n_procesors, const std::vector<T>& tasks_cost,
     for (long unsigned int idx = 0; idx < tasks_cost.size(); idx++) {
         auto smallest_time = queue.top();
         queue.pop();
-        queue.push(smallest_time + tasks_cost[idx] + runtime_overhead);  //@todo: overflow protection mechanism
+        queue.push(smallest_time + tasks_cost[idx] + runtime_overhead);  // TODO: overflow protection mechanism
     }
 
     // Return the max of the queue -> the execution critical path (last in queue)
     T result = static_cast<T>(0);
+    while (!queue.empty()) {
+        result = queue.top();
+        queue.pop();
+    }
+    return result;
+}
+
+template <>
+inline CyclesInterfaceType dpu_schedule(const unsigned int n_procesors,
+                                        const std::vector<CyclesInterfaceType>& tasks_cost,
+                                        const CyclesInterfaceType runtime_overhead) {
+    const auto initializer = std::vector<CyclesInterfaceType>(n_procesors, 0);
+    // MIN priority queue, one element per processor, minimum used processor first.
+    auto queue = std::priority_queue<CyclesInterfaceType, std::vector<CyclesInterfaceType>,
+                                     std::greater<CyclesInterfaceType>>(initializer.begin(), initializer.end());
+
+    for (const auto& cost : tasks_cost) {
+        const CyclesInterfaceType smallest_time = queue.top();
+        queue.pop();
+        queue.push(Cycles::cost_adder(Cycles::cost_adder(smallest_time, cost), runtime_overhead));
+    }
+
+    // Return the max of the queue -> the execution critical path (last in queue)
+    CyclesInterfaceType result{0};
     while (!queue.empty()) {
         result = queue.top();
         queue.pop();
@@ -128,11 +153,17 @@ inline unsigned int divide_and_multiply_vectors(const std::vector<unsigned int>&
 inline unsigned int helper_input_dim(unsigned int output, unsigned int kernel, unsigned int total_padding,
                                      unsigned int stride) {
     // output = floor((input + total_padding - kernel) / stride)) + 1
-    unsigned int input = (output - 1) * stride - total_padding + kernel;
-    assert(output == (input + total_padding - kernel) / stride + 1);
+    const int raw_input = ((int)output - 1) * (int)stride - (int)total_padding + (int)kernel;
+    const int input{((raw_input <= 0) || (output == 0)) ? 0 : raw_input};
+
+    if (output > 0) {
+        assert(output == (input + total_padding - kernel) / stride + 1);
+    } else {
+        assert(output == (unsigned int)input);  // zero
+    }
+
     return input;
 }
-
 }  // namespace VPUNN
 
 #endif  // VPUNN_UTILS_H

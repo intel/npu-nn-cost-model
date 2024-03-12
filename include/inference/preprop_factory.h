@@ -47,8 +47,8 @@ private:
 
 public:
     /// @brief True if a preprocessor exists for required/interrogated version
-    bool exists_preprocessing(int version) const noexcept {
-        auto found = pp_map.find(version);
+    bool exists_preprocessing(int input_version) const noexcept {
+        auto found = pp_map.find(input_version);
         return (found != pp_map.cend());
     }
     /** @brief provides a preprocessor for the required interface

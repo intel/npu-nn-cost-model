@@ -25,9 +25,12 @@ public:
     /// @brief computes size of weights (input_1) in elements not bytes
     virtual long long input_1_volume(const TensorInfo& w) const noexcept = 0;
 
-    /// @brief computes the aligned size in bytes
-    virtual long long input_1_aligned_size_bytes(const long long elem_size, const IDeviceValidValues& config,
-                                                 const DPUOperation& dpu) const noexcept = 0;
+    /// @brief computes the aligned size in bytes for weights of a workload
+    virtual long long input_1_aligned_size_bytes(const IDeviceValidValues& config, const DPUOperation& dpu) const
+            noexcept = 0;
+    /// @brief computes the non CMX aligned/contiguous  size in bytes for the weights
+    virtual long long input_1_contiguous_size_bytes(const IDeviceValidValues& config, const DPUOperation& dpu) const
+            noexcept = 0;
 
     /// @brief computes size of activators (input_0)
     virtual long long input_0_volume(const TensorInfo& w) const noexcept {

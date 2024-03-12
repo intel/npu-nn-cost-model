@@ -1,0 +1,48 @@
+// Copyright © 2023 Intel Corporation
+// SPDX-License-Identifier: Apache 2.0
+// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// is subject to the terms and conditions of the software license agreements for the Software Package,
+// which may also include notices, disclaimers, or license terms for third party or open source software
+// included in or with the Software Package, and your use indicates your acceptance of all such terms.
+// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Software Package for additional details.
+
+#include <gtest/gtest.h>
+#include "vpu_cost_model.h"
+#include "vpu/shave/layers.h"
+
+namespace VPUNN_unit_tests {
+using namespace VPUNN;
+
+
+class Test_SHV_Legacy_all : public ::testing::Test {
+protected:
+    VPUCostModel model{};
+    
+    template <typename KN>
+    void doTest() {
+        const VPUTensor input_tensor{56, 56, 16, 1, VPUNN::DataType::FLOAT16};
+        const VPUTensor output_tensor{56, 56, 16, 1, VPUNN::DataType::FLOAT16};
+
+        KN swwl{VPUNN::VPUDevice::VPU_2_7, input_tensor, output_tensor};
+
+        // Cycles
+        auto cycles = model.SHAVE(swwl);
+        // Theoretical cycles
+        auto theoretical_cycles =
+                static_cast<unsigned int>(round(float(output_tensor.size() / swwl.getKernelEfficiency()))) +
+                swwl.getLatency();
+        // Expect equality.
+        EXPECT_EQ(cycles, theoretical_cycles);
+    }
+};
+
+//macro for a test case
+#define LEGACY_SHV_TEST_F(TCN, KN) TEST_F(Test_SHV_Legacy_all, TCN) {  doTest<KN>();}
+
+// list of all test cases that were generated at buil, Should cover all Activation tests
+
+@LIST_ACT_TEST_CASES@
+
+
+} //namespace

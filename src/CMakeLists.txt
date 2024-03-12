@@ -40,6 +40,7 @@ add_subdirectory(inference)
 add_subdirectory(optimization)
 add_subdirectory(shave)
 add_subdirectory(schema)
+add_subdirectory(vpu)
 
 # Python bindings
 if(ENABLE_PYTHON_BINDING OR SKBUILD)

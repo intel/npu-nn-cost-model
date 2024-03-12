@@ -29,8 +29,11 @@ if(NOT pybind11_FOUND)
     endif()
 endif()
 
+set(PYTHON_BINDING_CPP ${CMAKE_CURRENT_SOURCE_DIR}/VPUNN.cpp)
+
 if (${GENERATE_PYTHON_BINDING})
     include(ExternalProject)
+    message(STATUS "Generating Python bindings source ${PYTHON_BINDING_CPP}")
 
     # We use binder to generate the python bindings for VPUNN
     ExternalProject_Add(binder
@@ -44,7 +47,7 @@ if (${GENERATE_PYTHON_BINDING})
         -DBINDER_ENABLE_TEST=OFF)
 
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/VPUNN.cpp
+	OUTPUT ${PYTHON_BINDING_CPP}
         DEPENDS
         binder inferenceStatic vpunn_optimization
         ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
@@ -70,11 +73,11 @@ if (${GENERATE_PYTHON_BINDING})
         -I${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
     add_custom_target(generated-bindings-code EXCLUDE_FROM_ALL
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/VPUNN.cpp)
+        DEPENDS ${PYTHON_BINDING_CPP})
 endif()
 
 pybind11_add_module(vpunn_python_bindings MODULE
-    ${CMAKE_CURRENT_SOURCE_DIR}/VPUNN.cpp
+    ${PYTHON_BINDING_CPP}
     binding.h)
 
 add_dependencies(vpunn_python_bindings python_schema)

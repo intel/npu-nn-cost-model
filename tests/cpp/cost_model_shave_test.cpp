@@ -18,12 +18,13 @@
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 /// @brief Tests that the Shave objects can be created. Not covering every functionality/shave
 class TestSHAVE : public ::testing::Test {
 public:
 protected:
-    VPUNN::VPUCostModel empty_model{VPUNN::VPUCostModel()};
+    VPUNN::VPUCostModel empty_model{};
 
     const VPUNN::VPUTensor input_0{56, 56, 16, 1, VPUNN::DataType::FLOAT16};   // input dimensions
     const VPUNN::VPUTensor output_0{56, 56, 16, 1, VPUNN::DataType::FLOAT16};  // output dimensions
@@ -127,6 +128,25 @@ TEST_F(TestSHAVE, BasicAssertionsActivationSigmoid) {
     auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
     // Expect equality.
     EXPECT_GE(shave_cycles_sigmoid, 0u);
+}
+
+/// @brief tests that V2 prototypeinterface s usable
+TEST_F(TestSHAVE, SHAVE_v2_Smoke) {
+    SHAVEWorkload swwl{
+            "UnspecifiedName",
+            VPUDevice::VPU_2_7,
+            {input_0},
+            {output_0},
+    };
+    EXPECT_EQ(swwl.get_device(), VPUNN::VPUDevice::VPU_2_7);
+    ASSERT_EQ(swwl.get_inputs().size(), 1);
+
+    ASSERT_EQ(swwl.get_outputs().size(), 1);
+
+    std::string info;
+    auto shave_cycles = empty_model.SHAVE_2(swwl, info);
+    // Expect equality.
+    EXPECT_EQ(shave_cycles, V(Cycles::ERROR_SHAVE));
 }
 
 }  // namespace VPUNN_unit_tests

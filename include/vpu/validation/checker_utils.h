@@ -26,7 +26,16 @@ private:
     bool clean_status{true};       ///< true if no problems were found since reset
     std::string acc_findings{""};  ///< textual info gathered since last reset
 
+    static bool print_tags;  ///< set to false to avoid the addition of [CHECK] tags. true by default
+
 public:
+    /// sets a new mode and returns the current mode
+    static bool set_print_tags(bool new_mode) {
+        const auto old_mode = print_tags;
+        print_tags = new_mode;
+        return old_mode;
+    }
+
     /// cleans  up the history
     /// @returns the state before reset
     bool reset() {
@@ -43,14 +52,14 @@ public:
     }
     /// marks the checker with error and ads a textual info
     /// @param info the string with information
-    void add_check_failed(std::string info) {
+    void add_check_failed(const std::string& info) {
         clean_status = false;  // at least one problem
 
-        std::stringstream buffer;
-        buffer << "\n[CHECK FAILED]: " << info << " [END_CHECK]";
-        const std::string details = buffer.str();
-
-        acc_findings = acc_findings + details;
+        if (Checker::print_tags) {
+            acc_findings += ("\n[CHECK FAILED]: " + info + " [END CHECK]");
+        } else {
+            acc_findings += info;
+        }
     }
 
     /// @returns the string containing the textual information that was logged (since reset).
@@ -86,7 +95,7 @@ public:
 
     /// checks if the item belongs to a container. If not present it will record an error/finding
     template <class T>
-    bool check_is_in_list(const T& item, const Values<T>& container, const std::string what) noexcept {
+    bool check_is_in_list(const T& item, const Values<T>& container, const std::string& what) noexcept {
         const auto found = std::find(container.begin(), container.end(), item) != container.end();
 
         if (!found) {
@@ -99,6 +108,23 @@ public:
         }
 
         return found;
+    }
+
+    /// checks if the item belongs to a closed interval. If not present it will record an error/finding
+    template <class T>
+    bool check_is_in_interval(const T& item, const std::pair<T, T>& interval, const std::string& what) noexcept {
+        const bool belongs{(item >= interval.first) && (item <= interval.second)};
+
+        if (!belongs) {
+            std::stringstream buffer;
+            buffer << what << " with value: " << Show<T>::show_value(item) << " is not found in interval: [ "
+                   << interval.first << " , " << interval.second << " ]";
+            const std::string details = buffer.str();
+
+            add_check_failed(details);
+        }
+
+        return belongs;
     }
 
     /// checks for equality. If not present it will record an error/finding

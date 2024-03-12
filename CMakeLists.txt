@@ -14,6 +14,11 @@ set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
 # set the project name
 project(VPUNN)
 
+# impacts the blas/blasStatic library , if ON and linux will enable vector instructions by -msse[N]
+# on win(MSVC) will define USE_SIMD
+# if target architecture does not support it, deactivate it and enable manually the required optimizations (for vector instructions if runtime is important) at least for blas
+option(VPUNN_ENABLE_VECTOR_INSTRUCTIONS "use vector instructions" ON)
+
 option(VPUNN_BUILD_SHARED_LIB "build shared library" ON)
 option(VPUNN_BUILD_EXAMPLES "build examples" ON)
 option(VPUNN_BUILD_TESTS "build tests" ON)

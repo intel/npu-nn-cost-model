@@ -80,7 +80,7 @@ std::vector<unsigned int> getSplitsFromRange(const unsigned int maxSplitRange, c
  * @param layer the DPULayer object to optimize
  */
 bool requireMaxZTile(const DPULayer& layer) {
-    if (layer.device == VPUDevice::VPU_2_7 || layer.device == VPUDevice::VPU_4_0) {
+    if (layer.device == VPUDevice::VPU_2_7 || layer.device == VPUDevice::VPU_RESERVED) {
         if (layer.op == Operation::CM_CONVOLUTION || layer.op == Operation::MAXPOOL ||
             layer.op == Operation::DW_CONVOLUTION || layer.op == Operation::AVEPOOL) {
             return true;

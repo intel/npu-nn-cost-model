@@ -58,11 +58,6 @@ struct PnPEstimates {
     float power;                 ///< power in mW
 };
 
-using DPUWorkloads = std::vector<DPUWorkload>;  ///< List of DPU workloads
-
-///  describes a pair of cost and the associated DPUWorkloads
-using DPUWorkloadsCost = std::pair<CyclesInterfaceType, DPUWorkloads>;
-
 /**
  * @brief DPU Tiler interface
  */
@@ -105,10 +100,10 @@ public:
 /**
  * @brief Factory function that generates a DPUTiler instance
  *
- * @param _model a shared pointer to a VPUCostModel object
+ * @param _model a reference to a VPUCostModel object
  * @return std::unique_ptr<DPUTiler>
  */
-std::unique_ptr<DPUTiler> getDPUTiler(std::shared_ptr<VPUCostModel> const& _model);
+std::unique_ptr<DPUTiler> getDPUTiler(VPUCostModel& _model);
 
 }  // namespace VPUNN
 

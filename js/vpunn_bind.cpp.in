@@ -55,7 +55,7 @@ EMSCRIPTEN_BINDINGS(vpunn) {
             .value("VPU_2_0", VPUDevice::VPU_2_0)
             .value("VPU_2_1", VPUDevice::VPU_2_1)
             .value("VPU_2_7", VPUDevice::VPU_2_7)
-            .value("VPU_4_0", VPUDevice::VPU_4_0);
+            .value("VPU_RESERVED", VPUDevice::VPU_RESERVED);
     enum_<DataType>("DataType")
             .value("UINT8", DataType::UINT8)
             .value("INT8", DataType::INT8)
@@ -91,14 +91,11 @@ EMSCRIPTEN_BINDINGS(vpunn) {
             .function("DPU", select_overload<unsigned int(DPUWorkload)>(&VPUCostModel::DPU))
             .function("DMA", select_overload<unsigned int(VPUDevice, const VPUTensor&, const VPUTensor&, MemoryLocation, MemoryLocation, unsigned int) const>(
                                      &VPUCostModel::DMA))
-            .function("SHAVE", &VPUCostModel::SHAVE)
+            .function("SHAVE", select_overload<unsigned int(const SWOperation&)>(&VPUCostModel::SHAVE))
             .function("hw_utilization", &VPUCostModel::hw_utilization)
             .function("initialized", &VPUCostModel::nn_initialized)
             // POWER API
-            .function("DPUActivityFactor", &VPUCostModel::DPUActivityFactor)
-            .function("DPUPower", select_overload<float(DPUWorkload&)>(&VPUCostModel::DPUPower))
-            .function("DMAPower", select_overload<float(DMAWorkload&)>(&VPUCostModel::DMAPower))
-            .function("SHAVEPower", select_overload<float(SWOperation&)>(&VPUCostModel::SHAVEPower));
+            .function("DPUActivityFactor", &VPUCostModel::DPUActivityFactor);
 
     // Helper functions
     function("createTensor", &createTensor);

@@ -26,7 +26,7 @@ protected:
     void SetUp() override {
     }
 
-    auto read_a_file(const std::string filename) const {
+    auto read_a_file(const std::string& filename) const {
         std::vector<char> buf(0);
         std::ifstream myFile;
         myFile.open(filename, std::ios::binary | std::ios::in);
@@ -51,7 +51,7 @@ private:
 /// Test cases covering the creation of the Runtime object
 TEST_F(TestRuntime, CreationBasicTest) {
     {  // good data
-        std::string vpunn_file = VPU_2_0_MODEL_PATH;
+        const std::string vpunn_file = VPU_2_0_MODEL_PATH;
         auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
         EXPECT_TRUE(runtime_model_f.initialized());
 
@@ -76,7 +76,7 @@ TEST_F(TestRuntime, CreationBasicTest) {
                   runtime_model_b.model_version_info().get_raw_name());
     }
     {  // good data
-        std::string vpunn_file = VPU_2_7_MODEL_PATH;
+        const std::string vpunn_file = VPU_2_7_MODEL_PATH;
         auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
         EXPECT_TRUE(runtime_model_f.initialized());
 
@@ -102,7 +102,7 @@ TEST_F(TestRuntime, CreationBasicTest) {
     }
 
     {  // garbage data/no file
-        std::string vpunn_file = "NoFileHere.vpunn";
+        const std::string vpunn_file = "NoFileHere.vpunn";
         auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
         EXPECT_FALSE(runtime_model_f.initialized());
 

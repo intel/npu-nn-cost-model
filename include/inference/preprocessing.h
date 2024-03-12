@@ -248,7 +248,16 @@ protected:
      * @return unsigned int  size of the descriptor for this workload according to NN input expectations
      */
     size_t calculate_size() {
-        const auto dummy_wl = DPUWorkload();
+        const DPUWorkload dummy_wl{
+                VPUNN::VPUDevice::VPU_2_7,
+                VPUNN::Operation::CONVOLUTION,
+                {VPUNN::VPUTensor(1, 1, 1, 1, VPUNN::DataType::UINT8)},  // input dimensions
+                {VPUNN::VPUTensor(1, 1, 1, 1, VPUNN::DataType::UINT8)},  // output dimensions
+                {1, 1},                                                  // kernels
+                {1, 1},                                                  // strides
+                {0, 0, 0, 0},                                            // padding
+                VPUNN::ExecutionMode::CUBOID_16x16                       // execution mode
+        };
         size_t size_required = 0;
         // use the derived class to run a mock of transform only for finding how much it fills in
         static_cast<D*>(this)->template transformOnly<true>(dummy_wl, size_required);

@@ -25,13 +25,26 @@ elseif(CBLAS_LIB STREQUAL "internal")
     add_library(blas blas.cpp)
     add_library(blasStatic STATIC blas.cpp)
 
+    # vector instructions are required for fast code
     if(NOT MSVC)
-        # Add vector instructions support for linux
-        target_compile_options(blas PRIVATE -march=native)
-        target_compile_options(blasStatic PRIVATE -march=native)
+        if(NOT ${JS_BUILD}) #NA for WASM compiler 
+            if(VPUNN_ENABLE_VECTOR_INSTRUCTIONS)
+                message(STATUS "BLAS: -msse -msse2 -msse3 -msse4 -msse4.2 set")
+                target_compile_options(blas PRIVATE -msse -msse2 -msse3 -msse4 -msse4.2)
+                target_compile_options(blasStatic PRIVATE -msse -msse2 -msse3 -msse4 -msse4.2) 
+            else()
+                 message(STATUS "BLAS: no vector optimization set (linux)")
+            endif()
+        endif()
     else()
-        target_compile_definitions(blas PRIVATE USE_SIMD)
-        target_compile_definitions(blasStatic PRIVATE USE_SIMD)
+        if(VPUNN_ENABLE_VECTOR_INSTRUCTIONS)
+            #for Win/MSVC also SIMD specific code can be enabled
+            message(STATUS "BLAS: USE_SIMD ON manually: msvc")
+            target_compile_definitions(blas PRIVATE USE_SIMD)
+            target_compile_definitions(blasStatic PRIVATE USE_SIMD)
+        else()
+             message(STATUS "BLAS: no USE_SIMD change (MSVC) ")
+        endif()
     endif()
 
     add_dependencies(kernels blas)

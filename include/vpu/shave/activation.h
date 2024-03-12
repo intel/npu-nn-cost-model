@@ -58,7 +58,7 @@ struct SHVActivation : public SWOperation {
      *
      * @return unsigned int number of cycles
      */
-    unsigned int cycles() override {
+    unsigned int cycles() const override {
         float size = static_cast<float>(outputs[0].size());
         return static_cast<unsigned int>(round(size / getKernelEfficiency())) + getLatency();
     }

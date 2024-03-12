@@ -49,6 +49,7 @@ const std::string toString(LogLevel level);
  * @brief A class that implements a cout-enabled interface for logging
  *
  */
+/* coverity[rule_of_three_violation:FALSE] */
 class LoggerStream {
     bool _enabled;
     LogLevel _logLevel;
@@ -102,6 +103,9 @@ public:
             *pout << std::endl;
         }
     }
+
+    LoggerStream(const LoggerStream&) = default;
+    LoggerStream& operator=(const LoggerStream&) = default;
 };
 
 /**

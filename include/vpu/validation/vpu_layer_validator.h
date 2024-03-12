@@ -37,7 +37,7 @@ using LayerOperationsBehaviour =
 /// @brief services for Layer validation
 class VPU_LayerValidator :
         public Behavior_Device_Mapping<LayerOperationsBehaviour,  // operations
-                                       VPU2_0_LayerValidValues, VPU2_7_LayerValidValues> {
+                                       VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU_RESERVED_LayerValidValues> {
 protected:
 public:
     void check_layer_consistency(const DPUOperation& w, const IDeviceValidValues& config,
@@ -78,8 +78,8 @@ public:
             {  // input/activation dimensions and tensor properties
                 const auto& in0{w.input_0};
                 // what to do with batch??
-                checker.check_is_in_list((int)in0.height, config.get_input_height_range(w), "input_0.height");
-                checker.check_is_in_list((int)in0.width, config.get_input_width_range(w), "input_0.width");
+                checker.check_is_in_interval((int)in0.height, config.get_input_height_interval(w), "input_0.height");
+                checker.check_is_in_interval((int)in0.width, config.get_input_width_interval(w), "input_0.width");
 
                 checker.check_is_in_list((int)in0.channels, config.get_input_channels_range(w), "input_0.channels");
 
@@ -107,11 +107,16 @@ public:
                         config.compute_output_dim((int)w.input_0.height, w.kernel.pad_top, w.kernel.pad_bottom,
                                                   w.kernel.height, w.kernel.stride_height);
 
-                checker.check_is_in_list(w.output_0.width, {expected_out_width}, "output_0.width");
-                checker.check_is_in_list(w.output_0.height, {expected_out_height}, "output_0.height");
+                checker.check_is_in_interval((int)w.output_0.width,
+                                             std::make_pair(expected_out_width, expected_out_width), "output_0.width");
+
+                checker.check_is_in_interval((int)w.output_0.height,
+                                             std::make_pair(expected_out_height, expected_out_height),
+                                             "output_0.height");
 
                 {  // special SOH situation ; todo: ISI is just the desired one to be applied at tile splitting
-                    if (w.isi_strategy == ISIStrategy::SPLIT_OVER_H) {
+                    if (w.isi_strategy ==
+                        ISIStrategy::SPLIT_OVER_H) {  // SOH or SOHO, be careful to set this correctly for layer
                         if (w.output_0.height <= 1) {
                             // cannot do split
                             checker.add_check_failed("can't do SPLIT_OVER_H if output_0_.height is <= 1");

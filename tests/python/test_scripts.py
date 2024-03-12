@@ -18,9 +18,9 @@ def run(command, path="."):
     return subprocess.check_output(command, cwd=path, shell=True)
 
 
-@pytest.mark.parametrize("mode", ["DPU", "DMA", "Utilization"])
-@pytest.mark.parametrize("target", ["cycles", "power"])
-@pytest.mark.parametrize("device", ["VPU_2_0", "VPU_2_7"])
+@pytest.mark.parametrize("mode", ["DPU"])
+@pytest.mark.parametrize("target", ["cycles", "power", "utilization"])
+@pytest.mark.parametrize("device", ["VPU_2_0"])
 @pytest.mark.parametrize("operation", ["CONVOLUTION"])
 @pytest.mark.parametrize("width", [56])
 @pytest.mark.parametrize("height", [56])
@@ -29,9 +29,10 @@ def run(command, path="."):
 @pytest.mark.parametrize("kernel", [1])
 @pytest.mark.parametrize("padding", [0])
 @pytest.mark.parametrize("strides", [1])
-@pytest.mark.parametrize("input_dtype", ["UINT8"])
-@pytest.mark.parametrize("output_dtype", ["UINT8"])
-def test_vpu_cost_model(
+@pytest.mark.parametrize("input_dtype", ['UINT8', 'INT8', 'FLOAT16', 'BFLOAT16'])
+@pytest.mark.parametrize("output_dtype", ['UINT8', 'INT8', 'FLOAT16', 'BFLOAT16'])
+@pytest.mark.parametrize("execution_order", ['VECTOR_FP16', 'VECTOR', 'MATRIX',])
+def test_vpu_cost_model_2_0(
     mode,
     target,
     device,
@@ -45,24 +46,86 @@ def test_vpu_cost_model(
     strides,
     input_dtype,
     output_dtype,
+    execution_order,
 ):
 
     cmd = (
-        f"vpu_cost_model --mode {mode} "
+        f"vpu_cost_model "
         f"--target {target} "
         f"--device {device} "
+        f"{mode} "
         f"--operation {operation} "
         f"--width {width} "
         f"--height {height} "
-        f"--input_channels {input_channels} "
-        f"--output_channels {output_channels} "
-        f"--kernel {kernel} "
-        f"--padding {padding} "
-        f"--strides {strides} "
-        f"--input_dtype {input_dtype} "
-        f"--output_dtype {output_dtype}"
+        f"--input-channels {input_channels} "
+        f"--output-channels {output_channels} "
+        f"--kw {kernel} "
+        f"--kh {kernel} "
+        f"--pad-bottom {padding} "
+        f"--pad-left {padding} "
+        f"--pad-right {padding} "
+        f"--pad-top {padding} "
+        f"--stride-height {strides} "
+        f"--stride-width {strides} "
+        f"--input-datatype {input_dtype} "
+        f"--output-datatype {output_dtype} "
+        f"--execution-order {execution_order}"
     )
+    run(cmd)
 
+@pytest.mark.parametrize("mode", ["DPU"])
+@pytest.mark.parametrize("target", ["cycles", "power", "utilization"])
+@pytest.mark.parametrize("device", ["VPU_2_7"])
+@pytest.mark.parametrize("operation", ["CONVOLUTION"])
+@pytest.mark.parametrize("width", [56])
+@pytest.mark.parametrize("height", [56])
+@pytest.mark.parametrize("input_channels", [64])
+@pytest.mark.parametrize("output_channels", [64])
+@pytest.mark.parametrize("kernel", [1])
+@pytest.mark.parametrize("padding", [0])
+@pytest.mark.parametrize("strides", [1])
+@pytest.mark.parametrize("input_dtype", ['UINT8', 'INT8', 'FLOAT16', 'BFLOAT16'])
+@pytest.mark.parametrize("output_dtype", ['UINT8', 'INT8', 'FLOAT16', 'BFLOAT16'])
+@pytest.mark.parametrize("execution_order", ['CUBOID_4x16', 'CUBOID_8x16', 'CUBOID_16x16'])
+def test_vpu_cost_model_2_7(
+    mode,
+    target,
+    device,
+    operation,
+    width,
+    height,
+    input_channels,
+    output_channels,
+    kernel,
+    padding,
+    strides,
+    input_dtype,
+    output_dtype,
+    execution_order,
+):
+
+    cmd = (
+        f"vpu_cost_model "
+        f"--target {target} "
+        f"--device {device} "
+        f"{mode} "
+        f"--operation {operation} "
+        f"--width {width} "
+        f"--height {height} "
+        f"--input-channels {input_channels} "
+        f"--output-channels {output_channels} "
+        f"--kw {kernel} "
+        f"--kh {kernel} "
+        f"--pad-bottom {padding} "
+        f"--pad-left {padding} "
+        f"--pad-right {padding} "
+        f"--pad-top {padding} "
+        f"--stride-height {strides} "
+        f"--stride-width {strides} "
+        f"--input-datatype {input_dtype} "
+        f"--output-datatype {output_dtype} "
+        f"--execution-order {execution_order}"
+    )
     run(cmd)
 
 

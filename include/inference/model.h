@@ -38,7 +38,7 @@ class VPUNN_API(InferenceModel) {
 private:
     std::vector<char> buf;
     const VPUNN_SCHEMA::Model* model{nullptr};  //< the flatbuffer model. todo: make it reference?
-    std::vector<std::shared_ptr<Tensor<float>>> tensor_map;
+    std::vector<Tensor<float>> tensor_map;
     bool initialized;
     BiasOp bias;  ///< the bias operation support. Contains the bias buffer.
 
@@ -67,7 +67,7 @@ private:
         std::vector<Tensor<float>*> result;
         for (auto it = tensors->begin(); it != tensors->end(); ++it) {
             if (*it >= 0 && *it < (int)tensor_map.size())
-                result.push_back(tensor_map[*it].get());
+                result.push_back(&(tensor_map[*it]));
         }
         return result;
     }
@@ -79,7 +79,7 @@ private:
     int max_batch_in_tensors() const {
         int max_dim_zero = 0;
         for (auto it = tensor_map.begin(); it != tensor_map.end(); ++it) {
-            const int dim_zero = (*it)->shape()[0];
+            const int dim_zero = (*it).shape()[0];
             max_dim_zero = std::max(max_dim_zero, dim_zero);
         }
         return max_dim_zero;
@@ -155,12 +155,12 @@ public:
      */
     template <typename T>
     void set_inputs(const T* inputs, const unsigned int size) {
-        if (model->inputs()->Length() > 1) {
+        if (model->inputs()->size() > 1) {
             Logger::error() << "Only single input model is valid";
             throw std::runtime_error("This model has more inputs.Only single input model is valid.");
         }
 
-        tensor_map[model->inputs()->Get(0)]->assign(inputs, sizeof(T) * size);
+        tensor_map[model->inputs()->Get(0)].assign(inputs, sizeof(T) * size);
     }
 
     // get network outputs
@@ -172,11 +172,11 @@ public:
      */
     template <typename T>
     const T* get_outputs() {
-        if (model->outputs()->Length() > 1) {
+        if (model->outputs()->size() > 1) {
             Logger::error() << "Only single output model is valid";
             return nullptr;
         }
-        return tensor_map[model->outputs()->Get(0)]->data();
+        return tensor_map[model->outputs()->Get(0)].data();
     }
 
     /**
@@ -187,11 +187,11 @@ public:
      */
     template <typename T>
     const std::vector<T> get_outputs_vector() {
-        if (model->outputs()->Length() > 1) {
+        if (model->outputs()->size() > 1) {
             Logger::error() << "Only single output model is valid";
             return {};
         }
-        return tensor_map[model->outputs()->Get(0)]->data_vector();
+        return tensor_map[model->outputs()->Get(0)].data_vector();
     }
 
     /**
@@ -291,5 +291,67 @@ private:
     }
 };
 
+/// @brief enum for NN output versions
+enum class NNOutputVersions : int {
+    OUT_LATEST = 0,                 ///< last version, expecting cycles as output
+    OUT_HW_OVERHEAD_BOUNDED = 1,    ///< Output expected as hw_overhead bounded, deprecated
+    OUT_CYCLES = 2,                 ///< expecting cycles as output
+    OUT_HW_OVERHEAD_UNBOUNDED = 3,  ///< Outpout expected as hw_overhead unbounded, deprecated
+};
+
+/** @brief Configuration options concerning the interpretation and post processing of inferred values
+ * This class have the goal to check if we know something about the output version of the model and if we don't know we
+ * will not support the output for the CostModel. We are going to use the output version parsed by the ModelVersion and
+ * use it to determine based on known output version if we support it or not. In case that we don't know the version we
+ * are going to not supprt the output.
+ */
+class PostProcessSupport {
+public:
+    /// @brief The constructor for this object who sets the supported bool depending on output version
+    /// @param output_version is the output version based on the ModelVersion extracted from NN raw name
+    PostProcessSupport(int output_version) {
+        set_output_version(output_version);
+    }
+
+    /// @brief a method to see if we support the output
+    bool is_output_supported() const {
+        return output_support;
+    }
+
+protected:
+    /** @brief a method to set the output support based on the output version parsed as an int
+     *
+     * The set_output_version will determine based on the NNOutputVersions if we know something about the output
+     * version. In case that we know if it is supported or not based on the known versions of output, we are going to
+     * set the bool output_support on either true or false. In case that we don't know the version that is coming than,
+     * we are going to not support that version.
+     *
+     *@param output_version the output version of the Model
+     */
+    void set_output_version(int output_version) {
+        // based on known output versions that we support:
+        switch (output_version) {
+        case (int)VPUNN::NNOutputVersions::OUT_LATEST: {
+            output_support = true;
+        } break;
+        case (int)VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_BOUNDED: {
+            output_support = false;
+        } break;
+        case (int)VPUNN::NNOutputVersions::OUT_CYCLES: {
+            output_support = true;
+        } break;
+        case (int)VPUNN::NNOutputVersions::OUT_HW_OVERHEAD_UNBOUNDED: {
+            output_support = false;
+        } break;
+        // in case we don't have the version in the list we will not support the output
+        default:
+            output_support = false;
+            break;
+        }
+    }
+
+private:
+    bool output_support;
+};
 }  // namespace VPUNN
 #endif

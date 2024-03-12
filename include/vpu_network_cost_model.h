@@ -63,7 +63,7 @@ public:
         unsigned long int cost = 0;
         for (auto layer : dag) {
             if (strategy.exists(layer)) {
-                cost += layer->cycles(*this, strategy[layer]);
+                cost = Cycles::cost_adder(cost, layer->cycles(*this, strategy[layer]));
             } else {
                 throw_error<std::runtime_error>("Impossible to find a strategy for a layer");
             }

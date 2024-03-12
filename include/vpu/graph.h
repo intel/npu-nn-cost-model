@@ -48,6 +48,7 @@ public:
      */
     VPUComputeNode(const std::shared_ptr<DPULayer> dpu_op): dpu(dpu_op) {
         type = VPUComputeNode::OpType::DPU_COMPUTE_NODE;
+        /* coverity[dont_call] */
         _hash = std::rand();
     }
 
@@ -222,7 +223,7 @@ public:
      */
     size_t edges() {
         size_t edges = 0;
-        for (auto node : layers) {
+        for (const auto& node : layers) {
             edges += successors[node].size();
         }
         return edges;
@@ -326,11 +327,11 @@ public:
             }
             // Node visited
             visited[current_node_ptr] = true;
-            for (auto sinks : dag.successors[current_node_ptr]) {
+            for (const auto& sinks : dag.successors[current_node_ptr]) {
                 // Decrement the dependencies of the successors nodes
                 dependendcies[sinks] -= 1;
             }
-            for (auto layer : dag.layers) {
+            for (const auto& layer : dag.layers) {
                 if (dependendcies[layer] == 0 && !visited[layer]) {
                     current_node_ptr = layer;
                     return *this;

@@ -21,7 +21,7 @@ namespace VPUNN_unit_tests {
 class CostModelStochastic : public ::testing::Test {
 public:
 protected:
-    VPUNN::VPUCostModel model{VPUNN::VPUCostModel()};
+    VPUNN::VPUCostModel model{};
 
     void SetUp() override {
     }
@@ -50,7 +50,7 @@ protected:
                                                     const unsigned int high_threshold, unsigned int n_workloads) {
         const auto& model_path = model_info.first;
 
-        auto current_model = VPUNN::VPUCostModel(model_path, false);  // with cache, batch =1
+        VPUNN::VPUCostModel current_model{model_path, false};  // with cache, batch =1
         const VPUNN::VPUDevice device = model_info.second;
 
         // Generate N workloads
@@ -84,7 +84,7 @@ protected:
         const float checked_result = not_valid_value;
         // const float delta_error = 0.01F;
 
-        auto current_model = VPUNN::VPUCostModel(model_path, false, 0U);  // with cache, batch =1
+        VPUNN::VPUCostModel current_model{model_path, false, 0U};  // with cache, batch =1
         const VPUNN::VPUDevice device = model_info.second;
 
         // Generate N workloads
@@ -106,14 +106,13 @@ protected:
                                                            const float high_threshold,
                                                            const std::vector<VPUNN::DPUWorkload>& workloads) {
         const auto& model_path = model_info.first;
-        auto current_model = VPUNN::VPUCostModel(model_path, false);  // with cache, batch =1
+        VPUNN::VPUCostModel current_model{model_path, false};  // with cache, batch =1
 
         int ilow{0};   // increments at every error
         int ihigh{0};  // increments at every error
         int i{0};      // index
         const auto n{workloads.size()};
-        for (auto wl :
-             workloads) {  // keep wl copy because compute method needs non const reference (for internal sanitation)
+        for (const auto& wl : workloads) {
             float inference = current_model.run_NN(wl);
 
             // EXPECT_GT(inference, low_threshold)
@@ -148,17 +147,17 @@ protected:
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device_version));
 
-        auto slow_model = VPUNN::VPUCostModel(the_NN_models.standard_model_paths[modelIndex].first,
-                                              false);  // with cache, batch =1
-        auto fast_model = VPUNN::VPUCostModel(the_NN_models.fast_model_paths[modelIndex].first,
-                                              false);  // with cache, batch =1
+        VPUNN::VPUCostModel slow_model{the_NN_models.standard_model_paths[modelIndex].first,
+                                       false};  // with cache, batch =1
+        VPUNN::VPUCostModel fast_model{the_NN_models.fast_model_paths[modelIndex].first,
+                                       false};  // with cache, batch =1
 
         int i_abs_errors{0};  // increments at delta > threshold
         int i_errs{0};        // increments at every error(delta + ratio)
         int i_range_errs{0};  // increments at every error
         int i{0};             // index workload
         const auto n{workloads.size()};
-        for (auto wl : workloads) {
+        for (const auto& wl : workloads) {
             auto cycles_s = slow_model.DPU(wl);
             auto cycles_f = fast_model.DPU(wl);
 
@@ -223,8 +222,8 @@ protected:
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device_version));
 
-        VPUNN::VPUCostModel slow_model = VPUNN::VPUCostModel(nn1, false);  // with cache, batch =1
-        VPUNN::VPUCostModel fast_model = VPUNN::VPUCostModel(nn2, false);  // with cache, batch =1
+        VPUNN::VPUCostModel slow_model{nn1, false};  // with cache, batch =1
+        VPUNN::VPUCostModel fast_model{nn2, false};  // with cache, batch =1
 
         EXPECT_TRUE(slow_model.nn_initialized()) << "\n Modelfile: " << nn1 << "  not initialized";
         EXPECT_TRUE(fast_model.nn_initialized()) << "\n Modelfile: " << nn2 << "  not initialized";
@@ -246,7 +245,7 @@ protected:
         int i_range_errs{0};  // increments at every error
         int i{0};             // index workload
         const auto n{workloads.size()};
-        for (auto wl : workloads) {
+        for (const auto& wl : workloads) {
             auto cycles_s = slow_model.DPU(wl);
             auto cycles_f = fast_model.DPU(wl);
 
@@ -599,6 +598,7 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
 
     auto results_table_show_lambda = [&](auto& nn_list, ResultMap& results) {
         std::cout << "\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        const auto default_precision{std::cout.precision()};
         std::cout << "\n ERRORS matrix: how many samples (out of: " << n_workloads
                   << " ) have big delta (larger than: " << (int)(max_ratio_delta * 100) << "% )";
         for (const auto& nn1 : nn_list) {
@@ -625,7 +625,9 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
                     std::cout << "\t " << std::setw(5) << "-";
             }
         }
-        std::cout << "\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        std::cout << std::setprecision(default_precision)
+                  << "\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        /* coverity[end_of_path] */
     };
 
     {
@@ -635,7 +637,7 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
         const std::vector<std::string> nns{
                 VPU_2_0_MODEL_PATH,
                 (NameHelperNN::get_model_root() + "vpu_2_0-150-1.vpunn"),
-                (NameHelperNN::get_model_root() + "vpu_2_0-orig-141.vpunn"),
+                //(NameHelperNN::get_model_root() + "vpu_2_0-orig-141.vpunn"),
 
                 NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH),
                 (NameHelperNN::get_model_root() + "vpu_2_0.fast-150-1.vpunn"),
@@ -657,11 +659,12 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
 
         const std::vector<std::string> nns{
                 VPU_2_7_MODEL_PATH,
+                (NameHelperNN::get_model_root() + "vpu_2_7-150.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7-150-1.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7-141.vpunn"),
-                //(NameHelperNN::get_model_root() + "vpu_2_7.vpunn.ORIGINAL"),
 
                 NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH),
+                (NameHelperNN::get_model_root() + "vpu_2_7.fast-150.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7.fast-150-1.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7.fast-141.vpunn"),
         };

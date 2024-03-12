@@ -37,9 +37,13 @@ class VPUCostModel:
     def DPU(self, **args):
         if self.verbose:
             self.describe_input(args)
-        # Get DPU cycles
-        return self.model.DPU(generate_model_input(args))
-
+        wl = generate_model_input(args)
+        cycles, error_msg = self.model.DPUMsg(wl)
+        if error_msg != '':
+            return error_msg
+        else:
+            return cycles
+    
     def hw_utilization(self, **args):
         if self.verbose:
             self.describe_input(args)
@@ -77,208 +81,159 @@ def getInputDim(output_dim, kernel, padding, strides):
         for o, k, p, z in zip(output_dim, kernel, padding, strides)
     ]
 
+def sparsity_float(x):
+    try:
+        x = float(x)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{x} not a floating-point literal")
+
+    if x < 0.0 or x >= 1.0:
+        raise argparse.ArgumentTypeError(f"{x} not in range [0.0, 1.0)")
+    return x
+
+def padding_type(x):
+    x = int(x)
+    if x < 0:
+        raise argparse.ArgumentTypeError(f"{x} smaller than 0, invalid for padding")
+    return x
+
+def stride_type(x):
+    x = int(x)
+    if x < 1:
+        raise argparse.ArgumentTypeError(f"{x} smaller than 1, invalid for stride")
+    return x
 
 def define_and_parse_args():
     parser = argparse.ArgumentParser(description="VPU cost model")
 
     parser.add_argument("--model", "-m", default="", type=str, help="Model path")
-    parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["DPU", "DMA", "Utilization"],
-        default="DPU",
-        help="Profiling mode",
-    )
-    parser.add_argument(
-        "--target",
-        type=str,
-        choices=[
-            "cycles",
-            "power",
-        ],
-        default="cycles",
-        help="Target type",
-    )
-    parser.add_argument(
-        "--device",
-        "-d",
-        type=str,
-        choices=["VPU_2_0", "VPU_2_1", "VPU_2_7", "VPU_4_0"],
-        help="The VPU IP device",
-    )
-    parser.add_argument(
-        "--operation",
-        "-op",
-        type=str,
-        choices=[
-            "CONVOLUTION",
-            "DW_CONVOLUTION",
-            "ELTWISE",
-            "MAXPOOL",
-            "CM_CONVOLUTION",
-        ],
-        default="CONVOLUTION",
-        help="The operation",
-    )
-    parser.add_argument(
-        "--mpe_mode",
-        type=str,
-        choices=["4x4", "16x1", "4x1"],
-        default="4x4",
-        help="DPU MPE mode",
-    )
-    parser.add_argument(
-        "--nthw-ntk",
-        type=str,
-        choices=["4x16", "8x8", "16x4"],
-        help="DPU nthw-ntk mode",
-        default="8x8",
-    )
-    parser.add_argument(
-        "--activation",
-        "-act",
-        type=str,
-        choices=["NONE", "RELU", "MULT", "LRELU", "ADD", "SUB"],
-        default="NONE",
-        help="The operation activation function",
-    )
-    parser.add_argument("--width", "-x", type=int, help="Tensor width")
-    parser.add_argument("--height", "-y", type=int, help="Tensor height")
-    parser.add_argument(
-        "--input_channels", "-ic", type=int, help="Tensor input channels"
-    )
-    parser.add_argument(
-        "--output_channels", "-oc", type=int, help="Tensor output channels"
-    )
-    parser.add_argument("--batch", "-b", type=int, default=1, help="Tensor batch")
-    parser.add_argument("--kernel", "-k", type=int, default=1, help="Operation Kernel")
-    parser.add_argument(
-        "--padding", "-p", type=int, default=0, help="Operation padding"
-    )
-    parser.add_argument(
-        "--strides", "-s", type=int, default=1, help="Operation strides"
-    )
-    parser.add_argument(
-        "--input_dtype",
-        type=str,
-        choices=["UINT8", "INT8", "FLOAT16", "BFLOAT16"],
-        default="UINT8",
-        help="The input datatype",
-    )
-    parser.add_argument(
-        "--output_dtype",
-        type=str,
-        choices=["UINT8", "INT8", "FLOAT16", "BFLOAT16"],
-        default="UINT8",
-        help="The output datatype",
-    )
+    parser.add_argument('-t','--target', dest='target', type=str, help='The target type', choices=["cycles", "power", "utilization"], default="cycles")
+    parser.add_argument('-d','--device', dest='device', type=str, help='The VPU IP device', choices=['VPU_2_0', 'VPU_2_1', 'VPU_2_7'], required=True)
 
-    parser.add_argument(
-        "--output_layout",
-        type=str,
-        choices=["ZXY", "XZY", "YXZ", "YZX", "ZYX", "XYZ"],
-        default="ZXY",
-        help="The odu layout",
-    )
+    subparsers = parser.add_subparsers(dest='module')
+    subparsers.required = True
+    parser_dpu = subparsers.add_parser('DPU')
+    parser_dma = subparsers.add_parser('DMA')
+    
+    parser_dpu.add_argument('-o','--op','--operation', dest='operation', type=str, help='Operation type', required=True, choices=[
+                "CONVOLUTION",
+                "DW_CONVOLUTION",
+                "ELTWISE",
+                "MAXPOOL",
+                "AVEPOOL",
+                "CM_CONVOLUTION",
+            ])
+    parser_dpu.add_argument('--inch','--input-channels','--input-0-channels', dest='input_0_channels', type=int, help='Number of input channels', required=True)
+    parser_dpu.add_argument('--outch','--output-channels','--output-0-channels', dest='output_0_channels', type=int, help='Number of output channels')
+    parser_dpu.add_argument('--height','--input-height','--input-0-height', dest='input_0_height', type=int, help='Input activation height', required=True)
+    parser_dpu.add_argument('--width','--input-width','--input-0-width', dest='input_0_width', type=int, help='Input activation width', required=True)
+    # parser_dpu.add_argument('--input-sparsity-enabled', help='The flag to enable input sparsity', action='store_true')
+    parser_dpu.add_argument('--weight-sparsity-enabled', help='The flag to enable weight sparsity', action='store_true')
+    # parser_dpu.add_argument('--input-sparsity-rate', type=sparsity_float, help='The rate of input sparsity (only valid when enabling input sparsity)', default=0.0)
+    parser_dpu.add_argument('--weight-sparsity-rate', type=sparsity_float, help='The rate of weight sparsity (only valid when enabling weight sparsity)', default=0.0)
+    parser_dpu.add_argument('--mpe-mode','--execution-order','--execution-mode', dest='execution_order', type=str, help='For KMB device set the MPE mode (VECTOR_FP16, VECTOR, MATRIX), for later devices it sets the Execution Order (nthw)', required=True, choices=[
+                'VECTOR_FP16',
+                'VECTOR',
+                'MATRIX',
+                'CUBOID_4x16',
+                'CUBOID_8x16',
+                'CUBOID_16x16'
+            ])
+    parser_dpu.add_argument('--kh','--kernel-height', dest='kernel_height', type=int, help='The kernel height', required=True)
+    parser_dpu.add_argument('--kw','--kernel-width', dest='kernel_width', type=int, help='The kernel width', required=True)
+    parser_dpu.add_argument('--pb','--pad-bottom', dest='kernel_pad_bottom', type=padding_type, help='The bottom padding', default=0)
+    parser_dpu.add_argument('--pl','--pad-left', dest='kernel_pad_left', type=padding_type, help='The left padding', default=0)
+    parser_dpu.add_argument('--pr','--pad-right', dest='kernel_pad_right', type=padding_type, help='The right padding', default=0)
+    parser_dpu.add_argument('--pt','--pad-top', dest='kernel_pad_top', type=padding_type, help='The top padding', default=0)
+    parser_dpu.add_argument('--sh','--stride-height', dest='kernel_stride_height', type=stride_type, help='The stride height', default=1)
+    parser_dpu.add_argument('--sw','--stride-width', dest='kernel_stride_width', type=stride_type, help='The stride width ', default=1)
+    parser_dpu.add_argument('--indt','--input-datatype','--input_datatype', dest='input_0_datatype', type=str, help='The input datatype', choices=["UINT8", "INT8", "FLOAT16", "BFLOAT16"], required=True)
+    parser_dpu.add_argument('--outdt','--output-datatype','--output_datatype', dest='output_0_datatype', type=str, help='The output datatype', choices=["UINT8", "INT8", "FLOAT16", "BFLOAT16"], required=True)
+    parser_dpu.add_argument('--isi','--isi-strategy', dest='isi_strategy', type=str, help='The ISI Strategy', default='CLUSTERING', choices=[
+                            'CLUSTERING',
+                            'SOH',
+                            'SOK'
+                        ])
+    parser_dpu.add_argument('--owt','--output-write-tiles', dest='output_write_tiles', type=int, help='Controls on how many tiles the DPU broadcast (1 = no broadcast)', default=1)
+    # parser_dpu.add_argument('--output-sparsity-enabled', help='The flag to enable output sparsity', action='store_true')
 
-    parser.add_argument(
-        "--isi_strategy",
-        type=str,
-        choices=["clustering", "split_over_h", "split_over_k"],
-        default="clustering",
-        help="ISI Strategy",
-    )
-
-    parser.add_argument(
-        "--act-sparsity", type=float, default=0, help="Activation tensor sparsity"
-    )
-    parser.add_argument(
-        "--param-sparsity-enabled",
-        type=bool,
-        default=False,
-        help="Weight tensor sparsity enabled",
-    )
-    parser.add_argument(
-        "--param-sparsity", type=float, default=0, help="Weight tensor sparsity"
-    )
-    parser.add_argument(
-        "--input-swizzling", type=int, default=0, help="Input tensor swizzling"
-    )
-    parser.add_argument(
-        "--param-swizzling", type=int, default=0, help="Weight tensor swizzling"
-    )
-    parser.add_argument(
-        "--output-swizzling", type=int, default=0, help="output tensor swizzling"
-    )
-
-    parser.add_argument(
-        "--output-write-tiles",
-        type=int,
-        default=1,
-        help="Controls on how many tiles the DPU broadcast (1 = no broadcast)",
-    )
-
+    parser_dma.add_argument('--height', type=int, required=True)
+    parser_dma.add_argument('--width', type=int, required=True)
+    parser_dma.add_argument('--kernel', type=int, required=True)
+    parser_dma.add_argument('--padding', type=int, required=True)
+    parser_dma.add_argument('--strides', type=int, required=True)
+    parser_dma.add_argument('--device', type=str, required=True)
+    parser_dma.add_argument('--input_channels', type=int, required=True)
+    parser_dma.add_argument('--output_channels', type=int, required=True)
+    parser_dma.add_argument('--input_dtype', type=int, required=True)
+    parser_dma.add_argument('--output_dtype', type=int, required=True)
+    
     args = parser.parse_args()
 
-    if args.device.upper() in ["VPU_2_7", "VPU_4_0"]:
-        if args.nthw_ntk == "4x16":
-            args.execution_mode = "CUBOID_4x16"
-        elif args.nthw_ntk == "8x8":
-            args.execution_mode = "CUBOID_8x16"
+    if args.output_0_channels is None:
+        if args.operation in ['cm_convolution', 'convolution']:
+            raise argparse.ArgumentTypeError(f"The number of output channels must be specified when operation is set to cm_convolution or convolution")
         else:
-            args.execution_mode = "CUBOID_16x16"
-    else:
-        if args.input_dtype.upper() in ["FLOAT16", "BFLOAT16"]:
-            args.execution_mode = "VECTOR_FP16"
-        elif args.mpe_mode == "4x4":
-            args.execution_mode = "MATRIX"
-        else:
-            args.execution_mode = "VECTOR"
-
+            args.output_0_channels = args.input_0_channels
+        
+    args.input_1_datatype = args.input_0_datatype
+    
     if args.model == "":
         args.model = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             f"models/{args.device.lower()}.vpunn",
         )
-
     return args
-
 
 def main():
 
     args = define_and_parse_args()
     model = VPUCostModel(args.model, verbose=True)
+    
+    isi_dict = {'CLUSTERING':'CLUSTERING','SOH':'SPLIT_OVER_H','SOK':'SPLIT_OVER_K'}
 
-    if args.mode == "DPU":
-        function_ = model.DPU if args.target == "cycles" else model.DPUPower
-        cycles = function_(
-            device=f"VPUDevice.{args.device.upper()}",
-            operation=f"Operation.{args.operation.upper()}",
-            input_0_width=args.width,
-            input_0_height=args.height,
-            input_0_channels=args.input_channels,
-            input_0_batch=args.batch,
-            output_0_channels=args.output_channels,
-            input_0_datatype=f"DataType.{args.input_dtype}",
-            output_0_datatype=f"DataType.{args.output_dtype}",
-            output_0_layout=f"Layout.{args.output_layout}",
-            execution_order=f"ExecutionMode.{args.execution_mode}",
-            kernel_height=args.kernel,
-            kernel_width=args.kernel,
-            kernel_stride_height=args.strides,
-            kernel_stride_width=args.strides,
-            kernel_pad_top=args.padding,
-            kernel_pad_left=args.padding,
-            input_sparsity_rate=args.act_sparsity,
-            weight_sparsity_enabled=args.param_sparsity_enabled,
-            weight_sparsity_rate=args.param_sparsity,
-            input_0_swizzling=f"Swizzling.KEY_{args.input_swizzling}",
-            input_1_swizzling=f"Swizzling.KEY_{args.param_swizzling}",
-            output_0_swizzling=f"Swizzling.KEY_{args.output_swizzling}",
-            output_write_tiles=args.output_write_tiles,
-            isi_strategy=f"ISIStrategy.{args.isi_strategy.upper()}",
+    if args.module == "DPU":
+        if args.target == "cycles":
+            function_ = model.DPU
+        elif args.target == "power":
+            function_ = model.DPUActivityFactor
+        else:
+            function_ = model.hw_utilization
+        result = function_(
+            device = f"VPUDevice.{args.device}",
+            operation = f"Operation.{args.operation}",
+            input_0_channels = args.input_0_channels,
+            output_0_channels = args.output_0_channels,
+            input_0_height = args.input_0_height,
+            input_0_width = args.input_0_width,
+            input_sparsity_enabled = False,#args.input_sparsity_enabled,
+            weight_sparsity_enabled = args.weight_sparsity_enabled,
+            input_sparsity_rate = 0.0,#args.input_sparsity_rate,
+            weight_sparsity_rate = args.weight_sparsity_rate,
+            execution_order = f"ExecutionMode.{args.execution_order}",
+            activation_function = f"ActivationFunction.NONE",
+            kernel_height = args.kernel_height,
+            kernel_width = args.kernel_width,
+            kernel_pad_bottom = args.kernel_pad_bottom,
+            kernel_pad_left = args.kernel_pad_left,
+            kernel_pad_right = args.kernel_pad_right,
+            kernel_pad_top = args.kernel_pad_top,
+            kernel_stride_height = args.kernel_stride_height,
+            kernel_stride_width = args.kernel_stride_width,
+            input_0_datatype = f"DataType.{args.input_0_datatype}",
+            input_1_datatype = f"DataType.{args.input_1_datatype}",
+            output_0_datatype = f"DataType.{args.output_0_datatype}",
+            input_0_layout = f"Layout.ZXY",
+            input_1_layout = f"Layout.ZXY",
+            output_0_layout = f"Layout.ZXY",
+            input_0_swizzling = f"Swizzling.KEY_0",
+            input_1_swizzling = f"Swizzling.KEY_0",
+            output_0_swizzling = f"Swizzling.KEY_0",
+            isi_strategy = f"ISIStrategy.{isi_dict[args.isi_strategy]}",
+            output_write_tiles = 2 if args.isi_strategy=='SOK' else args.output_write_tiles,
+            output_sparsity_enabled = False#args.output_sparsity_enabled,
         )
-        print(f"DPU execution {args.target}: {cycles}")
+        print(f"DPU execution {args.target}: {result}")
     elif args.mode == "DMA":
         input_height, input_width = getInputDim(
             [args.height, args.width],
@@ -286,29 +241,28 @@ def main():
             [args.padding, args.padding],
             [args.strides, args.strides],
         )
-
-        function_ = model.DMA if args.target == "cycles" else model.DMAPower
-        cycles = function_(
-            device=f"VPUDevice.{args.device.upper()}",
-            input_dimension=[
-                input_width,
-                input_height,
-                args.input_channels,
-                args.batch,
-            ],
-            output_dimension=[
-                args.width,
-                args.height,
-                args.output_channels,
-                args.batch,
-            ],
-            input_location=f"MemoryLocation.DRAM",
-            output_location=f"MemoryLocation.CMX",
-            input_dtype=f"DataType.{args.input_dtype}",
-            output_dtype=f"DataType.{args.output_dtype}",
-        )
-
-        print(f"DMA execution {args.target}: {cycles}")
+        if args.target == "cycles" :
+            function_ = model.DMA 
+            cycles = function_(
+                device=f"VPUDevice.{args.device.upper()}",
+                input_dimension=[
+                    input_width,
+                    input_height,
+                    args.input_channels,
+                    args.batch,
+                ],
+                output_dimension=[
+                    args.width,
+                    args.height,
+                    args.output_channels,
+                    args.batch,
+                ],
+                input_location=f"MemoryLocation.DRAM",
+                output_location=f"MemoryLocation.CMX",
+                input_dtype=f"DataType.{args.input_dtype}",
+                output_dtype=f"DataType.{args.output_dtype}",
+            )
+            print(f"DMA execution {args.target}: {cycles}")
 
 
 if __name__ == "__main__":

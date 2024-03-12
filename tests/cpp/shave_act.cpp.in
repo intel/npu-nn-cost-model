@@ -9,12 +9,49 @@
 
 #include <gtest/gtest.h>
 #include "vpu_cost_model.h"
+#include "vpu/shave/layers.h"
+
+namespace VPUNN_unit_tests {
+using namespace VPUNN;
+
+#define TEST_FIXTURE_NAME @TEST_NAME@FIXTURE
+#define TEST_F_NAME @KERNEL_NAME@_SmokeTest
+#define TEST_CASE_NAME @KERNEL_NAME@_Basic
 
 #define KERNEL_NAME @KERNEL_NAME@
 #define TEST_NAME @TEST_NAME@
 
+class TEST_FIXTURE_NAME : public ::testing::Test {
+protected:
+    VPUCostModel model{};
+    
+    template <typename KN>
+    void doTest() {
+        const VPUTensor input_tensor{56, 56, 16, 1, VPUNN::DataType::FLOAT16};
+        const VPUTensor output_tensor{56, 56, 16, 1, VPUNN::DataType::FLOAT16};
 
-static auto model = VPUNN::VPUCostModel();
+        KN swwl{VPUNN::VPUDevice::VPU_2_7, input_tensor, output_tensor};
+
+        // Cycles
+        auto cycles = model.SHAVE(swwl);
+        // Theoretical cycles
+        auto theoretical_cycles =
+                static_cast<unsigned int>(round(float(output_tensor.size() / swwl.getKernelEfficiency()))) +
+                swwl.getLatency();
+        // Expect equality.
+        EXPECT_EQ(cycles, theoretical_cycles);
+    }
+};
+
+//macro for a test case
+#define LEGACY_SHV_TEST_F(TFN, TCN, KN) TEST_F(TFN, TCN) {  doTest<KN>();}
+
+//TEST_F(TEST_FIXTURE_NAME, TEST_F_NAME) { doTest<KERNEL_NAME>(); }
+
+LEGACY_SHV_TEST_F(TEST_FIXTURE_NAME, TEST_CASE_NAME, KERNEL_NAME)
+
+/*
+static VPUNN::VPUCostModel model{};
 
 TEST(TEST_NAME, BasicAssertions) {
     auto input_tensor = VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::FLOAT16);
@@ -31,6 +68,9 @@ TEST(TEST_NAME, BasicAssertions) {
     // Expect equality.
     EXPECT_EQ(cycles, theoretical_cycles);
 }
+*/
+
+} //namespace
 
 #undef KERNEL_NAME
 #undef TEST_NAME

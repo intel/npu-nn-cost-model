@@ -234,7 +234,7 @@ TEST_F(DeviceValidValuesTest, get_input_height_range) {
             {1, 1, 1, 1},                                         // padding
             ExecutionMode::CUBOID_16x16,                          // execution mode
     };
-    auto check_it = [&dut](DPUOperation& wl, std::array<int, 2> pad, int minExp, std::string h = "") {
+    auto check_it = [&dut](DPUOperation& wl, std::array<int, 2> pad, int minExp, const std::string& h = "") {
         wl.kernel.pad_top = pad[0];
         wl.kernel.pad_bottom = pad[1];
         auto r = dut.get_input_height_range(wl);
@@ -328,7 +328,7 @@ TEST_F(DeviceValidValuesTest, get_input_width_range) {
             {1, 1, 1, 1},                                         // padding
             ExecutionMode::CUBOID_16x16,                          // execution mode
     };
-    auto check_it = [&dut](DPUOperation& wl, std::array<int, 2> pad, int minExp, std::string h = "") {
+    auto check_it = [&dut](DPUOperation& wl, std::array<int, 2> pad, int minExp, const std::string& h = "") {
         wl.kernel.pad_left = pad[0];
         wl.kernel.pad_right = pad[1];
         auto r = dut.get_input_width_range(wl);

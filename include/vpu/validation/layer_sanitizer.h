@@ -32,11 +32,16 @@ protected:
 
     /// configuration bundle for Workloads that are no finally split. Are just Layers on a Tile
     using SplitLayersContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations for workloads
-                                                       VPU2_0_LayerOnTileValidValues, VPU2_7_LayerOnTileValidValues>;
+                                                       VPU2_0_LayerOnTileValidValues, VPU2_7_LayerOnTileValidValues,
+                                                       VPU_RESERVED_LayerOnTileValidValues>;
     using DPU_SplitLayersValidator = DPU_ConfigurableOperationValidator<SplitLayersContext>;
     DPU_SplitLayersValidator splitLayer_validator;
 
 public:
+    const IDeviceValidValues& getDeviceConfiguratorForTiles(VPUDevice device) const {
+        return splitLayer_validator.get_config(device);  // for now
+    }
+
     /// @brief checks the layer validity against the rules of an unsplit Layer
     void check_completeLayer_consistency(const DPULayer& layer, SanityReport& result, ISIStrategy strategy,
                                          unsigned int nTiles) const {
@@ -52,7 +57,10 @@ public:
             auto& operation_behaviour = config.get_specific_behaviour(layer.op);  // will throw if unknown op
             DPUOperation w(layer);                                                // workload internal representation
 
-            w.set_intended_split(strategy, nTiles);
+            w.set_intended_split(
+                    strategy,
+                    nTiles);  // here we remain with SOH even if we do SOHO because it is still a split , not clustering
+            // this has to be carefully redesigned when we get rid of ISI.
 
             operation_behaviour.deduce_input_1(w.input_0, w.output_0, config, w.kernel, w.input_1);
 

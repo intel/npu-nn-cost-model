@@ -40,7 +40,7 @@ TEST_F(TestTensor, CreationNoInit) {
             {{1U, 5U, 6U, 7U}, 1 * 5 * 6 * 7},
     };
 
-    for (auto tst : test_vector) {
+    for (const auto& tst : test_vector) {
         VPUNN::Tensor<float> t(tst.dimensions);
         EXPECT_EQ(t.size(), tst.expected_size) << "size is not matching";
 
@@ -65,7 +65,7 @@ TEST_F(TestTensor, CreationwithInit) {
             {{8U, 1U, 1U, 7U}, 8 * 1 * 1 * 7, 4.332F},
     };
 
-    for (auto tst : test_vector) {
+    for (const auto& tst : test_vector) {
         VPUNN::Tensor<float> t(tst.dimensions, tst.init_val);
         EXPECT_EQ(t.size(), tst.expected_size) << "size is not matching";
 
@@ -94,7 +94,7 @@ TEST_F(TestTensor, CreationExternalData) {
             {{1U, 5U, 6U, 7U}, 1 * 5 * 6 * 7},
     };
 
-    for (auto tst : test_vector) {
+    for (const auto& tst : test_vector) {
         float* memory = new float[tst.expected_size];
 
         VPUNN::Tensor<float> t(memory, tst.dimensions);
@@ -113,7 +113,8 @@ TEST_F(TestTensor, CreationExternalData) {
         auto& tst = test_vector[0];
         float* memory = new float[tst.expected_size];
 
-        VPUNN::Tensor<float>* pt = new VPUNN::Tensor<float>(memory, tst.dimensions);
+        VPUNN::Tensor<float>* pt =
+                new VPUNN::Tensor<float>(memory, tst.dimensions);  // now pt is considered the owner of memory
         VPUNN::Tensor<float>& t = *pt;
         EXPECT_EQ(t.size(), tst.expected_size) << "size is not matching";
         ASSERT_EQ(t.data(), memory);
@@ -124,7 +125,8 @@ TEST_F(TestTensor, CreationExternalData) {
             ASSERT_EQ(*(t.data() + idx), data_vector[idx]);
         }
 
-        // delete the memory
+        // delete the memory, implies the pt will have an invalid pointer that will try to deallocate(2nd time) at
+        // destruction
         delete[] memory;
 
         // now delete the tensor, it will crash if tries to delete the memory second time
@@ -136,6 +138,7 @@ TEST_F(TestTensor, CreationExternalData) {
         // delete pt;
         // EXPECT_NO_THROW(delete pt);
 #endif  // _WINDOWS
+        /* coverity[leaked_storage] */
     }
 }
 
@@ -292,9 +295,10 @@ TEST_F(TestTensor, MoveConstructor) {
             EXPECT_EQ(t1[i], initial_fill) << "content not matching at index: " << i << std::endl;
         }
 
-        // check also the source of move, should be undefined byut usable
+        // check also the source of move, should be undefined but usable
+        /* coverity[use_after_move] */
         EXPECT_EQ(t0.size(), 0) << "moved obj should be empty";
-        EXPECT_EQ(t0.data(), nullptr) << "not data expecetd in moved object";
+        EXPECT_EQ(t0.data(), nullptr) << "not data expected in moved object";
         EXPECT_EQ(t0.shape().size(), 0) << "no dimensions in an empty moved object";
     }
 }
@@ -326,7 +330,9 @@ TEST_F(TestTensor, MoveAssignement) {
                 EXPECT_EQ(td[i], initial_fill) << "content not matching at index: " << i << std::endl;
             }
 
-            // in our impl ts is consistent and is from td (this check might change if we change the impl)
+            // in our impl ts is consistent and is from td (this check might change if we change the impl). ts is moved
+            // but stable
+            // coverity[use_after_move]
             ASSERT_EQ(ts.size(), d_initial_size);
             ASSERT_EQ(ts.shape(), dim_d);
             EXPECT_EQ(ts.data(), d_initial_memory) << "Internal pointer is from moved object";

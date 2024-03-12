@@ -68,9 +68,7 @@ public:
         const auto in_0_size = operation_behaviour.input_0_volume(w.input_0);
         const auto in_0_aligned_size = config.compute_size_aligned(in_0_size, w.input_0.datatype);
 
-        const auto in_1_size = operation_behaviour.input_1_volume(w.input_1);
-        // const auto in_1_aligned_size = config.compute_size_aligned(in_1_size, w.input_1.datatype);
-        const auto in_1_aligned_size = operation_behaviour.input_1_aligned_size_bytes(in_1_size, config, w);
+        const auto in_1_aligned_size = operation_behaviour.input_1_aligned_size_bytes(config, w);
 
         const auto out_0_size = operation_behaviour.output_0_volume(w.output_0);
         const auto out_0_aligned_size = config.compute_size_aligned(out_0_size, w.output_0.datatype);
@@ -97,7 +95,6 @@ public:
                           ignore_cmx_overhead};
     }
 };
-
 }  // namespace VPUNN
 
 #endif  //

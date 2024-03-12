@@ -105,7 +105,9 @@ protected:
 
     /// static rules (described by data) for each device
     const std::vector<const IDeviceValidValues*> validators_config{&(std::get<0>(specific_vv)),
-                                                                   &(std::get<1>(specific_vv))};
+                                                                   &(std::get<1>(specific_vv)),
+
+                                                                   &(std::get<2>(specific_vv))};
 
 public:
     /// @brief true if the device is supported by this instance

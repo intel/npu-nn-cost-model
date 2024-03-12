@@ -61,9 +61,18 @@ public:
         return w.height * w.width * w.channels * w.batch;
     }
 
-    /// @brief computes the aligned size in bytes
-    long long input_1_aligned_size_bytes(const long long elem_size, const IDeviceValidValues& config,
-                                         const DPUOperation& dpu) const noexcept override {
+    /// @brief computes the aligned size in bytes for weights
+    long long input_1_aligned_size_bytes(const IDeviceValidValues& config, const DPUOperation& dpu) const
+            noexcept override {
+        const auto in1_nonAlignedSize{Base_Constraints::input_1_contiguous_size_bytes(config, dpu)};  // non polymorphic
+
+        return config.align_to(in1_nonAlignedSize, config.alignement_size_bytes);  // # align to 16KB chunks
+    }
+
+    /// @brief computes the non CMX aligned/contiguous  size in bytes for the weights
+    virtual long long input_1_contiguous_size_bytes(const IDeviceValidValues& config, const DPUOperation& dpu) const
+            noexcept override {
+        const auto elem_size{input_1_volume(dpu.input_1)};
         auto in_1_size = config.compute_size_raw(elem_size, dpu.input_1.datatype);
 
         if (dpu.input_1.sparsity_enabled) {
@@ -78,7 +87,7 @@ public:
 
         in_1_size += get_weight_table_size(dpu.output_0.channels);
 
-        return config.align_to(in_1_size, config.alignement_size_bytes);  // # align to 16KB chunks
+        return in_1_size;
     }
 };
 
@@ -241,16 +250,6 @@ protected:
 
         // swizzling and sparsity are not deduced.
     }
-
-    /// @brief changes kernels in case a stricter constraint must be used
-    /// @returns true if normalization was done (kernel changed)
-    //bool normalize_kernel_dimension(const ISIStrategy& isi, KernelInfo& kernel) const override {
-    //    if ((isi == ISIStrategy::SPLIT_OVER_H) && (kernel.height != kernel.width)) {
-    //        kernel.height = kernel.width;  // make  them equal
-    //        return true;                   // kernel was adjusted
-    //    }
-    //    return false;
-    //}
 };
 
 class CM_CONVOLUTION_Constraints : public GenericConvolution_Constraints {
@@ -343,6 +342,24 @@ protected:
 
     long long input_1_volume(const TensorInfo& w) const noexcept override {
         return w.height * w.width * w.channels;
+    }
+
+    bool check_sparsity_rules(const IDeviceValidValues&, const DPUOperation& dpu, std::string& info) const override {
+        Checker checker;
+        // if not enabled then the value should be zero
+
+        if (!dpu.input_0.sparsity_enabled) {
+            checker.check_is_equal(dpu.input_0.sparsity, 0.0f, "input_0.sparsity_enabled false and sparsity is ");
+        }
+
+        if (!dpu.input_1.sparsity_enabled) {
+            checker.check_is_equal(dpu.input_1.sparsity, 0.0f, "input_1.sparsity_enabled false and sparsity is ");
+        }
+
+        checker.check_is_equal(dpu.output_0.sparsity_enabled, false, "output_0 sparsity_enabled  ");
+
+        info = checker.findings();
+        return checker.is_clean();
     }
 
     void deduce_input_1(const TensorInfo& in_0, const TensorInfo&, const IDeviceValidValues&, const KernelInfo&,

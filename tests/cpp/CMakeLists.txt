@@ -23,15 +23,27 @@ enable_testing()
 include_directories(${CMAKE_BINARY_DIR}/include)
 include_directories(${FLATBUFFERS_SRC_DIR}/include)
 
+set (LIST_ACT_TEST_CASES "")
+
 function(GENERATE_SHV_KERNEL_TEST KERNEL_TYPE KERNEL_NAME)
+  set(K_NAME_csv "${KERNEL_NAME}")# original from csv
+
   set(KERNEL_NAME "SHV${KERNEL_NAME}")
   set(TEST_NAME "SHV${KERNEL_NAME}Cost")
 
   if(${KERNEL_TYPE} STREQUAL "ACTIVATION")
-    configure_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/shave_act.cpp.in"
-      "${CMAKE_CURRENT_BINARY_DIR}/shave/${KERNEL_NAME}.cpp"
-    )
+ #   configure_file(
+ #     "${CMAKE_CURRENT_SOURCE_DIR}/shave_act.cpp.in"
+ #     "${CMAKE_CURRENT_BINARY_DIR}/shave/${KERNEL_NAME}.cpp"
+ #   )
+ #  message(STATUS "  > Generated SHV ACT Kernel TEST: ${TEST_NAME} for:${KERNEL_NAME}") 
+
+   set(TEST_NAME_SMOKE "${K_NAME_csv}_SmokeTest")
+   set (TEST_CASE_LINE "LEGACY_SHV_TEST_F( ${TEST_NAME_SMOKE}, ${KERNEL_NAME}) //${K_NAME_csv}")
+   #message(STATUS "  >                  ${TEST_CASE_LINE}")
+
+   set (LIST_ACT_TEST_CASES "${LIST_ACT_TEST_CASES} \n ${TEST_CASE_LINE} \n" PARENT_SCOPE)
+
   endif()
 endfunction()
 
@@ -40,6 +52,7 @@ STRING(REPLACE " " "" config "${config}")
 STRING(REPLACE "\n" ";" config "${config}")
 
 set(SKIP_HEADER TRUE)
+message(STATUS " >> Generating Legacy Shave Unit TEST ")
 
 foreach(LINE ${config})
   if(SKIP_HEADER)
@@ -50,9 +63,15 @@ foreach(LINE ${config})
   endif()
 endforeach()
 
-file(GLOB test_src "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+#message(STATUS " >> Generated TEST code is : \n ${LIST_ACT_TEST_CASES} \n  >> Generated test code END")
+ configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/shave_legacy_all.cpp.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/shave/shave_legacy_all.cpp"
+    )
 
+file(GLOB test_src "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 file(GLOB shv_test_src "${CMAKE_CURRENT_BINARY_DIR}/shave/*.cpp")
+
 add_executable(
   test_cost_model
   ${test_src}

@@ -26,7 +26,7 @@ inline bool operator<(const DPUWorkloads& lhs, const DPUWorkloads& rhs) {
  */
 class DPUTilerImplementation : public DPUTiler {
 private:
-    std::shared_ptr<VPUCostModel> model;
+    VPUCostModel& model;
 
     VPUDevice getWorkloadsDevice(const DPUWorkloads& workloads) const {
         if (workloads.size() == 0) {
@@ -112,8 +112,7 @@ public:
      *
      * @param _model a shared pointer to a VPUCostModel object
      */
-    DPUTilerImplementation(std::shared_ptr<VPUCostModel> const& _model) {
-        model = _model;
+    explicit DPUTilerImplementation(VPUCostModel& _model): model{_model} {
     }
 
     DPUWorkloadsCost intraTileSplit(const DPULayer& layer, const SplitOptions& options) override {
@@ -158,11 +157,11 @@ public:
             return {0, 0.0f};  // no runtime to execute nothing
 
         // Get the execution time in cycles of the workloads
-        const auto workload_cycles = model->DPU(workloads);  // if it throws will be catch outside
+        const auto workload_cycles = model.DPU(workloads);  // if it throws will be catch outside
         const auto how_many_errors{countErrors(workload_cycles)};
 
         if (how_many_errors > 0) {  // errors
-            const auto errIndex = firstErrorIndex(workload_cycles);
+            const auto errIndex = (firstErrorIndex(workload_cycles) >= 0) ? firstErrorIndex(workload_cycles) : 0;
             Logger::warning() << "\n Error result returned by DPU for workloads"
                               << "\n Errors cnt: " << how_many_errors
                               << " , from a wl_list size: " << workload_cycles.size()
@@ -182,11 +181,12 @@ public:
         // Get the average power by computing the workload on ratio by dividing its cycles by the total layer cycles
         float average_power = 0.0f;
         if (!skip_power) {
-            unsigned int idx = 0;
-            for (auto wl : workloads) {
+            /*unsigned int idx = 0;
+            for (DPUWorkload wl : workloads) {
                 float workload_on_ratio = total_cycles > 0 ? (float)workload_cycles[idx++] / total_cycles : 0.0f;
-                average_power += model->DPUPower(wl) * workload_on_ratio;
-            }
+                average_power += 0 * workload_on_ratio;
+            }*/
+            average_power = 0.0f;
         }
 
         // Return a PnP structure with total cycles and average power
@@ -209,16 +209,18 @@ private:
     }
 
     int firstErrorIndex(const std::vector<CyclesInterfaceType>& workloads_cycles) const {
-        for (decltype(workloads_cycles.size()) i = 0; i < workloads_cycles.size(); ++i) {
-            if (Cycles::isErrorCode(workloads_cycles[i])) {
-                return static_cast<int>(i);
+        if (countErrors(workloads_cycles) > 0) {
+            for (decltype(workloads_cycles.size()) i = 0; i < workloads_cycles.size(); ++i) {
+                if (Cycles::isErrorCode(workloads_cycles[i])) {
+                    return static_cast<int>(i);
+                }
             }
         }
         return -1;
     }
 };
 
-std::unique_ptr<DPUTiler> getDPUTiler(std::shared_ptr<VPUCostModel> const& _model) {
+std::unique_ptr<DPUTiler> getDPUTiler(VPUCostModel& _model) {
     return std::make_unique<DPUTilerImplementation>(_model);
 }
 

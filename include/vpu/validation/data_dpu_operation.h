@@ -78,7 +78,8 @@ struct DPUOperation {
     Operation operation{};
 
     TensorInfo input_0;  ///< activators
-    TensorInfo input_1;  ///< weights
+    TensorInfo input_1;  ///< weights. NOte: different operations will use differently the tensor shape to represent
+                         ///< weights
 
     TensorInfo output_0;
 
@@ -123,37 +124,25 @@ struct DPUOperation {
     DPUOperation() = default;
 
     DPUWorkload clone_as_DPUWorkload() const {
-        DPUWorkload wl;  // looks like local  object , but  hope  for Return Value Optimization (RVO)
+        const auto& in = input_0;
+        const auto& out = output_0;
 
-        wl.device = device;
-        wl.op = operation;
-
-        // data type restriction is mandatory, but should be also for all DPU workloads not just generated ones
-        {
-            auto& in = input_0;
-            wl.inputs[0] = VPUTensor({static_cast<unsigned int>(in.width), static_cast<unsigned int>(in.height),
-                                      static_cast<unsigned int>(in.channels), static_cast<unsigned int>(in.batch)},
-                                     in.datatype, in.layout, in.sparsity_enabled);
-        }
-        {
-            auto& out = output_0;
-            wl.outputs[0] = VPUTensor({static_cast<unsigned int>(out.width), static_cast<unsigned int>(out.height),
-                                       static_cast<unsigned int>(out.channels), static_cast<unsigned int>(out.batch)},
-                                      out.datatype, out.layout, out.sparsity_enabled);
-        }
-
-        wl.kernels[Dim::Grid::W] = kernel.width;
-        wl.kernels[Dim::Grid::H] = kernel.height;
-
-        wl.strides[Dim::Grid::W] = kernel.stride_width;
-        wl.strides[Dim::Grid::H] = kernel.stride_height;
-
-        wl.padding[Dim::Padding::TOP] = kernel.pad_top;
-        wl.padding[Dim::Padding::BOTTOM] = kernel.pad_bottom;
-        wl.padding[Dim::Padding::LEFT] = kernel.pad_left;
-        wl.padding[Dim::Padding::RIGHT] = kernel.pad_right;
-
-        wl.execution_order = execution_order;
+        DPUWorkload wl{
+                device,
+                operation,
+                {VPUTensor({static_cast<unsigned int>(in.width), static_cast<unsigned int>(in.height),
+                            static_cast<unsigned int>(in.channels), static_cast<unsigned int>(in.batch)},
+                           in.datatype, in.layout, in.sparsity_enabled)},  // input dimensions
+                {VPUTensor({static_cast<unsigned int>(out.width), static_cast<unsigned int>(out.height),
+                            static_cast<unsigned int>(out.channels), static_cast<unsigned int>(out.batch)},
+                           out.datatype, out.layout, out.sparsity_enabled)},  // output dimensions
+                {static_cast<unsigned int>(kernel.width), static_cast<unsigned int>(kernel.height)},  // kernels
+                {static_cast<unsigned int>(kernel.stride_width),
+                 static_cast<unsigned int>(kernel.stride_height)},  // strides
+                {static_cast<unsigned int>(kernel.pad_top), static_cast<unsigned int>(kernel.pad_bottom),
+                 static_cast<unsigned int>(kernel.pad_left), static_cast<unsigned int>(kernel.pad_right)},  // padding
+                execution_order  // execution mode
+        };                       // looks like local  object , but  hope  for Return Value Optimization (RVO)
 
         // wl.activation_function = dpu.  // WHERE IS IT?
         wl.activation_function = ActivationFunction::NONE;  //

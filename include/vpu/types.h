@@ -21,6 +21,7 @@
 #include <cmath>
 #include <iostream>
 #include <map>
+#include <sstream>  //
 #include <string>
 
 namespace VPUNN {
@@ -41,7 +42,7 @@ using EnumInverseMap = std::map<const std::string, const int>;
 /// @brief creates and inverse map given a direct map (EnumMap)
 inline const EnumInverseMap createInverseMap(const EnumMap& direct_map) {
     EnumInverseMap inverse_map;
-    for (auto elem : direct_map) {
+    for (const auto& elem : direct_map) {
         inverse_map.emplace(std::make_pair(elem.second, elem.first));
     }
     return inverse_map;
@@ -85,9 +86,9 @@ inline const EnumInverseMap& mapFromText() {
  * @brief VPU IP generations
  *
  */
-enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, __size };
+enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_RESERVED, __size };
 static const EnumMap VPUDevice_ToText{link(VPUDevice::VPU_2_0, "VPU_2_0"), link(VPUDevice::VPU_2_1, "VPU_2_1"),
-                                      link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_4_0, "VPU_4_0")};
+                                      link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_RESERVED, "VPU_RESERVED")};
 template <>
 inline const EnumMap& mapToText<VPUDevice>() {
     return VPUDevice_ToText;
@@ -374,11 +375,12 @@ inline std::vector<unsigned int> mpe_mode_to_nthw_ntk_grid(ExecutionMode mode) {
  */
 class VPUTensor {
 private:
-    std::array<unsigned int, 4> shape;    ///< the 4 dimensions of the real tensor in the order Dim::Act XYZC  WHCB
-    DataType dtype;                       ///< datatatype of the described tensor
-    Layout layout;                        ///< memory organization of the tensor
-    bool sparsity;                        ///< is sparsity present?
-    std::array<unsigned int, 4> strides;  ///< strides of the tensor's dimensions. order is the same as for shape
+    std::array<unsigned int, 4> shape;  ///< the 4 dimensions of the real tensor in the order Dim::Act XYZC  WHCB
+    DataType dtype;                     ///< datatatype of the described tensor
+    Layout layout;                      ///< memory organization of the tensor
+    bool sparsity;                      ///< is sparsity present?
+    std::array<unsigned int, 4> strides{0, 0, 0, 0};  ///< strides of the tensor's dimensions. order is the same as for
+                                                      ///< shape. Strides are computed in constructor.
 
     void compute_strides() {
         auto size = dtype_to_bytes(dtype);
@@ -720,35 +722,52 @@ struct DMAWorkload {
     MemoryLocation input_location;   ///< Input memory location
     MemoryLocation output_location;  ///<  Output memory location
 
-    unsigned int output_write_tiles = 1;  ///< number of CMX tiles to broadcast
+    unsigned int output_write_tiles = 1;  ///< number of CMX tiles to broadcast. NOT USED!
 
     /**
      * @brief This function computes the size of the DMAWorkload features to feed to the NN
      *
      * @return unsigned int
      */
-    static unsigned int size() {
-        // output_write_tiles size
-        unsigned int size = 1;
-
-        // Size of Device
-        size += static_cast<int>(VPUDevice::__size);
-
-        // Input + output tensor size
-        size += 2 * (4 + static_cast<int>(DataType::__size) + static_cast<int>(Layout::__size));
-
+    static unsigned int sizeTODELETEME() {
+        unsigned int size = 1;                        // output_write_tiles size
+        size += static_cast<int>(VPUDevice::__size);  // Size of Device
+        size += 2 * (4 + static_cast<int>(DataType::__size) +
+                     static_cast<int>(Layout::__size));  // Input + output tensor size
         return size;
     }
 };
+
+inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMAWorkload& d) {
+    stream << "DMA Workload: \n"  //
+           << " device: \t" << (int)d.device << " : " << VPUDevice_ToText.at(static_cast<int>(d.device))
+           << " ;\n"  //
+           // inputs and outputs tensors
+           << " input: \t{\n"
+           << d.input << " ; size(bytes): " << d.input.size() << " } ;\n"  //
+           << " output: \t{\n"
+           << d.output << " ; size(bytes): " << d.output.size()
+           << " } ;\n"  //
+
+           //
+           << " input_location: \t" << (int)d.input_location << " : "
+           << MemoryLocation_ToText.at(static_cast<int>(d.input_location)) << " ;\n"  //
+           << " output_location: \t" << (int)d.output_location << " : "
+           << MemoryLocation_ToText.at(static_cast<int>(d.output_location)) << " ;\n"  //
+
+           << " output_write_tiles: \t" << d.output_write_tiles << " ;\n"  //
+            ;
+    return stream;
+}
 
 /**
  * @brief The base structure that encodes a Software layer
  *
  */
 struct SWOperation {
-    VPUDevice device;                ///< The VPU device
-    std::vector<VPUTensor> inputs;   ///< The input tensors
-    std::vector<VPUTensor> outputs;  ///< The output tensors
+    VPUDevice device;                      ///< The VPU device
+    const std::vector<VPUTensor> inputs;   ///< The input tensors
+    const std::vector<VPUTensor> outputs;  ///< The output tensors
 
     /// @brief ctor must exist since we have aggregate initialization possible on this type (abstract type)
     SWOperation(const VPUDevice& device, const std::vector<VPUTensor>& inputs, const std::vector<VPUTensor>& outputs)
@@ -760,14 +779,81 @@ struct SWOperation {
      *
      * @return unsigned int
      */
-    virtual unsigned int cycles() = 0;
+    virtual unsigned int cycles() const = 0;
 
     /**
      * @brief Destroy the SWOperation object
      *
      */
-    virtual ~SWOperation() = default;
+    virtual ~SWOperation(){};
 };
+
+/**
+ * @brief describes a Software layer (SHAVE) request
+ */
+class SHAVEWorkload {
+    std::string name;  ///<  the name of the SW operation. We have a very flexible range of them.
+    VPUDevice device;  ///< The VPU device. There will be different methods/calibrations/profiling depending on device
+
+    // input and output tensors number and content must be correlated with the operation and among themselves. Not all
+    // combinations are possible
+    std::vector<VPUTensor> inputs;   ///< The input tensors. Mainly shape and datatype are used
+    std::vector<VPUTensor> outputs;  ///< The output tensors. Mainly shape and datatype are used
+
+public:
+    /// @brief ctor must exist since we have aggregate initialization possible on this type (abstract type)
+    SHAVEWorkload(const std::string& operation_name, const VPUDevice& device, const std::vector<VPUTensor>& inputs,
+                  const std::vector<VPUTensor>& outputs)
+            : name(operation_name), device{device}, inputs{inputs}, outputs{outputs} {
+    }
+
+    SHAVEWorkload(const SHAVEWorkload&) = default;
+    SHAVEWorkload& operator=(const SHAVEWorkload&) = default;
+
+    // accessors
+
+    std::string get_name() const {
+        return name;
+    };
+    VPUDevice get_device() const {
+        return device;
+    };
+    const std::vector<VPUTensor>& get_inputs() const {
+        return inputs;
+    };
+    const std::vector<VPUTensor>& get_outputs() const {
+        return outputs;
+    };
+    std::string toString() const {
+        std::stringstream stream;
+        stream << "SHAVEWorkload: \n"                                                                                //
+               << " Operation: \t" << name << " ;\n"                                                                 //
+               << " device: \t" << (int)device << " : " << VPUDevice_ToText.at(static_cast<int>(device)) << " ;\n";  //
+
+        // inputs and outputs tensors
+        {
+            stream << " inputs: \t{\n";
+            for (size_t i = 0; i < inputs.size(); i++) {
+                stream << " input[" << i << "]: \t{\n" << inputs[i] << " } ;\n";
+            }
+            stream << "\t}inputs \n";
+        }
+        {
+            stream << " outputs: \t{\n";
+            for (size_t i = 0; i < outputs.size(); i++) {
+                stream << " output[" << i << "]: \t{\n" << outputs[i] << " } ;\n";
+            }
+            stream << "\t}outputs \n";
+        }
+
+        return stream.str();
+    };
+};
+
+inline std::ostream& operator<<(std::ostream& stream, const VPUNN::SHAVEWorkload& d) {
+    stream << d.toString();
+    return stream;
+}
 
 }  // namespace VPUNN
 

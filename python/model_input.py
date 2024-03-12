@@ -8,30 +8,26 @@
 # Software Package for additional details.
 
 from vpunn import VPUNN_lib
-from vpunn import workloads
 import numpy as np
-
+from argparse import Namespace
 
 class Preprocessing:
     def __init__(self):
         self.model = VPUNN_lib.Preprocessing_Interface10_float_t()
 
-    def transform(self, **args):
+    def transform(self, args):
         vector = self.model.transform(generate_model_input(args))
-
         return np.array(vector)
-
 
 def str2enum(value):
     return eval(f"VPUNN_lib.{value}")
 
-
 def generate_model_input(args, wl_type=VPUNN_lib.DPUWorkload):
+
     wl = wl_type()
     if wl_type == VPUNN_lib.DPUWorkload:
-        dpu_wl = workloads.DPUWorkload(**args)
+        dpu_wl = Namespace(**args)
 
-        #         print(dpu_wl)
         # Convert all input to VPUNN enum
         wl.device = str2enum(dpu_wl.device)
         wl.op = str2enum(dpu_wl.operation)
@@ -60,7 +56,7 @@ def generate_model_input(args, wl_type=VPUNN_lib.DPUWorkload):
                     dpu_wl.input_0_width,
                     dpu_wl.input_0_height,
                     dpu_wl.input_0_channels,
-                    dpu_wl.input_0_batch,
+                    1,
                 ],
                 str2enum(dpu_wl.input_0_datatype),
                 str2enum(dpu_wl.input_0_layout),
@@ -73,10 +69,10 @@ def generate_model_input(args, wl_type=VPUNN_lib.DPUWorkload):
         wl.outputs = [
             VPUNN_lib.VPUTensor(
                 [
-                    dpu_wl.output_0_width,
-                    dpu_wl.output_0_height,
+                    dpu_wl.output_0_width if 'output_0_width' in args else int(((dpu_wl.input_0_width + (dpu_wl.kernel_pad_left + dpu_wl.kernel_pad_right) - (dpu_wl.kernel_width-1)-1)//dpu_wl.kernel_stride_width)+1),
+                    dpu_wl.output_0_height if 'output_0_height' in args else int(((dpu_wl.input_0_height + (dpu_wl.kernel_pad_top + dpu_wl.kernel_pad_bottom) - (dpu_wl.kernel_height-1)-1)//dpu_wl.kernel_stride_height)+1),
                     dpu_wl.output_0_channels,
-                    dpu_wl.output_0_batch,
+                    1,
                 ],
                 str2enum(dpu_wl.output_0_datatype),
                 str2enum(dpu_wl.output_0_layout),

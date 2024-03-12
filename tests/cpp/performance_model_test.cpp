@@ -15,6 +15,7 @@
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 /// @brief tests for performance.h
 class TestVPUNNPerformanceModel : public ::testing::Test {
@@ -62,18 +63,6 @@ TEST_F(TestVPUNNPerformanceModel, ArchTest2_7_BasicAssertions) {
                     1300.0f / 27000.0f);
 }
 
-TEST_F(TestVPUNNPerformanceModel, ArchTest4_0_BasicAssertions) {
-    const auto device = VPUNN::VPUDevice::VPU_4_0;
-
-    EXPECT_EQ(input_channels_mac(device), 8u);
-    EXPECT_EQ(get_nr_ppe(device), 64u);
-    EXPECT_EQ(get_nr_macs(device), 2048u);
-    EXPECT_EQ(get_dpu_fclk(device), 1700u);
-    EXPECT_FLOAT_EQ(get_bandwidth_cycles_per_bytes(VPUNN::VPUTensor({56, 56, 64, 1}, VPUNN::DataType::UINT8), device,
-                                                   VPUNN::MemoryLocation::DRAM),
-                    1700.0f / 45000.0f);
-}
-
 TEST_F(TestVPUNNPerformanceModel, BITC2_7_BasicAssertions) {
     const auto device = VPUNN::VPUDevice::VPU_2_7;
     const auto tensor = VPUNN::VPUTensor({56, 56, 64, 1}, VPUNN::DataType::UINT8);
@@ -91,6 +80,21 @@ TEST_F(TestVPUNNPerformanceModel, Permute_2_7_BasicAssertions) {
                     0.5f * 1300.0f / 975.0f);
     EXPECT_FLOAT_EQ(get_bandwidth_cycles_per_bytes(tensor_uint8, device, VPUNN::MemoryLocation::CMX, false, true),
                     1.0f * 1300.0f / 975.0f);
+}
+
+TEST_F(TestVPUNNPerformanceModel, LatencyTests) {
+    // tests to prove compiletime calculations of constants
+    static_assert(get_DMA_latency(VPUDevice::VPU_2_7, MemoryLocation::DRAM) == 1242,
+                  "latency should be compile time available");
+    static_assert(get_DMA_latency(VPUDevice::VPU_2_7, MemoryLocation::CMX) == 21,
+                  "latency should be compile time available");
+
+    EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_2_7, MemoryLocation::DRAM), 1242);  // 956ns @1300Mhz
+    EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_2_7, MemoryLocation::CMX), 21);     // 16 cyc @ 975MHZ => 21.x @1300
+
+    // 2.0 not supported
+    EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_2_0, MemoryLocation::DRAM), 0);
+    EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_2_0, MemoryLocation::CMX), 0);
 }
 
 }  // namespace VPUNN_unit_tests
