@@ -34,7 +34,7 @@ inline constexpr unsigned int get_dpu_fclk(VPUDevice device) {
         return 850;
     case VPUDevice::VPU_2_7:
         return 1300;
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 1700;
     default:
         return 700;
@@ -55,7 +55,7 @@ inline constexpr unsigned int get_cmx_fclk(VPUDevice device) {
         return 850;
     case VPUDevice::VPU_2_7:
         return 975;
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 975;
     default:
         return 700;
@@ -74,7 +74,7 @@ inline constexpr unsigned int get_cmx_word_size_bytes(VPUDevice device) {
     case VPUDevice::VPU_2_1:
     case VPUDevice::VPU_2_7:
         return 16;
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 32;
     default:
         return 16;
@@ -94,7 +94,7 @@ inline constexpr unsigned int get_dpu_cmx_num_read_ports(VPUDevice device) {
         return 4;  // RO
     case VPUDevice::VPU_2_7:
         return 8;  // RO
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 8;  // 4x RO, 4x RW
     default:
         return 8;
@@ -114,7 +114,7 @@ inline constexpr float get_dram_bandwidth_MBps(VPUDevice device) {
         return 20000.0f;
     case VPUDevice::VPU_2_7:
         return 27000.0f;
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 45000.0f;
     default:
         return 1;
@@ -210,8 +210,8 @@ inline constexpr CyclesInterfaceType get_DMA_latency(VPUDevice device, MemoryLoc
 
         return (location == MemoryLocation::DRAM) ? dram_DPUCycles : cmx_DPUCycles;
     } break;
-    case VPUDevice::VPU_RESERVED: {
-        constexpr VPUDevice const_device{VPUDevice::VPU_RESERVED};
+    case VPUDevice::VPU_4_0: {  //@todo: update for VPU4.0 actual latency (now a clone of 2.7)
+        constexpr VPUDevice const_device{VPUDevice::VPU_4_0};
         constexpr int dramLatency_Nanoseconds{956};   // nanoseconds
         constexpr int cmxLatency_CMXClockCycles{16};  // 16 clock cycles at VPU frequency
 
@@ -240,7 +240,7 @@ inline constexpr unsigned int get_nr_macs(VPUDevice device) {
     case VPUDevice::VPU_2_1:
         return 256;
     case VPUDevice::VPU_2_7:
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 2048;
     default:
         return 2048;
@@ -275,7 +275,7 @@ inline constexpr unsigned int get_nr_ppe(VPUDevice device) {
     case VPUDevice::VPU_2_1:
         return 16;
     case VPUDevice::VPU_2_7:
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 64;
     default:
         return 64;
@@ -684,7 +684,7 @@ inline constexpr int get_dma_ports(VPUDevice device) {
         return 2;
     case VPUDevice::VPU_2_7:
         return 2;
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return 2;
     default:
         return 1;

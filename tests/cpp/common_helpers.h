@@ -23,6 +23,10 @@
 #define VPU_2_0_MODEL_PATH "../../../models/vpu_2_0.vpunn"
 #endif
 
+#ifndef VPU_4_0_MODEL_PATH
+#define VPU_4_0_MODEL_PATH VPU_2_7_MODEL_PATH
+#endif
+
 namespace VPUNN_unit_tests {
 
 /// @brief class to help extracting paths and names of neural network model

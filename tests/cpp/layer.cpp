@@ -22,6 +22,7 @@ protected:
 
     VPUNN::VPULayerCostModel model_2_0{VPU_2_0_MODEL_PATH};
     VPUNN::VPULayerCostModel model_2_7{VPU_2_7_MODEL_PATH};
+    VPUNN::VPULayerCostModel model_4_0{VPU_4_0_MODEL_PATH};
 
     void SetUp() override {
         VPUNN::Logger::clear2ndlog();
@@ -39,6 +40,8 @@ protected:
             return model_2_0;
         case VPUDevice::VPU_2_7:
             return model_2_7;
+        case VPUDevice::VPU_4_0:
+            return model_4_0;
         default:
             return model_invalid;
             break;
@@ -256,6 +259,42 @@ TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply8641_VPU27) {
              "CLUSTERING , no memmove, with errors"},
             {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
              {NO_ERROR_EXPECTED, true, 37000, 38000},
+             "SOK , no memmove"},
+            {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
+             {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1U, 1U},
+             "SOH ,no memmove, with errors"},
+    };
+
+    executeTests(tests);
+}
+
+TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply8641_VPU40_mock) {
+    const VPUNN::DPULayer tst_layer(VPUNN::VPUDevice::VPU_4_0, VPUNN::Operation::CONVOLUTION,
+                                    {VPUNN::VPUTensor(14, 14, 512, 1, VPUNN::DataType::UINT8)},  // input dimensions
+                                    {VPUNN::VPUTensor(7, 7, 512, 1, VPUNN::DataType::UINT8)},    // output dimensions
+                                    {3, 3},                                                      // kernels
+                                    {2, 2},                                                      // strides
+                                    {1, 0, 1, 0}                                                 // padding
+    );
+
+    const VPUNN::VPULayerStrategy tst_strategy{1U,    1U,    2U /*tiles*/, VPUNN::VPUTilingStrategy::NONE,
+                                               false, false, true};  // prefetching  true = only DPU data, no DMA.
+
+    {  // SOH
+        TestInput tin{tst_layer, tst_strategy};
+        tin.strategy.tiling_strategy = VPUNN::VPUTilingStrategy::SOH;
+
+        TestExpectations texp{VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1U, 1U};
+
+        DoRegularTest(tin, texp, "SOH with errors");
+    }
+
+    const std::vector<TestCase> tests{
+            {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+             {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1U, 1U},
+             "CLUSTERING , no memmove, with errors"},
+            {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+             {NO_ERROR_EXPECTED, false, 37000, 38000},  // same values as for VPU27
              "SOK , no memmove"},
             {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, true}},
              {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1U, 1U},
@@ -2832,6 +2871,76 @@ TEST_F(VPULayerCM_InvestigationTest, RuntimeELT_CONV_SOH_SOK_EISW_98656) {
                                                   false, false, prefetch, detailed_split))
                 << tst_layer << strategy << cost_cyc;
         //       EXPECT_EQ(cost_cyc, 5) << tst_layer << toStringLayerSplitInfo(detailed_split);  //<<
+    }
+}
+
+TEST_F(VPULayerCM_InvestigationTest, MoreTiles_EISW_99246) {
+    const VPUNN::DPUWorkload wl_MXP_layer{
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::MAXPOOL,
+            {VPUNN::VPUTensor(112, 112, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(56, 56, 64, 1, VPUNN::DataType::UINT8)},    // output dimensions
+            {3, 3},                                                       // kernels
+            {2, 2},                                                       // strides
+            {1, 0, 1, 0},                                                 // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                           // execution mode
+            VPUNN::ActivationFunction::NONE,                              // activation
+            0.0F,                                                         // act_sparsity
+            0.0F,                                                         // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},           // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                    // output_swizzling
+            1,                                                            // output_write_tiles
+            {0, 0, 0, 0},                                                 // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                               // isi_strategy
+            false,                                                        // weight_sparsity_enabled
+    };
+
+    // const std::string altModelName(NameHelperNN::get_model_root() + "vpu_2_7-150.vpunn");
+    // VPULayerCostModel model_alternative{altModelName};
+    const bool prefetch{true};
+    VPULayerCostModel& theModel = model_4_0;
+
+    //{
+    //    const VPUNN::DPULayer tst_layer(wl_MXP_layer);
+
+    //    const std::vector<TestCase> tests{
+    //            {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, prefetch}},
+    //             {VPUNN::Cycles::NO_ERROR, true, 95000, 95000 + 10000},  //
+    //             "SOH , no memmove, "},
+    //            {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH, false, false, prefetch}},
+    //             {VPUNN::Cycles::NO_ERROR, true, 70000, 70000 + 10000},  //
+    //             "Clustering , no memmove, "},
+    //    };
+    //    executeTests(tests);
+    //}
+    const std::string nline{"\n ------------- NEW TEST------------------------------------ ------------------"};
+
+    // element wise
+    {
+        std::cout << nline;
+        VPUNN::DPULayer tst_layer(wl_MXP_layer);
+        const VPULayerStrategy strategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH, false, false, prefetch};
+
+        Logger::clear2ndlog();
+        CyclesInterfaceType cost_cyc{};
+        LayerSplitInfo detailed_split;
+        ASSERT_NO_THROW(cost_cyc = theModel.Layer(tst_layer, strategy.tiling_strategy, strategy.nDPUs, strategy.nTiles,
+                                                  false, false, prefetch, detailed_split))
+                << tst_layer << strategy << cost_cyc;
+        // EXPECT_EQ(cost_cyc, 1) << tst_layer << toStringLayerSplitInfo(detailed_split) << Logger::get2ndlog();
+    }
+    {
+        std::cout << nline;
+        VPUNN::DPULayer tst_layer(wl_MXP_layer);
+        const VPULayerStrategy strategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH, false, false, prefetch};
+
+        Logger::clear2ndlog();
+        CyclesInterfaceType cost_cyc{};
+        LayerSplitInfo detailed_split;
+        ASSERT_NO_THROW(cost_cyc = theModel.Layer(tst_layer, strategy.tiling_strategy, strategy.nDPUs, strategy.nTiles,
+                                                  false, false, prefetch, detailed_split))
+                << tst_layer << strategy << cost_cyc;
+        // EXPECT_EQ(cost_cyc, 2) << tst_layer << toStringLayerSplitInfo(detailed_split) << Logger::get2ndlog();
     }
 }
 

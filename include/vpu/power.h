@@ -104,7 +104,7 @@ private:
         const pf_lut_t pf_lut_l{
                 {VPUDevice::VPU_2_0, vpu_2_0_values},
                 {VPUDevice::VPU_2_7, vpu_2_7_values},
-                {VPUDevice::VPU_RESERVED, vpu_4_0_values},
+                {VPUDevice::VPU_4_0, vpu_4_0_values},
         };
 
         return pf_lut_l;
@@ -209,7 +209,7 @@ public:
             fp_to_int_ratio = 0.87f;  // this implies INT is more power hungry (=> power virus int  is the max!)
         else if (device == VPUDevice::VPU_2_7)
             fp_to_int_ratio = 1.3f;
-        else if (device == VPUDevice::VPU_RESERVED)
+        else if (device == VPUDevice::VPU_4_0)
             fp_to_int_ratio = 1.3f;
         else
             fp_to_int_ratio = 1.0f;

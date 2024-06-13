@@ -306,7 +306,7 @@ public:
             this->execution_order = inputs[0].is_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
             break;
         case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_RESERVED:
+        case VPUDevice::VPU_4_0:
             this->execution_order = ExecutionMode::CUBOID_16x16;
             break;
         default:
@@ -324,7 +324,7 @@ public:
             this->execution_order = inputs[0].is_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
             break;
         case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_RESERVED:
+        case VPUDevice::VPU_4_0:
             this->execution_order = ExecutionMode::CUBOID_16x16;
             break;
         default:
@@ -351,7 +351,7 @@ public:
         case VPUTilingStrategy::SOW:
         case VPUTilingStrategy::SOHW:
         default:
-            Logger::error() << "Unsupported strategy!";
+            Logger::error() << "Unsupported VPU4 strategy!";
             return clustering(nTiles);
         }
     }
@@ -371,7 +371,7 @@ public:
         case VPUTilingStrategy::SOW:
         case VPUTilingStrategy::SOHW:
         default:
-            Logger::error() << "Unsupported strategy!";
+            Logger::error() << "Unsupported VPU4 strategy!";
             return ISIStrategy::CLUSTERING;
         }
     }
@@ -583,7 +583,7 @@ public:
         case VPUDevice::VPU_2_1:
             return getValidExecutionMode_2_0(wl);
         case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_RESERVED:
+        case VPUDevice::VPU_4_0:
             return getValidExecutionMode_2_7(wl);
         default:
             return {};

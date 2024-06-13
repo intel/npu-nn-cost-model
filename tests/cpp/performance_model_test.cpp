@@ -63,6 +63,18 @@ TEST_F(TestVPUNNPerformanceModel, ArchTest2_7_BasicAssertions) {
                     1300.0f / 27000.0f);
 }
 
+TEST_F(TestVPUNNPerformanceModel, ArchTest4_0_BasicAssertions) {
+    const auto device = VPUNN::VPUDevice::VPU_4_0;
+
+    EXPECT_EQ(input_channels_mac(device), 8u);
+    EXPECT_EQ(get_nr_ppe(device), 64u);
+    EXPECT_EQ(get_nr_macs(device), 2048u);
+    EXPECT_EQ(get_dpu_fclk(device), 1700u);
+    EXPECT_FLOAT_EQ(get_bandwidth_cycles_per_bytes(VPUNN::VPUTensor({56, 56, 64, 1}, VPUNN::DataType::UINT8), device,
+                                                   VPUNN::MemoryLocation::DRAM),
+                    1700.0f / 45000.0f);
+}
+
 TEST_F(TestVPUNNPerformanceModel, BITC2_7_BasicAssertions) {
     const auto device = VPUNN::VPUDevice::VPU_2_7;
     const auto tensor = VPUNN::VPUTensor({56, 56, 64, 1}, VPUNN::DataType::UINT8);
@@ -95,6 +107,10 @@ TEST_F(TestVPUNNPerformanceModel, LatencyTests) {
     // 2.0 not supported
     EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_2_0, MemoryLocation::DRAM), 0);
     EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_2_0, MemoryLocation::CMX), 0);
+
+    // 4.0 not yet available
+    EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_4_0, MemoryLocation::DRAM), 1625);  // 956ns @1700Mhz
+    EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_4_0, MemoryLocation::CMX), 27);     // 16 cyc @ 975MHZ => 27.x @1700
 }
 
 }  // namespace VPUNN_unit_tests

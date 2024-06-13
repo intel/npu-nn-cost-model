@@ -37,7 +37,7 @@ using LayerOperationsBehaviour =
 /// @brief services for Layer validation
 class VPU_LayerValidator :
         public Behavior_Device_Mapping<LayerOperationsBehaviour,  // operations
-                                       VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU_RESERVED_LayerValidValues> {
+                                       VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU4_0_LayerValidValues> {
 protected:
 public:
     void check_layer_consistency(const DPUOperation& w, const IDeviceValidValues& config,

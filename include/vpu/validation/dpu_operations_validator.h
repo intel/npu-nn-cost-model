@@ -258,7 +258,7 @@ protected:
 /// configuration bundle for Workloads at the most atomic level. workloads that are to be subjected to DPU
 using OperationsContext =
         Behavior_Device_Mapping<OperationsBehaviour,  // operations
-                                VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues, VPU_RESERVED_WorkloadValidValues>;
+                                VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues, VPU4_0_WorkloadValidValues>;
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;
 

@@ -90,7 +90,7 @@ private:
     const ShaveSelector selector_20{VPUDevice::VPU_2_0, shaves_20_classic};
     const ShavePrioritySelector selector_27{VPUDevice::VPU_2_7, shaves_27_new,
                                             shaves_27_classic};  ///< special with 2 lists
-    const ShaveSelector selector_40{VPUDevice::VPU_RESERVED, shaves_40};
+    const ShaveSelector selector_40{VPUDevice::VPU_4_0, shaves_40};
 
     const ShaveSelector& getSelector(VPUDevice desired_device) const {
         switch (desired_device) {
@@ -101,7 +101,7 @@ private:
         case VPUNN::VPUDevice::VPU_2_7:
             return selector_27;
             break;
-        case VPUDevice::VPU_RESERVED:
+        case VPUDevice::VPU_4_0:
             return selector_40;
             break;
         default:

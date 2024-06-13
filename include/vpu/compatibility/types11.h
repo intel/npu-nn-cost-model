@@ -51,9 +51,9 @@ inline const EnumInverseMap& mapFromText() {
  * @brief VPU IP generations
  *
  */
-enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_RESERVED, __size };
+enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, __size };
 static const EnumMap VPUDevice_ToText{link(VPUDevice::VPU_2_0, "VPU_2_0"), link(VPUDevice::VPU_2_1, "VPU_2_1"),
-                                      link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_RESERVED, "VPU_RESERVED")};
+                                      link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_4_0, "VPU_4_0")};
 template <>
 inline const EnumMap& mapToText<VPUDevice>() {
     return VPUDevice_ToText;
@@ -282,8 +282,9 @@ protected:
 
         // for enums we must put here the equivalent version  from the target interface, not latest types
 
-        {  // device 4.0 is not supported for now we are mocking VPU_RESERVED with 2.7. This has to be removed when we have a
-            const auto device{workload.device == VPUDevice::VPU_RESERVED ? VPUDevice::VPU_2_7 : workload.device};
+        {  // device 4.0 is not supported for now we are mocking VPU_4_0 with 2.7. This has to be removed when we have a
+            // VPU4.0 trained NN
+            const auto device{workload.device == VPUDevice::VPU_4_0 ? VPUDevice::VPU_2_7 : workload.device};
 
             offset = this->insert<only_simulate>(intf_11::convert<intf_11::VPUDevice>(device), offset);
         }
