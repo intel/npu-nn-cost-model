@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef VPUNN_DEVICE_VALID_VALUES_VPU_RESERVED_H
-#define VPUNN_DEVICE_VALID_VALUES_VPU_RESERVED_H
+#ifndef VPUNN_DEVICE_VALID_VALUES_VPU4_H
+#define VPUNN_DEVICE_VALID_VALUES_VPU4_H
 
 #include <algorithm>
 #include <cstdint>
@@ -31,13 +31,13 @@
 
 namespace VPUNN {
 
-//////////////////////// 
-/// @brief reserved VPU configuration possibilities for workload, not layer
-class VPU_RESERVED_WorkloadValidValues : public IDeviceValidValues {
+//////////////////////// VPU 4.0  all
+/// @brief specific VPU 4.0 configuration possibilities for workload, not layer
+class VPU4_0_WorkloadValidValues : public IDeviceValidValues {
 private:
 public:
     /// constructor with link to operations dynamic behavior
-    VPU_RESERVED_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
+    VPU4_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
             : IDeviceValidValues(op_dynamic_constraints) {
         valid_execution_order = {
                 ExecutionMode::CUBOID_4x16,
@@ -58,7 +58,7 @@ public:
         };  //< not allowing INVALID, it is only for input_1 in particular conditions
 
         devices = {
-                VPUDevice::VPU_RESERVED,
+                VPUDevice::VPU_4_0,
         };
         cmx_KB_sizes = {{devices[0], ((512 + 1024) * 100) / 100}};  // memory increased with 0%
         output_write_tile_options = {1, 2, 3, 4, 5, 6, 7, 8};  // maybe only 1,2,4, is real limit? keep free for now
@@ -89,7 +89,7 @@ public:
     };
 
     Swizzling adapt_device_comaptible_swizzling(Swizzling swizz) const override {
-        return swizz;
+        return swizz;  // no change for VPU2.7 all swizzlings accepted
     };
 
 protected:
@@ -106,13 +106,13 @@ protected:
 };
 
 //////// LAYER UNSPLIT situation
-/// @brief reserved VPU configuration possibilities for  layer
-class VPU_RESERVED_LayerValidValues : public VPU_RESERVED_WorkloadValidValues {
+/// @brief specific VPU 4.0 configuration possibilities for  layer
+class VPU4_0_LayerValidValues : public VPU4_0_WorkloadValidValues {
 private:
 public:
     /// constructor with link to operations dynamic behavior
-    VPU_RESERVED_LayerValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
-            : VPU_RESERVED_WorkloadValidValues(op_dynamic_constraints) {
+    VPU4_0_LayerValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
+            : VPU4_0_WorkloadValidValues(op_dynamic_constraints) {
         input_heigth_start_factor_SOH = 2;
 
         // at layer level we are not limited like for workload level
@@ -159,14 +159,14 @@ protected:
 
 //////// LAYER SPLIT on tile  situation,
 
-/// @brief reserved VPU configuration possibilities for layer already split on tile.
+/// @brief specific VPU 4.0 configuration possibilities for  layer already split on tile.
 /// channels restrictions are less strict vs workload, since a further split is expected
-class VPU_RESERVED_LayerOnTileValidValues : public VPU_RESERVED_WorkloadValidValues {
+class VPU4_0_LayerOnTileValidValues : public VPU4_0_WorkloadValidValues {
 private:
 public:
     /// constructor with link to operations dynamic behavior
-    VPU_RESERVED_LayerOnTileValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
-            : VPU_RESERVED_WorkloadValidValues(op_dynamic_constraints) {
+    VPU4_0_LayerOnTileValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
+            : VPU4_0_WorkloadValidValues(op_dynamic_constraints) {
         // at layer level we are not limited like for workload level
         valid_input_channels = std::unordered_map<Operation, Channels>{
                 {Operation::CONVOLUTION, makeList(1, channels_max, 16)},     //

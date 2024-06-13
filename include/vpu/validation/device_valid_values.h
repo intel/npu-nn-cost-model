@@ -29,7 +29,7 @@
 #include "interface_valid_values.h"
 #include "vpu/types.h"
 
-#include "device_valid_values_reserved.h"
+#include "device_valid_valuesVPU4.h"
 
 namespace VPUNN {
 

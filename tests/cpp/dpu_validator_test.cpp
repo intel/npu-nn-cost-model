@@ -185,6 +185,35 @@ TEST_F(DPU_OperationValidator_Test, convolutionMemorySize_Test) {
     }
 }
 
+TEST_F(DPU_OperationValidator_Test, VPU40_presence_Test) {
+    const VPUNN::DPUWorkload wl_ref{
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::ELTWISE,
+            {VPUNN::VPUTensor(56, 56, 256, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(56, 56, 256, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {1, 1},                                                      // kernels
+            {1, 1},                                                      // strides
+            {0, 0, 0, 0},                                                // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                          // execution mode
+            VPUNN::ActivationFunction::NONE,                             // activation
+            0.0F,                                                        // act_sparsity
+            0.0F,                                                        // weight_sparsity
+            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},          // input_swizzling
+            {VPUNN::Swizzling::KEY_0},                                   // output_swizzling
+            1,                                                           // output_write_tiles
+            {0, 0, 0, 0},                                                // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                              // isi_strategy
+            false,                                                       // weight_sparsity_enabled
+    };
+
+    // elemntwise has in-place output, so no output contribution to total cmx size
+
+    {  // no ISI strategy
+        auto wl{wl_ref};
+        EXPECT_TRUE(dut.is_supported(wl.device));
+    }
+}
+
 class DPU_WorkloadValidatorTest : public ::testing::Test {
 public:
 protected:
@@ -197,6 +226,31 @@ private:
 TEST_F(DPU_WorkloadValidatorTest, basicCheckerTest) {
     VPUNN::DPU_OperationSanitizer dut;
     VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_7};
+    VPUNN::SanityReport sane;
+    {
+        VPUNN::DPUWorkload wl = {
+                device_req,
+                VPUNN::Operation::CONVOLUTION,
+                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
+                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+                {12, 1},                                                    // kernels
+                {1, 1},                                                     // strides
+                {1, 1, 1, 1},                                               // padding
+                VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+        };
+
+        dut.check_data_consistency(wl, sane);
+
+        // ASSERT_EQ(sane.value(), VPUNN::Cycles::NO_ERROR)<<sane.value();
+        ASSERT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_INVALID_INPUT_CONFIGURATION))
+                << sane.info << "\n error is : " << VPUNN::Cycles::Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+    }
+}
+
+TEST_F(DPU_WorkloadValidatorTest, basicCheckerTest_VPU40) {
+    VPUNN::DPU_OperationSanitizer dut;
+    VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_4_0};
     VPUNN::SanityReport sane;
     {
         VPUNN::DPUWorkload wl = {

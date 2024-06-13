@@ -79,6 +79,7 @@ add_executable(
 )
 target_compile_definitions(test_cost_model PRIVATE VPU_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_2_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_0.vpunn")
+target_compile_definitions(test_cost_model PRIVATE VPU_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn")
 
 add_dependencies(test_cost_model cpp_schema)
 target_link_libraries(

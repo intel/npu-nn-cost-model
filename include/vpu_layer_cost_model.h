@@ -723,7 +723,7 @@ public:
         case VPUDevice::VPU_2_1:
         case VPUDevice::VPU_2_7:
             return {VPUTilingStrategy::NONE, VPUTilingStrategy::SOH, VPUTilingStrategy::SOK};
-        case VPUDevice::VPU_RESERVED:
+        case VPUDevice::VPU_4_0:
             return {VPUTilingStrategy::NONE, VPUTilingStrategy::SOH,  VPUTilingStrategy::SOK,
                     VPUTilingStrategy::SOW,  VPUTilingStrategy::SOHW, VPUTilingStrategy::SOHK};
         default:

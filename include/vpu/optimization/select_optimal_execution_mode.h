@@ -59,7 +59,7 @@ ExecutionMode select_optimal_nthw_ntk(VPUCostModel& model, const DPULayer& layer
                                       const std::vector<ExecutionMode>& available_modes = {
                                               ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_4x16,
                                               ExecutionMode::CUBOID_8x16}) {
-    if (layer.device != VPUDevice::VPU_2_7 && layer.device != VPUDevice::VPU_RESERVED) {
+    if (layer.device != VPUDevice::VPU_2_7 && layer.device != VPUDevice::VPU_4_0) {
         Logger::error() << "Invalid VPU device type. Only 2.7 and 4.0 available";
     }
 
@@ -73,7 +73,7 @@ ExecutionMode select_optimal_execution_mode(VPUCostModel& model, const DPULayer&
     case VPUDevice::VPU_2_1:
         return select_optimal_grid(model, layer);
     case VPUDevice::VPU_2_7:
-    case VPUDevice::VPU_RESERVED:
+    case VPUDevice::VPU_4_0:
         return select_optimal_nthw_ntk(model, layer);
     default:
         Logger::error() << "Invalid VPU device type";

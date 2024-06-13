@@ -76,7 +76,7 @@ def define_and_parse_args():
         "--device",
         "-d",
         type=str,
-        choices=["VPU_2_0", "VPU_2_1", "VPU_2_7"],
+        choices=["VPU_2_0", "VPU_2_1", "VPU_2_7", "VPU_4_0"],
         help="The VPU IP device",
     )
     parser.add_argument(

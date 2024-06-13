@@ -55,7 +55,7 @@ EMSCRIPTEN_BINDINGS(vpunn) {
             .value("VPU_2_0", VPUDevice::VPU_2_0)
             .value("VPU_2_1", VPUDevice::VPU_2_1)
             .value("VPU_2_7", VPUDevice::VPU_2_7)
-            .value("VPU_RESERVED", VPUDevice::VPU_RESERVED);
+            .value("VPU_4_0", VPUDevice::VPU_4_0);
     enum_<DataType>("DataType")
             .value("UINT8", DataType::UINT8)
             .value("INT8", DataType::INT8)

@@ -34,6 +34,7 @@ protected:
                                   {1, 1, 1, 1},                                               // padding
                                   VPUNN::ExecutionMode::CUBOID_16x16};
     VPUNN::DPUWorkload wl_glob_20;
+    VPUNN::DPUWorkload wl_glob_40;
 
     VPUNN::VPUCostModel model{};
 
@@ -41,6 +42,9 @@ protected:
         wl_glob_20 = wl_glob_27;
         wl_glob_20.device = VPUNN::VPUDevice::VPU_2_0;
         wl_glob_20.execution_order = VPUNN::ExecutionMode::MATRIX;
+
+        wl_glob_40 = wl_glob_27;
+        wl_glob_40.device = VPUNN::VPUDevice::VPU_4_0;
     }
 
     auto read_a_file(const std::string filename) const {
@@ -1094,6 +1098,65 @@ TEST_F(TestCostModel, InitAspects) {
     }
 }
 
+TEST_F(TestCostModel, Mock_40_vs_VPU27_DPU) {
+    {  // 27 and 40
+        VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+        EXPECT_TRUE(model_2_7.nn_initialized());
+        VPUNN::VPUCostModel model_4_0{VPU_2_7_MODEL_PATH};
+        EXPECT_TRUE(model_4_0.nn_initialized());
+
+        auto cycles_27 = model_2_7.DPU(wl_glob_27);
+        auto cycles_40 = model_4_0.DPU(wl_glob_40);
+
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_27));
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_40));
+
+        EXPECT_EQ(cycles_27, cycles_40) << wl_glob_27 << wl_glob_40;
+    }
+    {  // garbage data/no file
+        const std::string model_path = "NoFileHere.vpunn";
+        VPUNN::VPUCostModel model_2_7{model_path};
+        EXPECT_FALSE(model_2_7.nn_initialized());
+        VPUNN::VPUCostModel model_4_0{model_path};
+        EXPECT_FALSE(model_4_0.nn_initialized());
+
+        auto cycles_27 = model_2_7.DPU(wl_glob_27);
+        auto cycles_40 = model_4_0.DPU(wl_glob_40);
+
+        EXPECT_EQ(cycles_27, 3445);  // theoretical, but at 1300MHz
+        EXPECT_EQ(cycles_40, 3445);  // theoretical, but at 1700MHz
+    }
+}
+
+TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
+    const auto ratio_27per40 = (float)get_dpu_fclk(VPUDevice::VPU_2_7) /
+                               (float)get_dpu_fclk(VPUDevice::VPU_4_0);  //[cycles27/cycles40] is the unit
+    {                                                                    // DMA
+        const std::string model_path = "NoFileHere.vpunn";
+        VPUNN::VPUCostModel model_2_7{model_path};
+        VPUNN::VPUCostModel model_4_0{model_path};
+
+        auto cycles_27_DtoC = model_2_7.DMA(wl_glob_27.device, wl_glob_27.inputs[0], wl_glob_27.outputs[0],
+                                            MemoryLocation::DRAM, MemoryLocation::CMX);
+        auto cycles_40_DtoC = model_4_0.DMA(wl_glob_40.device, wl_glob_40.inputs[0], wl_glob_40.outputs[0],
+                                            MemoryLocation::DRAM, MemoryLocation::CMX);
+
+        EXPECT_GT(cycles_27_DtoC, (cycles_40_DtoC * ratio_27per40));  // 2.7 is slower
+        EXPECT_EQ(cycles_27_DtoC, 3658);                              // theoretical DMA
+        EXPECT_EQ(cycles_40_DtoC, 4359);                              // theoretical DMA
+
+        auto cycles_27_CtoD = model_2_7.DMA(wl_glob_27.device, wl_glob_27.inputs[0], wl_glob_27.outputs[0],
+                                            MemoryLocation::CMX, MemoryLocation::DRAM);
+        auto cycles_40_CtoD = model_4_0.DMA(wl_glob_40.device, wl_glob_40.inputs[0], wl_glob_40.outputs[0],
+                                            MemoryLocation::CMX, MemoryLocation::DRAM);
+
+        EXPECT_GT(cycles_27_CtoD, (cycles_40_CtoD * ratio_27per40));  // 2.7 is slower
+
+        EXPECT_EQ(cycles_27_CtoD, 3658);  // theoretical DMA
+        EXPECT_EQ(cycles_40_CtoD, 4359);  // theoretical DMA
+    }
+}
+
 TEST_F(TestCostModel, ComaparativeRuns) {
     const std::string model_path = VPU_2_0_MODEL_PATH;
 
@@ -1245,6 +1308,19 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
         EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
     }
+    {  // 40
+        const DPUWorkload wl{wl_glob_40};
+        const std::string modelFile{VPU_4_0_MODEL_PATH};
+
+        VPUNN::VPUCostModel test_model{modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+        auto cycles_dpu = test_model.DPU(wl);
+        auto cycles_Pack = test_model.DPUInfo(wl);
+
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_dpu));
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
+        EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+    }
 }
 TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 20
@@ -1268,6 +1344,24 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 27
         const DPUWorkload wl_device{wl_glob_27};
         const std::string modelFile{VPU_2_7_MODEL_PATH};
+        constexpr unsigned int n_workloads = 100;
+
+        auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
+        std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(wl_device.device));
+
+        VPUNN::VPUCostModel test_model{modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+
+        for (const auto& wl : workloads) {
+            auto cycles_dpu = test_model.DPU(wl);
+            DPUInfoPack cycles_Pack;
+            ASSERT_NO_THROW(cycles_Pack = test_model.DPUInfo(wl)) << wl;
+            EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+        }
+    }
+    {  // 40
+        const DPUWorkload wl_device{wl_glob_40};
+        const std::string modelFile{VPU_4_0_MODEL_PATH};
         constexpr unsigned int n_workloads = 100;
 
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
