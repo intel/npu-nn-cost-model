@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -96,6 +96,33 @@ TEST_F(SamplerTest, DecreasingDistributionTest) {
     //  std::cout << "\n";
 
     // expect decreasing probability
+    EXPECT_GT(histo[0], histo[1]) << " Seed: " << sampler.get_seed();
+    EXPECT_GT(histo[1], histo[2]) << " Seed: " << sampler.get_seed();
+    EXPECT_GT(histo[2], *(histo.cend() - 1)) << " Seed: " << sampler.get_seed();
+}
+
+TEST_F(SamplerTest, SmartRanges_DecreasingDistributionTest) {
+    VPUNN::Sampler sampler;
+    SmartRanges range{16, 8192, 16};
+    const int samples{1000};
+
+    std::vector<int> genout;
+    for (int n = 0; n < samples; ++n) {
+        auto g = sampler.sample_list_decrease_prob(range);
+        genout.push_back(g);
+    }
+
+    // lets count them
+
+    std::vector<int> histo;
+    std::string text = "";
+    for (auto i = range.getLowerBound(); i < range.getUpperBound(); i++) {
+        if (range.is_in(i, text)) {
+            const int num_items = static_cast<int>(std::count(genout.cbegin(), genout.cend(), i));
+            histo.push_back(num_items);
+        }
+    }
+
     EXPECT_GT(histo[0], histo[1]) << " Seed: " << sampler.get_seed();
     EXPECT_GT(histo[1], histo[2]) << " Seed: " << sampler.get_seed();
     EXPECT_GT(histo[2], *(histo.cend() - 1)) << " Seed: " << sampler.get_seed();
@@ -425,5 +452,94 @@ TEST_F(LayersValidationTest, basicLayerValidatorTest) {
         }
     }
 }
+
+
+// here we want to see the behavior of check_layer_consistency() function when layer have bigger weight, height or/and
+// channels than we normally accept now we should accept W,H bigger than we normally do at high/layer level because we
+// will handle possible problems regarding these situations at lower levels (split layers and workloads)
+TEST_F(LayersValidationTest, Check_layer_with_big_shape) {
+    auto generate_wl = [](unsigned int w, unsigned int h, unsigned int c) {
+        DPUWorkload wl{
+                VPUDevice::VPU_4_0,
+                Operation::CONVOLUTION,
+                {VPUTensor(w, h, c, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
+                {VPUTensor(w, h, c, 1, DataType::UINT8, Layout::ZXY)},  // output dimensions
+                {1, 1},                                                 // kernels
+                {1, 1},                                                 // strides
+                {0, 0, 0, 0},                                           // padding
+                ExecutionMode::CUBOID_16x16,                            // execution mode
+        };
+        DPULayer wl_(wl);
+        return wl_;
+    };
+
+    LayersValidation dut;
+
+    struct TestInput {
+        const DPULayer wl;
+        ISIStrategy strategy;
+        unsigned int nTiles;
+        VPUTilingStrategy t_str;
+    };
+
+    struct TestExpectation {
+        CyclesInterfaceType err_expected;
+    };
+
+    struct TestCase {
+        TestInput t_in;
+        TestExpectation t_exp;
+        const std::string test_case = "";
+    };
+
+    using TestsVector = std::vector<TestCase>;
+    //big weight
+    auto lambda=[&dut](TestsVector &tests){
+       SanityReport sane;
+   
+
+       for (auto& t : tests) {
+           std::cout << t.test_case <<" "<<VPUTilingStrategy_ToText.at(static_cast<int>(t.t_in.t_str))<< "\n";
+
+            dut.check_completeLayer_consistency(t.t_in.wl, sane, t.t_in.strategy, t.t_in.nTiles, t.t_in.t_str);
+
+            EXPECT_EQ(sane.value(), V(t.t_exp.err_expected))
+                    << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n";
+       }
+    };
+
+    TestsVector tests = {
+            // clang-format off
+            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOW},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W, one tile"},
+            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOW},{Cycles::NO_ERROR}, "Big W, 2 tile"},
+
+            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W, one tile"},
+            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W, 2 tiles"},
+
+
+            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOH_Overlapped},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big H, one tile"},
+            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOH_Overlapped},{Cycles::NO_ERROR}, "Big H, 2 tiles"},
+
+            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOH_HaloRead},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big H, one tile"},
+            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHK},{Cycles::NO_ERROR}, "Big H, 2 tiles"},
+
+            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big C, one tile"},
+            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOK},{Cycles::NO_ERROR}, "Big C, 2 tiles"},
+
+            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOH_Overlapped},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big C, one tile"},
+            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOW},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big C, 2 tiles"},
+
+            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
+            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHW},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
+            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOH_Overlapped},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
+            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOK_NO_BROADCAST},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
+                                                                         
+            {{generate_wl(16, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHK},{Cycles::NO_ERROR}, "Big H,C, 2 tiles"},
+            {{generate_wl(16000, 16000, 32), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHW},{Cycles::NO_ERROR}, "Big W, H 2 tiles"},
+             // clang-format on
+    };
+
+    lambda(tests);
+    }
 
 }  // namespace VPUNN_unit_tests

@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,6 +11,11 @@
 
 namespace VPUNN {
 
+// VPU split constants
+constexpr unsigned int DEFAULT_ZTILE_VALUE = 16;
+constexpr unsigned int MIN_VALID_ZTILE_EXPONENT = 4;
+constexpr unsigned int MAX_VALID_ZTILE_EXPONENT = 8;
+
 /**
  * @brief Infers input shape from a DPU workload and its original layer. It modify the DPUWorkload
  *
@@ -18,14 +23,19 @@ namespace VPUNN {
  * part of the originalLayer but split on  one or more DPUs
  * @param originalLayer the DPULayer that is the source of the workloads split on one or more DPU's
  */
-void inferInputTensorShape(DPUWorkload& wl, const DPULayer& originalLayer) {
-    // const auto layout = originalLayer.inputs[0].get_layout(); //redundant?
-    // const auto dtype = originalLayer.inputs[0].get_dtype();//redundant?
+static void inferInputTensorShape(DPUWorkload& wl, const DPULayer& originalLayer) {
+    // const auto input_width = (wl.outputs[0].width() - 1) * wl.strides[Dim::Grid::W] + wl.kernels[Dim::Grid::W] -
+    //                         wl.padding[Dim::Padding::LEFT] - wl.padding[Dim::Padding::RIGHT];
+    // const auto input_height = (wl.outputs[0].height() - 1) * wl.strides[Dim::Grid::H] + wl.kernels[Dim::Grid::H] -
+    //                          wl.padding[Dim::Padding::TOP] - wl.padding[Dim::Padding::BOTTOM];
 
-    const auto input_width = (wl.outputs[0].width() - 1) * wl.strides[Dim::Grid::W] + wl.kernels[Dim::Grid::W] -
-                             wl.padding[Dim::Padding::LEFT] - wl.padding[Dim::Padding::RIGHT];
-    const auto input_height = (wl.outputs[0].height() - 1) * wl.strides[Dim::Grid::H] + wl.kernels[Dim::Grid::H] -
-                              wl.padding[Dim::Padding::TOP] - wl.padding[Dim::Padding::BOTTOM];
+    const auto input_width = helper_input_dim(wl.outputs[0].width(), wl.kernels[Dim::Grid::W],
+                                              wl.padding[Dim::Padding::LEFT] + wl.padding[Dim::Padding::RIGHT],
+                                              wl.strides[Dim::Grid::W]);
+
+    const auto input_height = helper_input_dim(wl.outputs[0].height(), wl.kernels[Dim::Grid::H],
+                                               wl.padding[Dim::Padding::TOP] + wl.padding[Dim::Padding::BOTTOM],
+                                               wl.strides[Dim::Grid::H]);
 
     // the workload can be a result of HW split or Z split
     // for HW split the input channels remain unaffected (operation irrelevant)
@@ -46,10 +56,39 @@ void inferInputTensorShape(DPUWorkload& wl, const DPULayer& originalLayer) {
     const auto inputTensor =
             VPUTensor({input_width, input_height, input_channel, input_batch}, originalLayer.inputs[0]);
     wl.inputs[0] = inputTensor;
+
+    // sanitary limitation
+    {  // limit halo height
+        if (wl.halo.input_0_halo.top > (int)wl.inputs[0].height()) {
+            wl.halo.input_0_halo.top = (int)wl.inputs[0].height();
+        }
+        if (wl.halo.input_0_halo.bottom > (int)wl.inputs[0].height()) {
+            wl.halo.input_0_halo.bottom = (int)wl.inputs[0].height();
+        }
+    }
+    {  // limit width
+        if (wl.halo.input_0_halo.left > (int)wl.inputs[0].width()) {
+            wl.halo.input_0_halo.left = (int)wl.inputs[0].width();
+        }
+        if (wl.halo.input_0_halo.right > (int)wl.inputs[0].width()) {
+            wl.halo.input_0_halo.right = (int)wl.inputs[0].width();
+        }
+    }
+
+    {  // limit halo channels/depth
+        if (wl.halo.input_0_halo.front > (int)wl.inputs[0].channels()) {
+            wl.halo.input_0_halo.front = (int)wl.inputs[0].channels();
+        }
+        if (wl.halo.input_0_halo.back > (int)wl.inputs[0].channels()) {
+            wl.halo.input_0_halo.back = (int)wl.inputs[0].channels();
+        }
+    }
 }
 
-void Tiler::setWorkloadsMode(DPUWorkloads& workloads, const ExecutionMode mode, const DPULayer& originalLayer) {
-    for (auto& wl : workloads) {
+void ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(DPUWorkloadsWithCyclesSplit& workloads_split,
+                                                          const ExecutionMode mode,
+                                                          const DPULayer& originalLayer) {
+    for (auto& wl : workloads_split.workloads) {
         wl.execution_order = mode;
         inferInputTensorShape(wl, originalLayer);
     }
@@ -62,7 +101,7 @@ void Tiler::setWorkloadsMode(DPUWorkloads& workloads, const ExecutionMode mode, 
  * @param maxLimit the absolute maximum split value
  * @return std::vector<unsigned int>
  */
-std::vector<unsigned int> getSplitsFromRange(const unsigned int maxSplitRange, const unsigned int maxLimit) {
+static std::vector<unsigned int> getSplitsFromRange(const unsigned int maxSplitRange, const unsigned int maxLimit) {
     std::vector<unsigned int> splits;
     for (unsigned int idx = 0; idx < std::log2(maxSplitRange); idx++) {
         auto powIdx = static_cast<unsigned int>(std::pow(2, idx));
@@ -79,8 +118,9 @@ std::vector<unsigned int> getSplitsFromRange(const unsigned int maxSplitRange, c
  *
  * @param layer the DPULayer object to optimize
  */
-bool requireMaxZTile(const DPULayer& layer) {
-    if (layer.device == VPUDevice::VPU_2_7 || layer.device == VPUDevice::VPU_4_0) {
+static bool requireMaxZTile(const DPULayer& layer) {
+    if (layer.device == VPUDevice::VPU_2_7 || layer.device == VPUDevice::VPU_4_0 ||
+        layer.device == VPUDevice::NPU_RESERVED1 || layer.device == VPUDevice::NPU_RESERVED1_W) {
         if (layer.op == Operation::CM_CONVOLUTION || layer.op == Operation::MAXPOOL ||
             layer.op == Operation::DW_CONVOLUTION || layer.op == Operation::AVEPOOL) {
             return true;
@@ -89,13 +129,15 @@ bool requireMaxZTile(const DPULayer& layer) {
     return false;
 }
 
-std::list<DPUWorkloads> Tiler::split_tile_in_workloads(const ExecutionMode mode, const unsigned int nWorkloads) {
-    std::list<DPUWorkloads> splitPool;
+std::list<DPUWorkloadsWithCyclesSplit> ITilerAlgorithm::split_tile_in_workloads(const ExecutionMode mode,
+                                                                 const unsigned int nWorkloads) {
+    std::list<DPUWorkloadsWithCyclesSplit> splitPool;
     // Optimized for 1 workloads
     if (nWorkloads == 1) {
-        DPUWorkloads workloads{layer_on_tile};                    // same as original
-        Tiler::setWorkloadsMode(workloads, mode, layer_on_tile);  // computes also input tensor
-        splitPool.push_back(workloads);
+        DPUWorkloadsWithCyclesSplit workloads_split{{Cycles::NO_ERROR}, {layer_on_tile}};  // same as original
+        ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(workloads_split, mode,
+                                                             layer_on_tile);  // computes also input tensor
+        splitPool.push_back(workloads_split);
     } else {
         tileMultipleWl(splitPool, mode, nWorkloads);
     }
@@ -107,13 +149,13 @@ std::list<DPUWorkloads> Tiler::split_tile_in_workloads(const ExecutionMode mode,
  * @brief A Tiler child class that implement the ZTiling algorithm
  *
  */
-class ZTiling : public Tiler {
+class ZTiling : public ITilerAlgorithm {
 public:
     /**
      * @brief Using the Tiler class constructor
      *
      */
-    using Tiler::Tiler;
+    using ITilerAlgorithm::ITilerAlgorithm;
 
     /**
      * @brief Generate a valid pool of splits
@@ -141,8 +183,6 @@ public:
         std::vector<unsigned int> maxSplitsInZ;
         {
             std::vector<unsigned int> validZTiles;
-            // Note: refer the values from workload number pool implementation at
-            // https://github.com/intel-innersource/frameworks.ai.vpu.presilicon.fathom/blob/main/src/Controllers/WorkloadGen.py#L84
             // 2^4 equals to the CMX word size in bytes,  2^8 is an up bound to limit the number of splits
             for (unsigned int i = MIN_VALID_ZTILE_EXPONENT; i < MAX_VALID_ZTILE_EXPONENT; ++i) {
                 validZTiles.push_back(static_cast<unsigned int>(std::pow(2, i)));
@@ -178,7 +218,7 @@ public:
      * @param mode the MPE mode
      * @param nWorkloads the number of workloads to generate
      */
-    void tileMultipleWl(std::list<DPUWorkloads>& splitPool, const ExecutionMode mode,
+    void tileMultipleWl(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                         const unsigned int nWorkloads) override {
         // Some layers have a max size in Z by specification
         const auto validZTiles{requireMaxZTile(layer_on_tile) ? std::vector<unsigned int>({16, 32, 64})
@@ -195,13 +235,13 @@ public:
  * @brief A Tiler child class that implement the HWTiling algorithm
  *
  */
-class HWTiling : public Tiler {
+class HWTiling : public ITilerAlgorithm {
 public:
     /**
      * @brief Using the Tiler class constructor
      *
      */
-    using Tiler::Tiler;
+    using ITilerAlgorithm::ITilerAlgorithm;
 
     /**
      * @brief Generate a valid pool of splits
@@ -247,7 +287,7 @@ public:
      * @param mode the MPE mode
      * @param nWorkloads the number of workloads to generate
      */
-    virtual void tileMultipleWl(std::list<DPUWorkloads>& splitPool, const ExecutionMode mode,
+    virtual void tileMultipleWl(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                                 const unsigned int nWorkloads) override {
         // Get each pair of factor of nWorkloads (largest, smallest)
         for (const auto& factor : getFactors(nWorkloads)) {
@@ -271,7 +311,8 @@ protected:
      * @param heightFactor  the number of splits in the Y dimension
      * @param mode the selected ExecutionMode
      */
-    void tileOverHW(std::list<DPUWorkloads>& splitPool, const unsigned int widthFactor, const unsigned int heightFactor,
+    void tileOverHW(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const unsigned int widthFactor,
+                    const unsigned int heightFactor,
                     const ExecutionMode mode) {
         splitOverHW(layer_on_tile, splitPool, widthFactor, heightFactor, mode);
     }
@@ -313,7 +354,7 @@ public:
      * @param mode the MPE mode
      * @param nWorkloads the number of workloads to generate
      */
-    void tileMultipleWl(std::list<DPUWorkloads>& splitPool, const ExecutionMode mode,
+    void tileMultipleWl(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                         const unsigned int nWorkloads) override {
         tileOverHW(splitPool, 1, nWorkloads, mode);
     }
@@ -341,7 +382,7 @@ public:
      * @param mode the MPE mode
      * @param nWorkloads the number of workloads to generate
      */
-    void tileMultipleWl(std::list<DPUWorkloads>& splitPool, const ExecutionMode mode,
+    void tileMultipleWl(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                         const unsigned int nWorkloads) override {
         tileOverHW(splitPool, nWorkloads, 1, mode);
     }
@@ -351,18 +392,19 @@ public:
 };
 
 /**
- * @brief Return true if it is possible to tile over H and/or W dimension
+ * @brief Return true if it is possible to tile over H and/or W dimension.
+ * If number of DPU's (inside tile) is 1 and ZTiling is in list, than nothing else except ZTiling is permitted
+ * If the operation requires a max CHannel size (like 16) than HW tiling is not allowed
  *
  * @param layer the DPULayer object to optimize
  * @param options that control the tiling
- * @return true the layer support HWTiling
- * @return false the layer does not support HWTiling
+ * @returns true if the layer support HWTiling
  */
-bool isHWTilingAllowed(const DPULayer& layer, const SplitOptions& options) {
+static bool isHWTilingAllowed(const DPULayer& layer, const SplitOptions& options) {
     const auto& strategies = options.availableStrategies;
     if (options.nDPU == 1 &&
         std::find(strategies.begin(), strategies.end(), VPUSplitStrategy::Z_TILING) != strategies.end()) {
-        return false;  // WHY?
+        return false;  // WHY? ONly K tiling allowed on one DPU, no parallelism?
     }
 
     // If the layer require a max tile size in Z then only ZTiling is allowed
@@ -372,15 +414,18 @@ bool isHWTilingAllowed(const DPULayer& layer, const SplitOptions& options) {
 /**
  * @brief Get the Tiling Algorithms objects, These are intra tile algos (splitting to DPUWorkloads)
  */
-TilingAlgorithms getTilingAlgorithms(const DPULayer& layer, const SplitOptions& options) {
-    TilingAlgorithms algos;
+TilingAlgorithmsContainer getTilingAlgorithms(const DPULayer& layer, const SplitOptions& options) {
+    TilingAlgorithmsContainer algos;
+    // @todo: re-factor this to be more explicit; Like pass 1 , filter out not allowed strategies, step 2 create Tiling
+    // algorithms for allowed ones.
+
     for (auto strategy : options.availableStrategies) {
         switch (strategy) {
         case VPUSplitStrategy::Z_TILING:
             algos.push_back(std::make_unique<ZTiling>(layer, options.maxWorkloads));
             break;
         case VPUSplitStrategy::HW_TILING:
-            if (isHWTilingAllowed(layer, options))  // Z Tiling will inhibit HW on 1 dpu!  WHY??
+            if (isHWTilingAllowed(layer, options))  // Z Tiling will inhibit HW on 1 dpu
                 algos.push_back(std::make_unique<HWTiling>(layer, options.maxWorkloads));
             break;
         case VPUSplitStrategy::H_TILING:

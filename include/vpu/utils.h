@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -13,9 +13,12 @@
 #define UNUSED(expr) (void)(expr)
 
 #include <vpu/cycles_interface_types.h>
+#include <algorithm>
 #include <cassert>
+#include <functional>
+#include <numeric>
 #include <queue>
-#include "types.h"
+#include <vector>
 
 namespace VPUNN {
 
@@ -164,6 +167,7 @@ inline unsigned int helper_input_dim(unsigned int output, unsigned int kernel, u
 
     return input;
 }
+
 }  // namespace VPUNN
 
 #endif  // VPUNN_UTILS_H

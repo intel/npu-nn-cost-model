@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -37,7 +37,7 @@ if (${GENERATE_PYTHON_BINDING})
 
     # We use binder to generate the python bindings for VPUNN
     ExternalProject_Add(binder
-        GIT_REPOSITORY git@github.com:RosettaCommons/binder.git
+        GIT_REPOSITORY https://github.com/RosettaCommons/binder.git
         GIT_TAG v1.3.0
         SOURCE_DIR ${EXTERNAL_INSTALL_LOCATION}/binder/src
         BINARY_DIR ${EXTERNAL_INSTALL_LOCATION}/binder/build
@@ -65,7 +65,7 @@ if (${GENERATE_PYTHON_BINDING})
         ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
         --
         -x c++
-        -std=c++14
+        -std=c++17
         -I${CMAKE_CURRENT_SOURCE_DIR}
         -I${FLATBUFFERS_SRC_DIR}/include
         -I${CMAKE_VPUNN_BINARY_DIR}/include

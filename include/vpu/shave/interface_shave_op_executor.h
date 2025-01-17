@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -35,6 +35,9 @@ public:
         return operation_name;
     }
 
+    /// provides a string with details of implementation, name parameters, frequencies, etc
+    virtual std::string toString() const = 0;
+
 protected:
     /// @brief copy ctor, default like implementation
     ShaveOpExecutor(const std::string& name): operation_name(name) {
@@ -48,6 +51,21 @@ private:
 
     /// @brief the friend class can delete the instance
     friend class DeviceShaveContainer;
+
+public:  // extended interface
+    /**
+     * @brief Return the number of cycles of the sw operation considering that the nominal freq were altered with the
+     * passed ones as params
+     *
+     * @param w the workload descriptor. Some fields may be ignored . Eg even if the Device is not matching the one that
+     * the model was built for, it will run the estimation as if it had a good device in workload
+     * @param present_dpu_frq  the new DPU freq
+     * @param present_shv_frq the new shave (VPU) freq
+     *
+     * @return cycles in dpu frequency as specified by present_dpu_frq
+     */
+    virtual CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
+                                          const int present_shv_frq) const = 0;
 };
 
 }  // namespace VPUNN

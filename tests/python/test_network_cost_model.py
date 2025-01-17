@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -106,7 +106,7 @@ def generate_simple_network(n_layers, edge_pattern, tiling_strategy, config_inde
     "tiling_strategy",
     [
         VPUNN_lib.VPUTilingStrategy.NONE,
-        VPUNN_lib.VPUTilingStrategy.SOH,
+        VPUNN_lib.VPUTilingStrategy.SOH_Overlapped,
         VPUNN_lib.VPUTilingStrategy.SOK,
     ],
 )

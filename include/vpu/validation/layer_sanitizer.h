@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -16,7 +16,9 @@
 #include "vpu/types.h"
 
 #include "behaviors_and_devices_containers.h"
-#include "device_valid_values.h"
+#include "device_valid_valuesVPU2.h"
+#include "device_valid_valuesVPU2_7.h"
+#include "device_valid_valuesVPU4.h"
 #include "dpu_operations_valid_behaviours.h"
 #include "dpu_operations_validator.h"
 #include "vpu_layer_validator.h"
@@ -33,7 +35,7 @@ protected:
     /// configuration bundle for Workloads that are no finally split. Are just Layers on a Tile
     using SplitLayersContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations for workloads
                                                        VPU2_0_LayerOnTileValidValues, VPU2_7_LayerOnTileValidValues,
-                                                       VPU4_0_LayerOnTileValidValues>;
+                                    VPU4_0_LayerOnTileValidValues>;
     using DPU_SplitLayersValidator = DPU_ConfigurableOperationValidator<SplitLayersContext>;
     DPU_SplitLayersValidator splitLayer_validator;
 
@@ -43,8 +45,8 @@ public:
     }
 
     /// @brief checks the layer validity against the rules of an unsplit Layer
-    void check_completeLayer_consistency(const DPULayer& layer, SanityReport& result, ISIStrategy strategy,
-                                         unsigned int nTiles) const {
+    void check_completeLayer_consistency(const DPULayer& layer, SanityReport& result, ISIStrategy presumed_strategy,
+                                         unsigned int nTiles, VPUTilingStrategy strategy=VPUTilingStrategy::NONE) const {
         result.resetOK();  // all OK
         if (!layer_validator.is_supported(layer.device)) {
             result.mark_unknown_device();
@@ -54,19 +56,15 @@ public:
         const auto& config = layer_validator.get_config(layer.device);  // previous if prevents throwing
 
         try {
-            auto& operation_behaviour = config.get_specific_behaviour(layer.op);  // will throw if unknown op
-            DPUOperation w(layer);                                                // workload internal representation
-
-            w.set_intended_split(
-                    strategy,
-                    nTiles);  // here we remain with SOH even if we do SOHO because it is still a split , not clustering
-            // this has to be carefully redesigned when we get rid of ISI.
-
-            operation_behaviour.deduce_input_1(w.input_0, w.output_0, config, w.kernel, w.input_1);
+            DPUOperation w(layer, config);  // workload internal representation
+            w.set_intended_split(presumed_strategy,
+                                 nTiles);  // here we remain with SOH even if we do SOHO because it is still a split ,
+                                           // not clustering this has to be carefully redesigned when we get rid of ISI.
 
             // no memory size check?
 
-            layer_validator.check_layer_consistency(w, config, operation_behaviour, result);
+            auto& operation_behaviour = config.get_specific_behaviour(layer.op);  // will throw if unknown op
+            layer_validator.check_layer_consistency(w, nTiles, strategy, config, operation_behaviour, result);
 
         } catch (const std::runtime_error&) {
             result.mark_unknown_operation();  // most probably
@@ -83,9 +81,7 @@ public:
         const auto& config = splitLayer_validator.get_config(layer.device);  // previous if prevents throwing
 
         try {
-            auto& operation_behaviour = config.get_specific_behaviour(layer.op);  // will throw if unknown op
-            DPUOperation w(layer);                                                // workload internal representation
-            operation_behaviour.deduce_input_1(w.input_0, w.output_0, config, w.kernel, w.input_1);
+            const DPUOperation w(layer, config);  // workload internal representation (throws if bad op)
 
             const WorkloadMemorySizeCalculator memory_calculator;  // ignore cmx overhead
             const auto cmx_memory = memory_calculator.compute_memory(w, config);
@@ -100,6 +96,7 @@ public:
                        << "\n available : " << avaialable_cmx_memo << "\n";
                 result.info += buffer.str();
             } else {
+                auto& operation_behaviour = config.get_specific_behaviour(layer.op);
                 splitLayer_validator.check_workload_consistency(w, config, operation_behaviour, result);
             }
 

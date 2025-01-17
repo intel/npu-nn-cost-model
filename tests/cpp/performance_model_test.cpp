@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -111,6 +111,25 @@ TEST_F(TestVPUNNPerformanceModel, LatencyTests) {
     // 4.0 not yet available
     EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_4_0, MemoryLocation::DRAM), 1625);  // 956ns @1700Mhz
     EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_4_0, MemoryLocation::CMX), 27);     // 16 cyc @ 975MHZ => 27.x @1700
+}
+TEST_F(TestVPUNNPerformanceModel, TestGetProfilingClkMHz) {
+    EXPECT_FLOAT_EQ(get_profiling_clk_MHz(VPUDevice::VPU_2_0), 38.4f);
+    EXPECT_FLOAT_EQ(get_profiling_clk_MHz(VPUDevice::VPU_2_1), 38.4f);
+    EXPECT_FLOAT_EQ(get_profiling_clk_MHz(VPUDevice::VPU_2_7), 38.4f);
+    EXPECT_FLOAT_EQ(get_profiling_clk_MHz(VPUDevice::VPU_4_0), 38.4f / 2);
+
+    EXPECT_FLOAT_EQ(get_profiling_clk_MHz(VPUDevice::__size), 0);             // Test with an unknown device
+    EXPECT_FLOAT_EQ(get_profiling_clk_MHz(static_cast<VPUDevice>(9999)), 0);  // Test with an unknown device
+}
+
+TEST_F(TestVPUNNPerformanceModel, TestGetProfilingClkHz) {
+    EXPECT_EQ(get_profiling_clk_Hz(VPUDevice::VPU_2_0), 38400000);
+    EXPECT_EQ(get_profiling_clk_Hz(VPUDevice::VPU_2_1), 38400000);
+    EXPECT_EQ(get_profiling_clk_Hz(VPUDevice::VPU_2_7), 38400000);
+    EXPECT_EQ(get_profiling_clk_Hz(VPUDevice::VPU_4_0), 38400000 / 2);
+
+    EXPECT_EQ(get_profiling_clk_Hz(VPUDevice::__size), 0);             // Test with an unknown device
+    EXPECT_EQ(get_profiling_clk_Hz(static_cast<VPUDevice>(9999)), 0);  // Test with an unknown device
 }
 
 }  // namespace VPUNN_unit_tests

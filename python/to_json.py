@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -22,7 +22,6 @@ exec = "flatc "
 
 
 def cmd_exists(name):
-    # Source: https://stackoverflow.com/questions/11210104/check-if-a-program-exists-from-a-python-script
     """Check whether `name` is on PATH and marked as executable."""
     return which(name) is not None
 

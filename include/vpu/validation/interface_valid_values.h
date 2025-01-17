@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -26,6 +26,8 @@
 
 #include "data_dpu_operation.h"
 #include "interface_operations_behavior.h"
+#include "vpu/datatype_collection_size.h"
+#include "vpu/ranges.h"
 #include "vpu/types.h"
 
 namespace VPUNN {
@@ -34,7 +36,7 @@ namespace VPUNN {
 class ValidValuesInfrastructure {
 public:
     /// @brief creates a list , rule: [from ... to] * multiply
-    Values<int> makeList(int from, int to, int multiply = 1) const {
+    static Values<int> makeList(int from, int to, int multiply = 1) {
         const int counts = to - from + 1;
         Values<int> v(counts);
         std::generate(v.begin(), v.end(), [multiply, n = from]() mutable {
@@ -49,7 +51,7 @@ public:
     /// @returns true if the element was found in container
     template <class T>
     bool contains_value(const Values<T>& container, const T& element) const noexcept {
-        return std::find(container.begin(), container.end(), element) != container.end();
+        return std::find(container.cbegin(), container.cend(), element) != container.cend();
     }
 
 protected:
@@ -67,30 +69,80 @@ protected:
 /// has also a connection to the specific behavior interface that discriminated between operations
 class IDeviceValidValues : public ValidValuesInfrastructure {
 public:
+    IDeviceValidValues(const IDeviceValidValues&) noexcept(false) = default;
+    IDeviceValidValues& operator=(const IDeviceValidValues&) = delete;
+
+    IDeviceValidValues(IDeviceValidValues&&) noexcept(false) = default;
+    IDeviceValidValues& operator=(IDeviceValidValues&&) = delete;
+
     /// wrapper for accessing IContainer_OperationsDynamicBehavior
     const IOperationDynamicConstraints& get_specific_behaviour(const Operation op) const {
         return operations_dynamic_behavior.get_operation_specific_behaviour(op);
     }
 
+    /// @brief collection of possible datatypes for different in/outs and operations
+    class ValidDatatypes {
+    public:
+        // valid data types based on operations
+        std::unordered_map<Operation, const Values<DataType>> input_datatypes;
+        std::unordered_map<Operation, const Values<DataType>> output_datatypes;
+        std::unordered_map<Operation, const Values<DataType>> weights_datatypes;
+    };
+
 protected:
     const IContainer_OperationsDynamicBehavior& operations_dynamic_behavior;  ///< externally attached dynamic behavior
     /// @brief non public constructor for initializing the reference
-    IDeviceValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
-            : operations_dynamic_behavior{op_dynamic_constraints} {
+    IDeviceValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
+                       const Values<ExecutionMode>& valid_execution_order_,                 //
+                       const Values<Swizzling>& valid_swizzlings_,                          //
+                       const Values<Layout>& valid_layouts_,                                //
+                       const Values<VPUDevice>& devices_,                                   //
+                       const std::unordered_map<VPUDevice, int>& cmx_KB_sizes_,             //
+                       const Values<int>& output_write_tile_options_,                       //
+                       const Values<ISIStrategy>& isi_stategy_options_,                     //
+                       const int& weigths_alignment_,                                       //
+                       const int& input_heigth_start_factor_SOH_,                           //
+                       const IDeviceValidValues::ValidDatatypes& valid_datatypes,           //
+                       const Values<Operation>& valid_operations_                           //
+                       )
+            : operations_dynamic_behavior{op_dynamic_constraints},            //
+              valid_execution_order{valid_execution_order_},                  //
+              valid_swizzlings{valid_swizzlings_},                            //
+              valid_layouts{valid_layouts_},                                  //
+              devices{devices_},                                              //
+              cmx_KB_sizes{cmx_KB_sizes_},                                    //
+              output_write_tile_options{output_write_tile_options_},          //
+              isi_stategy_options{isi_stategy_options_},                      //
+              weigths_alignment{weigths_alignment_},                          //
+              input_heigth_start_factor_SOH{input_heigth_start_factor_SOH_},  //
+              valid_datatypes_map{valid_datatypes},
+              valid_operations{valid_operations_} {
     }
 
 protected:
+    /// Cannot be deleted by interface users
     virtual ~IDeviceValidValues() = default;
 
     // virtual operations or dynamic ranges based on ops
 public:
-    const Values<Operation>& get_valid_operations_range() const {
-        return valid_operations;
-    };
+    // return a SmartRanges that verify if a value matches
+    virtual SmartRanges get_input_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
+    virtual SmartRanges get_output_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
 
-    virtual const Channels& get_output_channels_range(const DPUOperation& dpu) const = 0;
+    const Values<DataType>& get_input_valid_datatypes(const DPUOperation& dpu) const {
+        const auto& ch_map{valid_datatypes_map.input_datatypes};
+        return ch_map.at(dpu.operation);
+    }
 
-    virtual const Channels& get_input_channels_range(const DPUOperation& dpu) const = 0;
+    const Values<DataType>& get_output_valid_datatypes(const DPUOperation& dpu) const {
+        const auto& ch_map{valid_datatypes_map.output_datatypes};
+        return ch_map.at(dpu.operation);
+    }
+
+    const Values<DataType>& get_weights_valid_datatypes(const DPUOperation& dpu) const {
+        const auto& ch_map{valid_datatypes_map.weights_datatypes};
+        return ch_map.at(dpu.operation);
+    }
 
     /// @brief CHanges tensor layouts to match the device convention (if possible). Useful for defaults
     virtual Layout adapt_device_comaptible_tensor_layout(Layout layout) const = 0;
@@ -109,6 +161,7 @@ public:
         const auto maxH{input_spatial_dim_max};
         return std::make_pair(minH, maxH);  // force by value for constexpr
     }
+    /// slow , only for generators
     Values<int> get_input_height_range(const DPUOperation& dpu) const {
         const auto interval{get_input_height_interval(dpu)};
         return makeList(interval.first, interval.second);
@@ -120,6 +173,8 @@ public:
         const auto maxW{input_spatial_dim_max};
         return std::make_pair(minW, maxW);  // force by value for constexpr
     }
+
+    /// slow , only for generators
     Values<int> get_input_width_range(const DPUOperation& dpu) const {
         const auto interval{get_input_width_interval(dpu)};
         return makeList(interval.first, interval.second);
@@ -135,7 +190,7 @@ public:
     }
 
     /// restricts ISI options based on output write tile value.
-    virtual Values<ISIStrategy> get_ISI_Strategy_Range(const DPUOperation& dpu) const noexcept {
+    virtual Values<ISIStrategy> get_ISI_Strategy_Range(const DPUOperation& dpu) const {
         Values<ISIStrategy> v{isi_stategy_options};
 
         if (dpu.output_write_tiles <= 1) {  // SOK must have broadcasting, not allowed without
@@ -182,6 +237,41 @@ public:
         const auto max_stride_h = max_stride_op;
         return std::make_pair(makeList(1, max_stride_w), makeList(1, max_stride_h));
     }
+    /// To use when generating new data
+    Swizzling get_default_swizzling() const {
+        return valid_swizzlings.back();  // return the last one as the one with highest swizzling
+    }
+
+    const Values<int>& get_output_write_tile_options() const {
+        return output_write_tile_options;
+    }
+
+    /// provides the default/nominal weights alignment for the device. Can be used in case we need to align the weights
+    /// TODO: unclear measurement unit, BYtes or samples?  Now it is interpreted as Samples
+    int get_specific_weigths_alignment() const {
+        return weigths_alignment;
+    }
+
+    const Values<Operation>& get_valid_operations() const {
+        return valid_operations;
+    };
+
+    const Values<ExecutionMode>& get_valid_execution_order() const {
+        return valid_execution_order;
+    }
+    const Values<Swizzling>& get_valid_swizzlings() const {
+        return valid_swizzlings;
+    }
+    const Values<Layout>& get_valid_layouts() const {
+        return valid_layouts;
+    }
+    const Values<VPUDevice>& get_devices() const {
+        return devices;
+    }
+
+    const Values<bool>& get_boolean_datatypes() const {
+        return boolean_datatypes;
+    }
 
 protected:
     /// @brief what's the maximum kernel size if operation is known?
@@ -194,69 +284,65 @@ protected:
         return (op == Operation::ELTWISE) ? 1 : stride_max;
     }
 
-    // restrictions described as data
+    // restrictions described as data, set in derived classes
+protected:
+    const Values<ExecutionMode> valid_execution_order;  ///< what executions order are permitted
+    const Values<Swizzling> valid_swizzlings;  ///< what swizzlings are permitted, ordered from least to most swizzling
+    const Values<Layout> valid_layouts;        ///< what layouts are permitted
+    const Values<VPUDevice> devices;           ///< devices covered with this instance
+
+    const std::unordered_map<VPUDevice, int> cmx_KB_sizes;  ///< size of CMX memory for each device
+
+    const Values<int> output_write_tile_options;  ///<
+    const Values<ISIStrategy> isi_stategy_options;
+
+    const int weigths_alignment{16};             ///< default alignment for weights,
+    const int input_heigth_start_factor_SOH{1};  ///<  to be set in derived implementations
+
+    const ValidDatatypes valid_datatypes_map;  ///< valid data types for each operation
+
+    const Values<Operation> valid_operations;  ///< valid operations for this device
+    // const fixed here
+private:
+    inline static const Values<bool> boolean_datatypes{true, false};
+
 public:
-    Values<ExecutionMode> valid_execution_order;  ///< what executions order are permitted
-
-    Values<Swizzling> valid_swizzlings;             ///< what swizzlings are permitted
-    Swizzling default_swizzling{Swizzling::KEY_0};  ///< what is the default swizzling
-
-    Values<Layout> valid_layouts;  ///< what layouts are permitted
-
-    Values<VPUDevice> devices;                        ///< devices covered with this instance
-    std::unordered_map<VPUDevice, int> cmx_KB_sizes;  ///< size of CMX memory for each device
-
-    const Values<DataType> quantized_datatypes{DataType::UINT8, DataType::INT8};
-    const Values<DataType> float_datatypes{DataType::FLOAT16, DataType::BFLOAT16};
-
-    const Values<DataType> valid_datatypes{concat(quantized_datatypes, float_datatypes)};
-
-    const Values<Operation> valid_operations{
-            Operation::CONVOLUTION,     //
-            Operation::DW_CONVOLUTION,  //
-            Operation::CM_CONVOLUTION,  //
-            Operation::ELTWISE,         //
-            Operation::MAXPOOL,         //
-    };
-
-    const Values<bool> boolean_datatypes{true, false};
-
     static constexpr int alignement_size_bytes{16384};  // 16KB
     static constexpr int cmx_memory_aligned_overhead{
             (80 * 1024)    // runtime size
             + (16 * 1024)  // hardware profile block (hwp)
     };
 
-    Values<int> output_write_tile_options;  ///<
-    Values<ISIStrategy> isi_stategy_options;
-
-    int input_heigth_start_factor_SOH{1};  ///<  to be set in derived implementations
-
 protected:
     static constexpr int input_spatial_dim_max{8192};  ///< 1-8K. MAX HW dim
-
-    static constexpr int channels_max{512};         ///< 128,512, etc: influences channels range,
-    static constexpr int cm_conv_channels_max{16};  ///< CM convolution is limited to C<=16 ,
+    static constexpr int cm_conv_channels_max{16};     ///< CM convolution is limited to C<=16 ,
 
     static constexpr int kernel_max{11};  ///< max nominal kernel size (hardware)
     static constexpr int stride_max{8};   ///< hardware limit to 8
-
-    static constexpr DataType default_quantized{DataType::UINT8};
-    static constexpr DataType default_float{DataType::FLOAT16};
 
     static constexpr float cmx_size_safety_factor{1.0};
 
     static constexpr int sparsity_block_size{32};  ///< here we use 32 instead of 16 to take into account SOK sparsity
 
+    /// the data type on the left will be mapped to the unique type on the right
+    inline static const std::map<const DataType, const DataType> datatypes_pair_and_default{
+            {DataType::INT8, DataType::UINT8},        //
+            {DataType::INT4, DataType::UINT4},        //
+            {DataType::INT2, DataType::UINT2},        //
+            {DataType::INT1, DataType::UINT1},        //
+            {DataType::BFLOAT16, DataType::FLOAT16},  //
+            {DataType::HF8, DataType::BF8},           //
+    };
+
 public:
-    /// @brief restrict the datatype normally to one per int range and one per float range
+    /// @brief restrict the datatype if it has an alternative type. eg INT8 is same like UINT8
     DataType restrict_datatype(const DataType in) const {
-        if (contains_value(quantized_datatypes, in)) {
-            return default_quantized;
-        } else if (contains_value(float_datatypes, in)) {
-            return default_float;
+        auto it = datatypes_pair_and_default.find(in);
+        if (it != datatypes_pair_and_default.end()) {  // found
+            return it->second;
+        } else {
+            return in;  // pass through if not mapped
         }
-        return default_quantized;
     }
 
     /// @brief size of CMX in bytes
@@ -273,9 +359,10 @@ public:
         return ((kernel_dim) / 2);  // 7->3,  8->4, 1->0, 2->1
     }
 
-    /// @ computes output dimension based on input, kernel, padding and stride
+    /// computes output dimension based on input, kernel, padding and stride (for a spatial dimension)
+    /// @returns zero if  kernel_stride is zero(avoids div by zero) else returns computed output dimension
     int compute_output_dim(int input, int pad, int pad_oppopsite, int kernel, int kernel_stride) const noexcept {
-        return (((input + (pad + pad_oppopsite) - (kernel - 1) - 1) / kernel_stride) + 1);
+        return ((0 == kernel_stride) ? 0 : (((input + (pad + pad_oppopsite) - (kernel - 1) - 1) / kernel_stride) + 1));
     }
 
     /// @brief computes the next larger value of x that is multiple of multiple
@@ -295,7 +382,7 @@ public:
 
     /// Adapt  padding
     /// Reference :
-    /// https://theano-pymc.readthedocs.io/en/latest/tutorial/conv_arithmetic.html#zero-padding-non-unit-strides
+    ///
     int check_trailing_padding(int in_dim, int out_dim, int leading_pad, int kernel_radix, int stride) const noexcept {
         const int pads = stride * (out_dim - 1) + kernel_radix - leading_pad - in_dim;
         return std::max(pads, 0);
@@ -306,13 +393,13 @@ public:
         const auto raw_size{compute_size_raw(elements_count, datatype)};
         const long long aligned_size{align_to(raw_size, alignement_size_bytes)};
         return aligned_size;
-    };
+    }
 
     /// @brief computes size without alignment
     long long compute_size_raw(const long long elements_count, const DataType& datatype) const noexcept {
-        const int datatype_size{static_cast<int>(dtype_to_bytes(datatype))};
-        return elements_count * datatype_size;
-    };
+        const auto size{compute_size_in_bytes(elements_count, datatype)};
+        return size;
+    }
 };
 
 }  // namespace VPUNN

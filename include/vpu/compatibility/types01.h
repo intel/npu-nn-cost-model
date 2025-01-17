@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -17,6 +17,7 @@
 #include <vector>
 #include "../types.h"  // need to know the present day types for conversion
 #include "../utils.h"
+#include "inference/nn_descriptor_versions.h"
 #include "inference/preprocessing.h"
 
 #include <map>
@@ -298,7 +299,7 @@ protected:
         return this->processed_output;
     }
 
-    const size_t size_of_descriptor{
+    inline static const size_t size_of_descriptor{
             71};  ///< how big the descriptor is, fixed at constructor. This interface has 71 but writes only 67
 
 public:

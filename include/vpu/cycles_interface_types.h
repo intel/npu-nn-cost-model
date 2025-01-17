@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -39,6 +39,14 @@ namespace VPUNN {
 /// ERROR_SHAVE                         UINT_MAX - 11:0 - 12:Shave operation was not successful. Generic problem (maybe
 /// unavailable)
 ///
+/// ERROR_INFERENCE_NOT_POSSIBLE        UINT_MAX - 12:0 - 13:Inference is not possible to be run. Maybe no NN
+/// available.
+///
+/// ERROR_SHAVE_PARAMS                  UINT_MAX - 13:0 - 14:Problems with SHAVE parameters. Maybe some variadic
+/// parameters were not passed!
+/// ERROR_SHAVE_LAYOUT                  UINT_MAX - 14:0 - 15:Problems with SHAVE layout.
+/// ERROR_SHAVE_INVALID_INPUT           UINT_MAX - 15:0 - 16:Problems with SHAVE workload input.
+///
 ///     Zero value is not an error, and can represent NN cycles output. This might let the NN communicate something like
 ///     it cannot solve the request.
 ///     The zero value behavior might change in the future!
@@ -67,6 +75,12 @@ public:
     static constexpr CyclesInterfaceType ERROR_INVALID_CONVERSION_TO_CYCLES{MaxV - 10};
 
     static constexpr CyclesInterfaceType ERROR_SHAVE{MaxV - 11};
+
+    static constexpr CyclesInterfaceType ERROR_INFERENCE_NOT_POSSIBLE{MaxV - 12};
+
+    static constexpr CyclesInterfaceType ERROR_SHAVE_PARAMS{MaxV - 13};
+    static constexpr CyclesInterfaceType ERROR_SHAVE_LAYOUT{MaxV - 14};
+    static constexpr CyclesInterfaceType ERROR_SHAVE_INVALID_INPUT{MaxV - 15};
 
     static constexpr CyclesInterfaceType START_ERROR_RANGE{MaxV - 1000};  ///< 1000 position for errors
 
@@ -111,6 +125,14 @@ public:
             return "ERROR_INVALID_CONVERSION_TO_CYCLES";
         case ERROR_SHAVE:
             return "ERROR_SHAVE";
+        case ERROR_INFERENCE_NOT_POSSIBLE:
+            return "ERROR_INFERENCE_NOT_POSSIBLE";
+        case ERROR_SHAVE_PARAMS:
+            return "ERROR_SHAVE_PARAMS";
+        case ERROR_SHAVE_LAYOUT:
+            return "ERROR_SHAVE_LAYOUT";
+        case ERROR_SHAVE_INVALID_INPUT:
+            return "ERROR_SHAVE_INVALID_INPUT";
         default:
             return "UNKNOWN";
         }

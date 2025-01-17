@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -54,8 +54,14 @@ public:
     void mark_invalid_DPU_workload() {
         abnormal_return = Cycles::ERROR_INVALID_INPUT_CONFIGURATION;
     }
+    void mark_invalid_SHAVE_workload(){
+        abnormal_return = Cycles::ERROR_SHAVE_INVALID_INPUT;
+    }
     void mark_invalid_LayerConfiguration() {
         abnormal_return = Cycles::ERROR_INVALID_LAYER_CONFIGURATION;
+    }
+    void mark_split_error() {
+        abnormal_return = Cycles::ERROR_TILE_OUTPUT;
     }
 };
 

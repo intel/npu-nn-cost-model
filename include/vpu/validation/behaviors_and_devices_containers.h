@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -104,10 +104,12 @@ protected:
     };
 
     /// static rules (described by data) for each device
-    const std::vector<const IDeviceValidValues*> validators_config{&(std::get<0>(specific_vv)),
-                                                                   &(std::get<1>(specific_vv)),
+    const std::vector<const IDeviceValidValues*> validators_config{
+            &(std::get<0>(specific_vv)),  //
+            &(std::get<1>(specific_vv)),  //
 
-                                                                   &(std::get<2>(specific_vv))};
+            &(std::get<2>(specific_vv)),  //
+    };
 
 public:
     /// @brief true if the device is supported by this instance
@@ -115,8 +117,8 @@ public:
         bool found = false;
         for (const auto config : validators_config) {
             if (config != nullptr) {
-                auto it = std::find(config->devices.begin(), config->devices.end(), device);
-                if (it != config->devices.end()) {
+                auto it = std::find(config->get_devices().cbegin(), config->get_devices().cend(), device);
+                if (it != config->get_devices().cend()) {
                     found = true;
                     break;
                 }
@@ -129,8 +131,8 @@ public:
     const IDeviceValidValues& get_config(VPUNN::VPUDevice device) const {
         for (const auto config : validators_config) {
             if (config != nullptr) {
-                auto it = std::find(config->devices.begin(), config->devices.end(), device);
-                if (it != config->devices.end()) {
+                auto it = std::find(config->get_devices().cbegin(), config->get_devices().cend(), device);
+                if (it != config->get_devices().cend()) {
                     return *config;
                     break;
                 }

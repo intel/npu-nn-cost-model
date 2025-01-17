@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -75,11 +75,27 @@ file(GLOB shv_test_src "${CMAKE_CURRENT_BINARY_DIR}/shave/*.cpp")
 add_executable(
   test_cost_model
   ${test_src}
-  ${shv_test_src}
-)
-target_compile_definitions(test_cost_model PRIVATE VPU_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn")
+  ${shv_test_src})
+ 
+#DPU models
+
 target_compile_definitions(test_cost_model PRIVATE VPU_2_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_0.vpunn")
-target_compile_definitions(test_cost_model PRIVATE VPU_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn")
+target_compile_definitions(test_cost_model PRIVATE VPU_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn")
+
+
+set(MODEL40_REAL "${CMAKE_SOURCE_DIR}/models/vpu_4_0.vpunn")
+set(MODEL40_MOCK "${CMAKE_SOURCE_DIR}/models/vpu_4_0_cloned_from27.vpunn")
+set(MODEL40 "${MODEL40_REAL}") #select here the model to be used
+target_compile_definitions(test_cost_model PRIVATE VPU_4_0_MODEL_PATH="${MODEL40}")
+
+set(MODEL41_REAL "${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn")
+target_compile_definitions(test_cost_model PRIVATE VPU_4_1_MODEL_PATH="${MODEL41_REAL}")
+
+
+#DMA models
+target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn")
+target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn")
+target_compile_definitions(test_cost_model PRIVATE VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
 
 add_dependencies(test_cost_model cpp_schema)
 target_link_libraries(

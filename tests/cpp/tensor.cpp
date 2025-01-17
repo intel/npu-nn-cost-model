@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -18,6 +18,7 @@
 #include <vector>
 
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 class TestTensor : public ::testing::Test {
 public:
@@ -112,6 +113,13 @@ TEST_F(TestTensor, CreationExternalData) {
     {
         auto& tst = test_vector[0];
         float* memory = new float[tst.expected_size];
+        {
+            float* raw{memory};
+            float base{1000.7899345F};  // just an offset
+            for (int i = 0; i < tst.expected_size; ++i) {
+                raw[i] = base + ((float)(i+100) * (float)tst.expected_size)/(float)tst.expected_size;
+            }
+        }
 
         VPUNN::Tensor<float>* pt =
                 new VPUNN::Tensor<float>(memory, tst.dimensions);  // now pt is considered the owner of memory
@@ -146,10 +154,17 @@ TEST_F(TestTensor, CreationExternalData) {
 TEST_F(TestTensor, ObjectCopyConstructor) {
     {
         std::vector<unsigned int> dimensions{3U, 5U, 7U};  // must be non zero (well formed)
-        VPUNN::Tensor<float> t1(dimensions);
+        Tensor<float> t1(dimensions);
+        {
+            float* raw{t1.data()};
+            float base{7.7899345F};  // just an offset
+            for (int i = 0; i < t1.size(); ++i) {
+                raw[i] = base + (float)i;
+            }
+        }
 
         // use a copy constructor
-        VPUNN::Tensor<float> t2_cc{t1};
+        Tensor<float> t2_cc{t1};
         ASSERT_EQ(t2_cc.size(), t1.size());
         ASSERT_EQ(t2_cc.shape(), t1.shape());
         EXPECT_NE(t2_cc.data(), nullptr) << "Internal data must exist";

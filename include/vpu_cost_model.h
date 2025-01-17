@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -20,7 +20,10 @@
 
 #include "core/cache.h"
 #include "core/logger.h"
+#include "core/serializer.h"
 
+#include "inference/post_process.h"
+#include "inference/postprocessing_factory.h"
 #include "inference/preprocessing.h"
 #include "inference/preprop_factory.h"
 
@@ -29,78 +32,47 @@
 #include "vpu/types.h"
 #include "vpu/utils.h"
 #include "vpu/validation/checker_utils.h"
+#include "vpu/vpu_performance_model.h"
 #include "vpunn.h"
 
 #include "vpu/cycles_interface_types.h"
+#include "vpu/dpu_info_pack.h"
 #include "vpu/validation/dpu_operations_sanitizer.h"
 
 #include "vpu/shave/shave_collection.h"
 #include "vpu/shave/shave_devices.h"
 
+#include "inference/postprocessing_mocks.h"
+
+#include "vpu/dpu_dcim_workload.h"
+#include "vpu_dcim_cost_model_interface.h"
+
 namespace VPUNN {
 
-/// @brief L1API info for a DPUWorkload.
-/// intention is to obtain all info at once, in a more efficient way.
-/// Zero values means either error or value could not be obtained
-/// See the original interface method for each field to understand its meaning
-struct DPUInfoPack {
-    CyclesInterfaceType DPUCycles{0};  ///< DPU()
-    std::string errInfo;               ///< error info when doing DPU()
-
-    float energy{0};  ///< DPUEnergy(), uses power_* information
-
-    // for power usage, considers HW optimization like sparsity
-    float power_activity_factor{0};  ///< AF, operation adjusted, INT/FLOAT powerVirus as reference  is important
-    float power_mac_utilization{0};  ///< hw_utilization, mac only based, Uses estimated dpu Cycles,
-    unsigned long int power_ideal_cycles{0};     ///< pure mac, ops considers sparsity
-    unsigned long int sparse_mac_operations{0};  ///< how many macs this operation will have on this hardware
-
-    // efficiency part do not consider HW optimization like sparsity
-    float efficiency_activity_factor{0};  ///<  operation adjusted, INT/FLOAT powerVirus as reference  is important
-    float efficiency_mac_utilization{0};  ///< no op dependency, mac only based, Uses estimated dpu Cycles
-    unsigned long int efficiency_ideal_cycles{0};  ///< pure MAC based
-    unsigned long int dense_mac_operations{0};     ///< how many macs this operation will have, mathematical maximum
-
-    unsigned long int hw_theoretical_cycles{0};  ///< DPUTheoreticalCycles
-};
-
-inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUInfoPack& d) {
-    stream << "DPUInfoPack: \n"                                                                       //
-           << " DPUCycles: \t" << d.DPUCycles << " : " << Cycles::toErrorText(d.DPUCycles) << " ;\n"  //
-           << " errInfo: \t" << d.errInfo << " ;\n"                                                   //
-           << " energy: \t" << d.energy << " ;\n"                                                     //
-
-           << " power_activity_factor: \t" << d.power_activity_factor << " ;\n"  //
-           << " power_mac_utilization: \t" << d.power_mac_utilization << " ;\n"  //
-           << " power_ideal_cycles: \t" << d.power_ideal_cycles << " ;\n"        //
-           << " sparse_mac_operations: \t" << d.sparse_mac_operations << " ;\n"  //
-
-           << " efficiency_activity_factor: \t" << d.efficiency_activity_factor << " ;\n"  //
-           << " efficiency_mac_utilization: \t" << d.efficiency_mac_utilization << " ;\n"  //
-           << " efficiency_ideal_cycles: \t" << d.efficiency_ideal_cycles << " ;\n"        //
-           << " dense_mac_operations: \t" << d.dense_mac_operations << " ;\n"              //
-
-           << " hw_theoretical_cycles: \t" << d.hw_theoretical_cycles << " ;\n"  //
-            ;
-    return stream;
-}
+using DCiM_Workload_Interface = DCIMWorkload;  ///< alias for DCIMWorkload
+// using DCiM_Workload_Alias = DPUWorkload;        ///< alias for DCIMWorkload
 
 /**
  * @brief The VPUCostModel class
  *
  * Has behind a loaded CostModel neural network that infers cycle times for DPUWOrkloads
+ * ALso behind it need to have a dCIm model for the ops that support dCIM
  *
  */
-class VPUNN_API(VPUCostModel): public VPUNNPerformanceModel {
+class VPUNN_API(VPUCostModel)
+        : public VPUNNPerformanceModel,
+          protected DCiMCostModelInterface<DCiM_Workload_Interface>  // for DCiM CM interface, implementation TBD
+{
 private:
     const RuntimeProcessingFactory preprocessing_factory;  ///< provides Preprocessing objects
+    const PostProcessingFactory postprocessing_factory;
+
     Runtime vpunn_runtime;                ///< the loaded inference model is here, used for FW propagation
     Preprocessing<float>& preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
     LRUCache<float> cache;                ///< cache for inferred values, used only for single workload, not for batches
     const PostProcessSupport results_config;  ///< in case we have a deprecated version with hw_overhead, the ouptut
                                               ///< support should false and the response should be unused
-
-    DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
+    const IPostProcess& postProcess;          ///< postprocessing transformer
 
     const size_t prealloc_results{1000};          ///< how much results buffer to pre-alloc
     std::vector<float> workloads_results_buffer;  ///< buffer dedicated for workloads. avoids reallocation.
@@ -109,6 +81,40 @@ private:
 
     const ShaveConfiguration shave_gen_2;  ///< second generation of shaves
 
+    const std::string dummyStr{
+            "ConstCharInit"};  ///< dummy string for initialization (avoid possible dangling reference)
+
+    CSVSerializer serializer{};             ///< serializer for workloads, has its own file to save data
+    CSVSerializer cache_miss_serializer{};  ///< serializer for missed cache
+
+protected:
+    DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
+protected:
+    const std::string model_name_tag{
+            "pred_" +
+            vpunn_runtime.model_version_info().get_raw_name()};  ///< tag used for predicted cycles serialization
+    const std::string model_nickname{make_DPU_nickname()};
+
+public:
+    std::string get_DPU_nickname() const noexcept {
+        return model_nickname;
+    }
+    std::string make_DPU_nickname() const noexcept {
+        std::string full{vpunn_runtime.model_version_info().get_raw_name()};
+        const char delim{'$'};
+        const auto first = full.find_first_of(delim);
+        const auto last = full.find_last_of(delim);
+        if (first == std::string::npos || last == std::string::npos) {
+            return full;
+        }
+        auto nick = full.substr(first + 1, last - first - 1);
+
+        std::replace(nick.begin(), nick.end(), ' ', '_');
+
+        return "sim_" + nick;
+    }
+
+private:
     /// @brief obtains the actual preprocessing instance from factory. The factory must live longer than the instance
     /// created. warning: Throws if not possible
     static Preprocessing<float>& init_preproc(const RuntimeProcessingFactory& factory,
@@ -122,6 +128,25 @@ private:
         } else {
             std::stringstream buffer;
             buffer << "Cannot create preprocessing stage!.Preprocessing with version (" << input_version
+                   << ") is not known/supported. Filename: " << filename
+                   << " , Version info (raw): " << version_service.get_raw_name();
+            std::string details = buffer.str();
+            Logger::error() << details;
+
+            throw std::runtime_error(details);
+        }
+    }
+
+    static const IPostProcess& init_postproc(const PostProcessingFactory& factory, const ModelVersion& version_service,
+                                             const std::string& filename) {
+        const int version = version_service.get_output_interface_version();
+        //  checking if either we have some process or we have a unsupported version
+        if (factory.exists(version)) {
+            auto& proc = factory.make(version);
+            return proc;
+        } else {
+            std::stringstream buffer;
+            buffer << "Cannot create post processing stage!.Post processing with version (" << version
                    << ") is not known/supported. Filename: " << filename
                    << " , Version info (raw): " << version_service.get_raw_name();
             std::string details = buffer.str();
@@ -146,7 +171,7 @@ private:
     void check_post_config(const ModelVersion& v) {
         const auto raw_name_intf = v.get_raw_name();
 
-        // in case we have an empty ideal model the raw_name is defaulted to none and we should contiune the run
+        // in case we have an empty ideal model the raw_name is defaulted to none and we should continue the run
         if (raw_name_intf == "none") {
             return;
         }
@@ -197,11 +222,23 @@ protected:
     void compressConv_replace_by_CM_CONV_VPU27(DPUWorkload& workload) const {
         if (workload.device >= VPUDevice::VPU_2_7) {
             if ((workload.op == Operation::CONVOLUTION) &&
-                ((workload.inputs[0].channels() > 1) && (workload.inputs[0].channels() < 16))) {
-                Logger::warning() << "Workload with CONVOLUTION compressed IC[2..15] transformed to CM_CONV ";
+                ((workload.inputs[0].channels() >= 1) && (workload.inputs[0].channels() < 16))) {
+                Logger::warning() << "Workload with CONVOLUTION compressed IC[1..15] transformed to CM_CONV ";
                 workload.op = Operation::CM_CONVOLUTION;
             }
         }
+    }
+
+    /// @brief Provides identifiers for data to be serialized
+    // template <bool B = serialization_enabled, typename std::enable_if<B, int>::type = 0>
+    static const std::vector<std::string> get_names_for_serializer(const std::string& model_version) {
+        auto fields = std::vector<std::string>(DPUOperation::_get_member_names().cbegin(),
+                                               DPUOperation::_get_member_names().cend());
+        fields.emplace_back(model_version);
+        fields.emplace_back("info");
+        fields.emplace_back("workload_uid");
+
+        return fields;
     }
 
 private:
@@ -219,33 +256,31 @@ private:
         }
     }
 
-    /// 4 billion, any value higher than this might not be representable on UINT32, and
-    /// should be treated like a not in range value given by the NN
-    const float high_threshold{4000000000.0F};
-
-    /// less than this is not representable on UINT32, and has no meanings in
-    /// cycles. zero is still left possible to be returned, it might be a special
-    /// way of network to communicate something (like no answer)
-    const float low_threshold{0.0F};
-
-    /// @brief checks if the NN returned value is invalid, is outside of usable range
-    /// @param nn_output_cycles , the value to be analyzed, this is assumed given by the NN inference
-    /// @return true if invalid value
-    bool is_NN_value_invalid(const float nn_output_cycles) const {
-        bool validity = false;
-        if ((nn_output_cycles > high_threshold) || (nn_output_cycles < low_threshold)) {
-            validity = true;
-        }
-        return validity;
+public:
+    /// @brief Get a reference to the serializer
+    /// temporary only for testing aspects (extra save ). TO BE REFACTORED
+    CSVSerializer& get_serializer() noexcept {
+        return serializer;
     }
 
-public:
     /// @brief provides the value interval where the NN raw outputs are considered valid and will be used to further
     /// compute information
     ///
     /// @returns a pair containing (minimum_valid_value maximum_valid_value)
     std::pair<float, float> get_NN_Valid_interval() const noexcept {
-        return std::make_pair(low_threshold, high_threshold);
+        return postProcess.get_NN_Valid_interval();
+    }
+
+    /**
+     * @brief Construct a new VPUCostModel object
+     *
+     * @param filename the name of the .vpunn model
+     * @param cache_filename the name of the cache file
+     */
+    explicit VPUCostModel(const std::string& filename, const std::string& cache_filename,
+                          bool tryToLoadPairedCache = false)
+            : VPUCostModel(filename, false, 16384, 1, cache_filename, tryToLoadPairedCache) {
+        /* coverity[uninit_member] */
     }
 
     /**
@@ -257,11 +292,17 @@ public:
      * @param batch_size model batch size
      */
     explicit VPUCostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
-                          const unsigned int batch_size = 1)
-            : vpunn_runtime(filename, batch_size, profile),
+                          const unsigned int batch_size = 1, const std::string& cache_filename = "",
+                          bool tryToLoadPairedCache = false)
+            : preprocessing_factory{},
+              postprocessing_factory{},
+              vpunn_runtime(filename, batch_size, profile),
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), filename)),
-              cache(cache_size),
-              results_config(vpunn_runtime.model_version_info().get_output_interface_version()) {
+              cache(cache_size, preprocessing.output_size(), cache_filename, (tryToLoadPairedCache ? filename : "")),
+              results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
+              postProcess(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), filename)),
+              cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
+                                            .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE") {
         Logger::initialize();
         check_post_config(vpunn_runtime.model_version_info());
 
@@ -272,9 +313,13 @@ public:
         correlate_preprocessor_with_model_inputs();
         preprocessing.set_probable_batch(batch_size);
         workloads_results_buffer.reserve(prealloc_results);
+
+        serializer.initialize("l1_dpu_workloads", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
+        cache_miss_serializer.initialize("cache_misses", FileMode::READ_WRITE,
+                                         get_names_for_serializer(model_name_tag));
     }
-    // VPUCostModel(const VPUCostModel&) = delete;
-    // VPUCostModel(VPUCostModel&&) = default;
+    VPUCostModel(const VPUCostModel&) = delete;
+    // VPUCostModel(VPUCostModel&&) = default; //explicitly defaulted move constructor is implicitly deleted
 
     /**
      * @brief Construct a new VPUCostModel object
@@ -287,11 +332,17 @@ public:
      * @param batch_size model batch size
      */
     explicit VPUCostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
-                          const unsigned int cache_size = 16384, const unsigned int batch_size = 1)
-            : vpunn_runtime(model_data, model_data_length, copy_model_data, batch_size, profile),
-              preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), "ConstCharInit")),
-              cache(cache_size),
-              results_config(vpunn_runtime.model_version_info().get_output_interface_version()) {
+                          const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
+                          const char* cache_data = nullptr, size_t cache_data_length = 0)
+            : preprocessing_factory{},
+              postprocessing_factory{},
+              vpunn_runtime(model_data, model_data_length, copy_model_data, batch_size, profile),
+              preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), dummyStr)),
+              cache(cache_size, preprocessing.output_size(), cache_data, cache_data_length),
+              results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
+              postProcess(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), dummyStr)),
+              cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
+                                            .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE") {
         Logger::initialize();
         check_post_config(vpunn_runtime.model_version_info());
 
@@ -301,10 +352,15 @@ public:
         correlate_preprocessor_with_model_inputs();
         preprocessing.set_probable_batch(batch_size);
         workloads_results_buffer.reserve(prealloc_results);
+
+        serializer.initialize("l1_dpu_workloads", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
+        cache_miss_serializer.initialize("cache_misses", FileMode::READ_WRITE,
+                                         get_names_for_serializer(model_name_tag));
     }
 
-protected:
-    ///@ brief checks some validity criteria and performs sanitization that does not alter relevance
+    // protected:
+public:
+    /// @brief checks some validity criteria and performs sanitization that does not alter relevance
     ///
     /// @sa DPU_OperationSanitizer::check_and_sanitize for details
     /// from legacy behavior is ensures that input channels are equal to output channels for channel preserving
@@ -333,19 +389,174 @@ public:
      * @return float the NN raw output, not filtered
      */
     float run_NN(const DPUWorkload& workload) {
-        const auto& vector = preprocessing.transform(workload);
+        const auto& vector = preprocessing.transform(workload);  // due to preprop more wl can have same descriptor
         // Check for cache hit
         const float* const cached_value = cache.get(vector);
         if (cached_value == nullptr) {
             // run the model in case of a cache miss
-            const auto infered_value = vpunn_runtime.predict<float>(vector)[0];
-            // Add result to the cache
+            const auto infered_value{vpunn_runtime.predict<float>(vector)[0]};
             cache.add(vector, infered_value);
-            return infered_value;
+
+            if (cache_miss_serializer.is_serialization_enabled()) {  // has to be factored out
+                try {
+                    auto wl_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
+                    const size_t wl_uid = wl_op.hash();
+                    cache_miss_serializer.serialize(
+                            wl_op, SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)},
+                            SerializableField<std::string>{"info", workload.get_layer_info()});
+                    cache_miss_serializer.end();
+                } catch (const std::exception& e) {
+                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                    cache_miss_serializer.clean_buffers();
+                }
+            }
+
+            const auto postProcessed_value{postProcess.process(workload, infered_value)};
+            return postProcessed_value;
         }
-        return *cached_value;
+        const auto postProcessed_value{postProcess.process(workload, *cached_value)};
+        return postProcessed_value;
     }
 
+    /// @brief exposed only for debug purposes, populates the NN descriptor
+    /// Does not run the model, or checks the validity of the workload.
+    /// Descriptor generation might alter the WL content, depending on the loaded NN.
+    /// If no NN is loaded(empty mode) the default preprocessor is used.V1.
+    /// The method is not const because the preprocessing fills an internal buffer with the descriptor
+    ///
+    /// @returns the descriptor of the workload for the scenario that this workload reaches the transform stage.
+    /// Preliminary stages can alter the workload in case of a real execution (eg due to sanitization)
+    std::vector<float> getDpuDescriptor(DPUWorkload wl) {
+        return preprocessing.transform(wl);
+    }
+
+    /// @brief provides the input and output versions of the loaded NN (debug purposes)
+    std::tuple<int, int> getNNVersion() const {
+        const auto& version{vpunn_runtime.model_version_info()};
+        return std::make_tuple(version.get_input_interface_version(), version.get_output_interface_version());
+    }
+
+protected:
+    /**
+     * @brief Compute runtime when both sparsity (input and weight) are active.
+     * runtime will be a combined value (now is minimum) of the pair obtained by activating only one sparsity.
+     *
+     * @param workload is the workload to be inferred
+     * @return the runtime or error
+     */
+    float runNN_dualsparsity(const DPUWorkload& workload) {
+        // run twice
+        const auto wl_noAct{cloneDeactivateActSparsity(workload)};
+        const float act_off = run_NN(wl_noAct);
+
+        const auto wl_noWt{cloneDeactivateWeightSParsity(workload)};
+        const float wt_off = run_NN(wl_noWt);
+
+        // case when act_off is invalid, also this catch the case when both of values are invalid
+        //   does not count which of them we return if both are invalid
+        if (postProcess.is_NN_value_invalid(act_off)) {
+            return act_off;
+        }
+
+        // case when wt_off is invalid
+        if (postProcess.is_NN_value_invalid(wt_off)) {
+            return wt_off;
+        }
+
+        // MIN.. their combined runtime reduction should be at least like their independent one?
+        // IN general CostMOdelis a best case (due to memory contention, DMA ), but here  we keep this not so best case
+        // (too many variations) alternative: more policies and we chose which one has best FPS over models optimization
+        // on min:  run only once , for max sparsity (maybe balanced...)
+        float ret{std::min(act_off, wt_off)};  // algorithm here
+
+        return ret;  // exit point
+    }
+    /**
+     * @brief Wrapper over run_NN for handling situations where a workload cannot be resolved with only one inference.
+     * Now it is handling the dual input sparsity (activation and weights): compute the runtime using the algorithm @sa
+     * runNN_dualsparsity() for more explanations.
+     *
+     * @param workload is the workload to be inferred
+     * @return the runtime or error
+     */
+    float preCheck_and_runNN(const DPUWorkload& workload) {
+        // @todo : impact on energy?, CHeck if energy/DPUINfo/Theoretical cycles/ops considers this situation to reduce
+        // energy
+
+        // if weight and input (SEP irrelevant?) sparsity ON.
+        if (is_dualsparsity_active(workload)) {
+            return runNN_dualsparsity(workload);
+        }
+
+        return run_NN(workload);  // normal wl handling
+    }
+
+    /**
+     * @brief checks if both input tensor sparsity(activation) and wl weight sparsity are active
+     *
+     * @param wl is the workload
+     * @return true if both sparsities are active (sparsity enable true)
+     */
+    bool static is_dualsparsity_active(const DPUWorkload& wl) {
+        return (wl.inputs[0].get_sparsity() && wl.weight_sparsity_enabled);
+    }
+
+    /**
+     * @brief Deactivates input sparsity for a workload
+     *
+     * @param wl is the workload
+     * @return a clone of the original wl with deactivated sparsity
+     */
+    DPUWorkload cloneDeactivateActSparsity(const DPUWorkload& wl) {
+        DPUWorkload out{wl};
+        out.act_sparsity = 0.0;
+        out.inputs[0].set_sparsity(false);
+        return out;
+    }
+
+    /**
+     * @brief Deactivates weight sparsity for a workload
+     *
+     * @param wl is teh workload
+     * @return a clone of the original wl with deactivated sparsity
+     */
+    DPUWorkload cloneDeactivateWeightSParsity(const DPUWorkload& wl) {
+        DPUWorkload out{wl};
+        out.weight_sparsity = 0.0;
+        out.weight_sparsity_enabled = false;
+        return out;
+    }
+
+    /**
+     * @brief Wrapper over run_NN for batches for handling situations where a workload cannot be resolved with only one
+     * inference. Now it is handling the dual input sparsity (activation and weights): this situation is not supported,
+     * would complicate the implementation too much
+     *
+     *
+     * @param workloads a std::vector of DPUWorkloads
+     * @return a vector of runtimes
+     * @throws runtime_error: when input sparsity and weight sparsity are active at the same time for at least one
+     * workload (first workload)
+     */
+    const std::vector<float>& preCheck_and_runNN(const std::vector<DPUWorkload>& workloads) {
+        // here we check if at least one wl in vector workloads has act sparsity and weight sparsity active
+        const bool exists_dual_spars{
+                std::any_of(workloads.cbegin(), workloads.cend(), VPUCostModel::is_dualsparsity_active)};
+
+        if (exists_dual_spars) {
+            workloads_results_buffer.resize(workloads.size());
+            std::transform(workloads.cbegin(), workloads.cend(), workloads_results_buffer.begin(),
+                           [this](const DPUWorkload& wl) {
+                               return preCheck_and_runNN(wl);
+                           });
+
+            return workloads_results_buffer;
+        } else {
+            return run_NN(workloads);  // normal execution,
+        }
+    }
+
+public:
     /**
      * @brief Compute the NN Output of multiple DPUWorkloads
      * NOT taking in consideration the cache
@@ -384,6 +595,13 @@ public:
                 workloads_results_buffer[idx] = hw_overhead_arr[idx - wl_idx];
             }
         }
+        //\todo: optimization (skip this if no processing required?)
+        // post process the value : adapt it to the device and context.
+        std::transform(workloads.cbegin(), workloads.cend(), workloads_results_buffer.cbegin(),
+                       workloads_results_buffer.begin(), [this](const DPUWorkload& wl, const float nn_wl) {
+                           return this->postProcess.process(wl, nn_wl);
+                       });
+
         return workloads_results_buffer;
     }
 
@@ -443,7 +661,7 @@ public:
     /* coverity[pass_by_value] */
     CyclesInterfaceType DPU(DPUWorkload wl) {
         std::string dummy_info{};
-        return DPU(wl, dummy_info);
+        return DPU(std::move(wl), dummy_info);
     }
 
     /// @brief same like  @see DPU(DPUWorkload wl) , the extra param is to have as output the textual errors/findings
@@ -473,6 +691,18 @@ protected:
      *  Provides workload outside so we know on what(post sanitization) was done the inference
      */
     CyclesInterfaceType DPU_and_sanitize(DPUWorkload& wl, std::string& info) {
+        if (serializer.is_serialization_enabled()) {  // has to be factored out
+            try {
+                auto wl_op = DPUOperation(wl, sanitizer.getDeviceConfiguration(wl.device));
+                const size_t wl_uid = wl_op.hash();
+                serializer.serialize(wl_op, SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)},
+                                     SerializableField<std::string>{"info", wl.get_layer_info()});
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                serializer.clean_buffers();
+            }
+        }
+
         // sanitize and check the input.
         const auto is_inference_posible = nn_initialized();
         SanityReport problems{};
@@ -482,16 +712,29 @@ protected:
         CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
         if (is_inference_relevant) {
             if (is_inference_posible) {
-                const auto nn_output_cycles = run_NN(wl);
-                if (is_NN_value_invalid(nn_output_cycles)) {
+                const auto nn_output_cycles = preCheck_and_runNN(wl);
+                if (postProcess.is_NN_value_invalid(nn_output_cycles)) {
                     cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
                     // std::cout << "\n Problematic inf response: "<<nn_output_cycles<<std::endl<<wl<<"\n";
                 } else {
-                    cycles = static_cast<CyclesInterfaceType>(ceil(nn_output_cycles));  // NORMAL CASE
+                    cycles = static_cast<CyclesInterfaceType>(std::ceil(nn_output_cycles));  // NORMAL CASE
                 }
             } else {  // NN not available, use theoretical cycles
                 cycles = DPUTheoreticalCycles(wl);
             }
+        }
+
+        if (serializer.is_serialization_enabled()) {  // has to be factored out
+            try {
+                if (!serializer.is_write_buffer_clean()) {
+                    serializer.serialize(SerializableField<decltype(cycles)>{model_name_tag, cycles});
+                    serializer.end();
+                }
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                serializer.clean_buffers();
+            }
+            serializer.clean_buffers();
         }
 
         return cycles;
@@ -506,6 +749,12 @@ public:
      * explanations
      */
     std::vector<CyclesInterfaceType> DPU(std::vector<DPUWorkload> workloads) {
+        std::vector<DPUWorkload> serializer_orig_wls;  // should be const
+        if (serializer.is_serialization_enabled()) {   // has to be factored out
+            serializer_orig_wls = std::vector<DPUWorkload>(workloads.size());
+            std::copy(workloads.begin(), workloads.end(), serializer_orig_wls.begin());
+        }
+
         const auto number_of_workloads{workloads.size()};  ///< fixed value remembered here, workloads is non const
         std::vector<CyclesInterfaceType> cycles_vector = std::vector<CyclesInterfaceType>(number_of_workloads);
         const auto is_inference_posible = nn_initialized();
@@ -525,7 +774,7 @@ public:
         }
 
         // Compute using NN. Should not run if not initialized (fills a default value)
-        const std::vector<float>& NN_results = run_NN(workloads);  // always tentative run
+        const std::vector<float>& NN_results = preCheck_and_runNN(workloads);  // always tentative run, what if throws?
 
         // parse all and decide individually
         for (unsigned int idx = 0; idx < workloads.size(); ++idx) {
@@ -538,10 +787,10 @@ public:
             if (is_inference_relevant) {
                 if (is_inference_posible) {
                     const auto nn_output_cycles = NN_results[idx];
-                    if (is_NN_value_invalid(nn_output_cycles)) {
+                    if (postProcess.is_NN_value_invalid(nn_output_cycles)) {
                         cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
                     } else {
-                        cycles = static_cast<CyclesInterfaceType>(ceil(nn_output_cycles));  // NORMAL CASE
+                        cycles = static_cast<CyclesInterfaceType>(std::ceil(nn_output_cycles));  // NORMAL CASE
                     }
 
                 } else {  // NN not available, use theoretical cycles
@@ -550,6 +799,24 @@ public:
             }
 
             cycles_vector[idx] = cycles;
+        }
+
+        if (serializer.is_serialization_enabled()) {  // has to be factored out
+            for (unsigned int idx = 0; idx < serializer_orig_wls.size(); ++idx) {
+                try {
+                    auto wl_op = DPUOperation(serializer_orig_wls[idx],
+                                              sanitizer.getDeviceConfiguration(serializer_orig_wls[idx].device));
+                    const size_t wl_uid = wl_op.hash();
+                    serializer.serialize(wl_op, SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)});
+
+                    serializer.serialize(
+                            SerializableField<decltype(cycles_vector[idx])>{model_name_tag, cycles_vector[idx]});
+                    serializer.end();
+                } catch (const std::exception& e) {
+                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                    serializer.clean_buffers();
+                }
+            }
         }
 
         return cycles_vector;
@@ -599,7 +866,7 @@ protected:
                              decltype(&VPUCostModel::DPU_Efficency_IdealCycles) CalculateCycles) {
         std::string dummy_info{};
         DPUWorkload w{wl};
-        const auto nn_output_cycles = DPU_and_sanitize(w, dummy_info);  // might change W
+        const auto nn_output_cycles = DPU_and_sanitize(w, dummy_info);  // might change W, considers sparsities
         const auto ideal_cycles = (this->*CalculateCycles)(w);          //< this is independent of NN cycles
 
         return relative_mac_hw_utilization(nn_output_cycles, ideal_cycles);
@@ -641,6 +908,7 @@ public:
      * @param output_location where is the destination memory
      * @param output_write_tiles how many CMX tiles the DMA broadcast
      * @return unsigned int the number of cycles of the DMA transfer
+     * @deprecated Will be removed in future releases
      */
     unsigned int DMA(VPUDevice device, const VPUTensor& input, const VPUTensor& output,
                      MemoryLocation input_location = MemoryLocation::DRAM,
@@ -654,6 +922,7 @@ public:
      *
      * @param wl a DMAWorkload
      * @return unsigned int the number of cycles of the DMA transfer
+     * @deprecated Will be removed in future releases
      */
     unsigned int DMA(const DMAWorkload& wl) const {
         // Call the helper function
@@ -665,6 +934,7 @@ public:
      *
      * @param swl a Shave Kernel
      * @return unsigned int the number of cycles of the Shave kernel
+     * \deprecated
      */
     unsigned int SHAVE(const SWOperation& swl) {
         return SHAVETheoreticalCycles(swl);
@@ -673,29 +943,33 @@ public:
     /**
      * @brief Return the number of cycles needed to compute a Shave kernel
      *
-     * @param swl a Shave Kernel
-     * @return the number of cycles of the Shave kernel, in DPU cycles. Are the DPUcycles the ones of the device (yes)?
+     * @param shave_wl a Shave workload contains: name of kernel, device, in out tensor. PLus optional parameters of the
+     * operations
+     * @param infoOut  a string that will contain informative error information (in case of error)
+     * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
      */
-    CyclesInterfaceType SHAVE_2(const SHAVEWorkload& swl, std::string& infoOut) {
-        // seek it in implemented list based on name and device
-        // check if info like number of inputs & outputs and their info are OK (correlated)
-        // compute the runtime.
-        // infoOut += ("\n MOCK empty IMPLEMENTATION: " + swl.get_name());
-
-        // return Cycles::ERROR_INVALID_INPUT_CONFIGURATION;
-
-        return shave_gen_2.computeCycles(swl, infoOut);
+    CyclesInterfaceType SHAVE_2(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
+        return shave_gen_2.computeCycles(shave_wl, infoOut);
     }
-    // what would be good as meta services
 
-    // list of supported methods
-    // should it describe also each operation, more detail, like size based, wXH based?
+    /// gets the list of names of supported operators on a specified device. Each device has own operators
+    ///
+    /// @param device  for what device?
+    /// @returns container with the name of operators
     std::vector<std::string> getShaveSupportedOperations(VPUDevice device) const {
-        // const ShaveConfiguration shaves{};
         return shave_gen_2.getShaveSupportedOperations(device);
-        // std::vector<std::string> v{"empty" + VPUDevice_ToText.at(static_cast<int>(device))};
-        // return v;
     };
+
+    /// provides a reference to teh operator executor specified by name
+    /// The executor can be used to execute (run) the runtime prediction on different tensors/parameters
+    /// Or can be asked to print information about its implementation parameters
+    ///
+    /// @param name of the operator
+    /// @param device name
+    /// @returns a ref (no ownership transfered. exists as long as this VPUCostModel instance exists)
+    const ShaveOpExecutor& getShaveInstance(std::string name, VPUDevice device) const {
+        return shave_gen_2.getShaveInstance(std::move(name), device);  // may throw
+    }
 
     /**
      * @brief proxy for DPU_RelativeActivityFactor_hw
@@ -804,11 +1078,32 @@ public:
      *
      * @param swl a SWOperation
      * @return float the SWOperation energy , in units relative to DPU PowerVirus16
+     * \deprecated
      */
     float SHAVEEnergy(const SWOperation& swl) {
         constexpr float activity_factor{0.5f};      //<assume a constant activity factor of 0.5
         const float max_power_ratio_to_DPU{0.05f};  //<assume a max power of 5% of the DPU max power.
         const float energy = (activity_factor * max_power_ratio_to_DPU) * (float)SHAVE(swl);
+
+        return energy;
+    }
+
+    /** @brief Compute the energy of a SHAVE SHAVEWorkload.
+     * @details Energy here is a relative metric, but the activity factor of the operation multiplied by
+     *          its cost (number of clock cycles). We assume a constant activity factor of 0.5 for all and a max
+     *          power of 5% of the DPU max power.
+     *
+     * @param swl a SHAVEWorkload
+     * @return float the operation energy, in units relative to DPU PowerVirus. WIl return zero in case of error
+     */
+    float SHAVEEnergy(const SHAVEWorkload& swl) {
+        constexpr float activity_factor{0.5f};      //<assume a constant activity factor of 0.5
+        const float max_power_ratio_to_DPU{0.05f};  //<assume a max power of 5% of the DPU max power.
+
+        std::string infoOut;
+        const auto shave_raw_time{SHAVE_2(swl, infoOut)};
+        const float shave_ftime{Cycles::isErrorCode(shave_raw_time) ? 0.0f : (float)(shave_raw_time)};
+        const float energy = (activity_factor * max_power_ratio_to_DPU) * shave_ftime;
 
         return energy;
     }
@@ -824,7 +1119,8 @@ public:
         DPUInfoPack allData;      // expect RVO when returning it!
         DPUWorkload w{workload};  // local clone
 
-        allData.DPUCycles = DPU_and_sanitize(w, allData.errInfo);  // do this first, might change w
+        allData.DPUCycles = DPU_and_sanitize(
+                w, allData.errInfo);  // do this first, might change w. It considers both sparsities if activated
 
         {
             allData.sparse_mac_operations = compute_HW_MAC_operations_cnt(w);
@@ -859,7 +1155,19 @@ public:
 
         return allData;  // rvo
     }
-};
+
+    /////// Section for dCIM interfaces
+public:
+    // provides the interface that has methods for DCiM
+    DCiMCostModelInterface<DCiM_Workload_Interface>& getDCiM_interface() {
+        return *this;
+    }
+
+    const AccessCounter& getPreloadedCacheCounter() const {
+        return cache.getPreloadedCacheCounter();
+    }
+
+};  // class
 }  // namespace VPUNN
 
 #endif  // VPU_COST_MODEL_H

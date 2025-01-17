@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -9,6 +9,9 @@
 #include "inference/model.h"
 
 #include <gtest/gtest.h>
+
+#include "inference/model_version.h"
+#include "inference/post_process.h"
 
 #include <algorithm>
 #include <array>
@@ -53,6 +56,7 @@ TEST_F(TestModelVersion, SimpleVersionExtraction) {
         buffer << "( " << t.in_name << " , " << t.exp_name << " , " << t.in_v << " , " << t.out_v << " )";
         return buffer.str();
     };
+    //to do extend the tests to cover also Nickname and version
     std::vector<Test> test_vector{
             {"VPUNN-10-1", "VPUNN", 10, 1},
             {"VPUNN", "VPUNN", 1, 1},
@@ -63,10 +67,16 @@ TEST_F(TestModelVersion, SimpleVersionExtraction) {
             {"VPUNN-01-2", "VPUNN", 1, 2},
             {"VPUNN-44-3", "VPUNN", 44, 3},
             {"VPUNN-44-", "VPUNN", 44, 1},
+            {"VPUNN-4011-02", "VPUNN", 4011, 2},
             {"Hello dear -100-13 special version", "Hello dear ", 100, 13},
             //{"--22", "none", 1, 22}, throws....
             {"-22-5", "none", 22, 5},
             {"", "none", 00, 1},  // latest if empty
+            {"VPUNN-44-3Nickmname and version here, an-y lengths", "VPUNN", 44, 3},
+            {"VPUNN-44-3Nickname-22-11blah and version here, an-y lengths66-77", "VPUNN", 44, 3},
+            {"VPUNN-44-3 Nickname-22-11blah and version here, an-y lengths66-77", "VPUNN", 44, 3},
+            {"VPUNN-44-3-Nickname-22-11blah and version here, an-y lengths66-77", "VPUNN", 44, 3},
+            {"VPUNN-45-32 $v0000.0000 Nickname26chars$", "VPUNN", 45, 32},
 
     };
 
@@ -107,9 +117,14 @@ TEST_F(PostProcessChecker, BasicOutputSupport) {
     };
 
     std::vector<Test> test_vector{
-            {"OUT_LATEST", 0, true},       {"OUT_HW_OVERHEAD_BOUNDED", 1, false},
-            {"OUT_CYCLES", 2, true},       {"OUT_HW_OVERHEAD_UNBOUNDED", 3, false},
-            {"Other versions", 4, false},  {"Other versions", 199, false},
+            {"OUT_LATEST", 0, true},  //
+            {"OUT_HW_OVERHEAD_BOUNDED", 1, false},
+            {"OUT_CYCLES", 2, true},
+            {"OUT_HW_OVERHEAD_UNBOUNDED", 3, false},
+            {"MOck for post 2.7", 4, true},
+            {"NPU40 post proc", 5, true},
+            {"Other versions", 6, false},
+            {"Other versions", 199, false},
             {"Other versions", 22, false},
     };
 

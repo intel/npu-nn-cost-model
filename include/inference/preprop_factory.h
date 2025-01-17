@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,14 +10,17 @@
 #ifndef PREPROC_FACTORY_H
 #define PREPROC_FACTORY_H
 
-#include <math.h>
+// #include <math.h>
 #include <vpu/compatibility/types01.h>  // detailed implementations
-#include <vpu/compatibility/types11.h>  // detailed implementations
+#include <vpu/compatibility/types11.h>  // detailed implementations  pp_v01
+#include <vpu/compatibility/types12.h>  // detailed implementations  pp_v01
 #include <vpu/types.h>
 #include <sstream>  // for error formating
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include "nn_descriptor_versions.h"
 #include "preprocessing.h"
 
 namespace VPUNN {
@@ -32,18 +35,23 @@ private:
     using PreprocessingMap = std::map<int, PrepropType&>;
 
     // a simple and not optimum (allocates all static)
-    PreprocessingLatest<float> pp_v00_latest;
+    // PreprocessingLatest<float> pp_v00_latest;
     Preprocessing_Interface01<float> pp_v01_base;
     Preprocessing_Interface10<float> pp_v10;
     Preprocessing_Interface11<float> pp_v11;
+    Preprocessing_Interface4011<float> pp_v4011;
+    Preprocessing_Interface4111<float> pp_v4111;
+    Preprocessing_Interface12<float> pp_v12;
+    Preprocessing_Interface15911<float> pp_v89_11;  // special v159
 
     /// @brief the map of versions mapped to preprocessing concrete objects
-    const PreprocessingMap pp_map{
-            {pp_v00_latest.getInterfaceVersion(), pp_v00_latest},
-            {pp_v01_base.getInterfaceVersion(), pp_v01_base},
-            {pp_v10.getInterfaceVersion(), pp_v10},
-            {pp_v11.getInterfaceVersion(), pp_v11},
-    };
+    const PreprocessingMap pp_map{//{pp_v00_latest.getInterfaceVersion(), pp_v00_latest},
+                                  {pp_v01_base.getInterfaceVersion(), pp_v01_base},  //
+                                  {pp_v10.getInterfaceVersion(), pp_v10},            //
+                                  {pp_v11.getInterfaceVersion(), pp_v11},            //
+                                  {pp_v89_11.getInterfaceVersion(), pp_v89_11},      //
+                                  {pp_v4011.getInterfaceVersion(), pp_v4011},
+                                  {pp_v4111.getInterfaceVersion(), pp_v4111}};
 
 public:
     /// @brief True if a preprocessor exists for required/interrogated version

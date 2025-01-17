@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -13,7 +13,7 @@
 #include <vpu/types.h>
 #include <vpu/utils.h>
 #include <vpu_cost_model.h>
-#include <vpunn.h>
+// #include <vpunn.h>
 #include <algorithm>
 #include <string>
 #include <vector>

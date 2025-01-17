@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -181,7 +181,7 @@ TEST_F(WorkloadGeneration, WorkloadGenerationCreateTilerMultipleWLs) {
 
             auto layer = generate_helper_layer(make_compatible_device(model), 56, 64);
 
-            std::unique_ptr<VPUNN::DPUTiler> tiler = VPUNN::getDPUTiler(*model);
+            std::unique_ptr<VPUNN::IDPUTiler> tiler = VPUNN::getDPUTiler(*model);
 
             if (options.target == VPUNN::VPUOptimizationTarget::POWER) {
                 EXPECT_THROW(

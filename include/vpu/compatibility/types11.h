@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -17,7 +17,9 @@
 #include <vector>
 #include "../types.h"  // need to know the present day types for conversion
 #include "../utils.h"
+#include "inference/nn_descriptor_versions.h"
 #include "inference/preprocessing.h"
+#include "preprocessing_adapters.h"
 
 #include <map>
 #include <sstream>
@@ -243,14 +245,37 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 /**
  * @brief Preprocessing for VPU2.7 BEta  input interface
  * Has 93  floats input
+ *
+ * DATA CHANGES:
+ * 1) mock BF8 and HF8 to uint8
+ * 2) mock_replace_devices:   all > 2.7 to 2.7
+ * 3) mock_replace_operations : operation mock for NPU_RESERVED1: LAYER_NORM & ELTWISE_MUL mapped to ELTWISE;
+ * 4) establishUniqueSwizzling    : 5 for all except ELMWISE where 0 is also accepted.   All should be the same, if at
+ * least one is different than zero than we consider it to be all 5
+ * 5) owt and ISI:  avoid_untrained_space, order of calls: c, a, b
+ *
+ *  5.a) CLUSTERING + OWT=2+ : not possible,           :replaced with SOK+OWT=2+ (both do no use input HALO),  filter
+ * with step b) next
+ *
+ *  5.b) SOK + ELEMENTWISE   : not possible to profile : replace with CLU+OWT=1  (slightly smaller then real due to
+ * owt=1),
+ *
+ *  5.c) SOH + Kernel vertical is 1: no reason to use it, no input halo necessary: replace  with CLU , , filter with a)
+ * next.
+ *
+ * @TODO experiment: isi SOH  to put into the descriptor the memory tensor , not the compute one. This is how it was
+ * trained!? HOw are the runtime evolving: smaller or bigger. The Memory Tensors  are normally smaller.   Think if all
+ * memo tensors are a subject? or only ones that shrink on VPU2.7?  See some examples in Layer.cpp ion SOHH fake!
  */
-template <class T>
-class Preprocessing_Interface11 : public PreprocessingInserter<T, Preprocessing_Interface11<T>> {
+template <class T, typename DeviceAdapter, NNVersions V>
+class Preprocessing_Interface11_Archetype :
+        public PreprocessingInserter<T, Preprocessing_Interface11_Archetype<T, DeviceAdapter, V>> {
 private:
     const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
-    using PreprocessingInserter<T, Preprocessing_Interface11<T>>::insert;  ///< exposes the non virtual insert methods
-    friend class PreprocessingInserter<T, Preprocessing_Interface11<T>>;
+    using PreprocessingInserter<T, Preprocessing_Interface11_Archetype<T, DeviceAdapter, V>>::
+            insert;  ///< exposes the non virtual insert methods
+    friend class PreprocessingInserter<T, Preprocessing_Interface11_Archetype<T, DeviceAdapter, V>>;
 
     /// @brief insert specialization for VPUTensor
     template <bool only_simulate>
@@ -260,7 +285,10 @@ protected:
         offset = this->insert<only_simulate>(data.get_shape()[2], offset);
         offset = this->insert<only_simulate>(data.get_shape()[3], offset);
 
-        offset = this->insert<only_simulate>(intf_11::convert<intf_11::DataType>(data.get_dtype()), offset);
+        {  // mock BF8 and HF8 to uint8
+            const auto datatype{DeviceAdapter::mock_replace_datatypes(data.get_dtype())};
+            offset = this->insert<only_simulate>(intf_11::convert<intf_11::DataType>(datatype), offset);
+        }
         offset = this->insert<only_simulate>(intf_11::convert<intf_11::Layout>(data.get_layout()), offset);
         offset = this->insert<only_simulate>(data.get_sparsity(), offset);
         return offset;
@@ -284,18 +312,38 @@ protected:
 
         {  // device 4.0 is not supported for now we are mocking VPU_4_0 with 2.7. This has to be removed when we have a
             // VPU4.0 trained NN
-            const auto device{workload.device == VPUDevice::VPU_4_0 ? VPUDevice::VPU_2_7 : workload.device};
-
+            // Same for NPU_RESERVED1, MOCK
+            const auto device{DeviceAdapter::mock_replace_devices(workload.device)};
             offset = this->insert<only_simulate>(intf_11::convert<intf_11::VPUDevice>(device), offset);
         }
+        {  // operation mock for NPU_RESERVED1
+            const auto operation{DeviceAdapter::mock_replace_operations(workload.op)};
+            offset = this->insert<only_simulate>(intf_11::convert<intf_11::Operation>(operation), offset);
+        }
 
-        offset = this->insert<only_simulate>(intf_11::convert<intf_11::Operation>(workload.op), offset);
-
-        offset = this->insert<only_simulate>(workload.inputs[0], offset);
+        {  // this is a special case: VPU2.7 NN for SOHHalo(SPLIT_OVER_H) splits was trained only on memory tensor
+           // (smaller than input tensor). SO we need to generate the descriptor using the reduced  memory tensor for W
+           // and H.
+            offset = this->insert<only_simulate>(DeviceAdapter::alternative_input0_spatial_memory(workload), offset);
+        }
         // input 1 tensor to be generated in place here!
+        // NOTE : IN case the INPUT was changed have to be considered?Only for changes that we want to impact weights
         {
-            auto input_1 = workload_validator.construct_input_1(workload);
-            offset = this->insert<only_simulate>(input_1, offset);
+            DPUWorkload wl_adapted{workload};  // need this because eg CM_CONVto CONV changed the input size!
+            wl_adapted.device = DeviceAdapter::mock_replace_devices(
+                    workload.device);  // maybe changed use the Config from target device
+            wl_adapted.op = DeviceAdapter::mock_replace_operations(workload.op);  // maybe changed
+            wl_adapted.inputs[0] = DeviceAdapter::input0_OperationBasedReplace(workload, workload.inputs[0]);
+
+            const auto input_1 = workload_validator.construct_input_1(wl_adapted);
+            // wts type follow the computation on act types.
+            // INT4/UINT4 or other type dedicated for weights is ignored and replaced with the data type from input_0
+            const auto wts_established{wl_adapted.inputs[0].get_dtype()};
+
+            const VPUTensor wts{
+                    VPUTensor(input_1.get_shape(), wts_established, input_1.get_layout(), input_1.get_sparsity())};
+
+            offset = this->insert<only_simulate>(wts, offset);
         }
 
         offset = this->insert<only_simulate>(workload.outputs[0], offset);
@@ -313,20 +361,40 @@ protected:
 
         offset =
                 this->insert<only_simulate>(intf_11::convert<intf_11::ExecutionMode>(workload.execution_order), offset);
-        // offset = this->insert<only_simulate>(
-        //         intf_11::convert<intf_11::ActivationFunction>(workload.activation_function), offset);
-        offset = this->insert<only_simulate>(workload.act_sparsity, offset);
-        offset = this->insert<only_simulate>(workload.weight_sparsity, offset);
 
-        offset = this->insert<only_simulate>(intf_11::convert<intf_11::Swizzling>(workload.input_swizzling[0]), offset);
-        offset = this->insert<only_simulate>(intf_11::convert<intf_11::Swizzling>(workload.input_swizzling[1]), offset);
+        {
+            // normalize value as it have been read from a csv (limited precision) to match the generated cache
+            const float act_sprs{std::stof(std::to_string(workload.act_sparsity))};
+            const float wts_sprs{std::stof(std::to_string(workload.weight_sparsity))};
 
-        offset =
-                this->insert<only_simulate>(intf_11::convert<intf_11::Swizzling>(workload.output_swizzling[0]), offset);
+            offset = this->insert<only_simulate>(act_sprs, offset);
+            offset = this->insert<only_simulate>(wts_sprs, offset);
+        }
 
-        offset = this->insert<only_simulate>(workload.output_write_tiles, offset);
+        {
+            const auto swizz{DeviceAdapter::establishUniqueSwizzling(workload.input_swizzling[0],
+                                                                     workload.input_swizzling[1],
+                                                                     workload.output_swizzling[0], workload.op)};
 
-        offset = this->insert<only_simulate>(intf_11::convert<intf_11::ISIStrategy>(workload.isi_strategy), offset);
+            offset = this->insert<only_simulate>(intf_11::convert<intf_11::Swizzling>(std::get<0>(swizz)),
+                                                 offset);  // for in 0
+
+            offset = this->insert<only_simulate>(intf_11::convert<intf_11::Swizzling>(std::get<1>(swizz)),
+                                                 offset);  // for input 1
+
+            offset = this->insert<only_simulate>(intf_11::convert<intf_11::Swizzling>(std::get<2>(swizz)),
+                                                 offset);  // for output 0
+        }
+
+        {
+            const auto modified_fields{DeviceAdapter::avoid_untrained_space(workload)};
+
+            const auto owt{modified_fields.owt};
+            offset = this->insert<only_simulate>(owt, offset);
+
+            const auto isi{modified_fields.isi};
+            offset = this->insert<only_simulate>(intf_11::convert<intf_11::ISIStrategy>(isi), offset);
+        }
 
         debug_offset = offset;
 
@@ -334,22 +402,41 @@ protected:
         return this->processed_output;
     }
 
-    const size_t size_of_descriptor{93};  ///< how big the descriptor is, fixed at constructor.
+    inline static const size_t size_of_descriptor{93};  ///< how big the descriptor is, fixed at constructor.
 
 public:
     /// @brief the descriptor interface that this type was designed to fill/comply with
     static int getInterfaceVersion() {
-        return static_cast<std::underlying_type_t<NNVersions>>(NNVersions::VERSION_11_VPU27_BETA);
+        return static_cast<std::underlying_type_t<NNVersions>>(V);
     }
 
     /// @brief Ctor , inits the content with expected size
-    Preprocessing_Interface11() {
+    Preprocessing_Interface11_Archetype() {
         this->set_size(size_of_descriptor);
     };
 
     /// @brief default virtual destructor
-    virtual ~Preprocessing_Interface11() = default;
+    virtual ~Preprocessing_Interface11_Archetype() = default;
 };
+
+//---------------------------------------------------------
+template <class T>
+using Preprocessing_Interface11 =
+        Preprocessing_Interface11_Archetype<T, NN27InputAdapter, NNVersions::VERSION_11_VPU27_BETA>;
+
+//--------------------------------------------------------------
+
+template <class T>
+using Preprocessing_Interface4011 =
+        Preprocessing_Interface11_Archetype<T, /*NN27InputAdapter*/ NN40InputAdapter, NNVersions::VERSION_11_NPU40>;
+
+template <class T>
+using Preprocessing_Interface15911 = Preprocessing_Interface11_Archetype<T, /*NN27InputAdapter*/ NN27_159_InputAdapter,
+                                                                         NNVersions::VERSION_11_V89_COMPTBL>;
+
+template <class T>
+using Preprocessing_Interface4111 =
+        Preprocessing_Interface11_Archetype<T, /*NN27InputAdapter*/ NN41InputAdapter, NNVersions::VERSION_11_NPU41>;
 
 }  // namespace VPUNN
 

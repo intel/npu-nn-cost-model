@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -16,33 +16,35 @@
 namespace VPUNN {
 
 // When minimizing the cost we should prioritize choosing a smaller amount of workloads
-inline bool operator<(const DPUWorkloads& lhs, const DPUWorkloads& rhs) {
-    return lhs.size() < rhs.size();
+inline bool operator<(const DPUWorkloadsWithCyclesSplit& lhs, const DPUWorkloadsWithCyclesSplit& rhs) {
+    return lhs.workloads.size() < rhs.workloads.size();
 }
 
 /**
  * @brief Private implementation of the DPUTiler interface
  *
  */
-class DPUTilerImplementation : public DPUTiler {
+class DPUTilerImplementation : public IDPUTiler {
 private:
     VPUCostModel& model;
 
-    VPUDevice getWorkloadsDevice(const DPUWorkloads& workloads) const {
-        if (workloads.size() == 0) {
+    VPUDevice getWorkloadsDevice(const DPUWorkloadsWithCyclesSplit& workloads) const {
+        if (workloads.workloads.size() == 0) {
             throw_error<std::invalid_argument>("getWorkloadsDevice:empty workloads list");
         }
-        VPUDevice device = workloads[0].device;
-        for (unsigned int idx = 1; idx < workloads.size(); idx++) {
-            if (workloads[idx].device != device) {
+        VPUDevice device = workloads.workloads[0].device;
+        for (unsigned int idx = 1; idx < workloads.workloads.size(); idx++) {
+            if (workloads.workloads[idx].device != device) {
                 throw_error<std::invalid_argument>("getWorkloadsDevice: more than one device for a workloads list");
             }
         }
         return device;
     }
 
-    void generateSplits(std::list<DPUWorkloadsCost>& splits_costs, const TilingAlgorithms& algorithms,
-                        const std::vector<ExecutionMode>& valid_execution_modes, const SplitOptions& options) {
+    std::list<DPUWorkloadsWithCycleCost> generateSplits(const TilingAlgorithmsContainer& algorithms,
+                                                        const std::vector<ExecutionMode>& valid_execution_modes,
+                                                        const SplitOptions& options) {
+        std::list<DPUWorkloadsWithCycleCost> splits_costs;
         // Loop algorithms, splits, modes and populate the DPUWorkloadsCost list
         auto timeout = SyncStopWatch<std::micro>();
         if (options.maxLatencyUs > 0)
@@ -59,12 +61,13 @@ private:
                 for (auto nWorkloads : split_count_variants) {
                     // Return if the max time has elapsed
                     if (options.maxLatencyUs > 0 && timeout.interval() > options.maxLatencyUs) {
-                        return;
+                        return splits_costs;
                     }
 
                     // populates splitVariants with 0, 1 or more workloads vectors
-                    const std::list<DPUWorkloads> splitVariants{algo->split_tile_in_workloads(mode, nWorkloads)};
-                    for (const auto& workloads : splitVariants) {
+                    std::list<DPUWorkloadsWithCyclesSplit> splitVariants{
+                            algo->split_tile_in_workloads(mode, nWorkloads)};
+                    for (auto& workloads : splitVariants) {
                         // measure  this variant. try catch , and check its output for errors
                         try {
                             const auto pnp = getLayerPerformance(workloads, options.runtimeOverhead);  // may throw
@@ -104,6 +107,7 @@ private:
                 }
             }
         }
+        return splits_costs;
     }
 
 public:
@@ -115,26 +119,34 @@ public:
     explicit DPUTilerImplementation(VPUCostModel& _model): model{_model} {
     }
 
-    DPUWorkloadsCost intraTileSplit(const DPULayer& layer, const SplitOptions& options) override {
+    DPUWorkloadsCost intraTileSplit(
+            const DPULayer& layer, const SplitOptions& options,
+            std::vector<DPUWorkloadsWithCyclesSplit>* complete_output_splits = nullptr) override {
         // Get execution modes accepted  (e.g.: ExecutionMode::CUBOID_16x16,.....)
         auto valid_execution_modes = DPULayerModes::getValidExecutionMode(layer);  // based on operation
 
         // get all in-tile tiling algorithms. Each algo has a copy of Layer.
-        TilingAlgorithms algorithms = getTilingAlgorithms(layer, options);
+        TilingAlgorithmsContainer algorithms{getTilingAlgorithms(layer, options)};
 
         // Compute the cost of each split type.
-        std::list<DPUWorkloadsCost> splits_costs;
         // compute splits(one is a vector of DPUWorkload)  and cost for each split.
-        generateSplits(splits_costs, algorithms, valid_execution_modes, options);
+        std::list<DPUWorkloadsWithCycleCost> splits_costs{generateSplits(algorithms, valid_execution_modes, options)};
 
         if (splits_costs.size() == 0) {  // nothing to return
             throw_error<std::runtime_error>("intraTileSplit: no valid workload generated");
         }
 
+        if (complete_output_splits != nullptr) {
+            for (const auto& split : splits_costs) {
+                complete_output_splits->push_back(split.second);  // second is the DPUWorkloads
+            }
+        }
+
         // lambda comparator for obtaining the minimum one that has no errors and is not zero!
-        auto comp = [](const DPUWorkloadsCost& a, const DPUWorkloadsCost& b) {
+        auto comp = [](const DPUWorkloadsWithCycleCost& a, const DPUWorkloadsWithCycleCost& b) {
             // zero is not a min candidate
             // error is not a min candidate
+            // .first is the  cycle time of the workloads split
             if (Cycles::isErrorCode(a.first) || a.first <= 0) {
                 return false;  // a not < b, b might be good or not. If both bad they are equal
             }
@@ -147,36 +159,48 @@ public:
         };
 
         // Return the split with min cost (the optimal one). or the first error code (or zero)
-        return (*std::min_element(splits_costs.begin(), splits_costs.end(), comp));
+        // iterator to min
+        const auto& minimum_split{std::min_element(splits_costs.begin(), splits_costs.end(), comp)};
+
+        return {minimum_split->first, minimum_split->second.workloads};  // DPUWorkloadsCost pair
     }
 
-    PnPEstimates getLayerPerformance(const DPUWorkloads& workloads, const unsigned int runtimeOverhead = 0,
-                                     const bool skip_power = true) override {
+    PnPEstimates getLayerPerformance(DPUWorkloadsWithCyclesSplit& workloads_split,
+                                     const unsigned int runtimeOverhead = 0, const bool skip_power = true) override {
         // For an empty list of workloads immediately return 0
-        if (workloads.size() == 0)
+        if (workloads_split.workloads.size() == 0)
             return {0, 0.0f};  // no runtime to execute nothing
 
-        // Get the execution time in cycles of the workloads
-        const auto workload_cycles = model.DPU(workloads);  // if it throws will be catch outside
-        const auto how_many_errors{countErrors(workload_cycles)};
+        // std::vector<CyclesInterfaceType> workload_cycles;
+        // workload_cycles.reserve(workloads.size());
+        //  Iterate over the workloads and compute the execution time in cycles
+        //  The result is stored in the workload_cycles vector
+        //  In practice, it was observed that caching DPU calls has lower runtime than doing batched DPU calls.
+        std::string info;
+        for (size_t idx = 0; idx < workloads_split.workloads.size(); idx++) {
+            workloads_split.cycles[idx] = model.DPU(workloads_split.workloads[idx], info);
+        }
+
+        const auto how_many_errors{countErrors(workloads_split.cycles)};
 
         if (how_many_errors > 0) {  // errors
-            const auto errIndex = (firstErrorIndex(workload_cycles) >= 0) ? firstErrorIndex(workload_cycles) : 0;
+            const auto errIndex =
+                    (firstErrorIndex(workloads_split.cycles) >= 0) ? firstErrorIndex(workloads_split.cycles) : 0;
             Logger::warning() << "\n Error result returned by DPU for workloads"
                               << "\n Errors cnt: " << how_many_errors
-                              << " , from a wl_list size: " << workload_cycles.size()
-                              << "\nFirst ERROR code: " << workload_cycles[errIndex] << " : "
-                              << Cycles::toErrorText(workload_cycles[errIndex])
+                              << " , from a wl_list size: " << workloads_split.cycles.size()
+                              << "\nFirst ERROR code: " << workloads_split.cycles[errIndex] << " : "
+                              << Cycles::toErrorText(workloads_split.cycles[errIndex])
                               << "\n runtimeOverhead: " << runtimeOverhead
-                              << "\n Workload of first error: " << workloads[errIndex]
+                              << "\n Workload of first error: " << workloads_split.workloads[errIndex]
                               << "\n Returning first error for entire workloads";
 
-            return {workload_cycles[errIndex], 0.0f};  // return first error code
+            return {workloads_split.cycles[errIndex], 0.0f};  // return first error code
         }
 
         // Compute the total execution cycles, on good values (no overflow protection)
-        auto total_cycles = dpu_schedule<CyclesInterfaceType>(nDPU_per_tile(getWorkloadsDevice(workloads)),
-                                                              workload_cycles, runtimeOverhead);
+        auto total_cycles = dpu_schedule<CyclesInterfaceType>(nDPU_per_tile(getWorkloadsDevice(workloads_split)),
+                                                              workloads_split.cycles, runtimeOverhead);
 
         // Get the average power by computing the workload on ratio by dividing its cycles by the total layer cycles
         float average_power = 0.0f;
@@ -220,7 +244,7 @@ private:
     }
 };
 
-std::unique_ptr<DPUTiler> getDPUTiler(VPUCostModel& _model) {
+std::unique_ptr<IDPUTiler> getDPUTiler(VPUCostModel& _model) {
     return std::make_unique<DPUTilerImplementation>(_model);
 }
 

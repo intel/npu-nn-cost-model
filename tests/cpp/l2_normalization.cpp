@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -14,6 +14,7 @@
 #include <numeric>
 #include <vector>
 #include "core/tensors.h"
+#include <random>
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -24,11 +25,15 @@ protected:
     }
 
     void l2_test(unsigned int vector_size, unsigned int batch_size = 1) {
+        std::random_device rd;   // create a random device to obtain a seed for the random number generator
+        std::mt19937 gen(rd());  // initialize the random number generator with the random seed
+        std::uniform_real_distribution<float> distrib(0.0, 1.0);  // uniform distribution, range{0.0, 1.0}, we chose
+                                                                  // this range because of the old code: rand()/RAND_MAX 
+
         auto input = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
         auto output = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
         for (unsigned int idx = 0; idx < batch_size * vector_size; idx++) {
-            /* coverity[dont_call] */
-            input[idx] = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX));
+            input[idx] = distrib(gen); //old code: static_cast<float>(rand()) / (static_cast<float>(RAND_MAX));
         }
 
         L2Normalization(&input, &output);

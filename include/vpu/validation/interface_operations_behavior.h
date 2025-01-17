@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -15,37 +15,51 @@
 
 namespace VPUNN {
 
-// fw declaration of valid values interface
+// fw declaration of valid values interface.   You cannot use the config implementation in this file!
 class IDeviceValidValues;
 
 /// @brief Interface class for constraints/behaviors that are specific to operations
 /// It enforces dynamically the workload setup. Derived classes will implement specific rules based on the operation
 class IOperationDynamicConstraints {
 public:
-    /// @brief computes size of weights (input_1) in elements not bytes
+    /// @brief computes size of weights (input_1) in elements not bytes. SPecific for some operations
     virtual long long input_1_volume(const TensorInfo& w) const noexcept = 0;
 
-    /// @brief computes the aligned size in bytes for weights of a workload
-    virtual long long input_1_aligned_size_bytes(const IDeviceValidValues& config, const DPUOperation& dpu) const
-            noexcept = 0;
-    /// @brief computes the non CMX aligned/contiguous  size in bytes for the weights
-    virtual long long input_1_contiguous_size_bytes(const IDeviceValidValues& config, const DPUOperation& dpu) const
-            noexcept = 0;
-
-    /// @brief computes size of activators (input_0)
-    virtual long long input_0_volume(const TensorInfo& w) const noexcept {
-        return w.height * w.width * w.channels;
-    };
-
-    /// @brief computes size of activators (input_0)
-    long long output_0_volume(const TensorInfo& w) const noexcept {
-        return w.height * w.width * w.channels;
-    };
-
     /// @brief deduce input_1 based on input_0 and output_0,
-    /// deduce the weights
-    virtual void deduce_input_1(const TensorInfo& in_0, const TensorInfo& out_0, const IDeviceValidValues& config,
-                                const KernelInfo& kernel, TensorInfo& w) const noexcept = 0;
+    /// deduce the weights  shape and layoput. The datatype is already filled in.
+    /// This should be a natural continuation of constructor of DPUOperation, keep the call close to it so we have fast a
+    /// valid object
+    virtual void deduce_input_1_shape_and_layout(const TensorInfo& in_0, const TensorInfo& out_0,
+                                                 const IDeviceValidValues& config, const KernelInfo& kernel,
+                                                 TensorInfo& w) const noexcept = 0;
+
+    /// @brief computes the aligned size in bytes for weights of a workload
+    virtual long long input_1_aligned_size_bytes(const IDeviceValidValues& config,
+                                                 const DPUOperation& dpu) const noexcept = 0;
+    /// @brief computes the non CMX aligned/contiguous  size in bytes for the weights
+    virtual long long input_1_contiguous_size_bytes(const IDeviceValidValues& config,
+                                                    const DPUOperation& dpu) const noexcept = 0;
+
+    /// @brief computes size of activators (input_0) in elements not bytes. Specific for some operations
+    ///. Does not consider halo, but based on operation, the w content might be adjusted
+    virtual long long input_0_volume(const TensorInfo& w) const noexcept = 0;
+
+    /// @brief computes the aligned size in bytes for activators of a workload. the actual memory occupied considering
+    /// SEP or sparsity.
+    virtual long long input_0_aligned_size_bytes(const IDeviceValidValues& config,
+                                                 const DPUOperation& dpu) const noexcept = 0;
+    /// @brief computes the non CMX aligned/contiguous  size in bytes for the activators
+    virtual long long input_0_contiguous_size_bytes(const IDeviceValidValues& config,
+                                                    const DPUOperation& dpu) const noexcept = 0;
+
+    /// @brief computes the aligned size in bytes for  output activators of a workload. the actual memory occupied
+    /// considering sparsity map
+    virtual long long output_0_aligned_size_bytes(const IDeviceValidValues& config,
+                                                  const DPUOperation& dpu) const noexcept = 0;
+    /// @brief computes the non CMX aligned/contiguous  size in bytes for the output. the actual memory occupied
+    /// considering sparsity map
+    virtual long long output_0_contiguous_size_bytes(const IDeviceValidValues& config,
+                                                     const DPUOperation& dpu) const noexcept = 0;
 
     /// @returns a filtered strategy container that has the invalid ones eliminated. Operation dependent.
     virtual Values<ISIStrategy> filter_ISI_Strategy_Options(const Values<ISIStrategy>& strategies) const {
@@ -75,6 +89,8 @@ public:
                                       std::string& info) const = 0;
 
 protected:
+    const int pointer_size{4};  ///< dimension of pointers address in bytes. e.g. for Storage elements pointers
+
     virtual ~IOperationDynamicConstraints() = default;
 };
 

@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -43,6 +43,7 @@ private:
 // If another build is done in parallel (CI use case) the runtime will be high
 TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
     unsigned int n_workloads = 1000;
+    //EXPECT_TRUE(false);
 
     for (auto& model_info : the_NN_models.all_model_paths) {
         const auto& model_path = model_info.first;
@@ -57,7 +58,8 @@ TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device));
 
         std::cout << std::endl
-                  << "** WL Latency Info for " << model_path << "   Target Latency:" << target_latency << std::endl
+                  << "** WL Latency Info for " << model_path << "   Target Latency:" << target_latency << " milliseconds"
+                  << std::endl
                   << "Compiled in a time relevant mode (NDEBUG): " << time_relevance << std::endl;
         for (int r = 1; r <= 1; ++r) {  // repeat runs
 
@@ -86,14 +88,14 @@ TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
                 const auto at10percentile = individual_latencies[(int)(individual_latencies.size() * 0.1F)];
                 const auto at90percentile = individual_latencies[(int)(individual_latencies.size() * 0.9F)];
 
-                std::cout << "   T: 1xN: 1 wl avg latency: " << wl_latency << " Test with: " << n_workloads
+                std::cout << "   T: 1xN: 1 wl avg latency [ms]: " << wl_latency << " Test with: " << n_workloads
                           << " sequentially executed. "
                           << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat << ", Med: " << median
                           << "\n\t First: " << first << ", Last: " << last << ",  10th%: " << at10percentile
                           << ",  90th%: " << at90percentile << std::endl
                           << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
                 EXPECT_LE(wl_latency, target_latency)
-                        << " WL Latency Info for " << model_path << "   Target Latency:" << target_latency << std::endl
+                        << " WL Latency Info for " << model_path << "   Target Latency[ms]:" << target_latency << std::endl
                         << "   T: 1xN: 1 wl avg latency: " << wl_latency << " Test with: " << n_workloads
                         << " sequentially executed. "
                         << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat << ", Med: " << median
@@ -123,7 +125,7 @@ TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device));
 
         std::cout << std::endl
-                  << "** WL Latency Info for " << model_path << "   Target Latency:" << strict_target_latency
+                  << "** WL Latency Info for " << model_path << "   Target Latency[ms]:" << strict_target_latency
                   << std::endl
                   << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
         for (int r = 1; r <= 1; ++r) {  // repeat runs
@@ -153,7 +155,7 @@ TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
                 const auto at10percentile = individual_latencies[(int)(individual_latencies.size() * 0.1F)];
                 const auto at90percentile = individual_latencies[(int)(individual_latencies.size() * 0.9F)];
 
-                std::cout << "   T: 1xN: 1 wl avg latency: " << wl_latency << " Test with: " << n_workloads
+                std::cout << "   T: 1xN: 1 wl avg latency[ms]: " << wl_latency << " Test with: " << n_workloads
                           << " sequentially executed. "
                           << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat << ", Med: " << median
                           << "\n\t First: " << first << ", Last: " << last << ",  10th%: " << at10percentile
@@ -161,7 +163,7 @@ TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
                           << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
 
                 EXPECT_LE(wl_latency, strict_target_latency)
-                        << " WL Latency Info for " << model_path << "   Target Latency:" << strict_target_latency
+                        << " WL Latency Info for " << model_path << "   Target Latency[ms]:" << strict_target_latency
                         << std::endl
                         << "   T: 1xN: 1 wl avg latency: " << wl_latency << " Test with: " << n_workloads
                         << " sequentially executed. "

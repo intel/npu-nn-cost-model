@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -6,7 +6,8 @@
 # included in or with the Software Package, and your use indicates your acceptance of all such terms.
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
-
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(DEFINED flatc_COMMAND AND DEFINED flatc_TARGET)
     # Use flatc target from vpux-plugin
     message(STATUS "FLATBUFFERS:Use flatc target from vpux-plugin")
@@ -15,6 +16,10 @@ else()
     if(CMAKE_GENERATOR MATCHES "Visual Studio" OR NOT(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN}))
         message(STATUS "FLATBUFFERS: Have to fetch the flatbuffers!")
         include(FetchContent)
+
+        set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+        set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
 
         FetchContent_Declare(
             flatbuffers
@@ -34,6 +39,22 @@ else()
         set_property(DIRECTORY ${flatbuffers_SOURCE_DIR} PROPERTY COMPILE_OPTIONS "${FLATBUFFERS_COMPILE_OPTIONS}")
 
         FetchContent_MakeAvailable(flatbuffers)
+
+        if(NOT MSVC)
+            if ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS  13))
+                # no options , clang 10 not working 
+            else()
+                 # clang larger or any GCC
+                target_compile_options(flatbuffers PRIVATE -Wno-suggest-override)
+                target_compile_options(flatc PRIVATE -Wno-suggest-override)
+            endif()
+
+
+            if ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13))
+                target_compile_options(flatbuffers PRIVATE -Wno-unused-but-set-variable)
+                target_compile_options(flatc PRIVATE -Wno-unused-but-set-variable)
+            endif()
+        endif()
 
         set(FLATBUFFERS_SRC_DIR ${flatbuffers_SOURCE_DIR} PARENT_SCOPE)
 
