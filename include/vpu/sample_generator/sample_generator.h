@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,6 +11,8 @@
 #define VPUNN_SAMPLE_GENERATOR_H
 
 #include <random>
+
+#include "vpu/ranges.h"
 
 namespace VPUNN {
 
@@ -29,8 +31,8 @@ private:
     }
 
 public:
-    Sampler(): seed_used((std::random_device())()), generator(seed_used){};
-    Sampler(unsigned int forced_seed): seed_used(forced_seed), generator(seed_used){};
+    Sampler(): seed_used((std::random_device())()), generator(seed_used) {};
+    Sampler(unsigned int forced_seed): seed_used(forced_seed), generator(seed_used) {};
     unsigned int get_seed() const {
         return seed_used;
     };
@@ -78,6 +80,10 @@ public:
         return elements[idx];
     }
 };
+
+///  explicit implementation for smart ranges needs to be implemented in a convenient place
+template <>
+SmartRanges::value_type Sampler::sample_list_decrease_prob<SmartRanges>(const SmartRanges& elements) const;
 
 }  // namespace VPUNN
 

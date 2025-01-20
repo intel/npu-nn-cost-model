@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,58 +10,17 @@
 #ifndef VPUNN_WL_OPTIMIZATION_API_H
 #define VPUNN_WL_OPTIMIZATION_API_H
 
-#include <utility>
-#include <vector>
-#include "vpu/cycles_interface_types.h"
 #include "vpu/layer.h"
 #include "vpu/types.h"
-#include "vpu/utils.h"
 #include "vpu_cost_model.h"
+#include "workload_optimization_types.h"
 
 namespace VPUNN {
 
 /**
- * @brief Available VPU workload generation optimization targets
- *
- */
-enum class VPUOptimizationTarget { LATENCY, POWER, EFFICIENCY };
-/**
- * @brief Available VPU splitting strategies
- *
- */
-enum class VPUSplitStrategy { HW_TILING, Z_TILING, H_TILING, W_TILING };
-
-/**
- * @brief VPU splitting optimization configuration options
- * Used to guide the splitting of a Layer to 1 or more DPUs
- */
-struct SplitOptions {
-    unsigned int maxWorkloads{128U};  ///< Maximum number of workloads available. Default is 128 because of FIFO size
-    unsigned int maxLatencyUs{0};     ///< Number of DPU to optimize for. maxLatencyMs = 0 means full search
-    unsigned int nDPU{0};  ///< Number of DPU to optimize for. Setting nDPU = 0 VPUNN auto-detects the number of DPUs
-                           ///< based on the device
-    unsigned int runtimeOverhead{0};  ///<  Per workload runtime overhead in cycles
-
-    VPUOptimizationTarget target{VPUOptimizationTarget::LATENCY};  ///< Optimization target. Default is LATENCY,USED
-                                                                   ///< only for LATENCY for the moment
-    std::vector<VPUSplitStrategy> availableStrategies{
-            VPUSplitStrategy::HW_TILING,
-            VPUSplitStrategy::Z_TILING};  ///<  Valid strategies for splitting a layer into multiple workloads. Default
-                                          ///<  is all (HW tiling and Z tiling)
-};
-
-/**
- * @brief VPU Power and Performance estimates (cycles and power)
- */
-struct PnPEstimates {
-    CyclesInterfaceType cycles;  ///< execution cycles
-    float power;                 ///< power in mW
-};
-
-/**
  * @brief DPU Tiler interface
  */
-class DPUTiler {
+class IDPUTiler {
 public:
     /**
      * @brief Generate the optimal intra-tile split for a specific DPULayer
@@ -71,9 +30,12 @@ public:
      *
      * @param layer DPULayer to optimize
      * @param options workload splits algorithm configuration options
+     * @param complete_output_splits Output parameter, will be filled with full list of splits investigated
      * @return DPUWorkloadsCost the optimal workloads split
      */
-    virtual DPUWorkloadsCost intraTileSplit(const DPULayer& layer, const SplitOptions& options) = 0;
+    virtual DPUWorkloadsCost intraTileSplit(
+            const DPULayer& layer, const SplitOptions& options,
+            std::vector<DPUWorkloadsWithCyclesSplit>* complete_output_splits = nullptr) = 0;
 
     /**
      * @brief Get the cycles and power estimate for a list of workloads.
@@ -88,22 +50,22 @@ public:
      *
      * @throws exceptions from inner dependencies. like DPU invocation
      */
-    virtual PnPEstimates getLayerPerformance(const DPUWorkloads& workloads, const unsigned int runtimeOverhead = 0,
-                                             const bool skip_power = true) = 0;
+    virtual PnPEstimates getLayerPerformance(DPUWorkloadsWithCyclesSplit& workloads_split,
+                                             const unsigned int runtimeOverhead = 0, const bool skip_power = true) = 0;
 
     /**
      * @brief Destroy the DPUTiler object
      */
-    virtual ~DPUTiler() = default;
+    virtual ~IDPUTiler() = default;
 };
 
 /**
- * @brief Factory function that generates a DPUTiler instance
+ * @brief Factory function that generates a IDPUTiler instance
  *
  * @param _model a reference to a VPUCostModel object
- * @return std::unique_ptr<DPUTiler>
+ * @return std::unique_ptr<IDPUTiler>
  */
-std::unique_ptr<DPUTiler> getDPUTiler(VPUCostModel& _model);
+std::unique_ptr<IDPUTiler> getDPUTiler(VPUCostModel& _model);
 
 }  // namespace VPUNN
 

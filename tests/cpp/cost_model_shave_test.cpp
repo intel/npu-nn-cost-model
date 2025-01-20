@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -9,6 +9,8 @@
 #include "vpu/shave/activation.h"
 #include "vpu/shave/data_movement.h"
 #include "vpu/shave/elementwise.h"
+
+#include "vpu/shave/layers.h"
 
 #include <gtest/gtest.h>
 #include "common_helpers.h"
@@ -58,7 +60,7 @@ TEST_F(TestSHAVE, BasicAssertionsActivationCategory) {
     const auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
     const auto op_count = swwl.outputs[0].size();
 
-    EXPECT_NEAR(shave_cycles_sigmoid, round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
+    EXPECT_NEAR(shave_cycles_sigmoid, std::round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
 }
 
 /// @brief tests that an Element wise can be instantiated
@@ -83,7 +85,7 @@ TEST_F(TestSHAVE, BasicAssertionsELMWiseCategory) {
     const auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
     const auto op_count = swwl.outputs[0].size();
 
-    EXPECT_NEAR(shave_cycles_sigmoid, round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
+    EXPECT_NEAR(shave_cycles_sigmoid, std::round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
 }
 
 /// @brief tests that an Data Movement can be instantiated
@@ -109,7 +111,7 @@ TEST_F(TestSHAVE, BasicAssertionsDataMovementCategory) {
     const auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
     const auto op_count = swwl.outputs[0].size();
 
-    EXPECT_NEAR(shave_cycles_sigmoid, round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
+    EXPECT_NEAR(shave_cycles_sigmoid, std::round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
 }
 
 /// @brief tests that an Sigmoid can be instantiated
@@ -132,21 +134,166 @@ TEST_F(TestSHAVE, BasicAssertionsActivationSigmoid) {
 
 /// @brief tests that V2 prototypeinterface s usable
 TEST_F(TestSHAVE, SHAVE_v2_Smoke) {
-    SHAVEWorkload swwl{
-            "UnspecifiedName",
-            VPUDevice::VPU_2_7,
-            {input_0},
-            {output_0},
+    {
+        SHAVEWorkload swwl{
+                "UnspecifiedName",
+                VPUDevice::VPU_2_7,
+                {input_0},
+                {output_0},
+        };
+        EXPECT_EQ(swwl.get_device(), VPUNN::VPUDevice::VPU_2_7);
+        ASSERT_EQ(swwl.get_inputs().size(), 1);
+        ASSERT_EQ(swwl.get_outputs().size(), 1);
+        ASSERT_EQ(swwl.get_params().size(), 0);
+
+        std::string info;
+        auto shave_cycles = empty_model.SHAVE_2(swwl, info);
+        EXPECT_EQ(shave_cycles, V(Cycles::ERROR_SHAVE));
+    }
+
+    {
+        const SHAVEWorkload::Param p2{2.9f};
+        // p2.f = 2.9f;
+        const SHAVEWorkload::Param p3{p2};
+
+        // SHAVEWorkload::Parameters p{{1}, {.f=2.1f}};//only C++20
+
+        SHAVEWorkload swwl{"UnspecifiedName2", VPUDevice::VPU_4_0, {input_0}, {output_0}, {{1}, p2, p3}};
+        EXPECT_EQ(swwl.get_device(), VPUNN::VPUDevice::VPU_4_0);
+        ASSERT_EQ(swwl.get_inputs().size(), 1);
+        ASSERT_EQ(swwl.get_outputs().size(), 1);
+        ASSERT_EQ(swwl.get_params().size(), 3);
+
+        std::string info;
+        auto shave_cycles = empty_model.SHAVE_2(swwl, info);
+        EXPECT_EQ(shave_cycles, V(Cycles::ERROR_SHAVE));
+    }
+}
+
+TEST_F(TestSHAVE, SHAVE_v2_Cache_Smoke) {
+    const SHAVEWorkload wlp7{
+            "sigmoid",
+            VPUDevice::VPU_4_0,
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+            {{7}},
     };
-    EXPECT_EQ(swwl.get_device(), VPUNN::VPUDevice::VPU_2_7);
-    ASSERT_EQ(swwl.get_inputs().size(), 1);
 
-    ASSERT_EQ(swwl.get_outputs().size(), 1);
+    const SHAVEWorkload wlp10{
+            "sigmoid",
+            VPUDevice::VPU_4_0,
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+            {{10}},
+    };
 
-    std::string info;
-    auto shave_cycles = empty_model.SHAVE_2(swwl, info);
-    // Expect equality.
-    EXPECT_EQ(shave_cycles, V(Cycles::ERROR_SHAVE));
+    const SHAVEWorkload wls{
+            "sigmoid",
+            VPUDevice::VPU_4_0,
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+
+    };
+
+    {
+        std::string info;
+        auto shave_cycles = empty_model.SHAVE_2(wlp7, info);
+        EXPECT_EQ(shave_cycles, V(1));
+    }
+    {
+        std::string info;
+        auto shave_cycles = empty_model.SHAVE_2(wlp10, info);
+        EXPECT_EQ(shave_cycles, V(2));
+    }
+    {
+        std::string info;
+        auto shave_cycles = empty_model.SHAVE_2(wls, info);
+        EXPECT_GT(shave_cycles, V(100)) << wls << info;
+    }
+}
+
+TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
+    // EXPECT_TRUE(false);
+    {
+        const auto d{VPUDevice::VPU_2_7};
+        auto ops = empty_model.getShaveSupportedOperations(d);
+
+        EXPECT_EQ(ops.size(), 71 + 3);
+
+
+        std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
+                  << "  has # SHAVE operators : " << ops.size() << " -----------------------------------";
+        for (const auto& o : ops) {
+            std::cout << "\n  : " << o;
+        }
+    }
+
+    {
+        const auto d{VPUDevice::VPU_4_0};
+        auto ops = empty_model.getShaveSupportedOperations(d);
+
+        EXPECT_EQ(ops.size(), 80);
+
+
+        std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
+                  << "  has # SHAVE operators : " << ops.size() << " -----------------------------------";
+        for (const auto& o : ops) {
+            std::cout << "\n  : " << o;
+        }
+    }
+
+    {  // special in-existing
+        const auto d{VPUDevice::__size};
+        auto ops = empty_model.getShaveSupportedOperations(d);
+        EXPECT_EQ(ops.size(), 0);
+
+        std::cout << "\n -------------------------- DEVICE : OUT of RANGE "
+                  << "  has # SHAVE operators : " << ops.size() << " -----------------------------------";
+        for (const auto& o : ops) {
+            std::cout << "\n  : " << o;
+        }
+    }
+}
+
+TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_27) {
+    //  EXPECT_TRUE(false);
+    {
+        const auto d{VPUDevice::VPU_2_7};
+        auto ops = empty_model.getShaveSupportedOperations(d);
+
+        const auto ops_cnt{ops.size()};
+        EXPECT_GT(ops_cnt, 1);
+
+        std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
+                  << "  has # SHAVE operators : " << ops_cnt << " -----------------------------------";
+        int i{1};
+        for (const auto& o : ops) {
+            std::cout << "\n*** ----------- " << i++ << " of " << ops_cnt << " : " << o << " ---------\n";
+            const auto& shv = empty_model.getShaveInstance(o, d);
+            std::cout << shv.toString();
+            EXPECT_GT(shv.toString().length(), 50);
+        }
+    }
+}
+TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_40) {
+    // EXPECT_TRUE(false);
+    {
+        const auto d{VPUDevice::VPU_4_0};
+        auto ops = empty_model.getShaveSupportedOperations(d);
+
+        const auto ops_cnt{ops.size()};
+        EXPECT_GT(ops_cnt, 1);
+
+        std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
+                  << "  has # SHAVE operators : " << ops_cnt << " -----------------------------------";
+        int i{1};
+        for (const auto& o : ops) {
+            std::cout << "\n*** ----------- " << i++ << " of " << ops_cnt << " : " << o << " ---------\n";
+            const auto& shv = empty_model.getShaveInstance(o, d);
+            std::cout << shv.toString();
+            EXPECT_GT(shv.toString().length(), 50);
+        }
+    }
 }
 
 }  // namespace VPUNN_unit_tests

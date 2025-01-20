@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -17,11 +17,14 @@
 
 #include <iostream>
 
+#include "vpu/layer.h"
 #include "vpu/types.h"
 
 #include <tuple>
 #include "behaviors_and_devices_containers.h"
-#include "device_valid_values.h"
+#include "device_valid_valuesVPU2.h"
+#include "device_valid_valuesVPU2_7.h"
+#include "device_valid_valuesVPU4.h"
 #include "interface_operations_behavior.h"
 #include "interface_valid_values.h"
 #include "layer_operations_valid_behaviours.h"
@@ -40,17 +43,59 @@ class VPU_LayerValidator :
                                        VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU4_0_LayerValidValues> {
 protected:
 public:
-    void check_layer_consistency(const DPUOperation& w, const IDeviceValidValues& config,
+    /// nTiles: number of tiles we split a layer
+    /// strategy: split layer strategy
+    void check_layer_consistency(const DPUOperation& w, const unsigned int nTiles, VPUTilingStrategy strategy,
+                                 const IDeviceValidValues& config,
                                  const IOperationDynamicConstraints& operation_behaviour, SanityReport& result) const {
         result.resetOK();  // all OK
 
+        /// @brief: compute an array of coefficients by which we can multiply the upper limit of the allowed range (this
+        /// is equal with 8192) for the dimensions (width, height, channels) of a layer, this help us to maximize WHC at
+        /// high level, in that way by splitting a layer, at middle layer, we can have layers with maximum allowed
+        /// values
+        /// (=8192) for WHC
+        ///
+        /// @param strategy: tiling strategy
+        /// @param nTiles: number of tiles
+        /// @return: an array that contains the coefficients' values, the order of the coefficients in array is WHCB
+        auto border_coeff = [](VPUTilingStrategy strategy, const unsigned int nTiles) -> WHCBTensorShape {
+            switch (strategy) {
+            case VPUTilingStrategy::NONE:
+                return {1, 1, 1, 1};  // order WHCB
+            case VPUTilingStrategy::SOH_Overlapped:
+                return {1, nTiles, 1, 1};
+            case VPUTilingStrategy::SOK:
+                return {1, 1, nTiles, 1};
+            case VPUTilingStrategy::SOW:
+                return {nTiles, 1, 1, 1};
+            case VPUTilingStrategy::SOHW:
+                return {nTiles, nTiles, 1, 1};
+            case VPUTilingStrategy::SOHK:
+                return {1, nTiles, nTiles, 1};
+            case VPUTilingStrategy::SOH_HaloRead:
+                return {1, nTiles, 1, 1};
+            case VPUTilingStrategy::SOHO_K_SWITCH:
+                return {1, nTiles, 1, 1};
+            case VPUTilingStrategy::SOH_K_SWITCH:
+                return {1, nTiles, 1, 1};
+            case VPUTilingStrategy::SOK_NO_BROADCAST:
+                return {1, 1, nTiles, 1};
+            default:
+                return {1, 1, 1, 1};
+            }
+        };
+
+        const WHCBTensorShape extended_border_coeff{border_coeff(strategy, nTiles)};
+
         Checker checker;
         try {
-            checker.check_is_in_list(w.device, config.devices, "Device");
-            checker.check_is_in_list(w.operation, config.get_valid_operations_range(), "Operation");
+            checker.check_is_in_list(w.device, config.get_devices(), "Device");
+            checker.check_is_in_list(w.operation, config.get_valid_operations(), "Operation");
 
             // todo: this is just the desired one to be applied at tile splitting?
-            checker.check_is_in_list(w.output_write_tiles, config.output_write_tile_options, "output_write_tiles");
+            checker.check_is_in_list(w.output_write_tiles, config.get_output_write_tile_options(),
+                                     "output_write_tiles");
             // dep on out tile and op  todo: ISI is just the desired one to be applied at tile splitting
             checker.check_is_in_list(w.isi_strategy, config.get_ISI_Strategy_Range(w),
                                      "ISI_strategy");  // no ELMWISE and SOK
@@ -78,14 +123,22 @@ public:
             {  // input/activation dimensions and tensor properties
                 const auto& in0{w.input_0};
                 // what to do with batch??
-                checker.check_is_in_interval((int)in0.height, config.get_input_height_interval(w), "input_0.height");
-                checker.check_is_in_interval((int)in0.width, config.get_input_width_interval(w), "input_0.width");
 
-                checker.check_is_in_list((int)in0.channels, config.get_input_channels_range(w), "input_0.channels");
+                std::pair<int, int> height_interval{config.get_input_height_interval(w)};
+                height_interval.second = height_interval.second * extended_border_coeff.height();
+                checker.check_is_in_interval((int)in0.height, height_interval, "input_0.height");
 
-                checker.check_is_in_list(in0.datatype, config.valid_datatypes, "input_0.datatype");
-                checker.check_is_in_list(in0.layout, config.valid_layouts, "input_0.layout");
-                checker.check_is_in_list(in0.swizzling, config.valid_swizzlings, "input_0.swizzling");
+                std::pair<int, int> width_interval{config.get_input_width_interval(w)};
+                width_interval.second = width_interval.second * extended_border_coeff.width();
+                checker.check_is_in_interval((int)in0.width, width_interval, "input_0.width");
+
+                const auto range = config.get_input_channels_restriction(w);
+                const auto input_range{range.multiply_upper(extended_border_coeff.channels())};
+                checker.check_is_in_requirements((int)in0.channels, input_range, "input_0.channels");
+
+                checker.check_is_in_list(in0.datatype, config.get_input_valid_datatypes(w), "input_0.datatype");
+                checker.check_is_in_list(in0.layout, config.get_valid_layouts(), "input_0.layout");
+                checker.check_is_in_list(in0.swizzling, config.get_valid_swizzlings(), "input_0.swizzling");
             }
             {  // stride , depends on input zero, and operation sometimes
                 const auto k{w.kernel};
@@ -114,7 +167,12 @@ public:
                                              std::make_pair(expected_out_height, expected_out_height),
                                              "output_0.height");
 
-                {  // special SOH situation ; todo: ISI is just the desired one to be applied at tile splitting
+                // TODO: consider also the Split  H aspect
+                auto range = config.get_output_channels_restriction(w);
+                const auto output_range{range.multiply_upper(extended_border_coeff.channels())};
+                checker.check_is_in_requirements((int)w.output_0.channels, output_range, "output_0.channels");
+
+                {  // special SOH situation ;  to do: should be captured in the generic approach
                     if (w.isi_strategy ==
                         ISIStrategy::SPLIT_OVER_H) {  // SOH or SOHO, be careful to set this correctly for layer
                         if (w.output_0.height <= 1) {
@@ -129,10 +187,15 @@ public:
 
                 {  // sparsity and types  for output_0
                     const auto& out0{w.output_0};
-                    checker.check_is_in_list(out0.datatype, config.valid_datatypes, "output_0.datatype");
-                    checker.check_is_in_list(out0.layout, config.valid_layouts, "output_0.layout");
-                    checker.check_is_in_list(out0.swizzling, config.valid_swizzlings, "output_0.swizzling");
+                    checker.check_is_in_list(out0.datatype, config.get_output_valid_datatypes(w), "output_0.datatype");
+                    checker.check_is_in_list(out0.layout, config.get_valid_layouts(), "output_0.layout");
+                    checker.check_is_in_list(out0.swizzling, config.get_valid_swizzlings(), "output_0.swizzling");
                 }
+            }
+            {
+                // types for input_1
+                const auto& in1{w.input_1};
+                checker.check_is_in_list(in1.datatype, config.get_weights_valid_datatypes(w), "input_1.datatype");
             }
             {  // sparsity check on all channels
 
@@ -149,7 +212,7 @@ public:
                         checker.add_check_failed(info_out);
                 }
             }
-            { checker.check_is_in_list(w.execution_order, config.valid_execution_order, "Execution_Order"); }
+            { checker.check_is_in_list(w.execution_order, config.get_valid_execution_order(), "Execution_Order"); }
             // no padding optimization checked
 
             {  // check correlation between in-out tensors

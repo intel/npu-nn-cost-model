@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -9,147 +9,197 @@
 
 #include "inference/preprocessing.h"
 #include <gtest/gtest.h>
+#include <array>
 #include "vpu/compatibility/types01.h"
 #include "vpu/compatibility/types11.h"
+#include "vpu/compatibility/types12.h"
+
+#include "common_helpers.h"
 
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
-class TestPreprocessingLatest : public ::testing::Test {
-public:
-protected:
-    void SetUp() override {
-    }
-    const VPUNN::DPUWorkload wl = {VPUNN::VPUDevice::VPU_2_7,
-                                   VPUNN::Operation::CONVOLUTION,
-                                   {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                                   {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                                   {3, 3},                                                     // kernels
-                                   {1, 1},                                                     // strides
-                                   {1, 1},                                                     // padding
-                                   VPUNN::ExecutionMode::CUBOID_16x16};
-
-private:
-};
-
-// Demonstrate some basic assertions.
-TEST_F(TestPreprocessingLatest, SingleWLTestPreprocessing) {
-    // Instantiate the preprocessing class
-    auto pp = VPUNN::PreprocessingLatest<float>();
-    // Transform a single workload
-    std::vector<float> result = pp.transform(wl);
-}
-
-// Demonstrate some basic assertions.
-TEST_F(TestPreprocessingLatest, MultipleWLTestPreprocessing) {
-    // Instantiate the preprocessing class
-    auto pp = VPUNN::PreprocessingLatest<float>();
-    // Transform a batch of them
-    const std::vector<VPUNN::DPUWorkload> wl_lst = {wl, wl, wl};
-    std::vector<float> result = pp.transform(wl_lst);
-
-    for (unsigned int batch_idx = 0; batch_idx < 3; batch_idx++) {
-        std::vector<float> batch_result = pp.transform(wl_lst[batch_idx]);
-
-        EXPECT_EQ(batch_result.size() * 3, result.size());
-        for (unsigned int idx = 0; idx < batch_result.size(); idx++) {
-            EXPECT_EQ(batch_result[idx], result[idx + batch_idx * pp.output_size()]);
-        }
-    }
-}
-
-// Demonstrate basic creation and size
-TEST_F(TestPreprocessingLatest, CreationAndSize) {
-    auto pp = VPUNN::PreprocessingLatest<float>();
-    EXPECT_EQ(pp.output_size(), 102);
-
-    size_t data_written = 0;
-    std::vector<float> result = pp.generate_descriptor(wl, data_written);
-    EXPECT_EQ(data_written, 102);
-}
-
-// The latest fast implementation might have also a stable versioned implementation and their outputs should be the same
-TEST_F(TestPreprocessingLatest, TestLatestIsEqualToSomeVersion) {
-    // Instantiate the preprocessing class
-    auto pp = VPUNN::PreprocessingLatest<float>();
-
-    // const VPUNN::RuntimeProcessingFactory factory;
-
-    //    auto pp_equiv = VPUNN::Preprocessing_Interface11<float>();
-    auto pp_equiv = VPUNN::PreprocessingLatest<float>();  // not equal to any
-    // factory.make_preprocessing(pp.implements_also_interface());
-
-    EXPECT_EQ(pp.interface_version(), pp_equiv.interface_version());
-    EXPECT_EQ(pp.implements_also_interface(), pp_equiv.interface_version());
-
-    {
-        size_t filled = 0;
-        std::vector<float> resultL = pp.generate_descriptor(wl, filled);
-        size_t filled_equiv = 0;
-        std::vector<float> result_equiv = pp_equiv.generate_descriptor(wl, filled_equiv);
-
-        ASSERT_EQ(resultL.size(), result_equiv.size());
-        EXPECT_EQ(filled, filled_equiv) << "Actual filled data must match";
-
-        for (size_t i = 0; i < resultL.size(); ++i) {
-            EXPECT_EQ(resultL[i], result_equiv[i]) << "!= at elem : " << i;
-        }
-    }
-    // todo:  test should be done on multiple workloads
-    {
-        const VPUNN::DPUWorkload tst_wl = {
-                VPUNN::VPUDevice::VPU_2_7,
-                VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::XYZ,
-                                  true)},  // input dimensions
-                {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::XYZ,
-                                  true)},                            // output dimensions
-                {3, 3},                                              // kernels
-                {1, 1},                                              // strides
-                {1, 1},                                              // padding
-                VPUNN::ExecutionMode::CUBOID_16x16,                  //
-                VPUNN::ActivationFunction::NONE,                     //
-                0.7F,                                                // act sparsity
-                0.3F,                                                // weight_sparsity
-                {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},  // swiz in
-                {VPUNN::Swizzling::KEY_0},                           // swiz out
-                1,                                                   // owtiles
-                {0, 0, 0, 0},                                        // offsets,
-                VPUNN::ISIStrategy::SPLIT_OVER_H,                    //
-        };
-
-        size_t filled = 0;
-        std::vector<float> resultL = pp.generate_descriptor(tst_wl, filled);
-        size_t filled_equiv = 0;
-        std::vector<float> result_equiv = pp_equiv.generate_descriptor(tst_wl, filled_equiv);
-
-        ASSERT_EQ(resultL.size(), result_equiv.size());
-        EXPECT_EQ(filled, filled_equiv) << "Actual filled data must match";
-
-        for (size_t i = 0; i < resultL.size(); ++i) {
-            EXPECT_EQ(resultL[i], result_equiv[i]) << "!= at elem : " << i;
-        }
-    }
-}
+//class TestPreprocessingLatest : public ::testing::Test {
+//public:
+//protected:
+//    void SetUp() override {
+//    }
+//    const DPUWorkload wl = {
+//            VPUDevice::VPU_2_7,
+//            Operation::CONVOLUTION,
+//            {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+//            {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+//            {3, 3},                                       // kernels
+//            {1, 1},                                       // strides
+//            {1, 1},                                       // padding
+//            ExecutionMode::CUBOID_16x16,
+//            ActivationFunction::NONE,  //
+//            0.2F,                      // act sparsity
+//            0.8F,                      // weight_sparsity
+//            {swz_def, swz_def},        // input_swizzling
+//            {swz_def},                 // output_swizzling
+//            1,                         // owtiles
+//            {0, 0, 0, 0},              // offsets,
+//            ISIStrategy::CLUSTERING,   //
+//            false,                     // weight_sparsity_enabled
+//            {
+//                    {1, 2, 3, 4},              // input_0_halo
+//                    {5, 6, 7, 8},              // output_0_halo
+//                    {9, 10, 11, 12},           // output_0_halo_broadcast_cnt
+//                    {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
+//            }                                  // halo
+//    };
+//
+//private:
+//};
+//
+//// Demonstrate some basic assertions.
+//TEST_F(TestPreprocessingLatest, SingleWLTestPreprocessing) {
+//    // Instantiate the preprocessing class
+//    auto pp = PreprocessingLatest<float>();
+//    // Transform a single workload
+//    std::vector<float> result = pp.transform(wl);
+//}
+//
+//// Demonstrate some basic assertions.
+//TEST_F(TestPreprocessingLatest, MultipleWLTestPreprocessing) {
+//    // Instantiate the preprocessing class
+//    auto pp = PreprocessingLatest<float>();
+//    // Transform a batch of them
+//    const std::vector<DPUWorkload> wl_lst = {wl, wl, wl};
+//    std::vector<float> result = pp.transform(wl_lst);
+//
+//    for (unsigned int batch_idx = 0; batch_idx < 3; batch_idx++) {
+//        std::vector<float> batch_result = pp.transform(wl_lst[batch_idx]);
+//
+//        EXPECT_EQ(batch_result.size() * 3, result.size());
+//        for (unsigned int idx = 0; idx < batch_result.size(); idx++) {
+//            EXPECT_EQ(batch_result[idx], result[idx + batch_idx * pp.output_size()]);
+//        }
+//    }
+//}
+//
+//// Demonstrate basic creation and size
+//TEST_F(TestPreprocessingLatest, CreationAndSize) {
+//    const unsigned int expected_descriptor_size =
+//            102 + 2  // NPU device (5.0 & 5.0W)
+//            + 2      // new 2 operations
+//            + ((2 + 6) /*new 2 data types*/ * 3 /*tensors*/) +
+//            (3 * 6 /*3*6 halo info*/ - 9 /* rem Device and isi*/ - 15 /*swizz is 1 now*/);
+//
+//    EXPECT_EQ(expected_descriptor_size, 124);
+//
+//    auto pp{PreprocessingLatest<float>()};
+//    EXPECT_EQ(pp.output_size(), expected_descriptor_size);
+//
+//    size_t data_written = 0;
+//    std::vector<float> result = pp.generate_descriptor(wl, data_written);
+//    EXPECT_EQ(data_written, expected_descriptor_size);
+//}
+//
+//// The latest fast implementation might have also a stable version implementation and their outputs should be the same
+//TEST_F(TestPreprocessingLatest, TestLatestIsEqualToSomeVersion) {
+//    // Instantiate the preprocessing class
+//    auto pp = PreprocessingLatest<float>();
+//
+//    auto pp_equiv = Preprocessing_Interface12<float>();
+//    // auto pp_equiv = PreprocessingLatest<float>();  // not equal to any
+//
+//    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_00_LATEST_NONE);
+//    EXPECT_EQ(pp.implements_also_interface(), pp_equiv.interface_version());
+//
+//    {
+//        size_t filled = 0;
+//        std::vector<float> resultL = pp.generate_descriptor(wl, filled);
+//        size_t filled_equiv = 0;
+//        std::vector<float> result_equiv = pp_equiv.generate_descriptor(wl, filled_equiv);
+//
+//        ASSERT_EQ(resultL.size(), result_equiv.size());
+//        EXPECT_EQ(filled, filled_equiv) << "Actual filled data must match";
+//
+//        std::cout << "\nLatest    ";
+//        for (const auto x : resultL) {
+//            std::cout << " " << x << "";
+//        }
+//        std::cout << "\nEquivalent";
+//        for (const auto x : result_equiv) {
+//            std::cout << " " << x;
+//        }
+//
+//        for (size_t i = 0; i < resultL.size(); ++i) {
+//            EXPECT_EQ(resultL[i], result_equiv[i]) << "!= at elem : " << i;
+//        }
+//    }
+//    // todo:  test should be done on multiple workloads
+//    {
+//        const DPUWorkload tst_wl = {
+//                VPUDevice::VPU_2_7,
+//                Operation::CONVOLUTION,
+//                {VPUTensor(56, 57, 16, 1, DataType::UINT8, Layout::XYZ, true)},   // input dimensions
+//                {VPUTensor(56, 57, 16, 1, DataType::UINT8, Layout::XZY, false)},  // output dimensions
+//                {1, 2},                                                           // kernels
+//                {3, 4},                                                           // strides
+//                {5, 6, 7, 8},                                                     // padding
+//                ExecutionMode::CUBOID_16x16,                                      //
+//                ActivationFunction::NONE,                                         //
+//                0.7F,                                                             // act sparsity
+//                0.3F,                                                             // weight_sparsity
+//                {Swizzling::KEY_0, Swizzling::KEY_1},                             // swiz in
+//                {Swizzling::KEY_5},                                               // swiz out
+//                101,                                                              // owtiles
+//                {0, 0, 0, 0},                                                     // offsets,
+//                ISIStrategy::SPLIT_OVER_H,                                        //
+//                false,                                                            // weight_sparsity_enabled
+//                {
+//                        {1, 2, 3, 4},              // input_0_halo
+//                        {5, 6, 7, 8},              // output_0_halo
+//                        {9, 10, 11, 12},           // output_0_halo_broadcast_cnt
+//                        {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
+//                }                                  // halo
+//        };
+//
+//        size_t filled = 0;
+//        std::vector<float> resultL = pp.generate_descriptor(tst_wl, filled);
+//        size_t filled_equiv = 0;
+//        std::vector<float> result_equiv = pp_equiv.generate_descriptor(tst_wl, filled_equiv);
+//
+//        ASSERT_EQ(resultL.size(), result_equiv.size());
+//        EXPECT_EQ(filled, filled_equiv) << "Actual filled data must match";
+//
+//        std::cout << "\nLatest    ";
+//        for (const auto x : resultL) {
+//            std::cout << " " << x << "";
+//        }
+//        std::cout << "\nEquivalent";
+//        for (const auto x : result_equiv) {
+//            std::cout << " " << x;
+//        }
+//
+//        for (size_t i = 0; i < resultL.size(); ++i) {
+//            EXPECT_EQ(resultL[i], result_equiv[i]) << "!= at elem : " << i;
+//        }
+//    }
+//}
 
 class TestPreprocessing_Interface01 : public ::testing::Test {
 public:
 protected:
     void SetUp() override {
     }
-    const VPUNN::DPUWorkload wl = {VPUNN::VPUDevice::VPU_2_7,
-                                   VPUNN::Operation::CONVOLUTION,
-                                   {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                                   {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                                   {3, 3},                                                     // kernels
-                                   {1, 1},                                                     // strides
-                                   {1, 1},                                                     // padding
-                                   VPUNN::ExecutionMode::CUBOID_16x16};
+    const DPUWorkload wl = {VPUDevice::VPU_2_7,
+                            Operation::CONVOLUTION,
+                            {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                            {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                            {3, 3},                                       // kernels
+                            {1, 1},                                       // strides
+                            {1, 1},                                       // padding
+                            ExecutionMode::CUBOID_16x16};
 
 private:
 };
 /// Test cases covering the creation of the Preprocesing mode
 TEST_F(TestPreprocessing_Interface01, CreationTest) {
-    auto pp = VPUNN::Preprocessing_Interface01<float>();
+    auto pp = Preprocessing_Interface01<float>();
 
     ASSERT_EQ(pp.output_size(), 71);
 
@@ -159,15 +209,15 @@ TEST_F(TestPreprocessing_Interface01, CreationTest) {
 }
 
 TEST_F(TestPreprocessing_Interface01, TransformBad) {
-    auto pp = VPUNN::Preprocessing_Interface01<float>();
-    const VPUNN::DPUWorkload wl_b = {VPUNN::VPUDevice::VPU_2_7,
-                                     VPUNN::Operation::CONVOLUTION,
-                                     {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                                     {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                                     {3, 3},                                                     // kernels
-                                     {1, 1},                                                     // strides
-                                     {1, 1},                                                     // padding
-                                     VPUNN::ExecutionMode::CUBOID_16x16};
+    auto pp = Preprocessing_Interface01<float>();
+    const DPUWorkload wl_b = {VPUDevice::VPU_2_7,
+                              Operation::CONVOLUTION,
+                              {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                              {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                              {3, 3},                                       // kernels
+                              {1, 1},                                       // strides
+                              {1, 1},                                       // padding
+                              ExecutionMode::CUBOID_16x16};
 
     ASSERT_EQ(pp.output_size(), 71);
 
@@ -192,14 +242,14 @@ public:
 protected:
     void SetUp() override {
     }
-    const VPUNN::DPUWorkload wl = {VPUNN::VPUDevice::VPU_2_7,
-                                   VPUNN::Operation::CONVOLUTION,
-                                   {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                                   {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                                   {3, 3},                                                     // kernels
-                                   {1, 1},                                                     // strides
-                                   {1, 1},                                                     // padding
-                                   VPUNN::ExecutionMode::CUBOID_16x16};
+    const DPUWorkload wl = {VPUDevice::VPU_2_7,
+                            Operation::CONVOLUTION,
+                            {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                            {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                            {3, 3},                                       // kernels
+                            {1, 1},                                       // strides
+                            {1, 1},                                       // padding
+                            ExecutionMode::CUBOID_16x16};
 
 private:
 };
@@ -207,18 +257,18 @@ private:
 // Demonstrate some basic assertions.
 TEST_F(TestPreprocessing_Interface10, SingleWLTestPreprocessing) {
     // Instantiate the preprocessing class
-    auto pp = VPUNN::Preprocessing_Interface10<float>();
+    auto pp = Preprocessing_Interface10<float>();
     // Transform a single workload
     std::vector<float> result = pp.transform(wl);
 }
 
 // Demonstrate basic creation and size
 TEST_F(TestPreprocessing_Interface10, CreationAndSize) {
-    auto pp = VPUNN::Preprocessing_Interface10<float>();
+    auto pp = Preprocessing_Interface10<float>();
     EXPECT_EQ(pp.output_size(), 67);
 
     EXPECT_EQ(pp.interface_version(), pp.getInterfaceVersion()) << " dynamic and static version must be equal";
-    EXPECT_EQ(pp.interface_version(), (int)VPUNN::NNVersions::VERSION_10_ENUMS_SAME);
+    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_10_ENUMS_SAME);
     size_t data_written = 0;
     std::vector<float> result = pp.generate_descriptor(wl, data_written);
     EXPECT_EQ(data_written, 67);
@@ -229,24 +279,45 @@ public:
 protected:
     void SetUp() override {
     }
-    const VPUNN::DPUWorkload wl = {
-            VPUNN::VPUDevice::VPU_2_7,
-            VPUNN::Operation::CONVOLUTION,
-            {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::XYZ, true)},  // input dimensions
-            {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::XYZ, true)},  // output dimensions
-            {3, 3},                                                                               // kernels
-            {1, 1},                                                                               // strides
-            {1, 1},                                                                               // padding
-            VPUNN::ExecutionMode::CUBOID_16x16,                                                   //
-            VPUNN::ActivationFunction::NONE,                                                      //
-            0.7F,                                                                                 // act sparsity
-            0.3F,                                                                                 // weight_sparsity
-            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},                                   // swiz in
-            {VPUNN::Swizzling::KEY_0},                                                            // swiz out
-            1,                                                                                    // owtiles
-            {0, 0, 0, 0},                                                                         // offsets,
-            VPUNN::ISIStrategy::SPLIT_OVER_H,                                                     //
+    const DPUWorkload wl = {
+            VPUDevice::VPU_2_7,
+            Operation::CONVOLUTION,
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // input dimensions
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // output dimensions
+            {3, 3},                                                          // kernels
+            {1, 1},                                                          // strides
+            {1, 1},                                                          // padding
+            ExecutionMode::CUBOID_16x16,                                     //
+            ActivationFunction::NONE,                                        //
+            0.7F,                                                            // act sparsity
+            0.3F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // owtiles
+            {0, 0, 0, 0},                                                    // offsets,
+            ISIStrategy::SPLIT_OVER_H,                                       //
     };
+
+    // const int descriptor_expected_size{93};
+    const int tensorDescriptorSize =
+            4 + (int)intf_11::DataType::__size + (int)intf_11::Layout::__size + 1;  // 4 + 12 +9+1 =26
+    const int tens_dType_idx{4};
+    const int tens_Layout_idx{tens_dType_idx + (int)intf_11::DataType::__size};
+    const int tens_spars_idx{tens_Layout_idx + (int)intf_11::Layout::__size};
+
+    const int dev_idx = 0;
+    const int op_idx = dev_idx + (int)intf_11::VPUDevice::__size;  //+4
+    const int in_0_idx{op_idx + (int)intf_11::Operation::__size};  //
+    const int in_1_idx{in_0_idx + tensorDescriptorSize};
+    const int out_0_idx{in_1_idx + tensorDescriptorSize};
+
+    const int ksp_idx = out_0_idx + tensorDescriptorSize;
+
+    const int swizz_idx =
+            ksp_idx + 8 /*kernel:2 +strides:2+padding:4*/ + (int)intf_11::ExecutionMode::__size + 2 /*sparsities:2*/;
+    const int swizz_size{(int)intf_11::Swizzling::__size};
+
+    const int owt_idx = swizz_idx + (swizz_size * 3);
 
 private:
 };
@@ -254,47 +325,45 @@ private:
 // Demonstrate some basic assertions.
 TEST_F(TestPreprocessing_Interface11, SingleWLTestPreprocessing) {
     // Instantiate the preprocessing class
-    auto pp = VPUNN::Preprocessing_Interface11<float>();
+    auto pp = Preprocessing_Interface11<float>();
     // Transform a single workload
     std::vector<float> result = pp.transform(wl);
     EXPECT_EQ(result.size(), 93);
 }
-
 // Demonstrate basic creation and size
 TEST_F(TestPreprocessing_Interface11, CreationAndSize) {
-    auto pp = VPUNN::Preprocessing_Interface11<float>();
+    auto pp = Preprocessing_Interface11<float>();
     EXPECT_EQ(pp.output_size(), 93);  // less , should be 91!!!
 
     EXPECT_EQ(pp.interface_version(), pp.getInterfaceVersion()) << " dynamic and static version must be equal";
-    EXPECT_EQ(pp.interface_version(), (int)VPUNN::NNVersions::VERSION_11_VPU27_BETA);
+    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_11_VPU27_BETA);
     size_t data_written = 0;
     std::vector<float> result = pp.generate_descriptor(wl, data_written);
     EXPECT_EQ(data_written, 93);  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
 }
-
 TEST_F(TestPreprocessing_Interface11, DescriptorContentTest) {
-    const VPUNN::DPUWorkload wl2 = {
-            VPUNN::VPUDevice::VPU_2_7,
-            VPUNN::Operation::ELTWISE,
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::ZXY, false)},  // input dimensions
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::ZXY, true)},  // output dimensions
-            {1, 1},                                                                                 // kernels
-            {1, 1},                                                                                 // strides
-            {0, 0, 0, 0},                                                                           // padding
-            VPUNN::ExecutionMode::CUBOID_4x16,                                                      //
-            VPUNN::ActivationFunction::NONE,                                                        //
-            0.F,                                                                                    // act sparsity
-            0.F,                                                                                    // weight_sparsity
-            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},                                     // swiz in
-            {VPUNN::Swizzling::KEY_0},                                                              // swiz out
-            1,                                                                                      // owtiles
-            {0, 0, 0, 0},                                                                           // offsets,
-            VPUNN::ISIStrategy::CLUSTERING,                                                         //
+    const DPUWorkload wl2 = {
+            VPUDevice::VPU_2_7,
+            Operation::ELTWISE,
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
+            {1, 1},                                                             // kernels
+            {1, 1},                                                             // strides
+            {0, 0, 0, 0},                                                       // padding
+            ExecutionMode::CUBOID_4x16,                                         //
+            ActivationFunction::NONE,                                           //
+            0.F,                                                                // act sparsity
+            0.F,                                                                // weight_sparsity
+            {swz_def, swz_def},                                                 // input_swizzling
+            {swz_def},                                                          // output_swizzling
+            1,                                                                  // owtiles
+            {0, 0, 0, 0},                                                       // offsets,
+            ISIStrategy::CLUSTERING,                                            //
     };
 
-    auto pp = VPUNN::Preprocessing_Interface11<float>();
+    auto pp = Preprocessing_Interface11<float>();
     size_t data_written = 0;
     std::vector<float> result = pp.generate_descriptor(wl2, data_written);
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
@@ -307,15 +376,13 @@ TEST_F(TestPreprocessing_Interface11, DescriptorContentTest) {
     }
     std::cout << "\n" << wl2 << "\n";
 
-    const int dev_idx = 0;
     EXPECT_EQ(std::lround(result[dev_idx + (int)wl2.device]), 1);  // as long as no enum change in specific interface
 
-    const int op_idx = dev_idx + 4;
     EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]), 1);  // as long as no enum change in specific interface
 
-    const int in_0_idx = 10;
-    const int in_1_idx = in_0_idx + 16;
-    const int out_0_idx = in_1_idx + 16;
+    // const int in_0_idx = 10;
+    // const int in_1_idx = in_0_idx + 16;
+    // const int out_0_idx = in_1_idx + 16;
     EXPECT_EQ(std::lround(result[in_0_idx]), wl2.inputs[0].width());
     EXPECT_EQ(std::lround(result[in_0_idx + 1]), wl2.inputs[0].height());
     EXPECT_EQ(std::lround(result[in_0_idx + 2]), wl2.inputs[0].z());
@@ -332,79 +399,459 @@ TEST_F(TestPreprocessing_Interface11, DescriptorContentTest) {
     EXPECT_EQ(std::lround(result[in_1_idx + 3]), std::lround(result[in_0_idx + 3]));
 }
 
+TEST_F(TestPreprocessing_Interface11, Test_spatial_memory_tensor_input_2_7) {
+    DPUWorkload wl_SOH{
+            VPUDevice::VPU_2_7,
+            Operation::DW_CONVOLUTION,
+            {VPUTensor(65, 12, 64, 1, DataType::FLOAT16)},  // input dimensions
+            {VPUTensor(65, 4, 64, 1, DataType::FLOAT16)},   // output dimensions
+            {9, 9},                                         // kernels
+            {1, 1},                                         // strides
+            {0, 0, 4, 4},                                   // padding
+            ExecutionMode::CUBOID_16x16,                    // execution mode
+            ActivationFunction::NONE,                       // activation
+            0.0F,                                           // act_sparsity
+            0.0F,                                           // weight_sparsity
+            {swz_def, swz_def},                             // input_swizzling
+            {swz_def},                                      // output_swizzling
+            1,                                              // output_write_tiles
+            {0, 0, 0, 0},                                   // offsets
+            ISIStrategy::SPLIT_OVER_H,                      // isi_strategy
+            false,                                          // weight_sparsity_enabled
+            {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo info TBLRFB
+    };
+
+    const int width_idx = in_0_idx;
+    const int height_idx = in_0_idx + 1;
+    const int channels_idx = in_0_idx + 2;
+    const int batch_idx = in_0_idx + 3;
+
+    /// @param wl_ref
+    /// @param in_halo: input halo
+    /// @param in_w: expected value for input0 tensor width
+    /// @param in_h: expected value for input0 tensor height
+    /// @param in_c: expected value for input0 tensor channels
+    /// @param in_b: expected value for input0 tensor batch
+    auto verify_input_WH = [&width_idx, &height_idx, &channels_idx, &batch_idx](
+                                   DPUWorkload& wl_ref, const HaloWorkload::HaloInfoHWC in_halo,
+                                   const unsigned int in_w, const unsigned int in_h, const unsigned int in_c,
+                                   const unsigned int in_b) {
+        wl_ref.halo.input_0_halo = in_halo;
+
+        auto pp = Preprocessing_Interface11<float>();
+        size_t data_written = 0;
+        std::vector<float> result = pp.generate_descriptor(wl_ref, data_written);
+        EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
+
+        EXPECT_EQ(result.size(), data_written);
+        std::cout << "\n descriptor\n";
+
+        for (auto x : result) {
+            std::cout << " " << std::lround(x) << " ";
+        }
+        std::cout << "\n" << wl_ref << "\n";
+
+        EXPECT_EQ(std::lround(result[width_idx]), in_w);
+        EXPECT_EQ(std::lround(result[height_idx]), in_h);
+        EXPECT_EQ(std::lround(result[channels_idx]), in_c);
+        EXPECT_EQ(std::lround(result[batch_idx]), in_b);
+    };
+    // clang-format off
+    // input0 tensor dimensions: W=65 H=12 C=64 B=1
+    
+    // ISIStrategy SOH
+    //************* base wl  |      in halo     |     W      |     H     | C | B | 
+    verify_input_WH(wl_SOH, {0, 4, 0, 6, 0, 0}, 59 /*65-6*/, 8 /*12-4*/, 64, 1);
+    verify_input_WH(wl_SOH, {4, 4, 4, 4, 3, 2}, 57 /*68-4-4*/, 4 /*12-4-4*/, 64, 1);
+    verify_input_WH(wl_SOH, {-2, 4, 3, -6, 0, 1}, 62 /*65-3-0*/, 8 /*12-4-0*/, 64, 1); //negative halo is considered equal to 0
+    verify_input_WH(wl_SOH, {-1, -1, -1, -1, -7, 0}, 65 /*65-0-0*/, 12 /*12-0-0*/, 64, 1);//negative halo is considered equal to 0
+    verify_input_WH(wl_SOH, {3, 4, 0, 0, 0, 0}, 65 /*65*/, 5 /*12-4-3*/, 64, 1);
+    verify_input_WH(wl_SOH, {0, 0, 3, 4, 0, 0}, 58 /*65-3-4*/, 12 /*12*/, 64, 1);
+
+    //ISIStrategy CLUSTERING
+    DPUWorkload wl_CLU{wl_SOH};
+    wl_CLU.isi_strategy=ISIStrategy::CLUSTERING;
+
+     //************* base wl |    in halo    |  W  |  H | C | B | 
+    verify_input_WH(wl_CLU, {0, 4, 0, 6, 0, 0}, 65 , 12 , 64, 1);
+    verify_input_WH(wl_CLU, {3, -4, 0, 0, 0, 0}, 65 , 12 , 64, 1);
+    verify_input_WH(wl_CLU, {0, 0, 5, -6, 0, 0}, 65 , 12 , 64, 1);
+    verify_input_WH(wl_CLU, {1, 2, 3, 6, 1, 2}, 65 , 12 , 64, 1);
+    // clang-format on
+}
+
+TEST_F(TestPreprocessing_Interface11, Test_spatial_memory_tensor_input_descriptors_comparing) {
+    DPUWorkload wl_SOH{
+            VPUDevice::VPU_2_7,
+            Operation::DW_CONVOLUTION,
+            {VPUTensor(65, 12, 64, 1, DataType::FLOAT16)},  // input dimensions
+            {VPUTensor(65, 4, 64, 1, DataType::FLOAT16)},   // output dimensions
+            {9, 9},                                         // kernels
+            {1, 1},                                         // strides
+            {0, 0, 4, 4},                                   // padding
+            ExecutionMode::CUBOID_16x16,                    // execution mode
+            ActivationFunction::NONE,                       // activation
+            0.0F,                                           // act_sparsity
+            0.0F,                                           // weight_sparsity
+            {swz_def, swz_def},                             // input_swizzling
+            {swz_def},                                      // output_swizzling
+            1,                                              // output_write_tiles
+            {0, 0, 0, 0},                                   // offsets
+            ISIStrategy::SPLIT_OVER_H,                      // isi_strategy
+            false,                                          // weight_sparsity_enabled
+            {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo info TBLRFB
+    };
+
+    const int width_idx = in_0_idx;
+    const int height_idx = in_0_idx + 1;
+
+    /// here we test if 2 descriptors are equal, except for the elements input0 height and input0 width, witch change
+    /// due to the presence of halo ans SPLIT_OVER_H
+    /// @param wl_SOH DPUWorkload with ISIStrategy SPLIT_OVER_H
+    /// @param wl_CLU DPUWorkload with ISIStrategy CLUSTERING
+    /// @param in_halo: input halo
+    auto verify_input_WH = [&width_idx, &height_idx](DPUWorkload& wl_SOH, DPUWorkload& wl_CLU,
+                                                     const HaloWorkload::HaloInfoHWC in_halo) {
+        wl_SOH.halo.input_0_halo = in_halo;
+        wl_CLU.halo.input_0_halo = in_halo;
+
+        auto pp = Preprocessing_Interface11<float>();
+        size_t data_written_wl_SOH = 0;
+        std::vector<float> result_wl_SOH = pp.generate_descriptor(wl_SOH, data_written_wl_SOH);
+        EXPECT_EQ(data_written_wl_SOH, pp.output_size());  // this is the actual filled dimension
+
+        EXPECT_EQ(result_wl_SOH.size(), data_written_wl_SOH);
+
+        size_t data_written_wl_CLU = 0;
+        std::vector<float> result_wl_CLU = pp.generate_descriptor(wl_SOH, data_written_wl_CLU);
+        EXPECT_EQ(data_written_wl_CLU, pp.output_size());  // this is the actual filled dimension
+
+        EXPECT_EQ(result_wl_CLU.size(), data_written_wl_CLU);
+
+        // both descriptors should be equal, except for the elements input0 width and input0 height
+        // if input halo is zero or negative values are equal else W and H for wl_SOH should be lower
+        EXPECT_LE(std::lround(result_wl_SOH[width_idx]), std::lround(result_wl_CLU[width_idx]));
+        EXPECT_LE(std::lround(result_wl_SOH[height_idx]), std::lround(result_wl_CLU[height_idx]));
+
+        // here we check that the rest of elements in both descriptors are equals
+        for (size_t i = 0; i < result_wl_CLU.size(); i++) {
+            if (i != static_cast<long unsigned int>(width_idx) || i != static_cast<long unsigned int>(height_idx)) {
+                EXPECT_EQ(std::lround(result_wl_SOH[i]), std::lround(result_wl_CLU[i]));
+            }
+        }
+    };
+    DPUWorkload wl_CLU{wl_SOH};
+    wl_CLU.isi_strategy = ISIStrategy::CLUSTERING;
+    verify_input_WH(wl_SOH, wl_CLU, {1, 2, 3, 4, 5, 6});
+    verify_input_WH(wl_SOH, wl_CLU, {-2, -3, 0, -4, 0, 0});
+}
+
+// for more info you can see the function @avoid_untrained_space()
+TEST_F(TestPreprocessing_Interface11, Test_limit_owt_to_2_mechanism_2_7) {
+    DPUWorkload wl_ref{
+            VPUDevice::VPU_2_7,
+            Operation::CONVOLUTION,
+            {VPUTensor(65, 12, 64, 1, DataType::FLOAT16)},  // input dimensions
+            {VPUTensor(65, 4, 64, 1, DataType::FLOAT16)},   // output dimensions
+            {9, 9},                                         // kernels
+            {1, 1},                                         // strides
+            {0, 0, 4, 4},                                   // padding
+            ExecutionMode::CUBOID_16x16,                    // execution mode
+            ActivationFunction::NONE,                       // activation
+            0.0F,                                           // act_sparsity
+            0.0F,                                           // weight_sparsity
+            {swz_def, swz_def},                             // input_swizzling
+            {swz_def},                                      // output_swizzling
+            5,                                              // output_write_tiles
+            {0, 0, 0, 0},                                   // offsets
+            ISIStrategy::CLUSTERING,                        // isi_strategy
+            false,                                          // weight_sparsity_enabled
+
+    };
+
+    auto generate_des = [](DPUWorkload& wl_ref) -> std::vector<float> {
+        auto pp = Preprocessing_Interface11<float>();
+        size_t data_written = 0;
+        std::vector<float> result = pp.generate_descriptor(wl_ref, data_written);
+        return result;
+    };
+
+    // case when owt is changed
+    std::vector<float> result_owt_change = generate_des(wl_ref);
+    std::cout << "\n descriptor when owt change\n";
+    for (auto x : result_owt_change) {
+        std::cout << " " << std::lround(x) << " ";
+    }
+    EXPECT_EQ(std::lround(result_owt_change[owt_idx]), 2);
+
+    // case when owt is not changed
+    wl_ref.output_write_tiles = 1;
+    std::vector<float> result_owt_not_change = generate_des(wl_ref);
+    std::cout << "\n descriptor when owt does not change\n";
+    for (auto x : result_owt_not_change) {
+        std::cout << " " << std::lround(x) << " ";
+    }
+    EXPECT_EQ(std::lround(result_owt_not_change[owt_idx]), 1);
+}
+TEST_F(TestPreprocessing_Interface11, SwizzlingContentTest) {
+    const DPUWorkload wl2 = {
+            VPUDevice::VPU_2_7,
+            Operation::ELTWISE,
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
+            {1, 2},                                                             // kernels
+            {3, 4},                                                             // strides
+            {5, 6, 7, 8},                                                       // padding
+            ExecutionMode::CUBOID_4x16,                                         //
+            ActivationFunction::NONE,                                           //
+            0.11F,                                                              // act sparsity
+            0.22F,                                                              // weight_sparsity
+            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
+            {Swizzling::KEY_0},                                                 // swiz out
+    };
+    const DPUWorkload wl3 = {
+            VPUDevice::VPU_2_7,
+            Operation::MAXPOOL,
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
+            {1, 2},                                                             // kernels
+            {3, 4},                                                             // strides
+            {5, 6, 7, 8},                                                       // padding
+            ExecutionMode::CUBOID_4x16,                                         //
+            ActivationFunction::NONE,                                           //
+            0.11F,                                                              // act sparsity
+            0.22F,                                                              // weight_sparsity
+            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
+            {Swizzling::KEY_0},                                                 // swiz out
+    };
+
+    auto pp = Preprocessing_Interface11<float>();
+    size_t data_written = 0;
+    std::vector<float> result = pp.generate_descriptor(wl2, data_written);
+    EXPECT_EQ(swizz_size, 6);
+
+    struct TestExpected {
+        Swizzling swizIn0;
+        Swizzling swizIn1;
+        Swizzling swizOut0;
+    };
+
+    auto executeTest = [&pp, this](const DPUWorkload& tin, const TestExpected& texp) {
+        size_t data_written = 0;
+        std::vector<float> result = pp.generate_descriptor(tin, data_written);
+
+        // std::cout << "\n descriptor\n";
+
+        // for (auto x : result) {
+        //    std::cout << " " << std::lround(x) << " ";
+        //}
+
+        const int swzi0_idx{swizz_idx + 0 * swizz_size};
+        const int swzi1_idx{swizz_idx + 1 * swizz_size};
+        const int swzo0_idx{swizz_idx + 2 * swizz_size};
+
+        const int swzPosIn0{(int)texp.swizIn0};
+        const int swzPosIn1{(int)texp.swizIn1};
+        const int swzPosOut0{(int)texp.swizOut0};
+
+        EXPECT_EQ(std::lround(result[swzi0_idx + swzPosIn0]), 1) << swzi0_idx << std::endl << tin;
+        EXPECT_EQ(std::lround(result[swzi1_idx + swzPosIn1]), 1) << swzi1_idx << std::endl << tin;
+        EXPECT_EQ(std::lround(result[swzo0_idx + swzPosOut0]), 1) << swzo0_idx << std::endl << tin;
+
+        // EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size]), texp.swizIn1) << swizz_idx << std::endl <<
+        // tin;
+        //  EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size + 1]), 0);
+        // EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size]), texp.swizOut0) << swizz_idx << std::endl <<
+        // tin;
+        //  EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size + 1]), 0);
+    };
+
+    auto gen = [](Swizzling in0, Swizzling in1, Swizzling out0, const DPUWorkload& prototype) {
+        DPUWorkload wl{prototype};
+        wl.input_swizzling[0] = in0;
+        wl.input_swizzling[1] = in1;
+        wl.output_swizzling[0] = out0;
+        return wl;
+    };
+
+    const DPUWorkload elm_proto{wl2};
+    const DPUWorkload conv_proto{wl};
+    const DPUWorkload maxp_proto{wl3};
+
+    struct Test {
+        const DPUWorkload tin;
+        const TestExpected texp;
+    };
+    const TestExpected allZero{Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0};
+    const TestExpected allFive{Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5};
+    const TestExpected five_0_5{Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5};
+
+    std::vector<Test> tests{
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, elm_proto), allZero},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, elm_proto), allFive},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, elm_proto), allFive},
+            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, elm_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, elm_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, elm_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, elm_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, elm_proto), allFive},
+
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, conv_proto), allFive},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, conv_proto), allFive},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, conv_proto), allFive},
+            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, conv_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, conv_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, conv_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, conv_proto), allFive},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, conv_proto), allFive},
+
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, maxp_proto), five_0_5},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, maxp_proto), five_0_5},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, maxp_proto), five_0_5},
+            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, maxp_proto), five_0_5},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, maxp_proto), five_0_5},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, maxp_proto), five_0_5},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, maxp_proto), five_0_5},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, maxp_proto), five_0_5},
+    };
+
+    for (auto& t : tests) {
+        executeTest(t.tin, t.texp);
+    }
+}
+
+// check the INVALID wts layout
+TEST_F(TestPreprocessing_Interface11, MAXPOOLContentTest) {
+    const DPUWorkload wl2 = {
+            VPUDevice::VPU_2_7,
+            Operation::MAXPOOL,
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ)},  // output dimensions
+            {3, 3},                                                    // kernels
+            {1, 1},                                                    // strides
+            {1, 1},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                               //
+            ActivationFunction::NONE,                                  //
+            0.0F,                                                      // act sparsity
+            0.0F,                                                      // weight_sparsity
+            {swz_def, swz_def},                                        // input_swizzling
+            {swz_def},                                                 // output_swizzling
+            1,                                                         // owtiles
+            {0, 0, 0, 0},                                              // offsets,
+            ISIStrategy::SPLIT_OVER_H,                                 // isi
+            true,                                                      // wt sparsity ON/OFF
+    };
+
+    auto pp = Preprocessing_Interface11<float>();
+    size_t data_written = 0;
+    std::vector<float> result = pp.generate_descriptor(wl2, data_written);
+    EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
+
+    EXPECT_EQ(result.size(), data_written);
+    std::cout << "\n descriptor\n";
+
+    for (auto x : result) {
+        std::cout << " " << std::lround(x) << " ";
+    }
+    std::cout << "\n" << wl2 << "\n";
+
+    EXPECT_EQ(std::lround(result[dev_idx + (int)wl2.device]),
+              1);  // as long as no enum change in specific interface
+
+    EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]), 1);  // as long as no enum change in specific interface
+
+    {  // input act
+        const auto idx{in_0_idx};
+        EXPECT_EQ(std::lround(result[idx + 0]), wl2.inputs[0].width());
+        EXPECT_EQ(std::lround(result[idx + 1]), wl2.inputs[0].height());
+        EXPECT_EQ(std::lround(result[idx + 2]), wl2.inputs[0].z());
+        EXPECT_EQ(std::lround(result[idx + 3]), wl2.inputs[0].b());
+        // datatyoe
+        EXPECT_EQ(std::lround(result[idx + tens_dType_idx + 0]), 1.0f);
+        EXPECT_EQ(std::lround(result[idx + tens_dType_idx + 1]), 0.0f);
+        // layout XYZ, XZY, YXZ, YZX, ZXY, ZYX, INVALID
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 0]), 0.0f);  // XYZ,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 1]), 0.0f);  // XZY,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 2]), 0.0f);  // YXZ,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 3]), 0.0f);  // YZX,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 4]), 1.0f);  // ZXY,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 5]), 0.0f);  // ZYX,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 6]), 0.0f);  // INVALID
+        /// sparsity
+        EXPECT_EQ(std::lround(result[in_0_idx + tens_spars_idx + 0]), 0.0f);  // sparsity ON/OFF
+    }
+
+    {  // output
+        const auto idx{out_0_idx};
+        EXPECT_EQ(std::lround(result[idx + 0]), wl2.outputs[0].width());
+        EXPECT_EQ(std::lround(result[idx + 1]), wl2.outputs[0].height());
+        EXPECT_EQ(std::lround(result[idx + 2]), wl2.outputs[0].z());
+        EXPECT_EQ(std::lround(result[idx + 3]), wl2.outputs[0].b());
+        // datatype
+        EXPECT_EQ(std::lround(result[idx + tens_dType_idx + 0]), 1.0f);
+        EXPECT_EQ(std::lround(result[idx + tens_dType_idx + 1]), 0.0f);
+        // layout XYZ, XZY, YXZ, YZX, ZXY, ZYX, INVALID
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 0]), 1.0f);  // XYZ,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 1]), 0.0f);  // XZY,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 2]), 0.0f);  // YXZ,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 3]), 0.0f);  // YZX,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 4]), 0.0f);  // ZXY,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 5]), 0.0f);  // ZYX,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 6]), 0.0f);  // INVALID
+        /// sparsity
+        EXPECT_EQ(std::lround(result[idx + tens_spars_idx + 0]), 0.0f);  // sparsity ON/OFF
+    }
+    {  // input 1 Wts
+        const auto idx{in_1_idx};
+        EXPECT_EQ(std::lround(result[idx + 0]), std::lround(0));
+        EXPECT_EQ(std::lround(result[idx + 1]), std::lround(0));
+        EXPECT_EQ(std::lround(result[idx + 2]), std::lround(0));
+        EXPECT_EQ(std::lround(result[idx + 3]), std::lround(0));
+        // datatyoe
+        EXPECT_EQ(std::lround(result[idx + tens_dType_idx + 0]), 1.0f);
+        EXPECT_EQ(std::lround(result[idx + tens_dType_idx + 1]), 0.0f);
+        // layout XYZ, XZY, YXZ, YZX, ZXY, ZYX, INVALID
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 0]), 0.0f);  // XYZ,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 1]), 0.0f);  // XZY,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 2]), 0.0f);  // YXZ,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 3]), 0.0f);  // YZX,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 4]), 0.0f);  // ZXY,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 5]), 0.0f);  // ZYX,
+        EXPECT_EQ(std::lround(result[idx + tens_Layout_idx + 6]), 1.0f);  // INVALID
+        /// sparsity
+        EXPECT_EQ(std::lround(result[idx + tens_spars_idx + 0]), 1.0f);  // sparsity ON/OFF
+    }
+}
+
 TEST_F(TestPreprocessing_Interface11, DescriptorContentTest_FLOAT_INT) {
-    const VPUNN::DPUWorkload wl_int_int = {
-            VPUNN::VPUDevice::VPU_2_7,
-            VPUNN::Operation::ELTWISE,
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {1, 1},                                                       // kernels
-            {1, 1},                                                       // strides
-            {0, 0, 0, 0},                                                 // padding
-            VPUNN::ExecutionMode::CUBOID_4x16,                            //
-            VPUNN::ActivationFunction::NONE,                              //
-            0.F,                                                          // act sparsity
-            0.F,                                                          // weight_sparsity
-            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},           // swiz in
-            {VPUNN::Swizzling::KEY_0},                                    // swiz out
-            1,                                                            // owtiles
-            {0, 0, 0, 0},                                                 // offsets,
-            VPUNN::ISIStrategy::CLUSTERING,                               //
+    class Builder {
+    public:
+        static DPUWorkload makeSameWl(DataType Tin, DataType Tout) {
+            return DPUWorkload{
+                    VPUDevice::VPU_2_7,
+                    Operation::ELTWISE,
+                    {VPUTensor(15, 1972, 16, 1, Tin)},   // input dimensions
+                    {VPUTensor(15, 1972, 16, 1, Tout)},  // output dimensions
+                    {1, 1},                              // kernels
+                    {1, 1},                              // strides
+                    {0, 0, 0, 0},                        // padding
+                    ExecutionMode::CUBOID_4x16,          //
+                    ActivationFunction::NONE,            //
+                    0.F,                                 // act sparsity
+                    0.F,                                 // weight_sparsity
+                    {swz_def, swz_def},                  // input_swizzling
+                    {swz_def},                           // output_swizzling
+                    1,                                   // owtiles
+                    {0, 0, 0, 0},                        // offsets,
+                    ISIStrategy::CLUSTERING,             //
+            };
+        }
     };
-    const VPUNN::DPUWorkload wl_float_float = {
-            VPUNN::VPUDevice::VPU_2_7,
-            VPUNN::Operation::ELTWISE,
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {1, 1},                                                         // kernels
-            {1, 1},                                                         // strides
-            {0, 0, 0, 0},                                                   // padding
-            VPUNN::ExecutionMode::CUBOID_4x16,                              //
-            VPUNN::ActivationFunction::NONE,                                //
-            0.F,                                                            // act sparsity
-            0.F,                                                            // weight_sparsity
-            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},             // swiz in
-            {VPUNN::Swizzling::KEY_0},                                      // swiz out
-            1,                                                              // owtiles
-            {0, 0, 0, 0},                                                   // offsets,
-            VPUNN::ISIStrategy::CLUSTERING,                                 //
-    };
-    const VPUNN::DPUWorkload wl_float_int = {
-            VPUNN::VPUDevice::VPU_2_7,
-            VPUNN::Operation::ELTWISE,
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::FLOAT16)},  // input dimensions
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::UINT8)},    // output dimensions
-            {1, 1},                                                         // kernels
-            {1, 1},                                                         // strides
-            {0, 0, 0, 0},                                                   // padding
-            VPUNN::ExecutionMode::CUBOID_4x16,                              //
-            VPUNN::ActivationFunction::NONE,                                //
-            0.F,                                                            // act sparsity
-            0.F,                                                            // weight_sparsity
-            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},             // swiz in
-            {VPUNN::Swizzling::KEY_0},                                      // swiz out
-            1,                                                              // owtiles
-            {0, 0, 0, 0},                                                   // offsets,
-            VPUNN::ISIStrategy::CLUSTERING,                                 //
-    };
-    const VPUNN::DPUWorkload wl_int_float = {
-            VPUNN::VPUDevice::VPU_2_7,
-            VPUNN::Operation::ELTWISE,
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::UINT8)},    // input dimensions
-            {VPUNN::VPUTensor(15, 1972, 16, 1, VPUNN::DataType::FLOAT16)},  // output dimensions
-            {1, 1},                                                         // kernels
-            {1, 1},                                                         // strides
-            {0, 0, 0, 0},                                                   // padding
-            VPUNN::ExecutionMode::CUBOID_4x16,                              //
-            VPUNN::ActivationFunction::NONE,                                //
-            0.F,                                                            // act sparsity
-            0.F,                                                            // weight_sparsity
-            {VPUNN::Swizzling::KEY_0, VPUNN::Swizzling::KEY_0},             // swiz in
-            {VPUNN::Swizzling::KEY_0},                                      // swiz out
-            1,                                                              // owtiles
-            {0, 0, 0, 0},                                                   // offsets,
-            VPUNN::ISIStrategy::CLUSTERING,                                 //
-    };
+
+    const DPUWorkload wl_int_int{Builder::makeSameWl(DataType::UINT8, DataType::UINT8)};
+    const DPUWorkload wl_float_float{Builder::makeSameWl(DataType::FLOAT16, DataType::FLOAT16)};
+    const DPUWorkload wl_float_int{Builder::makeSameWl(DataType::FLOAT16, DataType::UINT8)};
+    const DPUWorkload wl_int_float{Builder::makeSameWl(DataType::UINT8, DataType::FLOAT16)};
 
     auto show_desc = [](const std::vector<float>& result, std::string prefix) {
         std::cout << prefix;
@@ -413,14 +860,11 @@ TEST_F(TestPreprocessing_Interface11, DescriptorContentTest_FLOAT_INT) {
         }
     };
 
-    auto pp = VPUNN::Preprocessing_Interface11<float>();
+    auto pp = Preprocessing_Interface11<float>();
     size_t data_written = 0;
     std::vector<float> result_i_i = pp.generate_descriptor(wl_int_int, data_written);
-
     std::vector<float> result_f_i = pp.generate_descriptor(wl_float_int, data_written);
-
     std::vector<float> result_i_f = pp.generate_descriptor(wl_int_float, data_written);
-
     std::vector<float> result_f_f = pp.generate_descriptor(wl_float_float, data_written);
 
     std::cout << "\n descriptors\n";
@@ -433,78 +877,470 @@ TEST_F(TestPreprocessing_Interface11, DescriptorContentTest_FLOAT_INT) {
 
     // EXPECT_EQ(result_i_i, result_i_f);
 
+    using datatypeContent = std::array<int, (int)intf_11::DataType::__size>;
+    const datatypeContent uint8_content{1, 0, 0, 0};
+    const datatypeContent f16_content{0, 0, 1, 0};
+    const int cntToCheck{(int)std::tuple_size<decltype(uint8_content)>{}};
+
     const int dtype_idx = 4;
-    const int in_0_idx = 10;
-    const int in_1_idx = in_0_idx + 16;
-    const int out_0_idx = in_1_idx + 16;
+    // const int in_0_idx = 10;
+    // const int in_1_idx = in_0_idx + 16;
+    // const int out_0_idx = in_1_idx + 16;
 
     {
         auto& r = result_i_i;
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 0]), 1);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 2]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 3]), 0);
+        auto& exp_in_0{uint8_content};
+        auto& exp_in_1{uint8_content};
+        auto& exp_out_0{uint8_content};
 
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 0]), 1);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 2]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 3]), 0);
-
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 0]), 1);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 2]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 3]), 0);
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
     }
     {
         auto& r = result_i_f;
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 0]), 1);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 2]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 3]), 0);
+        auto& exp_in_0{uint8_content};
+        auto& exp_in_1{uint8_content};
+        auto& exp_out_0{f16_content};
 
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 0]), 1);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 2]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 3]), 0);
-
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 0]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 2]), 1);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 3]), 0);
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
     }
     {
         auto& r = result_f_i;
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 0]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 2]), 1);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 3]), 0);
+        auto& exp_in_0{f16_content};
+        auto& exp_in_1{f16_content};
+        auto& exp_out_0{uint8_content};
 
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 0]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 2]), 1);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 3]), 0);
-
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 0]), 1);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 2]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 3]), 0);
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
     }
     {
         auto& r = result_f_f;
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 0]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 2]), 1);
-        EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + 3]), 0);
+        auto& exp_in_0{f16_content};
+        auto& exp_in_1{f16_content};
+        auto& exp_out_0{f16_content};
 
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 0]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 2]), 1);
-        EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + 3]), 0);
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
+    }
+}
 
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 0]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 1]), 0);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 2]), 1);
-        EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + 3]), 0);
+/// interface 12
+
+class TestPreprocessing_Interface12 : public ::testing::Test {
+public:
+protected:
+    void SetUp() override {
+    }
+    const DPUWorkload wl = {
+            VPUDevice::VPU_2_7,
+            Operation::CONVOLUTION,
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // input dimensions
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // output dimensions
+            {3, 3},                                                          // kernels
+            {1, 1},                                                          // strides
+            {1, 1},                                                          // padding
+            ExecutionMode::CUBOID_16x16,                                     //
+            ActivationFunction::NONE,                                        //
+            0.7F,                                                            // act sparsity
+            0.3F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // owtiles
+            {0, 0, 0, 0},                                                    // offsets,
+            ISIStrategy::SPLIT_OVER_H,                                       //
+            false,                                                           // weight_sparsity_enabled
+            {
+                    {1, 2, 3, 4, 41, 42},      // input_0_halo
+                    {5, 6, 7, 8, 81, 82},      // output_0_halo
+                    {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
+                    {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
+            }                                  // halo
+    };
+
+    const int descriptor_expected_size{124};
+    const int tensorDescriptorSize =
+            4 + (int)intf_12::DataType::__size + (int)intf_12::Layout::__size + 1;  // 4 + 12 +9+1 =26
+
+    const int op_idx = 0;
+    const int in_0_idx{op_idx + (int)intf_12::Operation::__size};  //
+    const int in_1_idx{in_0_idx + tensorDescriptorSize};
+    const int out_0_idx{in_1_idx + tensorDescriptorSize};
+
+    const int ksp_idx = out_0_idx + tensorDescriptorSize;
+
+    const int swizz_idx =
+            ksp_idx + 8 /*kernel:2 +strides:2+padding:4*/ + (int)intf_12::ExecutionMode::__size + 2 /*sparsities:2*/;
+    // const int swizz_size{(int)intf_12::Swizzling::__size};
+    const int swizz_size{1};
+
+    const int halo_idx = swizz_idx + (3 * swizz_size) + 1 /*owt*/;
+};
+
+// Demonstrate some basic assertions.
+TEST_F(TestPreprocessing_Interface12, SingleWLTestPreprocessing) {
+    EXPECT_EQ(descriptor_expected_size, 124);
+    // Instantiate the preprocessing class
+    auto pp = Preprocessing_Interface12<float>();
+    // Transform a single workload
+    std::vector<float> result = pp.transform(wl);
+    EXPECT_EQ(result.size(), descriptor_expected_size);
+}
+// Demonstrate basic creation and size
+TEST_F(TestPreprocessing_Interface12, CreationAndSize) {
+    auto pp = Preprocessing_Interface12<float>();
+    EXPECT_EQ(pp.output_size(), descriptor_expected_size);  //
+
+    EXPECT_EQ(pp.interface_version(), pp.getInterfaceVersion()) << " dynamic and static version must be equal";
+    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_12_HALO);
+    size_t data_written = 0;
+    std::vector<float> result = pp.generate_descriptor(wl, data_written);
+    EXPECT_EQ(data_written, descriptor_expected_size);  // this is the actual filled dimension
+
+    EXPECT_EQ(result.size(), data_written);
+}
+
+TEST_F(TestPreprocessing_Interface12, DescriptorContentTest) {
+    const DPUWorkload wl2 = {
+            VPUDevice::VPU_2_7,
+            Operation::ELTWISE,
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
+            {1, 2},                                                             // kernels
+            {3, 4},                                                             // strides
+            {5, 6, 7, 8},                                                       // padding
+            ExecutionMode::CUBOID_4x16,                                         //
+            ActivationFunction::NONE,                                           //
+            0.11F,                                                              // act sparsity
+            0.22F,                                                              // weight_sparsity
+            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
+            {Swizzling::KEY_0},                                                 // swiz out
+            100,                                                                // owtiles
+            {0, 0, 0, 0},                                                       // offsets,
+            ISIStrategy::SPLIT_OVER_K,                                          //
+            false,                                                              // weight_sparsity_enabled
+            {
+                    {1, 2, 3, 4, 5, 6},        // input_0_halo
+                    {7, 8, 9, 10, 11, 12},     // output_0_halo
+                    {13, 14, 15, 16, 17, 18},  // output_0_halo_broadcast_cnt
+                    {19, 20, 21, 22, 23, 24},  // output_0_inbound_halo
+            }                                  // halo
+    };
+
+    auto pp = Preprocessing_Interface12<float>();
+    size_t data_written = 0;
+    std::vector<float> result = pp.generate_descriptor(wl2, data_written);
+    EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
+
+    EXPECT_EQ(result.size(), data_written);
+    std::cout << "\n descriptor\n";
+
+    for (auto x : result) {
+        std::cout << " " << x /*std::lround(x) */ << " ";
+    }
+    std::cout << "\n" << wl2 << "\n";
+
+    // const int dev_idx = 0;
+    // EXPECT_EQ(std::lround(result[dev_idx + (int)wl2.device]), 1);  // as long as no enum change in specific
+    // interface
+
+    EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]),
+              1);  // as long as no enum change in specific interface
+
+    EXPECT_EQ(std::lround(result[in_0_idx]), wl2.inputs[0].width());
+    EXPECT_EQ(std::lround(result[in_0_idx + 1]), wl2.inputs[0].height());
+    EXPECT_EQ(std::lround(result[in_0_idx + 2]), wl2.inputs[0].z());
+    EXPECT_EQ(std::lround(result[in_0_idx + 3]), wl2.inputs[0].b());
+
+    EXPECT_EQ(std::lround(result[out_0_idx + 0]), wl2.outputs[0].width());
+    EXPECT_EQ(std::lround(result[out_0_idx + 1]), wl2.outputs[0].height());
+    EXPECT_EQ(std::lround(result[out_0_idx + 2]), wl2.outputs[0].z());
+    EXPECT_EQ(std::lround(result[out_0_idx + 3]), wl2.outputs[0].b());
+
+    EXPECT_EQ(std::lround(result[in_1_idx + 0]), std::lround(result[in_0_idx + 1]));
+    EXPECT_EQ(std::lround(result[in_1_idx + 1]), std::lround(result[in_0_idx + 2]));
+    EXPECT_EQ(std::lround(result[in_1_idx + 2]), std::lround(result[in_0_idx + 0]));
+    EXPECT_EQ(std::lround(result[in_1_idx + 3]), std::lround(result[in_0_idx + 3]));
+
+    EXPECT_EQ(std::lround(result[ksp_idx + 0]), 1);
+    EXPECT_EQ(std::lround(result[ksp_idx + 1]), 2);
+    EXPECT_EQ(std::lround(result[ksp_idx + 2]), 3);
+    EXPECT_EQ(std::lround(result[ksp_idx + 3]), 4);
+    EXPECT_EQ(std::lround(result[ksp_idx + 4]), 5);
+    EXPECT_EQ(std::lround(result[ksp_idx + 5]), 6);
+    EXPECT_EQ(std::lround(result[ksp_idx + 6]), 7);
+    EXPECT_EQ(std::lround(result[ksp_idx + 7]), 8);
+
+    // EXPECT_EQ(swizz_size, (int)intf_12::Swizzling::__size);
+    EXPECT_EQ(swizz_size, 1);
+
+    EXPECT_EQ(std::lround(result[swizz_idx + 0]), 1) << swizz_idx;
+    // EXPECT_EQ(std::lround(result[swizz_idx + 0 + 1]), 0);
+
+    EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size]), 1) << swizz_idx;
+    // EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size + 1]), 0);
+    EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size]), 0) << swizz_idx;
+    // EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size + 1]), 0);
+
+    EXPECT_EQ(std::lround(result[halo_idx + 0]), 1);
+    EXPECT_EQ(std::lround(result[halo_idx + 1]), 2);
+    EXPECT_EQ(std::lround(result[halo_idx + 2]), 3);
+    EXPECT_EQ(std::lround(result[halo_idx + 3]), 4);
+    EXPECT_EQ(std::lround(result[halo_idx + 4]), 5);
+    EXPECT_EQ(std::lround(result[halo_idx + 5]), 6);
+    EXPECT_EQ(std::lround(result[halo_idx + 6]), 7);
+    EXPECT_EQ(std::lround(result[halo_idx + 7]), 8);
+    EXPECT_EQ(std::lround(result[halo_idx + 8]), 9);
+    EXPECT_EQ(std::lround(result[halo_idx + 9]), 10);
+    EXPECT_EQ(std::lround(result[halo_idx + 10]), 11);
+    EXPECT_EQ(std::lround(result[halo_idx + 11]), 12);
+
+    EXPECT_EQ(std::lround(result[halo_idx + 12]), 13);
+    EXPECT_EQ(std::lround(result[halo_idx + 13]), 14);
+    EXPECT_EQ(std::lround(result[halo_idx + 14]), 15);
+    EXPECT_EQ(std::lround(result[halo_idx + 15]), 16);
+    EXPECT_EQ(std::lround(result[halo_idx + 16]), 17);
+    EXPECT_EQ(std::lround(result[halo_idx + 17]), 18);
+}
+
+TEST_F(TestPreprocessing_Interface12, SwizzlingContentTest) {
+    const DPUWorkload wl2 = {
+            VPUDevice::VPU_2_7,
+            Operation::ELTWISE,
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
+            {1, 2},                                                             // kernels
+            {3, 4},                                                             // strides
+            {5, 6, 7, 8},                                                       // padding
+            ExecutionMode::CUBOID_4x16,                                         //
+            ActivationFunction::NONE,                                           //
+            0.11F,                                                              // act sparsity
+            0.22F,                                                              // weight_sparsity
+            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
+            {Swizzling::KEY_0},                                                 // swiz out
+    };
+    const DPUWorkload wl3 = {
+            VPUDevice::VPU_2_7,
+            Operation::MAXPOOL,
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
+            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
+            {1, 2},                                                             // kernels
+            {3, 4},                                                             // strides
+            {5, 6, 7, 8},                                                       // padding
+            ExecutionMode::CUBOID_4x16,                                         //
+            ActivationFunction::NONE,                                           //
+            0.11F,                                                              // act sparsity
+            0.22F,                                                              // weight_sparsity
+            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
+            {Swizzling::KEY_0},                                                 // swiz out
+    };
+
+    auto pp = Preprocessing_Interface12<float>();
+    size_t data_written = 0;
+    std::vector<float> result = pp.generate_descriptor(wl2, data_written);
+    EXPECT_EQ(swizz_size, 1);
+
+    struct TestExpected {
+        int swizIn0;
+        int swizIn1;
+        int swizOut0;
+    };
+
+    auto executeTest = [&pp, this](const DPUWorkload& tin, const TestExpected& texp) {
+        size_t data_written = 0;
+        std::vector<float> result = pp.generate_descriptor(tin, data_written);
+
+        // for (auto x : result) {
+        //     std::cout << " " << x /*std::lround(x) */ << " ";
+        // }
+
+        EXPECT_EQ(std::lround(result[swizz_idx + 0]), texp.swizIn0) << swizz_idx << std::endl << tin;
+        // EXPECT_EQ(std::lround(result[swizz_idx + 0 + 1]), 0);
+
+        EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size]), texp.swizIn1) << swizz_idx << std::endl << tin;
+        // EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size + 1]), 0);
+        EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size]), texp.swizOut0) << swizz_idx << std::endl << tin;
+        // EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size + 1]), 0);
+    };
+
+    auto gen = [](Swizzling in0, Swizzling in1, Swizzling out0, const DPUWorkload& prototype) {
+        DPUWorkload wl{prototype};
+        wl.input_swizzling[0] = in0;
+        wl.input_swizzling[1] = in1;
+        wl.output_swizzling[0] = out0;
+        return wl;
+    };
+
+    const DPUWorkload elm_proto{wl2};
+    const DPUWorkload conv_proto{wl};
+    const DPUWorkload maxp_proto{wl3};
+
+    struct Test {
+        const DPUWorkload tin;
+        const TestExpected texp;
+    };
+
+    std::vector<Test> tests{
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, elm_proto), {0, 0, 0}},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, elm_proto), {0, 0, 1}},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, elm_proto), {1, 1, 0}},
+            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, elm_proto), {1, 1, 0}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, elm_proto), {1, 1, 0}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, elm_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, elm_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, elm_proto), {1, 1, 1}},
+
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, conv_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, conv_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, conv_proto), {1, 1, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, conv_proto), {1, 1, 1}},
+
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, maxp_proto), {1, 0, 1}},
+            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
+            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, maxp_proto), {1, 0, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, maxp_proto), {1, 0, 1}},
+            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, maxp_proto), {1, 0, 1}},
+    };
+
+    for (auto& t : tests) {
+        executeTest(t.tin, t.texp);
+    }
+}
+
+TEST_F(TestPreprocessing_Interface12, DescriptorContentTest_FLOAT_INT) {
+    class Builder {
+    public:
+        static DPUWorkload makeSameWl(DataType Tin, DataType Tout) {
+            return DPUWorkload{
+                    VPUDevice::VPU_2_7,
+                    Operation::ELTWISE,
+                    {VPUTensor(15, 1972, 16, 1, Tin)},   // input dimensions
+                    {VPUTensor(15, 1972, 16, 1, Tout)},  // output dimensions
+                    {1, 1},                              // kernels
+                    {1, 1},                              // strides
+                    {0, 0, 0, 0},                        // padding
+                    ExecutionMode::CUBOID_4x16,          //
+                    ActivationFunction::NONE,            //
+                    0.F,                                 // act sparsity
+                    0.F,                                 // weight_sparsity
+                    {swz_def, swz_def},                  // input_swizzling
+                    {swz_def},                           // output_swizzling
+                    1,                                   // owtiles
+                    {0, 0, 0, 0},                        // offsets,
+                    ISIStrategy::CLUSTERING,             //
+                    false,                               // weight_sparsity_enabled
+                    {
+                            {1, 2, 3, 4, 41, 42},      // input_0_halo
+                            {5, 6, 7, 8, 81, 82},      // output_0_halo
+                            {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
+                            {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
+                    }                                  // halo
+            };
+        }
+    };
+
+    const DPUWorkload wl_int_int{Builder::makeSameWl(DataType::UINT8, DataType::UINT8)};
+    const DPUWorkload wl_float_float{Builder::makeSameWl(DataType::FLOAT16, DataType::FLOAT16)};
+    const DPUWorkload wl_float_int{Builder::makeSameWl(DataType::FLOAT16, DataType::UINT8)};
+    const DPUWorkload wl_int_float{Builder::makeSameWl(DataType::UINT8, DataType::FLOAT16)};
+
+    auto show_desc = [](const std::vector<float>& result, std::string prefix) {
+        std::cout << prefix;
+        for (auto x : result) {
+            std::cout << " " << std::lround(x) << " ";
+        }
+    };
+
+    auto pp = Preprocessing_Interface12<float>();
+    size_t data_written = 0;
+    std::vector<float> result_i_i = pp.generate_descriptor(wl_int_int, data_written);
+    std::vector<float> result_f_i = pp.generate_descriptor(wl_float_int, data_written);
+    std::vector<float> result_i_f = pp.generate_descriptor(wl_int_float, data_written);
+    std::vector<float> result_f_f = pp.generate_descriptor(wl_float_float, data_written);
+
+    std::cout << "\n descriptors\n";
+
+    show_desc(result_i_i, "\nii:");
+    show_desc(result_f_i, "\nfi:");
+    show_desc(result_i_f, "\nif:");
+    show_desc(result_f_f, "\nff:");
+    std::cout << std::endl;
+
+    // EXPECT_EQ(result_i_i, result_i_f);
+
+    using datatypeContent = std::array<int, (int)intf_12::DataType::__size>;
+    const datatypeContent uint8_content{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    const datatypeContent f16_content{0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    const int cntToCheck{(int)std::tuple_size<decltype(uint8_content)>{}};
+
+    const int dtype_idx = 4;
+
+    {
+        auto& r = result_i_i;
+        auto& exp_in_0{uint8_content};
+        auto& exp_in_1{uint8_content};
+        auto& exp_out_0{uint8_content};
+
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
+    }
+    {
+        auto& r = result_i_f;
+        auto& exp_in_0{uint8_content};
+        auto& exp_in_1{uint8_content};
+        auto& exp_out_0{f16_content};
+
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
+    }
+    {
+        auto& r = result_f_i;
+        auto& exp_in_0{f16_content};
+        auto& exp_in_1{f16_content};
+        auto& exp_out_0{uint8_content};
+
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
+    }
+    {
+        auto& r = result_f_f;
+        auto& exp_in_0{f16_content};
+        auto& exp_in_1{f16_content};
+        auto& exp_out_0{f16_content};
+
+        for (int i = 0; i < cntToCheck; ++i) {
+            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
+            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
+            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
+        }
     }
 }
 

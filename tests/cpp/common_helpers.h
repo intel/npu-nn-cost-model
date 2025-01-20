@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -12,80 +12,17 @@
 
 #include <string>
 #include <vector>
+#include "nn_models.h"
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
 
-#ifndef VPU_2_7_MODEL_PATH
-#define VPU_2_7_MODEL_PATH "../../../models/vpu_2_7.vpunn"
-#endif
-
-#ifndef VPU_2_0_MODEL_PATH
-#define VPU_2_0_MODEL_PATH "../../../models/vpu_2_0.vpunn"
-#endif
-
-#ifndef VPU_4_0_MODEL_PATH
-#define VPU_4_0_MODEL_PATH VPU_2_7_MODEL_PATH
-#endif
-
 namespace VPUNN_unit_tests {
-
-/// @brief class to help extracting paths and names of neural network model
-class NameHelperNN {
-public:
-    /// @brief gets the folder where the models are
-    static std::string get_model_root() {
-        const std::string m{VPU_2_0_MODEL_PATH};
-        return get_model_root(m);
-    }
-
-    /// @brief gets the folder where this model is
-    static std::string get_model_root(const std::string& model_file) {
-        const std::string m{model_file};
-        std::string model_root = m.substr(0, m.find_last_of('/') + 1);
-        return model_root;
-    }
-
-    /// @brief appends .fast before .vpunn file suffix
-    static std::string make_fast_version(const std::string& model_file) {
-        const std::string m{model_file};
-        std::string model_base = m.substr(0, m.rfind(".vpunn"));
-
-        std::string fast_name = model_base + ".fast" + ".vpunn";
-        return fast_name;
-    };
-};
-
-/// @brief Contains the lists of available models.
-/// Is aware of fast or normal files, and knows the associated devices for each NN
-class VPUNNModelsFiles {
-public:
-    using ModelDescriptor = std::pair<std::string, VPUNN::VPUDevice>;
-    const std::vector<ModelDescriptor> standard_model_paths{{VPU_2_0_MODEL_PATH, VPUNN::VPUDevice::VPU_2_0},
-                                                            {VPU_2_7_MODEL_PATH, VPUNN::VPUDevice::VPU_2_7}};
-    const std::vector<ModelDescriptor> fast_model_paths{
-            {NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH), VPUNN::VPUDevice::VPU_2_0},
-            {NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH), VPUNN::VPUDevice::VPU_2_7}};
-
-    const std::vector<ModelDescriptor> all_model_paths{concat(standard_model_paths, fast_model_paths)};
-
-    static const VPUNNModelsFiles& getModels() {
-        static const VPUNNModelsFiles the_NN_models;
-        return the_NN_models;
-    }
-
-private:
-    std::vector<ModelDescriptor> concat(const std::vector<ModelDescriptor>& v1,
-                                        const std::vector<ModelDescriptor>& v2) const {
-        std::vector<ModelDescriptor> v(v1);
-        v.insert(v.end(), v2.begin(), v2.end());
-        return v;
-    }
-};
 
 /// Value
 inline VPUNN::CyclesInterfaceType V(const VPUNN::CyclesInterfaceType v) {
     return v;
 }
+const VPUNN::Swizzling swz_def{VPUNN::Swizzling::KEY_5};  // default enabled for 2.7 onwards
 
 namespace wlh {  // keep this isolated. Better would have been a static consts in a class, but implies a cpp file.
 const std::string eq{"="};
@@ -162,6 +99,60 @@ public:
 
         return buffer.str();
     }
+};
+
+class CompareValues {
+protected:
+    /// example:  if value is 100 and tol_percent is 10, the function returns 10 (which is 10% of 100)
+    /// all values provided as parameters to this function must be positive otherwise undefined behavior
+    /// @param value is the value for which we determine the desired percentage part
+    /// @param tol_percent is a percentage , if 13 it means 13%
+    /// @return that specific percentage (tol_percent) of the total value
+    template <typename T>
+    static float compute_maximum_difference(T value, float tol_percent) {
+        // parameters must be positive otherwise undefined behavior
+        assert(value >= 0 && tol_percent >= 0);
+
+        return (tol_percent * value) / 100;
+    }
+
+public:
+    /// this function compares v1 and v2 and see if they can be considered equal or not
+    ///   For example, this function was designed for the following situation:
+    /// -v1 is a standard value,
+    /// -v2 is a value obtained from some functions,
+    /// -min_necessary_abs_diff is the maximum difference for which these values are still considered equal
+    /// -tol_percent represents how much percent the difference can be from the smallest value, bassically tell me by
+    /// how much percent a value can be greater or smaller than the other, We use this tol_percent only if the absolute
+    ///  difference between v1 and v2 is greater than diff.
+    /// all values provided as parameters to this function must be positive otherwise undefined behavior
+    /// @param v1 a value we want to compare
+    /// @param v2 the other value we want to compare with
+    /// @param min_necessary_abs_diff if the absolute difference between v1 and v2 is smaller than
+    /// min_necessary_abs_diff, tol_percent no longer matters, we consider v1=v2
+    /// @param tol_percent represents how much percent the difference can be from the smallest value, tol_percent
+    /// represents a tolerance threshold expressed as a gross value, not as a percentage, eg: if tol_percent=5 it
+    /// means 5%
+    /// @return true if values are considered to be equal, false if not
+    template <typename T>
+    static bool isEqual(T v1, T v2, T min_necessary_abs_diff, float tol_percent) {
+        // parameters must be positive otherwise undefined behavior
+        assert(v1 >= 0 && v2 >= 0 && min_necessary_abs_diff >= 0 && tol_percent >= 0);
+
+        const auto difference = (v1 > v2) ? (v1 - v2) : (v2 - v1);
+
+        if (difference < min_necessary_abs_diff)
+            return true;
+
+        // worst case scenario: the maximum difference should be calculated based on the smallest value we want to
+        // compare
+        const float max_diff =
+                std::min(compute_maximum_difference(v1, tol_percent), compute_maximum_difference(v2, tol_percent));
+
+        return (difference <= max_diff);
+    }
+
+private:
 };
 
 }  // namespace VPUNN_unit_tests

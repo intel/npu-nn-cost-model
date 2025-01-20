@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -8,3 +8,8 @@
 // Software Package for additional details.
 
 #include <vpu_network_cost_model.h>
+#include <vpu/shave/layers.h>  // for SWOperation implementations . SHAVE v1
+#include <vpu_dma_cost_model.h>
+
+template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU27>;  ///< explicit instantiation 
+template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU40>;  ///< explicit instantiation 

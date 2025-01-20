@@ -154,4 +154,6 @@ build_wasm
 doc
 doxy.warn
 /.vs
+/.vscode
 /build2
+_skbuild

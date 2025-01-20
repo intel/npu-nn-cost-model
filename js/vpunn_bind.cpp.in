@@ -107,10 +107,12 @@ EMSCRIPTEN_BINDINGS(vpunn) {
     class_<VPUTensor>("VPUTensor")
             .constructor<std::array<unsigned int, 4>, DataType>()
             .function("size", &VPUTensor::size)
-            .function("is_float", &VPUTensor::is_float)
-            .function("is_int", &VPUTensor::is_int)
-            .function("get_shape", &VPUTensor::get_shape)
-            .function("get_dtype", &VPUTensor::get_dtype);
+            //the following do not compile ! WHY?
+            //.function("is_float", &VPUTensor::is_float)
+            //.function("is_int", &VPUTensor::is_int)
+            //.function("get_shape", &VPUTensor::get_shape)
+            //.function("get_dtype", &VPUTensor::get_dtype)
+            ;
 
     class_<DPUWorkload>("DPUWorkload");
     class_<DMAWorkload>("DMAWorkload");

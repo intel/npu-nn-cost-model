@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -87,7 +87,8 @@ void stepDPU(std::string name, const std::string& model_path, const VPUNN::VPUDe
                 // Workload average latency in ms
                 auto wl_latency = total_latency / n_workloads;
 
-                std::cout << "   T: Nx1: 1 wl latency: " << wl_latency << " all workloads executed once." << std::endl;
+                std::cout << "   T: Nx1: 1 wl latency[ms]: " << wl_latency << " all workloads executed once."
+                          << std::endl;
 
                 all_run_at_once.push_back(wl_latency);
             }
@@ -119,7 +120,7 @@ void stepDPU(std::string name, const std::string& model_path, const VPUNN::VPUDe
                 WL_Stats measured_stats{wl_latency, min_lat, max_lat,        first,
                                         last,       median,  at10percentile, at90percentile};
 
-                std::cout << "   T: 1xN: 1 wl avg latency: " << wl_latency << " sequentially executed. "
+                std::cout << "   T: 1xN: 1 wl avg latency[ms]: " << wl_latency << " sequentially executed. "
                           << ". Min: " << min_lat << ", Med: " << median << std::endl;
 
                 individual_run.push_back(measured_stats);
@@ -209,7 +210,7 @@ void stepDPUINFO(std::string name, const std::string& model_path, const VPUNN::V
                 WL_Stats measured_stats{wl_latency, min_lat, max_lat,        first,
                                         last,       median,  at10percentile, at90percentile};
 
-                std::cout << "   T: 1xN: 1 wl avg latency: " << wl_latency << " sequentially executed. "
+                std::cout << "   T: 1xN: 1 wl avg latency[ms]: " << wl_latency << " sequentially executed. "
                           << ". Min: " << min_lat << ", Med: " << median << std::endl;
 
                 individual_run.push_back(measured_stats);

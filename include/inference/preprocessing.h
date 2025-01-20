@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,14 +10,15 @@
 #ifndef PREPROCESSING_H
 #define PREPROCESSING_H
 
-#include <math.h>
 #include <vpu/types.h>
 #include <sstream>  // for error formating
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
+#include <unordered_set>
 #include "vpu/validation/dpu_operations_validator.h"
 
 namespace VPUNN {
@@ -208,6 +209,46 @@ protected:
         return static_cast<D*>(this)->template insert<only_simulate>(data, offset);
     }
 
+    /// @brief insert specialization for HaloInfoHW
+    template <bool only_simulate>
+    size_t insert(const HaloWorkload::HaloInfoHW& data, size_t offset) {
+        offset = this->insert<only_simulate>(data.top, offset);
+        offset = this->insert<only_simulate>(data.bottom, offset);
+        offset = this->insert<only_simulate>(data.left, offset);
+        offset = this->insert<only_simulate>(data.right, offset);
+        return offset;
+    }
+
+    /// @brief insert specialization for HaloInfoHWC
+    template <bool only_simulate>
+    size_t insert(const HaloWorkload::HaloInfoHWC& data, size_t offset) {
+        offset = this->insert<only_simulate>(data.top, offset);
+        offset = this->insert<only_simulate>(data.bottom, offset);
+        offset = this->insert<only_simulate>(data.left, offset);
+        offset = this->insert<only_simulate>(data.right, offset);
+        offset = this->insert<only_simulate>(data.front, offset);
+        offset = this->insert<only_simulate>(data.back, offset);
+        return offset;
+    }
+
+    /// @brief insert specialization for HaloWorkload
+    template <bool only_simulate>
+    size_t insert(const HaloWorkload& data, size_t offset) {
+        offset = this->insert<only_simulate>(data.input_0_halo, offset);
+        offset = this->insert<only_simulate>(data.output_0_halo, offset);
+        offset = this->insert<only_simulate>(data.output_0_halo_broadcast_cnt, offset);
+        return offset;
+    }
+
+    // specialization for latest swizzling. Each version type should have its own if wants special treatment
+    // instead of enum one hot style, use a boolean enabled/disabled
+    template <bool only_simulate>
+    size_t insert(Swizzling data, size_t offset) {
+        // 1 for enabled :Key_n, zero for disabled: KEY_0
+        const bool is_swizzling_enabled{(data != Swizzling::KEY_0)};
+        return this->insert<only_simulate>(is_swizzling_enabled, offset);
+    }
+
     template <bool only_simulate = false, class E>
     size_t insert(E data, size_t offset) {
         return one_hot<only_simulate>(data, offset, static_cast<int>(E::__size));
@@ -215,6 +256,11 @@ protected:
 
     template <bool only_simulate = false>
     size_t insert(unsigned int data, size_t offset) {
+        return insert<only_simulate>(T(data), offset);
+    }
+
+    template <bool only_simulate = false>
+    size_t insert(int data, size_t offset) {
         return insert<only_simulate>(T(data), offset);
     }
 
@@ -264,6 +310,35 @@ protected:
         return size_required;
     }
 
+    ///// COmputes the memory  input tensor , regarding  the spatial W and H dimensions. It uses only real HALO specific
+    ///// to VPU2.7, (positive HALO).
+    ///// Scope is to generate the input tensor that was used when training the NPU2.7 NN.
+    /////
+    ///// @returns the new input tensor, only H and W are changed, and only by becoming smaller.
+    // VPUTensor computeActualSpatialMemoryNoHaloTensor(const VPUTensor& origT, const HaloWorkload& halo) const {
+    //     const auto& in_halo{halo.input_0_halo};
+    //     //  extension will be negative(memory reduction) if halo(positive halo),
+    //     // or positive (memory increase) ,memory is larger, if negative halo, but we consume less (prev layer wrote
+    //     //  more): DO NOT CARE
+
+    //    auto newDimension = [](const long long crtDimension, const int oneEndHalo, const int otherEndHalo) {
+    //        const int oneExt{oneEndHalo > 0 ? -oneEndHalo : 0};  // only if halo memory
+    //        const int twoExt{otherEndHalo > 0 ? -otherEndHalo : 0};
+
+    //        const long long newDim = crtDimension + (oneExt + twoExt);
+    //        return (newDim > 0 ? newDim : 0);  // limit to zero
+    //    };
+    //    const auto h{newDimension(origT.height(), in_halo.top, in_halo.bottom)};
+    //    const auto w{newDimension(origT.width(), in_halo.left, in_halo.right)};
+
+    //    const std::array<unsigned int, 4> newshape{static_cast<unsigned int>(w), static_cast<unsigned int>(h),  //
+    //                                               origT.channels(), origT.batches()};                          //
+    //                                               whcb
+    //    const VPUTensor ret(newshape, origT);
+    //    return ret;
+    //}
+
+protected:
 public:
     using Preprocessing<T>::transform;  ///< exposes the non virtual transform for  workloads vector
 
@@ -278,8 +353,8 @@ public:
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
      *
      * @param workload a DPUWorkload
-     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
-     * written
+     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions
+     * were written
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     const std::vector<T>& generate_descriptor(const DPUWorkload& workload, size_t& debug_offset) override {
@@ -288,120 +363,6 @@ public:
 
         return static_cast<D*>(this)->template transformOnly<false>(workload, debug_offset);
     };
-};
-/// @brief enum for NN descriptor versions (input versions)
-enum class NNVersions : int {
-    VERSION_00_LATEST_NONE = 0,  ///< no version OR last version
-    VERSION_01_BASE = 1,         ///< base version, the unnamed one
-    VERSION_10_ENUMS_SAME = 10,  ///< evo of v01, with correct size. est November 2022 VPU2.7 alpha release
-    VERSION_11_VPU27_BETA = 11,  ///< input 1 generated, isi strategy, layouts. est Jan 2023 VPU2.7 beta release
-};
-
-/**
- * @brief Latest evolution of the Preprocessing for latest interfaces
- */
-template <class T>
-class PreprocessingLatest : public PreprocessingInserter<T, PreprocessingLatest<T>> {
-private:
-    const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
-protected:
-    using PreprocessingInserter<T, PreprocessingLatest<T>>::insert;  ///< exposes the non virtual insert methods
-    friend class PreprocessingInserter<T, PreprocessingLatest<T>>;
-
-    /// @brief insert specialization for VPUTensor
-    template <bool only_simulate>
-    size_t insert(const VPUTensor& data, size_t offset) {
-        offset = this->insert<only_simulate>(data.get_shape(), offset);
-        offset = this->insert<only_simulate>(data.get_dtype(), offset);
-        offset = this->insert<only_simulate>(data.get_layout(), offset);
-        offset = this->insert<only_simulate>(data.get_sparsity(), offset);
-        return offset;
-    }
-
-    /**
-     * @brief Transform a DPUWorkload into a DPUWorkload descriptor
-     * Here the concrete descriptor is created/populated according to established convention/interface
-     *
-     * @param workload a DPUWorkload
-     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
-     * written
-     * @tparam only_simulate, if true then no data is actually written, only the offset is computed
-     * @return std::vector<T>& a DPUWorkload descriptor
-     */
-    template <bool only_simulate>
-    const std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
-        // Build the vector from the inputs
-        size_t offset = 0;
-        offset = this->insert<only_simulate>(workload.device, offset);
-        offset = this->insert<only_simulate>(workload.op, offset);
-
-        offset = this->insert<only_simulate>(workload.inputs, offset);
-
-        // input 1 tensor to be generated in place here!
-        {
-            auto input_1 = workload_validator.construct_input_1(workload);
-            offset = this->insert<only_simulate>(input_1, offset);
-        }
-        offset = this->insert<only_simulate>(workload.outputs, offset);
-
-        offset = this->insert<only_simulate>(workload.kernels, offset);
-        offset = this->insert<only_simulate>(workload.strides, offset);
-        offset = this->insert<only_simulate>(workload.padding, offset);
-
-        offset = this->insert<only_simulate>(workload.execution_order, offset);
-        // offset = this->insert<only_simulate>(workload.activation_function, offset);
-
-        offset = this->insert<only_simulate>(workload.act_sparsity, offset);
-        offset = this->insert<only_simulate>(workload.weight_sparsity, offset);
-
-        offset = this->insert<only_simulate>(workload.input_swizzling, offset);   // 2 elements
-        offset = this->insert<only_simulate>(workload.output_swizzling, offset);  // 1 element
-
-        offset = this->insert<only_simulate>(workload.output_write_tiles, offset);
-
-        offset = this->insert<only_simulate>(workload.isi_strategy, offset);
-
-        // weight_sparsity_enabled  contributes to the input_1 deduced tensor
-
-        debug_offset = offset;
-
-        // Return the output as a pointer to the data
-        return this->processed_output;
-    }
-
-    const size_t size_of_descriptor;  ///< how big the descriptor is, fixed at constructor
-
-public:
-    /// @brief the descriptor interface that this type was designed to fill/comply with
-    static int getInterfaceVersion() {
-        return static_cast<std::underlying_type_t<NNVersions>>(
-                NNVersions::VERSION_00_LATEST_NONE);  // 0 is a reserved interface type for latest evolution, draft
-                                                      // changes
-    }
-
-    /**
-     * @brief Tells what other interface is equal to this latest version, use with care
-     * A latest interface might have already a defined interface version (a specialization with version), or a new
-     * version is planned and this latest will become that version.
-     * If this latest is equal with a particular version it is worth to use the latests since it is faster at execution.
-     *
-     * @return the version of compatible/equal interface version, 0 otherwise
-     */
-    static int implements_also_interface() {
-        return static_cast<std::underlying_type_t<NNVersions>>(NNVersions::VERSION_00_LATEST_NONE);
-    }
-
-    /**
-     * @brief Ctor , inits the content with expected size
-     */
-    PreprocessingLatest(): size_of_descriptor(this->calculate_size()) {
-        this->set_size(size_of_descriptor);
-    };
-
-    /**
-     * @brief default virtual destructor
-     */
-    virtual ~PreprocessingLatest() = default;
 };
 
 }  // namespace VPUNN

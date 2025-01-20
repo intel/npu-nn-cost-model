@@ -1,0 +1,45 @@
+#
+# Copyright (C) 2022 Intel Corporation
+# SPDX-License-Identifier: Apache 2.0
+#
+
+default_install_hook_types: [pre-commit, commit-msg]
+repos:
+- repo: local
+  hooks:
+    - id: embargo-names
+      name: Check embargo names
+      entry: ./.githooks/embargo-names.sh
+      language: script
+      stages: [commit]
+    - id: embargo-names-commit-msg
+      name: Check embargo names in the commit message
+      entry: ./.githooks/embargo-names-commit-msg.sh
+      language: script
+      stages: [commit-msg]
+    - id: check-license
+      exclude: src/python/VPUNN.cpp
+      name: Check license
+      entry: ./.githooks/check-license.sh
+      language: script
+      stages: [commit]
+    - id: check-documentation
+      name: Check documentation
+      entry: ./.githooks/check-documentation.sh
+      language: script
+      stages: [commit]
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v10.0.1
+  hooks:
+    - id: clang-format
+      exclude: src/python/VPUNN.cpp
+- repo: https://github.com/psf/black
+  rev: 22.6.0
+  hooks:
+    - id: black
+      exclude: python/
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.1.0
+  hooks:
+    - id: check-merge-conflict
+    - id: check-json

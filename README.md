@@ -1,6 +1,6 @@
-# NPUNN cost model
+# VPUNN cost model
 
-A NN-Based Cost Model for NPU Devices. For additional information about model setup and training, please refer [this paper](https://arxiv.org/abs/2205.04586)
+A NN-Based Cost Model for VPU Devices. For additional information about model setup and training, please refer [this paper](https://arxiv.org/abs/2205.04586)
 
 If you find this work useful, please cite the following paper:
 
@@ -24,6 +24,8 @@ If you do not set CC and CXX environment variables, `which gcc` and `which g++` 
 
 Compile the library by typing `cmake -H. -Bbuild && cmake --build build`
 
+@TODO: environment compatible with newer compiler versions (gcc>=10, clamg >10 )  
+
 ### Use Intel oneAPI MKL
 
 Install oneAPI base Toolkit ([instructions](https://software.intel.com/content/www/us/en/develop/tools/oneapi/base-toolkit/download.html)). oneAPI is massive so feel free to install only the Math Kernel Library library.
@@ -41,7 +43,7 @@ You can select which BLAS library to use (assume you have MKL installed) and the
 
 ## Using the cost model: C++
 
-To use the NPUNN cost model in a cmake project is quite simple. An example of a CMakeLists.txt file is shown below
+To use the VPUN cost model in a cmake project is quite simple. An example of a CMakeLists.txt file is shown below
 
 ```cmake
 include_directories(${CMAKE_BINARY_DIR}/include)
@@ -82,128 +84,44 @@ You can install the library by typing `pip install .`
 
 Do this in a python virtual environment.
 
-### NPU cost model
+### Cost models
 
 Run the `vpu_cost_model` script to evaluate workloads from the command line
 
 ```bash
-usage: vpu_cost_model [-h] [--model MODEL] [-t {cycles,power,utilization}] -d {VPU_2_0,VPU_2_1,VPU_2_7} {DPU,DMA} ...
+usage: vpu_cost_model [-h] --model MODEL [-t {cycles,power,utilization}] {VPU_2_7,VPU_4_0} ...
 
-NPU cost model
+VPU cost model
 
 positional arguments:
-  {DPU,DMA}
+  {VPU_2_7,VPU_4_0}
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --model MODEL, -m MODEL
                         Model path
-  -t {cycles,power,utilization}, --target {cycles,power,utilization}
-                        The target type
-  -d {VPU_2_0,VPU_2_1,VPU_2_7}, --device {VPU_2_0,VPU_2_1,VPU_2_7}
-                        The NPU IP device
 ```
 
-DPU arguments:
-```
-usage: vpu_cost_model DPU [-h] -o {convolution,dw_convolution,eltwise,maxpool,avepool,cm_convolution} --inch INPUT_0_CHANNELS [--outch OUTPUT_0_CHANNELS] --height INPUT_0_HEIGHT --width INPUT_0_WIDTH
-                          [--input-sparsity-enabled] [--weight-sparsity-enabled] [--input-sparsity-rate INPUT_SPARSITY_RATE] [--weight-sparsity-rate WEIGHT_SPARSITY_RATE] --mpe-mode
-                          {VECTOR_FP16,VECTOR,MATRIX,CUBOID_4x16,CUBOID_8x16,CUBOID_16x16} [--af {none,relu,lrelu,add,sub,mult}] --kh KERNEL_HEIGHT --kw KERNEL_WIDTH [--pb KERNEL_PAD_BOTTOM]
-                          [--pl KERNEL_PAD_LEFT] [--pr KERNEL_PAD_RIGHT] [--pt KERNEL_PAD_TOP] [--sh KERNEL_STRIDE_HEIGHT] [--sw KERNEL_STRIDE_WIDTH] --indt {uint8,int8,float16,bfloat16} --outdt
-                          {uint8,int8,float16,bfloat16} [--input-layout {zxy,xzy,yxz,yzx,zyx,xyz,invalid}] [--output-layout {zxy,xzy,yxz,yzx,zyx,xyz,invalid}] [--input_swizzling INPUT_0_SWIZZLING]
-                          [--weight_swizzling INPUT_1_SWIZZLING] [--output_swizzling OUTPUT_0_SWIZZLING] [--isi {clustering,split_over_h,split_over_k}] [--owt OUTPUT_WRITE_TILES]
-                          [--output-sparsity-enabled]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -o {convolution,dw_convolution,eltwise,maxpool,avepool,cm_convolution}, --op {convolution,dw_convolution,eltwise,maxpool,avepool,cm_convolution}, --operation {convolution,dw_convolution,eltwise,maxpool,avepool,cm_convolution}
-                        Operation type
-  --inch INPUT_0_CHANNELS, --input-channels INPUT_0_CHANNELS, --input-0-channels INPUT_0_CHANNELS
-                        Number of input channels
-  --outch OUTPUT_0_CHANNELS, --output-channels OUTPUT_0_CHANNELS, --output-0-channels OUTPUT_0_CHANNELS
-                        Number of output channels
-  --height INPUT_0_HEIGHT, --input-height INPUT_0_HEIGHT, --input-0-height INPUT_0_HEIGHT
-                        Input activation height
-  --width INPUT_0_WIDTH, --input-width INPUT_0_WIDTH, --input-0-width INPUT_0_WIDTH
-                        Input activation width
-  --input-sparsity-enabled
-                        The flag to enable input sparsity
-  --weight-sparsity-enabled
-                        The flag to enable weight sparsity
-  --input-sparsity-rate INPUT_SPARSITY_RATE
-                        The rate of input sparsity (only valid when enabling input sparsity)
-  --weight-sparsity-rate WEIGHT_SPARSITY_RATE
-                        The rate of weight sparsity (only valid when enabling weight sparsity)
-  --mpe-mode {VECTOR_FP16,VECTOR,MATRIX,CUBOID_4x16,CUBOID_8x16,CUBOID_16x16}, --execution-order {VECTOR_FP16,VECTOR,MATRIX,CUBOID_4x16,CUBOID_8x16,CUBOID_16x16}, --execution-mode {VECTOR_FP16,VECTOR,MATRIX,CUBOID_4x16,CUBOID_8x16,CUBOID_16x16}
-                        For KMB device set the MPE mode, for later devices it sets the Execution Order (nthw)
-  --af {none,relu,lrelu,add,sub,mult}, --activation-function {none,relu,lrelu,add,sub,mult}
-                        The activation function that follow the operation (only valid for KMB)
-  --kh KERNEL_HEIGHT, --kernel-height KERNEL_HEIGHT
-                        The kernel height
-  --kw KERNEL_WIDTH, --kernel-width KERNEL_WIDTH
-                        The kernel width
-  --pb KERNEL_PAD_BOTTOM, --pad-bottom KERNEL_PAD_BOTTOM
-                        The bottom padding
-  --pl KERNEL_PAD_LEFT, --pad-left KERNEL_PAD_LEFT
-                        The left padding
-  --pr KERNEL_PAD_RIGHT, --pad-right KERNEL_PAD_RIGHT
-                        The right padding
-  --pt KERNEL_PAD_TOP, --pad-top KERNEL_PAD_TOP
-                        The top padding
-  --sh KERNEL_STRIDE_HEIGHT, --stride-height KERNEL_STRIDE_HEIGHT
-                        The stride height
-  --sw KERNEL_STRIDE_WIDTH, --stride-width KERNEL_STRIDE_WIDTH
-                        The stride width
-  --indt {uint8,int8,float16,bfloat16}, --input-datatype {uint8,int8,float16,bfloat16}
-                        The input datatype
-  --outdt {uint8,int8,float16,bfloat16}, --output-datatype {uint8,int8,float16,bfloat16}
-                        The output datatype
-  --input-layout {zxy,xzy,yxz,yzx,zyx,xyz,invalid}
-                        The input layout
-  --output-layout {zxy,xzy,yxz,yzx,zyx,xyz,invalid}
-                        The output layout
-  --input_swizzling INPUT_0_SWIZZLING, --input-0-swizzling INPUT_0_SWIZZLING
-                        The input swizzling
-  --weight_swizzling INPUT_1_SWIZZLING, --input-1-swizzling INPUT_1_SWIZZLING
-                        The weight swizzling
-  --output_swizzling OUTPUT_0_SWIZZLING, --output-0-swizzling OUTPUT_0_SWIZZLING
-                        The output swizzling
-  --isi {clustering,split_over_h,split_over_k}, --isi-strategy {clustering,split_over_h,split_over_k}
-                        The ISI Strategy
-  --owt OUTPUT_WRITE_TILES, --output-write-tiles OUTPUT_WRITE_TILES
-                        Controls on how many tiles the DPU broadcast (1 = no broadcast)
-  --output-sparsity-enabled
-                        The flag to enable output sparsity
-```
-
-minimal example:
+there are two possible VPU versions, each version has a DPU and DMA model. It is possible to bring up the help menu in the following ways:
 
 ```
-vpu_cost_model --device VPU_2_7 DPU  -o CONVOLUTION --inch 64 --outch 64 --height 16 --width 16 --kh 3 --kw 3 --indt UINT8 --outdt UINT8 --mpe-mode CUBOID_16x16
+vpu_cost_model VPU_2_7 DPU -h
+vpu_cost_model VPU_2_7 DMA -h
+vpu_cost_model VPU_4_0 DPU -h
+vpu_cost_model VPU_4_0 DMA -h
 ```
 
-DMA arguments:
+minimal example usage:
 ```
-usage: vpu_cost_model DMA [-h] --height HEIGHT --width WIDTH --kernel KERNEL --padding PADDING --strides STRIDES --device DEVICE --input_channels INPUT_CHANNELS --output_channels OUTPUT_CHANNELS
-                          --input_dtype INPUT_DTYPE --output_dtype OUTPUT_DTYPE
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --height HEIGHT
-  --width WIDTH
-  --kernel KERNEL
-  --padding PADDING
-  --strides STRIDES
-  --device DEVICE
-  --input_channels INPUT_CHANNELS
-  --output_channels OUTPUT_CHANNELS
-  --input_dtype INPUT_DTYPE
-  --output_dtype OUTPUT_DTYPE
+vpu_cost_model VPU_2_7 DPU -o CONVOLUTION --inch 64 --outch 64 --height 16 --width 16 --kh 3 --kw 3 --indt UINT8 --outdt UINT8 --mpe-mode CUBOID_16x16
+vpu_cost_model VPU_2_7 DMA -l 1024 --sw 1024 --dw 1024 -d DDR2CMX
+vpu_cost_model VPU_4_0 DPU -o CONVOLUTION --inch 64 --outch 64 --height 16 --width 16 --kh 3 --kw 3 --indt UINT8 --outdt UINT8 --mpe-mode CUBOID_16x16
+vpu_cost_model VPU_4_0 DMA 1024 --sw 1024 --dw 1024 -d DDR2CMX
 ```
 
-#### NPUNN builder
+#### VPUNN builder
 
-Generate a NPUNN model from a tensorflow one
+Generate a VPUNN model from a tensorflow one
 
 ```bash
 optional arguments:
@@ -212,9 +130,9 @@ optional arguments:
   --output OUTPUT  Output model (default model.vpunn)
 ```
 
-### NPUNN to JSON
+### VPUNN to JSON
 
-Convert a NPUNN model into json for debugging purpose
+Convert a VPUNN model into json for debugging purpose
 
 ```bash
 usage: vpunn_to_json [-h] file
@@ -277,7 +195,7 @@ Example: running only cost model integration test: `./tests/cpp/test_cost_model`
 
 ### WASM test
 
-Assuming you build NPUNN WASM library in `build_wasm`, install NPUNN locally with all its dependencies.
+Assuming you build VPUNN WASM library in `build_wasm`, install VPUNN locally with all its dependencies.
 
 ```bash
 npm install --prefix tests/js
@@ -302,3 +220,41 @@ Dependencies:
 
 - Gcov-9 and Gcovr tools are needed in order to generate the report
 - Only GCC is supported (no WASM/Visual Studio)
+
+## Notice about configurations not covered by training, or with greater errors.
+### NPU2.0
+Not Available
+### NPU2.7
+- ISI=CLUSTERING + OWT=2    : replaced at runtime with SOK. runtime should be the same, no input halo used
+- Elementwise + ISI=SOK     : replaced at runtime with clustering + owt=1,  time is a little undervalued, but its the best approximation available
+- CM_CONV (compress convolution) + InputChannels=1
+- SOH (HALO) split with Kernel =1 has probably not been part of training, doesn't make sense to have kernel=1 and input halo.NN predictions are problematic. :   replaced at runtime with Clustering.
+- SOH Halo split , at least when H is small, K small, produces much bigger results than SOH Overlapped. This is not realistic, might be a NN limitation. See VPULayerCostModelTest.Unet_perf_SOH_SOK_after_SOHO
+- Output write tiles is limited to 2. EG also when used as mock for NPU4.0 where more than 2 tiles are present and used for split.
+
+- NPU2.7 splits by H with Halo  were trained  to NN using the memory tensor instead of the general rule for compute tensor (memory tensor is smaller  with half a kernel in general). Calling NN with compute tensor introduces errors by reporting smaller values. To get corrected values (closer to Ground Truth) when generating the descriptor for NNs with interface 11 and SOH isi strategy, we are using not the input tensor, but a computed memory input tensor that mimics the one used at training
+
+### NPU4.0 (in development)
+Reusing:when using the 2.7 trained version as mock please read the NPU2.7 section above.
+  - DW_CONV (depthwise convolution)with kernel 3x3 is optimized in NPU4.0, but not in NPU2.7. The NN reported runtime is adjusted with a factor depending on datatype, channels and kernel size
+Trained NN for 4.0: 
+  - WIP
+
+### Known problems:
+- NPU2.7: NN was not trained to discriminate the sporadic high runtime for swizzling. EISXW-98656 not solved (ELt wise add with big profiled CLUSTERING, but small SOH) Test: RuntimeELT_CONV_SOH_SOK_EISXW_98656. 
+Elementwise accepts (at NN run) SWizzling ON or OFF but has to be the same for all in/out/wts  all 0 (OFF), all 5(ON) combinations not trained. *To consider:* training of NN with swizzlings combinations (profiling shows runtime is different)
+
+
+
+## SHAVE operators available
+
+Shave version interface 1 (the old one) will be deleted in the near future, do not use it.
+SHAVE v2 interface is active. 
+
+Details of any operator can be obtained by  calling: ShaveOpExecutor::toString() method. 
+
+For most updated list of operators and their details see also the unit tests: TestSHAVE.SHAVE_v2_ListOfOperators, TestSHAVE.SHAVE_v2_ListOfOperatorsDetails_27,... .
+
+For information about the profiled operators and extraparameters you can consult this [document](src/shave/Readme.md#shave-current-operators)
+
+

@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -9,7 +9,7 @@
 
 cmake_minimum_required(VERSION 3.12)
 
-set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
 # set the project name
 project(VPUNN)
@@ -94,7 +94,11 @@ if(VPUNN_BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
 
+# not yet 
+# add_subdirectory(apps/data_augmenter)
+
 if(VPUNN_BUILD_TESTS)
+	#enable_testing()
     add_subdirectory(tests/cpp)
 endif()
 

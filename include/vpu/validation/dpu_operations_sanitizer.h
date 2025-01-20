@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -15,7 +15,7 @@
 #include "sanity_report.h"
 #include "vpu/types.h"
 
-#include "device_valid_values.h"
+// #include "device_valid_values.h"
 #include "dpu_operations_valid_behaviours.h"
 #include "dpu_operations_validator.h"
 
@@ -71,14 +71,9 @@ public:
             wl.output_swizzling[0] = config.adapt_device_comaptible_swizzling(wl.output_swizzling[0]);
         }
 
-        try {  // operation might be problematic
-            auto& operation_behaviour = config.get_specific_behaviour(wl.op);
-
-            // check memory
-            DPUOperation w(wl);  // workload internal representation
-            operation_behaviour.deduce_input_1(w.input_0, w.output_0, config, w.kernel, w.input_1);
-
-            // here is a good place to do the validation checking!?
+        try {                                  // operation might be problematic
+                                               // check memory
+            const DPUOperation w(wl, config);  // workload internal representation
 
             const auto cmx_memory = memory_calculator.compute_memory(w, config);
 
@@ -91,6 +86,7 @@ public:
             }
 
             // here is a good place to do the validation checking. All was OK until now
+            auto& operation_behaviour = config.get_specific_behaviour(wl.op);
             DPU_OperationValidator::check_workload_consistency(w, config, operation_behaviour, result);
 
         } catch (const std::runtime_error&) {
@@ -108,17 +104,17 @@ public:
         const auto& config = get_config(wl.device);  // previous if prevents throwing
 
         try {
+            const DPUOperation w(wl, config);                                  // workload internal representation
             auto& operation_behaviour = config.get_specific_behaviour(wl.op);  // will throw if unknown op
-            DPUOperation w(wl);                                                // workload internal representation
-            {
-                operation_behaviour.deduce_input_1(w.input_0, w.output_0, config, w.kernel, w.input_1);
-            }  // wl  is complete
-            // Checker checker;
             DPU_OperationValidator::check_workload_consistency(w, config, operation_behaviour, result);
 
         } catch (const std::runtime_error&) {
             result.mark_unknown_operation();
         }
+    }
+
+    const IDeviceValidValues& getDeviceConfiguration(VPUDevice device) const {
+        return get_config(device);  // for now
     }
 };
 

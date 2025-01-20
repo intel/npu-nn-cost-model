@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -6,14 +6,47 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
+#include <vpu/cycles_interface_types.h>
 
 #include <gtest/gtest.h>
-#include <vpu/cycles_interface_types.h>
 #include <sstream>  // for error formating
 #include "common_helpers.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
+
+class TestCyclesInterfaceType : public ::testing::Test {
+public:
+protected:
+    void SetUp() override {
+    }
+
+private:
+};
+
+/// Some compilers do not support constexpr where references to them are kind of assumed to be needed (GCC/LLVM)
+/// some have no problems (MSVC)
+TEST_F(TestCyclesInterfaceType, BasicOps) {
+    EXPECT_EQ(V(Cycles::NO_ERROR), 0);
+
+    auto mm = std::max(V(Cycles::ERROR_INPUT_TOO_BIG), V(Cycles::ERROR_INVALID_INPUT_CONFIGURATION));
+    EXPECT_EQ(mm, V(Cycles::ERROR_INPUT_TOO_BIG));
+
+    EXPECT_NE(V(Cycles::ERROR_INVALID_LAYER_CONFIGURATION), V(Cycles::ERROR_INPUT_TOO_BIG));
+
+    // const VPUNN::CyclesInterfaceType& ref = VPUNN::Cycles::ERROR_INPUT_TOO_BIG;
+
+    //    EXPECT_EQ(VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, VPUNN::Cycles::ERROR_INPUT_TOO_BIG);
+
+    //  const VPUNN::CyclesInterfaceType* ptr = &VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION;
+
+    // EXPECT_EQ(*ptr, VPUNN::Cycles::ERROR_INPUT_TOO_BIG);
+    // EXPECT_EQ(ptr, nullptr);
+    // EXPECT_EQ(&VPUNN::Cycles::ERROR_INPUT_TOO_BIG, nullptr);
+
+    //    EXPECT_EQ(ptr, &VPUNN::Cycles::ERROR_INPUT_TOO_BIG);
+    //   EXPECT_EQ(ptr, &VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION);
+}
 
 class CycleAdderCheckerTest : public ::testing::Test {
 protected:
@@ -270,11 +303,15 @@ TEST_F(CycleAdderCheckerTest, CastingTesting) {
         EXPECT_EQ(65000, Cycles::toCycleInterfaceType(pozUnsigned)) << "Unsigned short int";
     }
     {
-        long int pozSigned = 2000000000;
-        long int negSigned = -2000000000;
+        const long int pozSigned{2000000000};
+        const long int negSigned{-2000000000};
+
         EXPECT_EQ(V(Cycles::ERROR_INVALID_CONVERSION_TO_CYCLES), Cycles::toCycleInterfaceType(negSigned))
                 << "Negative signed long int";
-        EXPECT_EQ(2000000000, Cycles::toCycleInterfaceType(pozSigned)) << "Positive signed long int";
+
+        EXPECT_EQ(2000000000, Cycles::toCycleInterfaceType(pozSigned)) << "Positive signed long int :" << pozSigned;
+        EXPECT_FALSE(pozSigned < 0) << "subzero Positive signed long int?";
+        EXPECT_EQ(2000000000L, pozSigned) << "is expected? Positive signed long int";
     }
     {
         long long int pozSigned = 4000000000;
@@ -321,6 +358,40 @@ TEST_F(CycleAdderCheckerTest, CastingTesting) {
         EXPECT_EQ(100001, Cycles::toCycleInterfaceType(pozdouble)) << "Pozitive double";
         EXPECT_EQ(V(Cycles::ERROR_INVALID_CONVERSION_TO_CYCLES), Cycles::toCycleInterfaceType(pozdoubleOverLimit))
                 << "Pozitive double over limit";
+    }
+}
+TEST_F(CycleAdderCheckerTest, CastingTestingSpecial) {
+    // the following 2 (commented out) are failing on Florins machine when building in release VS2022 (only).
+    //{
+    //    const long int pozSigned{1L};
+
+    //    const auto cyc{Cycles::toCycleInterfaceType<long int>(pozSigned)};
+    //    EXPECT_EQ(1L, cyc) << "Cycles :" << cyc << " Error meaning: " << Cycles::toErrorText(cyc)
+    //                                << ", POZ: " << pozSigned << " Type : " << typeid(pozSigned).name();
+    //}
+
+    //{
+    //    const int pozSigned{1};
+
+    //    const auto cyc{Cycles::toCycleInterfaceType<int>(pozSigned)};
+    //    EXPECT_EQ(1, cyc) << "Cycles :" << cyc << " Error meaning: " << Cycles::toErrorText(cyc)
+    //                               << ", POZ: " << pozSigned << " Type : " << typeid(pozSigned).name();
+    //}
+
+    {
+        constexpr long int pozSigned{2000000000L};
+
+        constexpr auto cyc{Cycles::toCycleInterfaceType(pozSigned)};
+        EXPECT_EQ(2000000000L, cyc) << "constexpr Cycles :" << cyc << " Error meaning: " << Cycles::toErrorText(cyc)
+                                    << ", POZ: " << pozSigned << " Type : " << typeid(pozSigned).name();
+    }
+
+    {
+        constexpr int pozSigned{2000000000};
+
+        constexpr auto cyc{Cycles::toCycleInterfaceType(pozSigned)};
+        EXPECT_EQ(2000000000, cyc) << "constexpr Cycles :" << cyc << " Error meaning: " << Cycles::toErrorText(cyc)
+                                   << ", POZ: " << pozSigned << " Type : " << typeid(pozSigned).name();
     }
 }
 TEST_F(CycleAdderCheckerTest, CyclesTypeCastCheck) {

@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,6 +11,8 @@
 #include "common_helpers.h"
 #include "vpu_network_cost_model.h"
 
+#include "vpu/shave/layers.h"
+
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
 
@@ -20,9 +22,12 @@ namespace VPUNN_unit_tests {
 class TestVPUCompute : public testing::Test {
 public:
 protected:
-    VPUNN::VPUNetworkCostModel model{};  ///< empty model
-    VPUNN::VPUNetworkCostModel model_2_7{VPU_2_7_MODEL_PATH};
-    VPUNN::VPUNetworkCostModel model_2_0{VPU_2_0_MODEL_PATH};
+    VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU27> invalid_dma_model{""};
+    VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU27> dma_model_2_7{VPU_DMA_2_7_MODEL_PATH};
+
+    VPUNN::VPUNetworkCostModel model{&invalid_dma_model};  ///< empty model
+    VPUNN::VPUNetworkCostModel model_2_7{&dma_model_2_7, VPU_2_7_MODEL_PATH};
+    VPUNN::VPUNetworkCostModel model_2_0{&dma_model_2_7, VPU_2_0_MODEL_PATH};
 
     void SetUp() override {
     }
@@ -179,7 +184,7 @@ TEST_F(TestVPUCompute, TestVPUNetworkStrategy) {
     VPUNN::VPULayerStrategy layer_strategy1 =
             VPUNN::VPULayerStrategy{1, 1, 1, VPUNN::VPUTilingStrategy::NONE, false, false};
     VPUNN::VPULayerStrategy layer_strategy2 =
-            VPUNN::VPULayerStrategy{1, 1, 1, VPUNN::VPUTilingStrategy::SOH, false, false};
+            VPUNN::VPULayerStrategy{1, 1, 1, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false};
 
     VPUNN::VPUNetworkStrategy strategy;
     for (auto layer : dag) {

@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -23,113 +23,104 @@ def str2enum(value):
     return eval(f"VPUNN_lib.{value}")
 
 def generate_model_input(args, wl_type=VPUNN_lib.DPUWorkload):
+    if isinstance(args, Namespace):
+        wl_ns = args
+    else:
+        wl_ns = Namespace(**args)
 
     wl = wl_type()
     if wl_type == VPUNN_lib.DPUWorkload:
-        dpu_wl = Namespace(**args)
 
         # Convert all input to VPUNN enum
-        wl.device = str2enum(dpu_wl.device)
-        wl.op = str2enum(dpu_wl.operation)
-        wl.execution_order = str2enum(dpu_wl.execution_order)
+        wl.device = str2enum(wl_ns.device)
+        wl.op = str2enum(wl_ns.operation)
+        wl.execution_order = str2enum(wl_ns.execution_order)
         wl.input_swizzling = [
-            str2enum(dpu_wl.input_0_swizzling),
-            str2enum(dpu_wl.input_1_swizzling),
+            str2enum(wl_ns.input_0_swizzling),
+            str2enum(wl_ns.input_1_swizzling),
         ]
-        wl.output_swizzling = [str2enum(dpu_wl.output_0_swizzling)]
-        wl.kernels = [dpu_wl.kernel_width, dpu_wl.kernel_height]
-        wl.strides = [dpu_wl.kernel_stride_width, dpu_wl.kernel_stride_height]
+        wl.output_swizzling = [str2enum(wl_ns.output_0_swizzling)]
+        wl.kernels = [wl_ns.kernel_width, wl_ns.kernel_height]
+        wl.strides = [wl_ns.kernel_stride_width, wl_ns.kernel_stride_height]
         wl.padding = [
-            dpu_wl.kernel_pad_top,
-            dpu_wl.kernel_pad_bottom,
-            dpu_wl.kernel_pad_left,
-            dpu_wl.kernel_pad_right,
+            wl_ns.kernel_pad_top,
+            wl_ns.kernel_pad_bottom,
+            wl_ns.kernel_pad_left,
+            wl_ns.kernel_pad_right,
         ]
 
-        wl.act_sparsity = dpu_wl.input_sparsity_rate
-        wl.weight_sparsity = dpu_wl.weight_sparsity_rate
-        wl.output_write_tiles = dpu_wl.output_write_tiles
+        wl.act_sparsity = wl_ns.input_sparsity_rate
+        wl.weight_sparsity = wl_ns.weight_sparsity_rate
+        wl.output_write_tiles = wl_ns.output_write_tiles
 
         wl.inputs = [
             VPUNN_lib.VPUTensor(
                 [
-                    dpu_wl.input_0_width,
-                    dpu_wl.input_0_height,
-                    dpu_wl.input_0_channels,
+                    wl_ns.input_0_width,
+                    wl_ns.input_0_height,
+                    wl_ns.input_0_channels,
                     1,
                 ],
-                str2enum(dpu_wl.input_0_datatype),
-                str2enum(dpu_wl.input_0_layout),
-                dpu_wl.input_sparsity_enabled,
+                str2enum(wl_ns.input_0_datatype),
+                str2enum(wl_ns.input_0_layout),
+                wl_ns.input_sparsity_enabled,
             )
         ]
 
-        wl.weight_sparsity_enabled = dpu_wl.weight_sparsity_enabled
+        wl.weight_sparsity_enabled = wl_ns.weight_sparsity_enabled
 
         wl.outputs = [
             VPUNN_lib.VPUTensor(
                 [
-                    dpu_wl.output_0_width if 'output_0_width' in args else int(((dpu_wl.input_0_width + (dpu_wl.kernel_pad_left + dpu_wl.kernel_pad_right) - (dpu_wl.kernel_width-1)-1)//dpu_wl.kernel_stride_width)+1),
-                    dpu_wl.output_0_height if 'output_0_height' in args else int(((dpu_wl.input_0_height + (dpu_wl.kernel_pad_top + dpu_wl.kernel_pad_bottom) - (dpu_wl.kernel_height-1)-1)//dpu_wl.kernel_stride_height)+1),
-                    dpu_wl.output_0_channels,
+                    wl_ns.output_0_width if 'output_0_width' in args else int(((wl_ns.input_0_width + (wl_ns.kernel_pad_left + wl_ns.kernel_pad_right) - (wl_ns.kernel_width-1)-1)//wl_ns.kernel_stride_width)+1),
+                    wl_ns.output_0_height if 'output_0_height' in args else int(((wl_ns.input_0_height + (wl_ns.kernel_pad_top + wl_ns.kernel_pad_bottom) - (wl_ns.kernel_height-1)-1)//wl_ns.kernel_stride_height)+1),
+                    wl_ns.output_0_channels,
                     1,
                 ],
-                str2enum(dpu_wl.output_0_datatype),
-                str2enum(dpu_wl.output_0_layout),
-                dpu_wl.output_sparsity_enabled,
+                str2enum(wl_ns.output_0_datatype),
+                str2enum(wl_ns.output_0_layout),
+                False,
             )
         ]
 
-        wl.output_write_tiles = dpu_wl.output_write_tiles
-        wl.activation_function = str2enum(dpu_wl.activation_function)
-        wl.isi_strategy = str2enum(dpu_wl.isi_strategy)
+        wl.output_write_tiles = wl_ns.output_write_tiles
+        wl.activation_function = str2enum(wl_ns.activation_function)
+        wl.isi_strategy = str2enum(wl_ns.isi_strategy)
 
-    elif wl_type == VPUNN_lib.DMAWorkload:
-        # Convert all input to VPUNN enum
-        wl.device = str2enum(args["device"])
-        if "input_dimension" not in args.keys():
-            args["input_dimension"] = [
-                args.get("input_0_width", args.get("output_0_width")),
-                args.get("input_0_height", args.get("output_0_height")),
-                args["input_0_channels"],
-                1,
-            ]
-        if "output_dimension" not in args.keys():
-            args["output_dimension"] = [
-                args["output_0_width"],
-                args["output_0_height"],
-                args["output_0_channels"],
-                1,
-            ]
+        return wl
+    elif wl_type == VPUNN_lib.DMANNWorkload_NPU27:
+        dma_wl = wl_type()
+        dma_wl.device = str2enum(f"VPUDevice.VPU_2_7")
+        dma_wl.length = wl_ns.length
+        dma_wl.src_width = wl_ns.src_width
+        dma_wl.dst_width = wl_ns.dst_width
 
-        # This field was renamed in the database, so old models may still use the old name
-        input_dtype_key = list(
-            filter(
-                lambda key: key in args.keys(),
-                ["input_0_datatype", "input_datatype", "input_dtype"],
-            )
-        )[0]
+        dma_wl.src_stride = wl_ns.src_stride
+        dma_wl.dst_stride = wl_ns.dst_stride
 
-        # Create the tensor
-        wl.input = VPUNN_lib.VPUTensor(
-            args["input_dimension"], str2enum(args[input_dtype_key])
-        )
+        dma_wl.num_planes = wl_ns.num_planes
+        dma_wl.src_plane_stride = wl_ns.src_plane_stride
+        dma_wl.dst_plane_stride = wl_ns.dst_plane_stride
+        dma_wl.transfer_direction = eval(f"VPUNN_lib.MemoryDirection.{wl_ns.direction}")
+        return dma_wl
 
-        # This field was renamed in the database, so old models may still use the old name
-        output_dtype_key = list(
-            filter(
-                lambda key: key in args.keys(),
-                ["output_0_datatype", "output_datatype", "output_dtype"],
-            )
-        )[0]
+    elif wl_type == VPUNN_lib.DMANNWorkload_NPU40:
+        dma_wl = wl_type()
 
-        wl.output = VPUNN_lib.VPUTensor(
-            args["output_dimension"], str2enum(args[output_dtype_key])
-        )
+        dma_wl.num_engine = eval(f"VPUNN_lib.Num_DMA_Engine.Num_Engine_{wl_ns.num_engine}")
+        dma_wl.transfer_direction = eval(f"VPUNN_lib.MemoryDirection.{wl_ns.direction}")
 
-        wl.input_location = str2enum(args["input_location"])
-        wl.output_location = str2enum(args["output_location"])
+        dma_wl.src_width  = wl_ns.src_width
+        dma_wl.dst_width  = wl_ns.dst_width
+        dma_wl.num_dim = wl_ns.num_dim
+
+        ss = VPUNN_lib.DMANNWorkload_NPU40.SizeStride
+        size_strides = [ss(),ss(),ss(),ss(),ss()]
+        for i in range(1,6):
+            for field in vars(wl_ns).keys():
+                if field.endswith(f'_{i}'):
+                    setattr(size_strides[i-1], field[:-2], getattr(wl_ns, field))
+        dma_wl.e_dim = size_strides
+        return dma_wl
     else:
         raise Exception("Workload type is not defined")
-
-    return wl

@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -21,7 +21,9 @@
 
 #include <tuple>
 #include "behaviors_and_devices_containers.h"
-#include "device_valid_values.h"
+#include "device_valid_valuesVPU2.h"
+#include "device_valid_valuesVPU2_7.h"
+#include "device_valid_valuesVPU4.h"
 #include "dpu_operations_valid_behaviours.h"
 #include "interface_valid_values.h"
 #include "memory_calculator.h"
@@ -64,16 +66,11 @@ public:
     /// @throws runtime_error if the operation from the workload is not supported or known
     /// @returns memory information. In case the device is not supported will contain -1 or negative values in structure
     MemorySize compute_wl_memory(const DPUWorkload& wl) const {
-        DPUOperation op(wl);
-
-        if (!context_ref.is_supported(op.device)) {
+        if (!context_ref.is_supported(wl.device)) {
             return MemorySize{-1};  // or maybe throw?
         }
-        const auto& config = context_ref.get_config(op.device);
-        const auto& operation_behaviour = config.get_specific_behaviour(op.operation);  // might throw
-
-        operation_behaviour.deduce_input_1(op.input_0, op.output_0, config, op.kernel, op.input_1);
-
+        const auto& config = context_ref.get_config(wl.device);
+        const DPUOperation op(wl, config);
         return memory_calculator.compute_memory(op, config);
     }
 };
@@ -100,14 +97,11 @@ public:
     ///
     /// @returns the VPUTensor describing input_1
     VPUTensor construct_input_1(const DPUWorkload& wl) const {
-        DPUOperation op(wl);
+        const auto& config = this->get_config(wl.device);
+        const DPUOperation op(wl, config);
 
-        const auto& config = this->get_config(op.device);
-        auto& operation_behaviour = config.get_specific_behaviour(op.operation);  // may throw
-
-        operation_behaviour.deduce_input_1(op.input_0, op.output_0, config, op.kernel, op.input_1);
-        // sparsity and swizzling set in constructor
-        // weights sparsity should not be present  if not enabled (assumed sanitation)
+        //  sparsity and swizzling set in constructor
+        //  weights sparsity should not be present  if not enabled (assumed sanitation)
 
         auto& in = op.input_1;
         const VPUTensor weights{{static_cast<unsigned int>(in.width), static_cast<unsigned int>(in.height),
@@ -128,10 +122,11 @@ public:
 
         Checker checker;
         try {
-            checker.check_is_in_list(w.device, config.devices, "Device");
-            checker.check_is_in_list(w.operation, config.get_valid_operations_range(), "Operation");
+            checker.check_is_in_list(w.device, config.get_devices(), "Device");
+            checker.check_is_in_list(w.operation, config.get_valid_operations(), "Operation");
 
-            checker.check_is_in_list(w.output_write_tiles, config.output_write_tile_options, "output_write_tiles");
+            checker.check_is_in_list(w.output_write_tiles, config.get_output_write_tile_options(),
+                                     "output_write_tiles");
             // dep on out tile and op
             checker.check_is_in_list(w.isi_strategy, config.get_ISI_Strategy_Range(w), "ISI_strategy");
 
@@ -162,21 +157,24 @@ public:
                 checker.check_is_in_interval((int)in0.height, config.get_input_height_interval(w), "input_0.height");
                 checker.check_is_in_interval((int)in0.width, config.get_input_width_interval(w), "input_0.width");
 
-                checker.check_is_in_list((int)in0.channels, config.get_input_channels_range(w), "input_0.channels");
+                checker.check_is_in_requirements((int)in0.channels, config.get_input_channels_restriction(w),
+                                                 "input_0.channels");
 
-                checker.check_is_in_list(in0.datatype, config.valid_datatypes, "input_0.datatype");
-                checker.check_is_in_list(in0.layout, config.valid_layouts, "input_0.layout");
-                checker.check_is_in_list(in0.swizzling, config.valid_swizzlings, "input_0.swizzling");
+                checker.check_is_in_list(in0.datatype, config.get_input_valid_datatypes(w), "input_0.datatype");
+                checker.check_is_in_list(in0.layout, config.get_valid_layouts(), "input_0.layout");
+                checker.check_is_in_list(in0.swizzling, config.get_valid_swizzlings(), "input_0.swizzling");
             }
-            {  // stride , depends on input zero, and operation sometimes
+            {
+                // stride , depends on input zero, and operation sometimes
                 const auto k{w.kernel};
                 const auto stride_options{config.get_dpu_strides_range(w)};
 
                 checker.check_is_in_list(k.stride_width, stride_options.first, "kernel.stride_width");
                 checker.check_is_in_list(k.stride_height, stride_options.second, "kernel.stride_height");
             }
-            {  // output dims, non random,  depend on input, padding, kernel, stride
-               // batch in out to be equal
+            {
+                // output dims, non random,  depend on input, padding, kernel, stride
+                // batch in out to be equal
                 if (w.output_0.batch != w.input_0.batch) {
                     checker.add_check_failed("Output.batch different than input_0.batch!");
                 }
@@ -204,15 +202,20 @@ public:
                 const auto allowed_heights{std::make_pair(expected_out_height_minimum, expected_out_height_maximum)};
                 checker.check_is_in_interval((int)w.output_0.height, allowed_heights, "output_0.height");
 
-                // channels, do not check? (maybe in op specific area)
+                checker.check_is_in_requirements((int)w.output_0.channels, config.get_output_channels_restriction(w), "output_0.channels"); //we check out ch here especially for CONV and CM_CONV
 
                 //
                 {  // layout and types for output_0
                     const auto& out0{w.output_0};
-                    checker.check_is_in_list(out0.datatype, config.valid_datatypes, "output_0.datatype");
-                    checker.check_is_in_list(out0.layout, config.valid_layouts, "output_0.layout");
-                    checker.check_is_in_list(out0.swizzling, config.valid_swizzlings, "output_0.swizzling");
+                    checker.check_is_in_list(out0.datatype, config.get_output_valid_datatypes(w), "output_0.datatype");
+                    checker.check_is_in_list(out0.layout, config.get_valid_layouts(), "output_0.layout");
+                    checker.check_is_in_list(out0.swizzling, config.get_valid_swizzlings(), "output_0.swizzling");
                 }
+            }
+            {
+                // types for input_1
+                const auto& in1{w.input_1};
+                checker.check_is_in_list(in1.datatype, config.get_weights_valid_datatypes(w), "input_1.datatype");
             }
             {  // sparsity check on all channels
 
@@ -233,12 +236,17 @@ public:
                         checker.add_check_failed(info_out);
                 }
             }
-            { checker.check_is_in_list(w.execution_order, config.valid_execution_order, "Execution_Order"); }
+            { checker.check_is_in_list(w.execution_order, config.get_valid_execution_order(), "Execution_Order"); }
             // no padding optimization checked
 
             {  // check correlation between in-out tensors
                 std::string info_out{};
                 if (!operation_behaviour.check_input_output_tensor_corelation(config, w, info_out))
+                    checker.add_check_failed(info_out);
+            }
+            {  //@todo: check halo is consistent, eg versus size and padding
+                std::string info_out{};
+                if (!check_halo(w, info_out))
                     checker.add_check_failed(info_out);
             }
 
@@ -251,17 +259,54 @@ public:
             result.info = checker.findings();
         }
     }
+    /// rets false if check failed
+    static bool check_halo(const DPUOperation& dpu, std::string& info) {
+        // input padding and halo are incompatible
+        Checker checker;
+        const auto& inHalo{dpu.halo.input_0_halo};
+        const KernelInfo& k{dpu.kernel};
+
+        if ((k.pad_top > 0) && (inHalo.top > 0)) {
+            checker.add_check_failed("Incompatible: Padding top >0 and input halo.top >0 ");
+        }
+        if ((k.pad_bottom > 0) && (inHalo.bottom > 0)) {
+            checker.add_check_failed("Incompatible: Padding bottom >0 and input halo.bottom >0 ");
+        }
+        if ((k.pad_left > 0) && (inHalo.left > 0)) {
+            checker.add_check_failed("Incompatible: Padding left >0 and input halo.left >0 ");
+        }
+        if ((k.pad_right > 0) && (inHalo.right > 0)) {
+            checker.add_check_failed("Incompatible: Padding right >0 and input halo.right >0 ");
+        }
+
+        // padding is only spatial TBLR, so no checkof padding versus halo channels (front/back)
+
+        // output halo should be >0
+        const auto& outHalo{dpu.halo.output_0_halo};
+        const auto& broadcastHalo{dpu.halo.output_0_halo_broadcast_cnt};
+        const auto& inboundHalo{dpu.halo.output_0_inbound_halo};
+
+        if ((outHalo.isAllPositive() == false) || (broadcastHalo.isAllPositive() == false) ||
+            (inboundHalo.isAllPositive() == false)) {
+            checker.add_check_failed("Incompatible: Halo values <0");
+        }
+
+        info = checker.findings();
+        return checker.is_clean();
+    }
 
 protected:
 };
 
 /// configuration bundle for Workloads at the most atomic level. workloads that are to be subjected to DPU
-using OperationsContext =
-        Behavior_Device_Mapping<OperationsBehaviour,  // operations
-                                VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues, VPU4_0_WorkloadValidValues>;
+using OperationsContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations
+                                                  VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues,
+                                                  VPU4_0_WorkloadValidValues>;
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;
 
+/// using the same configuration for SHAVE for now, the DPU behaviour will not affect the Shave needs for memory calculation
+using SHAVE_OperationValidator = DPU_OperationValidator;
 }  // namespace VPUNN
 
 #endif  //

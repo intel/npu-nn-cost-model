@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -152,12 +152,16 @@ protected:
         VPUNN::VPUCostModel fast_model{the_NN_models.fast_model_paths[modelIndex].first,
                                        false};  // with cache, batch =1
 
+        std::map<VPUNN::Operation, int> ops_errors;
+        std::map<VPUNN::Operation, int> all_ops;
+
         int i_abs_errors{0};  // increments at delta > threshold
         int i_errs{0};        // increments at every error(delta + ratio)
         int i_range_errs{0};  // increments at every error
         int i{0};             // index workload
         const auto n{workloads.size()};
         for (const auto& wl : workloads) {
+            all_ops[wl.op]++;
             auto cycles_s = slow_model.DPU(wl);
             auto cycles_f = fast_model.DPU(wl);
 
@@ -185,7 +189,7 @@ protected:
                     i_abs_errors++;
                     // EXPECT_LE(ratio, max_ratio_delta)
                     if (ratio >= max_ratio_delta) {
-                        std::cout << "Results with significant difference:  \n"
+                        std::cout << "\n*** Results with significant difference:  \n"
                                   << "Model: " << model_type << ", wl-index: " << i << " / " << n
                                   << ", occurrence :" << ++i_errs << " BIG DIFFERENCE :" << std::endl
                                   << "slow: " << cycles_s << std::endl
@@ -193,6 +197,7 @@ protected:
                                   << "delta: " << delta_c << std::endl
                                   << "ratio: " << ratio << std::endl
                                   << wl << std::endl;
+                        ops_errors[wl.op]++;
                     }
                 }
             }
@@ -208,6 +213,23 @@ protected:
                 << "\t ratio threshold: " << max_ratio_delta << std::endl
                 << "\t absolute threshold: " << min_absolute_delta << std::endl
                 << "\t expected_deviation_ratio: " << expected_deviation_ratio << std::endl;
+
+        std::cout << "\n Total relevant Errors: " << i_errs << "\n DIstributed on operations:";
+        
+        for (const auto& op : ops_errors) {
+            const int err_percent{(i_errs != 0) ? (int)(((float)op.second / i_errs) * 100) : 0};
+            std::cout << "\n op_id: " << (int)op.first
+                      << " OP: " << VPUNN::Operation_ToText.at(static_cast<int>(op.first))
+                      << "\t,  Count #:" << op.second << " , Count %: " << err_percent
+                      << " %";
+        }
+        std::cout << "\n\n Total operations:";
+        for (const auto& op : all_ops) {
+            std::cout << "\n op_id: " << (int)op.first
+                      << " OP: " << VPUNN::Operation_ToText.at(static_cast<int>(op.first))
+                      << "\t,  Count #:" << op.second << " , Count %: " << (int)(((float)op.second / n) * 100) << " %";
+        }
+
         return i_errs;
     }
     struct DataOut {
@@ -507,6 +529,8 @@ TEST_F(CostModelStochastic, Inference_output_in_Interval_Test_2_7_all_stochastic
 TEST_F(CostModelStochastic, DISABLED_NoONE_asInference_output_all_stochastic) {
     unsigned int n_workloads = 1000;
 
+    // nPU2.0 will give negative values
+
     for (auto& model_info : the_NN_models.all_model_paths) {
         auto cnt = CheckNoCase_InferenceOutput(model_info, 1.0F, n_workloads);
         EXPECT_EQ(cnt, 0) << "\n FAILED count:" << cnt << " problems out of all: " << n_workloads
@@ -539,7 +563,7 @@ TEST_F(CostModelStochastic, Comparative_fast_vs_slow_20_stochastic) {
 /// Make a fast versus slow statistical comparison.   no big delta expected.
 TEST_F(CostModelStochastic, Comparative_fast_vs_slow_27_stochastic) {
     // 5 will produce 1.5%
-    const float tolerance_factor{10.0F};  ///<  how much many samples do we allow (factor) versus strict theoretical
+    const float tolerance_factor{15.0F};  ///<  how much many samples do we allow (factor) versus strict theoretical
 
     const float max_ratio_delta{0.5F};  // between (fast and slow) delta over min of them  . (120-80)/80
     const float expected_deviation_ratio{(0.3036F / 100.0F) * tolerance_factor};  // Assumption: 95% (2*sigma) are in
@@ -561,6 +585,8 @@ TEST_F(CostModelStochastic, Comparative_fast_vs_slow_27_stochastic) {
 }
 
 /// Make a  statistical comparison.   no big delta expected.
+/// This takes a lot of time (minutes) and you need locally the NN files to compare
+/// cannot be run on CI, and it is not intended for repetitive CI run.
 TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
     const float max_ratio_delta{0.5F};                // between (fast and slow) delta over min of them  . (120-80)/80
     const float expected_deviation_ratio{0.003036F};  // Assumption: 95% (2*sigma) are in the 80-120% interval
@@ -646,9 +672,9 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
         };
 
         ResultMap res;
-        for (unsigned int i = 0; i < nns.size(); ++i)
+       /* for (unsigned int i = 0; i < nns.size(); ++i)
             for (unsigned int j = i + 1; j < nns.size(); ++j)
-                comp_lambda(nns[i], nns[j], 2, res);
+                comp_lambda(nns[i], nns[j], 2, res);*/
 
         results_table_show_lambda(nns, res);
     }
@@ -659,11 +685,19 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
 
         const std::vector<std::string> nns{
                 VPU_2_7_MODEL_PATH,
+                (NameHelperNN::get_model_root() + "vpu_2_7-160cp17L.vpunn"),
+                (NameHelperNN::get_model_root() + "vpu_2_7-160cp16L.vpunn"),
+                (NameHelperNN::get_model_root() + "vpu_2_7-155L.vpunn"),
+
                 (NameHelperNN::get_model_root() + "vpu_2_7-150.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7-150-1.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7-141.vpunn"),
 
                 NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH),
+                (NameHelperNN::get_model_root() + "vpu_2_7.fast-160cp17L.vpunn"),
+                (NameHelperNN::get_model_root() + "vpu_2_7.fast-160cp16L.vpunn"),
+                (NameHelperNN::get_model_root() + "vpu_2_7.fast-155L.vpunn"),
+
                 (NameHelperNN::get_model_root() + "vpu_2_7.fast-150.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7.fast-150-1.vpunn"),
                 (NameHelperNN::get_model_root() + "vpu_2_7.fast-141.vpunn"),

@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,70 +11,75 @@
 
 namespace VPUNN {
 
-/// @brief creates a Workload starting from layer. modifies the output tensor and shape, input tensor remains the same,
-/// kernels remain the same
-DPUWorkload createTile(const DPULayer& layer, const std::array<unsigned int, 4>& new_shape,
-                       const std::array<unsigned int, 4>& offsets = {0, 0, 0, 0}) {
-    // const auto dtype = layer.outputs[0].get_dtype();
-    // const auto layout = layer.outputs[0].get_layout();
-    const auto outTile = VPUTensor(new_shape, layer.outputs[0]);
+/// @brief creates a Workload starting from layer. modifies the output tensor and shape only, input tensor remains the
+/// same, kernels remain the same. This stage does not contain a valid Input output correlation.
+static DPUWorkload createIncompleteTile(const DPULayer& layer, const std::array<unsigned int, 4>& new_shape,
+                                        const std::array<unsigned int, 4>& offsets = {0, 0, 0, 0}) {
+    const auto outTile = VPUTensor(new_shape, layer.outputs[0]);  // new shape rest is the same
     DPUWorkload split(layer);
     split.outputs[0] = outTile;
     split.offsets = offsets;
     return split;
 }
 
-DPUWorkload createTileHW(const DPULayer& layer, const unsigned int width, const unsigned int height,
-                         const unsigned int offset_width, const unsigned int offset_height) {
-    return createTile(layer, {width, height, layer.outputs[0].z(), 1}, {offset_width, offset_height, 0, 0});
+static DPUWorkload createTileHW(const DPULayer& layer, const unsigned int width, const unsigned int height,
+                                const unsigned int offset_width, const unsigned int offset_height, HaloWorkload halo) {
+    DPUWorkload wl{
+            createIncompleteTile(layer, {width, height, layer.outputs[0].z(), 1}, {offset_width, offset_height, 0, 0})};
+    wl.halo = halo;
+    return wl;
 }
 
-DPUWorkload createTileZ(const DPULayer& layer, const unsigned int channels, const unsigned int offset_channels) {
-    return createTile(layer, {layer.outputs[0].x(), layer.outputs[0].y(), channels, 1}, {0, 0, offset_channels, 0});
+static DPUWorkload createTileZ(const DPULayer& layer, const unsigned int channels, const unsigned int offset_channels) {
+    return createIncompleteTile(layer, {layer.outputs[0].x(), layer.outputs[0].y(), channels, 1},
+                                {0, 0, offset_channels, 0});
 }
 
-bool isValidZ(unsigned int channels, const std::vector<unsigned int>& validZTiles) {
+static bool isValidZ(unsigned int channels, const std::vector<unsigned int>& validZTiles) {
     if (validZTiles.size() == 0)
         return true;
     return std::find(validZTiles.begin(), validZTiles.end(), channels) != validZTiles.end();
 }
 
-void splitOverZ(const DPULayer& layer, std::list<DPUWorkloads>& splitPool, const ExecutionMode mode,
+void splitOverZ(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                 const unsigned int nWorkloads, const std::vector<unsigned int>& validZTiles) {
-    DPUWorkloads workloads;
+    DPUWorkloadsWithCyclesSplit workloads_split;
     const auto gridSize = mpe_mode_to_grid(mode);
-    const auto gridSize_Z = gridSize[Dim::Act::Z];
+    const auto gridSize_Z = gridSize[Dim::Act::Z];  // typically 16?
 
-    if ((layer.outputs[0].z() < gridSize_Z) || ((layer.outputs[0].z() % gridSize_Z) != 0))
-        return;
+    const auto all_channels = layer.outputs[0].z();
+    if ((all_channels < gridSize_Z)            // smaller
+        || ((all_channels % gridSize_Z) != 0)  // must be a multiple of grid
+    )
+        return;  // nothing , cannot split
 
-    auto channels = layer.outputs[0].z();
-    const auto max_Z = round_up(ceil_division(channels, nWorkloads), gridSize_Z);
+    const auto max_Z = round_up(ceil_division(all_channels, nWorkloads), gridSize_Z);
 
+    auto channels = all_channels;  // channels remaining to split
     for (unsigned int idx = 0; idx < nWorkloads; idx++) {
         const auto actual_channels{(channels > max_Z) ? max_Z : channels};
         const auto offset_channels{idx * max_Z};
 
         if ((actual_channels % gridSize_Z) != 0) {
-            return;
+            return;  // error , not a multiple
         }
 
         // Invalid split
-        if (!isValidZ(actual_channels, validZTiles))
+        if (!isValidZ(actual_channels, validZTiles))  // can be zero before nWorkloads reached.
             return;
 
-        workloads.emplace_back(createTileZ(layer, actual_channels, offset_channels));
+        workloads_split.workloads.emplace_back(createTileZ(layer, actual_channels, offset_channels));
+        workloads_split.cycles.emplace_back(Cycles::NO_ERROR);
 
         channels -= actual_channels;
     }
-
-    Tiler::setWorkloadsMode(workloads, mode, layer);  // computes also input tensor
-    splitPool.push_back(workloads);
+    ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(workloads_split, mode, layer);  // computes also input tensor
+    splitPool.push_back(workloads_split);
 }
 
-void splitOverHW(const DPULayer& layer, std::list<DPUWorkloads>& splitPool, const unsigned int widthFactor,
-                 const unsigned int heightFactor, const ExecutionMode mode) {
-    DPUWorkloads workloads;
+void splitOverHW(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& splitPool,
+                 const unsigned int widthFactor, const unsigned int heightFactor, const ExecutionMode mode) {
+    DPUWorkloadsWithCyclesSplit workloads_split;
 
     const auto gridSize = mpe_mode_to_grid(mode);
 
@@ -88,15 +93,76 @@ void splitOverHW(const DPULayer& layer, std::list<DPUWorkloads>& splitPool, cons
     // And the actual split numbers
     const auto actualWidthSplitsNum = ceil_division(width, maxWidth);
     const auto actualHeightSplitsNum = ceil_division(height, maxHeight);
+    const auto& halo{layer.halo};
 
     auto remainedHeight = height;
     for (unsigned int idx = 0; idx < actualHeightSplitsNum; idx++) {
         const auto currentHeightStep = remainedHeight > maxHeight ? maxHeight : remainedHeight;
 
+        HaloWorkload halo_now{halo};  // full pass down
+
+        {
+            if (idx == 0)  // first
+            {
+                halo_now.input_0_halo.top = halo.input_0_halo.top;
+                halo_now.output_0_halo.top = halo.output_0_halo.top;
+                if (halo_now.output_0_halo.top > (int)currentHeightStep) {  // error
+                    halo_now.output_0_halo.top = (int)currentHeightStep;
+                }
+            } else {
+                halo_now.input_0_halo.top = 0;
+                halo_now.output_0_halo.top = 0;
+                halo_now.output_0_halo_broadcast_cnt.top = 0;
+            }
+
+            if (idx == (actualHeightSplitsNum - 1))  // last
+            {
+                halo_now.input_0_halo.bottom = halo.input_0_halo.bottom;
+                halo_now.output_0_halo.bottom = halo.output_0_halo.bottom;
+                if (halo_now.output_0_halo.bottom > (int)currentHeightStep) {  // error
+                    halo_now.output_0_halo.bottom = (int)currentHeightStep;
+                }
+            } else {
+                halo_now.input_0_halo.bottom = 0;
+                halo_now.output_0_halo.bottom = 0;
+                halo_now.output_0_halo_broadcast_cnt.bottom = 0;
+            }
+        }
+
         auto remainedWidth = width;
         for (unsigned int idy = 0; idy < actualWidthSplitsNum; idy++) {
             // Create a new output tile tensor from the original one
             const auto tile_width = remainedWidth > maxWidth ? maxWidth : remainedWidth;
+
+            {
+                halo_now.input_0_halo.left = 0;
+                halo_now.output_0_halo.left = 0;
+                if (idy == 0)  // first
+                {
+                    halo_now.input_0_halo.left = halo.input_0_halo.left;
+                    halo_now.output_0_halo.left = halo.output_0_halo.left;
+                    if (halo_now.output_0_halo.left > (int)tile_width) {  // error
+                        halo_now.output_0_halo.left = (int)tile_width;
+                    }
+                } else {
+                    halo_now.input_0_halo.left = 0;
+                    halo_now.output_0_halo.left = 0;
+                    halo_now.output_0_halo_broadcast_cnt.left = 0;
+                }
+
+                if (idy == (actualWidthSplitsNum - 1))  // last
+                {
+                    halo_now.input_0_halo.right = halo.input_0_halo.right;
+                    halo_now.output_0_halo.right = halo.output_0_halo.right;
+                    if (halo_now.output_0_halo.right > (int)tile_width) {  // error
+                        halo_now.output_0_halo.right = (int)tile_width;
+                    }
+                } else {
+                    halo_now.input_0_halo.right = 0;
+                    halo_now.output_0_halo.right = 0;
+                    halo_now.output_0_halo_broadcast_cnt.right = 0;
+                }
+            }
 
             const auto tile_height = currentHeightStep;
             const auto offset_width = idy * maxWidth;
@@ -105,13 +171,16 @@ void splitOverHW(const DPULayer& layer, std::list<DPUWorkloads>& splitPool, cons
             remainedWidth -= tile_width;
 
             // Generate the workload and assign the new shape
-            workloads.emplace_back(createTileHW(layer, tile_width, tile_height, offset_width, offset_height));
+            workloads_split.workloads.emplace_back(
+                    createTileHW(layer, tile_width, tile_height, offset_width, offset_height, halo_now));
+            workloads_split.cycles.emplace_back(Cycles::NO_ERROR);
         }
         remainedHeight -= currentHeightStep;
     }
 
-    Tiler::setWorkloadsMode(workloads, mode, layer);  // computes also input tensor
-    splitPool.push_back(workloads);
+    ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(
+            workloads_split, mode, layer);  // computes also input tensor, and halo inoput sanitisation
+    splitPool.push_back(workloads_split);
 }
 
 }  // namespace VPUNN

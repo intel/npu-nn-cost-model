@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,8 +10,9 @@
 #ifndef VPUNN_SHV_ACTIVATION_H
 #define VPUNN_SHV_ACTIVATION_H
 
-#include <math.h>
+#include <cmath>
 #include "vpu/types.h"
+#include "vpu/shave_old.h"
 
 namespace VPUNN {
 
@@ -60,7 +61,7 @@ struct SHVActivation : public SWOperation {
      */
     unsigned int cycles() const override {
         float size = static_cast<float>(outputs[0].size());
-        return static_cast<unsigned int>(round(size / getKernelEfficiency())) + getLatency();
+        return static_cast<unsigned int>(std::round(size / getKernelEfficiency())) + getLatency();
     }
 };
 

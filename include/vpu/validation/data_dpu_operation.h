@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,9 +10,23 @@
 #ifndef VPUNN_VPU_VALIDATOR_DATA_DPU_OPERATION_H
 #define VPUNN_VPU_VALIDATOR_DATA_DPU_OPERATION_H
 
-#include "vpu/types.h"
+#include <iostream>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <variant>
+#include <vector>
+#include <functional>
+
+#include "core/serializer.h"
+#include "vpu/dpu_defaults.h"
+#include "vpu/dpu_types.h"
+#include "vpu/dpu_workload.h"
 
 namespace VPUNN {
+
+class IDeviceValidValues;  // cannot include the header here, circular dependency
 
 template <class T>
 using Values = std::vector<T>;  ///< Values type container
@@ -42,6 +56,12 @@ struct TensorInfo {
     }
 
     TensorInfo() = default;
+
+    /// @brief Get the size in samples
+    /// @return how many elements are in this tensor shape
+    long long numberOfElements() const {
+        return height * width * channels * batch;
+    }
 };
 
 /// @brief kernel related informations, including stride and padding
@@ -73,22 +93,46 @@ struct KernelInfo {
 
 /// @brief local type describing a workload
 /// easy to change and adapt without touching the DPUWorkload interface
+/* coverity[rule_of_three_violation:FALSE] */
 struct DPUOperation {
     VPUDevice device{};  ///< device family, VPU2_0, 2_7, ...
     Operation operation{};
 
-    TensorInfo input_0;  ///< activators
+    TensorInfo input_0;  ///< activators compute tensor
     TensorInfo input_1;  ///< weights. NOte: different operations will use differently the tensor shape to represent
                          ///< weights
 
-    TensorInfo output_0;
+    TensorInfo output_0;  //< compute tensor
 
     ExecutionMode execution_order{};  ///< execution mode
 
     KernelInfo kernel;
 
+    ActivationFunction activation_function{ActivationFunction::NONE};
+
     int output_write_tiles{1};  //< broadcast policy
     ISIStrategy isi_strategy{ISIStrategy::CLUSTERING};
+
+    // new halo
+    HaloWorkload halo{};                 ///< halo aspects
+    TensorInfo input_0_memory_dense{};   ///< activators memory tensor. no sparsity or SEP, only halo influence
+    TensorInfo output_0_memory_dense{};  ///< memory tensor for output. no sparsity , only halo influence
+
+    SEPModeInfo sep_activators;  // SEP mode , input via Storage elements. Not compatible with halo?
+
+    bool weightless_operation{false};  ///< operation does not have weights
+
+    /// output tensor can be the same as the input tensor, for Elementwise ops only
+    bool in_place_output_memory{false};
+
+    using _ref_supported_type =
+            std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<Operation>,
+                         std::reference_wrapper<DataType>, std::reference_wrapper<Layout>,
+                         std::reference_wrapper<Swizzling>, std::reference_wrapper<ActivationFunction>,
+                         std::reference_wrapper<ExecutionMode>, std::reference_wrapper<ISIStrategy>,
+                         std::reference_wrapper<DimType>, std::reference_wrapper<long long>,
+                         std::reference_wrapper<int>, std::reference_wrapper<float>, std::reference_wrapper<bool>,
+                         std::function<VPUNN::DimType(VPUNN::DimType)>>;
 
     void set_intended_split(ISIStrategy strategy, unsigned int nTiles) {
         isi_strategy = strategy;
@@ -97,6 +141,7 @@ struct DPUOperation {
 
     /// constructor from a DPUWorkload.
     /// input_1 (weights) tensor is not filled with shape
+    /// @todo:  provide a version that is able to init also the wts
     explicit DPUOperation(const DPUWorkload& w)
             : device{w.device},
               operation{w.op},
@@ -104,24 +149,59 @@ struct DPUOperation {
               output_0{w.outputs[0]},
               execution_order{w.execution_order},
               kernel{w},
+              activation_function{w.activation_function},
               output_write_tiles{static_cast<int>(w.output_write_tiles)},
-              isi_strategy{w.isi_strategy} {
+              isi_strategy{w.isi_strategy},
+              halo{w.halo},                      // copy halo
+              sep_activators{w.sep_activators},  // copy sep
+              weightless_operation{w.is_weightless_operation()},
+              in_place_output_memory{w.is_inplace_output_memory()} {
         // from WL to tensors
         input_0.swizzling = w.input_swizzling[0];
         input_0.sparsity = w.act_sparsity;
 
-        {  // input 1 is left empty . the WL does not have info yet
-            // some extra aspects can be recovered based on operation and  in/out/Kernel size, but is not the scope
-            // here
+        {                                                                 // partial filling of input 1
+            input_1.datatype = w.weight_type.value_or(input_0.datatype);  // default to activator type
 
             input_1.swizzling = w.input_swizzling[1];
-            input_1.datatype = input_0.datatype;
+
             input_1.sparsity_enabled = w.weight_sparsity_enabled;
             input_1.sparsity = w.weight_sparsity;
         }
         output_0.swizzling = w.output_swizzling[0];
+
+        input_0_memory_dense = compute_dense_input_memory_tensor(input_0, halo);
+        output_0_memory_dense = compute_dense_output_memory_tensor(output_0, halo);
     }
     DPUOperation() = default;
+    DPUOperation(const DPUOperation& r)
+            : device{r.device},
+              operation{r.operation},
+              input_0{r.input_0},
+              input_1{r.input_1},
+              output_0{r.output_0},
+              execution_order{r.execution_order},
+              kernel{r.kernel},
+              activation_function{r.activation_function},
+              output_write_tiles{r.output_write_tiles},
+              isi_strategy{r.isi_strategy},
+              halo{r.halo},
+              input_0_memory_dense{r.input_0_memory_dense},
+              output_0_memory_dense{r.output_0_memory_dense},
+              sep_activators{r.sep_activators}, /*_member_map{}*/
+              weightless_operation{r.weightless_operation},
+              in_place_output_memory{r.in_place_output_memory} {
+    }
+
+    DPUOperation(DPUOperation&) = delete;
+    DPUOperation(const DPUOperation&&) = delete;
+    DPUOperation(DPUOperation&&) = delete;
+
+    DPUOperation& operator=(const DPUOperation&) = delete;
+    DPUOperation& operator=(DPUOperation&) = delete;
+    DPUOperation& operator=(DPUOperation) = delete;
+
+    ~DPUOperation() = default;
 
     DPUWorkload clone_as_DPUWorkload() const {
         const auto& in = input_0;
@@ -144,8 +224,7 @@ struct DPUOperation {
                 execution_order  // execution mode
         };                       // looks like local  object , but  hope  for Return Value Optimization (RVO)
 
-        // wl.activation_function = dpu.  // WHERE IS IT?
-        wl.activation_function = ActivationFunction::NONE;  //
+        wl.activation_function = activation_function;
 
         wl.act_sparsity = input_0.sparsity;
         wl.weight_sparsity = input_1.sparsity;
@@ -161,8 +240,312 @@ struct DPUOperation {
 
         wl.weight_sparsity_enabled = input_1.sparsity_enabled;
 
+        wl.halo = halo;  // halo aspects
+        wl.sep_activators = sep_activators;
+
+        wl.weight_type = input_1.datatype;  // this will make the optional as existing!
+
+        wl.weightless_operation = weightless_operation;
+        wl.set_inplace_output_memory(in_place_output_memory);
+
         return wl;
     }
+    /// knowing input compute tensor and halo will calculate the input memory tensor, without considering sparsity
+    /// or other indirection like SEP. Is like what would be the memory tensor if dense and no SEP (pointer
+    /// indirection) tricks
+    static TensorInfo compute_dense_input_memory_tensor(const TensorInfo& compute_t, const HaloWorkload& halo) {
+        TensorInfo t{compute_t};  // same as compute tensor first
+
+        const auto& in_halo{halo.input_0_halo};
+        //  extension will be negative(memory reduction) if halo(positive halo),
+        // or positive (memory increase) ,memory is larger, if negative halo, but we consume less (prev layer wrote
+        //  more)
+
+        auto newDimension = [](const long long crtDimension, const int oneEndHalo, const int otherEndHalo) {
+            const int oneExt = -oneEndHalo;
+            const int twoExt = -otherEndHalo;
+            const long long newDim = crtDimension + (oneExt + twoExt);
+            return (newDim > 0 ? newDim : 0);  // limit to zero
+        };
+
+        t.height = newDimension(t.height, in_halo.top, in_halo.bottom);
+        t.width = newDimension(t.width, in_halo.left, in_halo.right);
+        t.channels = newDimension(t.channels, in_halo.front, in_halo.back);
+
+        return t;
+    }
+
+    /// knowing output compute tensor and halo will calculate the output memory tensor, without considering sparsity
+    /// or other indirection
+    static TensorInfo compute_dense_output_memory_tensor(const TensorInfo& compute_t, const HaloWorkload& halo) {
+        TensorInfo t{compute_t};  // same as compute tensor first
+        const auto& inbopund_halo{halo.output_0_inbound_halo};
+        //  extension can be only positive = how many elements the other tiles are writing here
+        //  more)
+
+        auto newDimensionWithInbound = [](const long long crtDimension, const int oneEndHalo, const int otherEndHalo) {
+            const long long newDim = crtDimension + (oneEndHalo + otherEndHalo);
+            return newDim;
+        };
+
+        t.height = newDimensionWithInbound(t.height, inbopund_halo.top, inbopund_halo.bottom);
+        t.width = newDimensionWithInbound(t.width, inbopund_halo.left, inbopund_halo.right);
+        t.channels = newDimensionWithInbound(t.channels, inbopund_halo.front, inbopund_halo.back);
+
+        return t;
+    }
+
+    /// update memory tensors in accordance with compute tensors and Halo
+    void resyncronize_memory_tensors() {
+        input_0_memory_dense = compute_dense_input_memory_tensor(input_0, halo);
+        output_0_memory_dense = compute_dense_output_memory_tensor(output_0, halo);
+    }
+
+    /// @brief constructor based on DPUWorkload and a device valid values for initializing also the input_1 tensor
+    ///
+    /// @param w the source DPUWorkload
+    /// @param config the device valid values for this device
+    /// @throws std::runtime_error if the operation  is not supported
+    DPUOperation(const DPUWorkload& w, const IDeviceValidValues& config);
+
+    friend std::ostream& operator<<(std::ostream& stream, const DPUOperation& d);
+
+    const std::unordered_map<std::string, _ref_supported_type> _member_map{
+            {"device", std::ref(device)},
+            {"operation", std::ref(operation)},
+            {"input_0_batch", std::ref(input_0.batch)},
+            {"input_0_channels", std::ref(input_0.channels)},
+            {"input_0_height", std::ref(input_0.height)},
+            {"input_0_width", std::ref(input_0.width)},
+            {"input_1_batch", std::ref(input_1.batch)},
+            {"input_1_channels", std::ref(input_1.channels)},
+            {"input_1_height", std::ref(input_1.height)},
+            {"input_1_width", std::ref(input_1.width)},
+            {"input_sparsity_enabled", std::ref(input_0.sparsity_enabled)},
+            {"weight_sparsity_enabled", std::ref(input_1.sparsity_enabled)},
+            {"input_sparsity_rate", std::ref(input_0.sparsity)},
+            {"weight_sparsity_rate", std::ref(input_1.sparsity)},
+            {"execution_order", std::ref(execution_order)},
+            {"activation_function", std::ref(activation_function)},
+            {"kernel_height", std::ref(kernel.height)},
+            {"kernel_width", std::ref(kernel.width)},
+            {"kernel_pad_bottom", std::ref(kernel.pad_bottom)},
+            {"kernel_pad_left", std::ref(kernel.pad_left)},
+            {"kernel_pad_right", std::ref(kernel.pad_right)},
+            {"kernel_pad_top", std::ref(kernel.pad_top)},
+            {"kernel_stride_height", std::ref(kernel.stride_height)},
+            {"kernel_stride_width", std::ref(kernel.stride_width)},
+            {"output_0_batch", std::ref(output_0.batch)},
+            {"output_0_channels", std::ref(output_0.channels)},
+            {"output_0_height", std::ref(output_0.height)},
+            {"output_0_width", std::ref(output_0.width)},
+            {"input_0_datatype", std::ref(input_0.datatype)},
+            {"input_0_layout", std::ref(input_0.layout)},
+            {"input_0_swizzling", std::ref(input_0.swizzling)},
+            {"input_1_datatype", std::ref(input_1.datatype)},
+            {"input_1_layout", std::ref(input_1.layout)},
+            {"input_1_swizzling", std::ref(input_1.swizzling)},
+            {"output_0_datatype", std::ref(output_0.datatype)},
+            {"output_0_layout", std::ref(output_0.layout)},
+            {"output_0_swizzling", std::ref(output_0.swizzling)},
+            {"output_sparsity_enabled", std::ref(output_0.sparsity_enabled)},
+            {"isi_strategy", std::ref(isi_strategy)},
+            {"output_write_tiles", std::ref(output_write_tiles)},
+
+            {"input_0_halo_top", std::ref(halo.input_0_halo.top)},
+            {"input_0_halo_bottom", std::ref(halo.input_0_halo.bottom)},
+            {"input_0_halo_left", std::ref(halo.input_0_halo.left)},
+            {"input_0_halo_right", std::ref(halo.input_0_halo.right)},
+            {"input_0_halo_front", std::ref(halo.input_0_halo.front)},
+            {"input_0_halo_back", std::ref(halo.input_0_halo.back)},
+
+            {"output_0_halo_top", std::ref(halo.output_0_halo.top)},
+            {"output_0_halo_bottom", std::ref(halo.output_0_halo.bottom)},
+            {"output_0_halo_left", std::ref(halo.output_0_halo.left)},
+            {"output_0_halo_right", std::ref(halo.output_0_halo.right)},
+            {"output_0_halo_front", std::ref(halo.output_0_halo.front)},
+            {"output_0_halo_back", std::ref(halo.output_0_halo.back)},
+
+            {"output_0_halo_broadcast_top", std::ref(halo.output_0_halo_broadcast_cnt.top)},
+            {"output_0_halo_broadcast_bottom", std::ref(halo.output_0_halo_broadcast_cnt.bottom)},
+            {"output_0_halo_broadcast_left", std::ref(halo.output_0_halo_broadcast_cnt.left)},
+            {"output_0_halo_broadcast_right", std::ref(halo.output_0_halo_broadcast_cnt.right)},
+            {"output_0_halo_broadcast_front", std::ref(halo.output_0_halo_broadcast_cnt.front)},
+            {"output_0_halo_broadcast_back", std::ref(halo.output_0_halo_broadcast_cnt.back)},
+
+            {"output_0_halo_inbound_top", std::ref(halo.output_0_inbound_halo.top)},
+            {"output_0_halo_inbound_bottom", std::ref(halo.output_0_inbound_halo.bottom)},
+            {"output_0_halo_inbound_left", std::ref(halo.output_0_inbound_halo.left)},
+            {"output_0_halo_inbound_right", std::ref(halo.output_0_inbound_halo.right)},
+            {"output_0_halo_inbound_front", std::ref(halo.output_0_inbound_halo.front)},
+            {"output_0_halo_inbound_back", std::ref(halo.output_0_inbound_halo.back)},
+
+            {"sep_enabled", std::ref(sep_activators.sep_activators)},
+            {"sep_w",
+             [this](VPUNN::DimType width) -> VPUNN::DimType {
+                 if (width != 0) {
+                     sep_activators.storage_elements_pointers.set_width(width);
+                 }
+                 return sep_activators.storage_elements_pointers.width();
+             }},
+            {"sep_h",
+             [this](VPUNN::DimType height) -> VPUNN::DimType {
+                 if (height != 0) {
+                     sep_activators.storage_elements_pointers.set_height(height);
+                 }
+                 return sep_activators.storage_elements_pointers.height();
+             }},
+            {"sep_c",
+             [this](VPUNN::DimType ch) -> VPUNN::DimType {
+                 if (ch != 0) {
+                     sep_activators.storage_elements_pointers.set_channels(ch);
+                 }
+                 return sep_activators.storage_elements_pointers.channels();
+             }},
+            {"sep_b",
+             [this](VPUNN::DimType b) -> VPUNN::DimType {
+                 if (b != 0) {
+                     sep_activators.storage_elements_pointers.set_batches(b);
+                 }
+                 return sep_activators.storage_elements_pointers.batches();
+             }},
+            {"sep_act_w",
+             [this](VPUNN::DimType width) -> VPUNN::DimType {
+                 if (width != 0) {
+                     sep_activators.actual_activators_input.set_width(width);
+                 }
+                 return sep_activators.actual_activators_input.width();
+             }},
+            {"sep_act_h",
+             [this](VPUNN::DimType height) -> VPUNN::DimType {
+                 if (height != 0) {
+                     sep_activators.actual_activators_input.set_height(height);
+                 }
+                 return sep_activators.actual_activators_input.height();
+             }},
+            {"sep_act_c",
+             [this](VPUNN::DimType ch) -> VPUNN::DimType {
+                 if (ch != 0) {
+                     sep_activators.actual_activators_input.set_channels(ch);
+                 }
+                 return sep_activators.actual_activators_input.channels();
+             }},
+            {"sep_act_b",
+             [this](VPUNN::DimType b) -> VPUNN::DimType {
+                 if (b != 0) {
+                     sep_activators.actual_activators_input.set_batches(b);
+                 }
+                 return sep_activators.actual_activators_input.batches();
+             }},
+            {"sep_no_sparse_map", std::ref(sep_activators.no_sparse_map)},
+            {"weightless_operation", std::ref(weightless_operation)},
+            {"in_place_output_memory", std::ref(in_place_output_memory)},
+    };
+
+    static const std::vector<std::string>& _get_member_names() {
+        static std::vector<std::string> names = std::vector<std::string>{
+                "device",
+                "operation",
+                "input_0_batch",
+                "input_0_channels",
+                "input_0_height",
+                "input_0_width",
+                "input_1_batch",
+                "input_1_channels",
+                "input_1_height",
+                "input_1_width",
+                "input_sparsity_enabled",
+                "weight_sparsity_enabled",
+                "input_sparsity_rate",
+                "weight_sparsity_rate",
+                "execution_order",
+                "activation_function",
+                "kernel_height",
+                "kernel_width",
+                "kernel_pad_bottom",
+                "kernel_pad_left",
+                "kernel_pad_right",
+                "kernel_pad_top",
+                "kernel_stride_height",
+                "kernel_stride_width",
+                "output_0_batch",
+                "output_0_channels",
+                "output_0_height",
+                "output_0_width",
+                "input_0_datatype",
+                "input_0_layout",
+                "input_0_swizzling",
+                "input_1_datatype",
+                "input_1_layout",
+                "input_1_swizzling",
+                "output_0_datatype",
+                "output_0_layout",
+                "output_0_swizzling",
+                "output_sparsity_enabled",
+                "isi_strategy",
+                "output_write_tiles",
+                "input_0_halo_top",
+                "input_0_halo_bottom",
+                "input_0_halo_left",
+                "input_0_halo_right",
+                "input_0_halo_front",
+                "input_0_halo_back",
+                "output_0_halo_top",
+                "output_0_halo_bottom",
+                "output_0_halo_left",
+                "output_0_halo_right",
+                "output_0_halo_front",
+                "output_0_halo_back",
+                "output_0_halo_broadcast_top",
+                "output_0_halo_broadcast_bottom",
+                "output_0_halo_broadcast_left",
+                "output_0_halo_broadcast_right",
+                "output_0_halo_broadcast_front",
+                "output_0_halo_broadcast_back",
+                "output_0_halo_inbound_top",
+                "output_0_halo_inbound_bottom",
+                "output_0_halo_inbound_left",
+                "output_0_halo_inbound_right",
+                "output_0_halo_inbound_front",
+                "output_0_halo_inbound_back",
+                "sep_enabled",
+                "sep_w",
+                "sep_h",
+                "sep_c",
+                "sep_b",
+                "sep_act_w",
+                "sep_act_h",
+                "sep_act_c",
+                "sep_act_b",
+                "sep_no_sparse_map",
+                "weightless_operation",
+                "in_place_output_memory",
+                "weightless_operation",
+                "in_place_output_memory",
+        };
+
+        return names;
+    }
+
+    size_t hash() const {
+        std::size_t combined_hash = 0;
+        for (const auto& [key, value] : _member_map) {
+            std::visit(
+                    [&combined_hash](auto&& arg) {
+                        if constexpr (std::is_same_v<std::decay_t<std::remove_reference_t<decltype(arg)>>,
+                                                     std::function<VPUNN::DimType(VPUNN::DimType)>>) {
+                            combined_hash ^=
+                                    std::hash<int>{}(arg(0)) + 0x9e3779b9 + (combined_hash << 6) + (combined_hash >> 2);
+                        } else {
+                            using argtype = std::decay_t<std::remove_reference_t<decltype(arg.get())>>;
+                            combined_hash ^= std::hash<argtype>{}(arg) + 0x9e3779b9 + (combined_hash << 6) +
+                                                (combined_hash >> 2);
+                        }
+                    },
+                    value);
+        }
+        return combined_hash;
+    }   
 };
 
 inline std::ostream& operator<<(std::ostream& stream, const TensorInfo& d) {
@@ -212,7 +595,12 @@ inline std::ostream& operator<<(std::ostream& stream, const DPUOperation& d) {
 
            << " isi_strategy: \t" << (int)d.isi_strategy << " : "
            << ISIStrategy_ToText.at(static_cast<int>(d.isi_strategy)) << " ;\n"  //
-
+           << d.halo                                                             //
+           << " input  dense memo: \t{" << d.input_0_memory_dense << " } ;\n"
+           << " output dense memo: \t{" << d.output_0_memory_dense << " } ;\n"
+           << d.sep_activators                                                                     //
+           << " weightless_operation: \t" << std::to_string(d.weightless_operation) << " ;\n"      //
+           << " in_place_output_memory: \t" << std::to_string(d.in_place_output_memory) << " ;\n"  //
             ;
     return stream;
 }

@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -21,7 +21,7 @@
 #include "vpu/types.h"
 
 #include "sample_generator.h"
-#include "vpu/validation/device_valid_values.h"
+//#include "vpu/validation/device_valid_values.h"
 #include "vpu/validation/dpu_operations_valid_behaviours.h"
 
 #include "vpu/validation/dpu_operations_validator.h"
@@ -55,14 +55,15 @@ private:
     ///
     /// @param sampler the object used to chose a random sample from an interval or a discrete list
     /// @param config the static configuration of the option for this generator
-    /// @dpu [in , out] provides the device and will hold the generated information
+    /// @dpu [in , out] provides the device and will hold the generated information. must ensure invariants are still
+    /// valid (memory with halo)
     /// @throws runtime_error if the operation selected from config is not supported or known
     ///
     /// @returns true in case dpu contains a valid DPUOPeration, false in case there were problems and it was not
     /// possible to generate
     bool sample_tentative(Sampler& sampler, const IDeviceValidValues& config, DPUOperation& dpu) const {
         // 1. operation
-        dpu.operation = sampler.sample_list(config.get_valid_operations_range());
+        dpu.operation = sampler.sample_list(config.get_valid_operations());
 
         // 2. select Output write tiles
         {  // check again if depends on op?: yes depends, EMLwise cannot be !=1
@@ -98,7 +99,7 @@ private:
                 dpu.input_0.width = sampler.sample_list_decrease_prob(config.get_input_width_range(dpu));
 
                 // MAKE DYNAMIC CHANNELS
-                dpu.input_0.channels = sampler.sample_list_decrease_prob(config.get_input_channels_range(dpu));
+                dpu.input_0.channels = sampler.sample_list_decrease_prob(config.get_input_channels_restriction(dpu));
             }
 
             {  // stride , depends on input zero, and operation sometimes
@@ -134,21 +135,20 @@ private:
                                                                    dpu.kernel.pad_bottom, dpu.kernel.height,
                                                                    dpu.kernel.stride_height);
             }
-
-            dpu.input_0.datatype = sampler.sample_list(config.valid_datatypes);
+            // MAKE DYNAMIC DATATYPES
+            dpu.input_0.datatype = sampler.sample_list(config.get_input_valid_datatypes(dpu));
             dpu.input_0.datatype =
                     config.restrict_datatype(dpu.input_0.datatype);  // do not generate for untrained data
 
-            dpu.input_0.layout = config.valid_layouts[0];      // NOT COVERED
-            dpu.input_0.swizzling = config.default_swizzling;  // NOT COVERED
+            dpu.input_0.layout = config.get_valid_layouts()[0];      // NOT COVERED
+            dpu.input_0.swizzling = config.get_default_swizzling();  // NOT COVERED
 
-            dpu.input_1.swizzling = config.default_swizzling;  // NOT COVERED
+            dpu.input_1.swizzling = config.get_default_swizzling();  // NOT COVERED
 
-            dpu.output_0.datatype =
-                    dpu.input_0.datatype;  // SAME as input, but will be overwritten in operation specific
+            dpu.output_0.datatype = sampler.sample_list(config.get_output_valid_datatypes(dpu));
 
-            dpu.output_0.layout = config.valid_layouts[0];      // NOT COVERED
-            dpu.output_0.swizzling = config.default_swizzling;  // NOT COVERED
+            dpu.output_0.layout = config.get_valid_layouts()[0];      // NOT COVERED
+            dpu.output_0.swizzling = config.get_default_swizzling();  // NOT COVERED
         }
 
         {  // Operation dependent
@@ -164,7 +164,11 @@ private:
             operation_generator.generate_sparsity(sampler, config, dpu);
         }
         {                                                                             // execution order
-            dpu.execution_order = sampler.sample_list(config.valid_execution_order);  // uniform
+            dpu.execution_order = sampler.sample_list(config.get_valid_execution_order());  // uniform
+        }
+        {  // we are not changing halo, all on zero  supposed.
+            // memory tensors need to be recomputed since compute tensors have been random generated.
+            dpu.resyncronize_memory_tensors();
         }
 
         return true;

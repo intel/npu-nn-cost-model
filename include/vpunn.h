@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -13,6 +13,8 @@
 #include <string>
 #include "core/profiling.h"
 #include "inference/model.h"
+#include "inference/model_version.h"
+
 
 /// @brief top namespace for VPUNN cost model library
 namespace VPUNN {
@@ -49,7 +51,7 @@ public:
      *
      * @return a long lived reference to the version information
      */
-    const ModelVersion& model_version_info() {
+    const ModelVersion& model_version_info() const {
         return model_version;
     }
 

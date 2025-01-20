@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -39,10 +39,12 @@ if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
 
     function(GENERATE_SHV_KERNEL_BINDINGS KERNEL_TYPE KERNEL_NAME)
         string(TOUPPER ${KERNEL_NAME} KERNEL_NAME_UPPER)
-        set(SW_LAYER_ENUMERATIONS "${SW_LAYER_ENUMERATIONS} ${KERNEL_NAME_UPPER}, " PARENT_SCOPE)
-        set(SW_LAYER_BINDINGS "${SW_LAYER_BINDINGS} .value(\"${KERNEL_NAME_UPPER}\", SWActivationFunction::${KERNEL_NAME_UPPER}) \\\n" PARENT_SCOPE)
+
 
         if(${KERNEL_TYPE} STREQUAL "ACTIVATION")
+            set(SW_LAYER_ENUMERATIONS "${SW_LAYER_ENUMERATIONS} ${KERNEL_NAME_UPPER}, " PARENT_SCOPE)
+            set(SW_LAYER_BINDINGS "${SW_LAYER_BINDINGS} .value(\"${KERNEL_NAME_UPPER}\", SWActivationFunction::${KERNEL_NAME_UPPER}) \\\n" PARENT_SCOPE)     
+
             set(SW_LAYER_SWITCH_CASE "${SW_LAYER_SWITCH_CASE}  case SWActivationFunction::${KERNEL_NAME_UPPER}:  return std::make_unique<SHV${KERNEL_NAME}>(device, inT, outT); \\\n" PARENT_SCOPE)
         endif()
     endfunction()
@@ -63,7 +65,10 @@ if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
         endif()
     endforeach()
 
+    #rem this , it is unhandled in switch
     set(SW_LAYER_ENUMERATIONS "${SW_LAYER_ENUMERATIONS} __size }")
+    set(SW_LAYER_SWITCH_CASE "${SW_LAYER_SWITCH_CASE}  default:  return std::make_unique<SHVAbs>(device, inT, outT); \\\n")
+
 
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/vpunn_bind.cpp.in"
@@ -87,6 +92,8 @@ if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
         -v
         --bind
         -O3
+        -std=c++17
+        -std=c++1z
         -sEXCEPTION_DEBUG=1
         -sDEMANGLE_SUPPORT=1
         -sNO_DISABLE_EXCEPTION_CATCHING=1

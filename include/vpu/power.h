@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -18,7 +18,7 @@
 #include "vpu/performance.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
-#include "vpunn.h"
+// #include "vpunn.h"
 
 namespace VPUNN {
 
@@ -105,6 +105,7 @@ private:
                 {VPUDevice::VPU_2_0, vpu_2_0_values},
                 {VPUDevice::VPU_2_7, vpu_2_7_values},
                 {VPUDevice::VPU_4_0, vpu_4_0_values},
+                {VPUDevice::NPU_RESERVED1, vpu_2_7_values},
         };
 
         return pf_lut_l;
@@ -130,7 +131,7 @@ private:
         unsigned int smaller = table.cbegin()->first;   // what's before first value is equal to it
         unsigned int greater = table.crbegin()->first;  // what's after last value is equal to it
 
-        const float input_ch_log2 = log2((float)input_ch);
+        const float input_ch_log2 = std::log2((float)input_ch);
 
         for (const auto& it : table) {
             // Find the index below or at input_ch
@@ -210,7 +211,9 @@ public:
         else if (device == VPUDevice::VPU_2_7)
             fp_to_int_ratio = 1.3f;
         else if (device == VPUDevice::VPU_4_0)
-            fp_to_int_ratio = 1.3f;
+            fp_to_int_ratio = 1.3f;  // mock
+        else if (device == VPUDevice::NPU_RESERVED1 || device == VPUDevice::NPU_RESERVED1_W)
+            fp_to_int_ratio = 1.3f;  // mock
         else
             fp_to_int_ratio = 1.0f;
 

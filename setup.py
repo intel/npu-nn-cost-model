@@ -1,4 +1,4 @@
-# Copyright © 2023 Intel Corporation
+# Copyright © 2024 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -43,7 +43,6 @@ setup(
     name="vpunn_cost_model",
     version=get_version(),
     author="Alessandro Palla",
-    author_email="alessandro.palla@intel.com",
     description="VPUNN cost model",
     license="Apache License 2.0",
     cmake_install_target="vpunn-install-bindings",
@@ -54,9 +53,8 @@ setup(
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/intel-innersource/libraries.performance.modeling.vpu.nn_cost_model",
+ 
     project_urls={
-        "Bug Tracker": "https://github.com/intel-innersource/libraries.performance.modeling.vpu.nn_cost_model/issues",
     },
     classifiers=[
         "Programming Language :: Python :: 3",

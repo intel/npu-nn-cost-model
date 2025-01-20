@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -17,6 +17,7 @@
 #include <string>    // std::string
 
 #include "data_dpu_operation.h"
+#include "vpu/ranges.h"
 
 namespace VPUNN {
 
@@ -95,7 +96,7 @@ public:
 
     /// checks if the item belongs to a container. If not present it will record an error/finding
     template <class T>
-    bool check_is_in_list(const T& item, const Values<T>& container, const std::string& what) noexcept {
+    bool check_is_in_list(const T& item, const Values<T>& container, const std::string& what)  {
         const auto found = std::find(container.begin(), container.end(), item) != container.end();
 
         if (!found) {
@@ -112,7 +113,7 @@ public:
 
     /// checks if the item belongs to a closed interval. If not present it will record an error/finding
     template <class T>
-    bool check_is_in_interval(const T& item, const std::pair<T, T>& interval, const std::string& what) noexcept {
+    bool check_is_in_interval(const T& item, const std::pair<T, T>& interval, const std::string& what)  {
         const bool belongs{(item >= interval.first) && (item <= interval.second)};
 
         if (!belongs) {
@@ -127,9 +128,23 @@ public:
         return belongs;
     }
 
+    /// checks if the item respects all the rules of a smart range. If not it will record an error/finding
+    bool check_is_in_requirements(const int item, const SmartRanges& range, const std::string& what) {
+        std::string message{""};
+        bool result{range.is_in(item, message)};
+
+        if (!result) {
+            std::stringstream buffer;
+            buffer << what << " is not ok because: " << message;
+            const std::string details = buffer.str();
+            add_check_failed(details);
+        }
+        return result;
+    }
+
     /// checks for equality. If not present it will record an error/finding
     template <class T>
-    bool check_is_equal(const T& item, const T& right_side, const std::string what) noexcept {
+    bool check_is_equal(const T& item, const T& right_side, const std::string what) {
         const auto equal{item == right_side};
         if (!equal) {
             std::stringstream buffer;
@@ -145,7 +160,7 @@ public:
 
 private:
     template <class T>
-    std::string show_compact(const Values<T>& container) const noexcept {
+    std::string show_compact(const Values<T>& container) const {
         std::stringstream buffer;
         buffer << "[ ";
         if (container.size() > 5U) {  // brief

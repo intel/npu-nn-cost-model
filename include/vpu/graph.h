@@ -1,4 +1,4 @@
-// Copyright © 2023 Intel Corporation
+// Copyright © 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -15,6 +15,7 @@
 #include <memory>
 #include <unordered_map>
 #include "vpu_layer_cost_model.h"
+#include <random>
 
 namespace VPUNN {
 
@@ -47,9 +48,12 @@ public:
      * @param dpu_op a DPU layer
      */
     VPUComputeNode(const std::shared_ptr<DPULayer> dpu_op): dpu(dpu_op) {
+        std::random_device rd; //create a random device to obtain a seed for the random number generator
+        std::mt19937 gen(rd()); //initialize the random number generator with the random seed
+        std::uniform_int_distribution<int> distrib(0, RAND_MAX); //uniform distribution, range{0, RAND_MAX}
+
         type = VPUComputeNode::OpType::DPU_COMPUTE_NODE;
-        /* coverity[dont_call] */
-        _hash = std::rand();
+        _hash = distrib(gen);  // old code: std::rand();
     }
 
     /**
@@ -58,8 +62,12 @@ public:
      * @param shv_op a SHV layer
      */
     VPUComputeNode(const std::shared_ptr<SWOperation> shv_op): shv(shv_op) {
+        std::random_device rd;   // create a random device to obtain a seed for the random number generator
+        std::mt19937 gen(rd());  // initialize the random number generator with the random seed
+        std::uniform_int_distribution<int> distrib(0, RAND_MAX);  // uniform distribution, range{0, RAND_MAX}
+
         type = VPUComputeNode::OpType::SHV_COMPUTE_NODE;
-        _hash = std::rand();
+        _hash = distrib(gen);  // old code: std::rand();
     }
 
     /**
