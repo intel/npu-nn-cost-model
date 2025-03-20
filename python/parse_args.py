@@ -61,8 +61,8 @@ def add_parser_dpu(subparsers_module):
     parser_dpu.add_argument('--outdt','--output-datatype','--output_datatype', dest='output_0_datatype', type=str, help='The output datatype', choices=["UINT8", "INT8", "FLOAT16", "BFLOAT16"], required=True)
     parser_dpu.add_argument('--isi','--isi-strategy', dest='isi_strategy', type=str, help='The ISI Strategy', default='CLUSTERING', choices=[
                             'CLUSTERING',
-                            'SOH',
-                            'SOK'
+                            'SPLIT_OVER_H',
+                            'SPLIT_OVER_K'
                         ])
     parser_dpu.add_argument('--owt','--output-write-tiles', dest='output_write_tiles', type=int, help='Controls on how many tiles the DPU broadcast (1 = no broadcast)', default=1)
     # parser_dpu.add_argument('--output-sparsity-enabled', help='The flag to enable output sparsity', action='store_true')

@@ -35,7 +35,7 @@ namespace VPUNN {
 /// layer level operations dynamic behavior
 using LayerOperationsBehaviour =
         Behaviours<CONVOLUTION_Constraints_Layer, DW_CONVOLUTION_Constraints_Layer, CM_CONVOLUTION_Constraints_Layer,
-                   ELTWISE_Constraints_Layer, MAXPOOL_Constraints_Layer>;
+                   ELTWISE_Constraints_Layer, MAXPOOL_Constraints_Layer, LAYERNORM_Constraints_Layer, ELTWISE_MUL_Constraints_Layer>;
 
 /// @brief services for Layer validation
 class VPU_LayerValidator :

@@ -40,6 +40,9 @@ TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bytes_Test) {
 
     EXPECT_EQ(dtype_to_bytes(DataType::BF8), 1);
     EXPECT_EQ(dtype_to_bytes(DataType::HF8), 1);
+
+    EXPECT_EQ(dtype_to_bytes(DataType::INT32), 4);
+    EXPECT_EQ(dtype_to_bytes(DataType::FLOAT32), 4);
 }
 
 TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bits_Test) {
@@ -60,6 +63,9 @@ TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bits_Test) {
 
     EXPECT_EQ(dtype_to_bits(DataType::BF8), 8);
     EXPECT_EQ(dtype_to_bits(DataType::HF8), 8);
+
+    EXPECT_EQ(dtype_to_bits(DataType::INT32), 32);
+    EXPECT_EQ(dtype_to_bits(DataType::FLOAT32), 32);
 }
 
 TEST_F(DataTypes_Collection_Size_Test, Number_of_DTypes_per_byte) {
@@ -80,6 +86,9 @@ TEST_F(DataTypes_Collection_Size_Test, Number_of_DTypes_per_byte) {
 
     EXPECT_EQ(types_per_byte(DataType::BFLOAT16), 0);  //?
     EXPECT_EQ(types_per_byte(DataType::FLOAT16), 0);   //?
+
+    EXPECT_EQ(types_per_byte(DataType::INT32), 0);    //?
+    EXPECT_EQ(types_per_byte(DataType::FLOAT32), 0);  //?
 }
 
 // Test is_same_datatype_footprint function
@@ -105,6 +114,8 @@ TEST_F(DataTypes_Collection_Size_Test, IsSameDatatypeFootprint) {
     EXPECT_TRUE(is_same_datatype_footprint(DataType::BF8, DataType::HF8));
     EXPECT_TRUE(is_same_datatype_footprint(DataType::BF8, DataType::INT8));
 
+    EXPECT_TRUE(is_same_datatype_footprint(DataType::FLOAT32, DataType::INT32));
+
     // Additional test cases with expect false
     EXPECT_FALSE(is_same_datatype_footprint(DataType::HF8, DataType::BFLOAT16));
     EXPECT_FALSE(is_same_datatype_footprint(DataType::UINT4, DataType::INT8));
@@ -112,6 +123,9 @@ TEST_F(DataTypes_Collection_Size_Test, IsSameDatatypeFootprint) {
     EXPECT_FALSE(is_same_datatype_footprint(DataType::UINT1, DataType::INT2));
     EXPECT_FALSE(is_same_datatype_footprint(DataType::UINT8, DataType::INT1));
     EXPECT_FALSE(is_same_datatype_footprint(DataType::BF8, DataType::FLOAT16));
+    EXPECT_FALSE(is_same_datatype_footprint(DataType::INT32, DataType::FLOAT16));
+    EXPECT_FALSE(is_same_datatype_footprint(DataType::FLOAT32, DataType::FLOAT16));
+    EXPECT_FALSE(is_same_datatype_footprint(DataType::INT32, DataType::INT8));
 }
 
 TEST_F(DataTypes_Collection_Size_Test, Compute_elements_size_in_bytes_Test) {
@@ -213,6 +227,28 @@ TEST_F(DataTypes_Collection_Size_Test, Compute_elements_size_in_bytes_Test) {
 
         EXPECT_EQ(compute_size_in_bytes(133, DataType::INT2), 34);
     }
+
+    {  // 4bytes
+        auto testxbyte = [](const DataType dt) {
+            EXPECT_EQ(types_per_byte(dt), 0);
+            EXPECT_EQ(dtype_to_bits(dt), 32);
+
+            EXPECT_EQ(compute_size_in_bytes(-1, dt), 0) << "type:" << DataType_ToText.at((int)dt);
+            EXPECT_EQ(compute_size_in_bytes(-10, dt), 0) << "type:" << DataType_ToText.at((int)dt);
+
+            EXPECT_EQ(compute_size_in_bytes(0, dt), 0);
+            EXPECT_EQ(compute_size_in_bytes(1, dt), 4);
+            EXPECT_EQ(compute_size_in_bytes(2, dt), 8);
+            EXPECT_EQ(compute_size_in_bytes(3, dt), 12);
+            EXPECT_EQ(compute_size_in_bytes(63, dt), 63 * 4);
+            EXPECT_EQ(compute_size_in_bytes(128, dt), 128 * 4);
+            EXPECT_EQ(compute_size_in_bytes(256, dt), 256 * 4);
+            EXPECT_EQ(compute_size_in_bytes(125436, dt), 125436 * 4);
+        };
+
+        testxbyte(DataType::INT32);
+        testxbyte(DataType::FLOAT32);
+    }
 }
 
 TEST_F(DataTypes_Collection_Size_Test, Compute_elements_number_from_bytes_Test) {
@@ -248,6 +284,21 @@ TEST_F(DataTypes_Collection_Size_Test, Compute_elements_number_from_bytes_Test) 
     EXPECT_EQ(compute_elements_count_from_bytes(100, DataType::BFLOAT16), 50);
     EXPECT_EQ(compute_elements_count_from_bytes(101, DataType::BFLOAT16), 50);
     EXPECT_EQ(compute_elements_count_from_bytes(102, DataType::BFLOAT16), 51);
+
+    EXPECT_EQ(compute_elements_count_from_bytes(-1, DataType::INT32), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(-10, DataType::FLOAT32), 0);
+
+    EXPECT_EQ(compute_elements_count_from_bytes(0, DataType::FLOAT32), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(1, DataType::FLOAT32), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(2, DataType::FLOAT32), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(3, DataType::FLOAT32), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(4, DataType::FLOAT32), 1);
+
+    EXPECT_EQ(compute_elements_count_from_bytes(100, DataType::FLOAT32), 25);
+    EXPECT_EQ(compute_elements_count_from_bytes(101, DataType::FLOAT32), 25);
+    EXPECT_EQ(compute_elements_count_from_bytes(102, DataType::FLOAT32), 25);
+    EXPECT_EQ(compute_elements_count_from_bytes(103, DataType::FLOAT32), 25);
+    EXPECT_EQ(compute_elements_count_from_bytes(104, DataType::FLOAT32), 26);
 }
 
 }  // namespace VPUNN_unit_tests

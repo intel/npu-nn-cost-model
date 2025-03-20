@@ -87,8 +87,7 @@ void stepDPU(std::string name, const std::string& model_path, const VPUNN::VPUDe
                 // Workload average latency in ms
                 auto wl_latency = total_latency / n_workloads;
 
-                std::cout << "   T: Nx1: 1 wl latency[ms]: " << wl_latency << " all workloads executed once."
-                          << std::endl;
+                std::cout << "   T: Nx1: 1 wl latency[ms]: " << wl_latency << " all workloads executed once." << std::endl;
 
                 all_run_at_once.push_back(wl_latency);
             }

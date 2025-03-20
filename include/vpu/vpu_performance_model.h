@@ -313,7 +313,7 @@ public:
 
         unsigned int nr_macs{get_nr_macs(wl.device)};
 
-        // As per Xxxxxxx Xxxxx: ELTWISE_ST = (C*H*W)/64 --- ELTWISE_MT = (C*H*W)/(64/2) --- ST = single tile --- MT
+        // As per Bernard David: ELTWISE_ST = (C*H*W)/64 --- ELTWISE_MT = (C*H*W)/(64/2) --- ST = single tile --- MT
         // = multi tile The 64 is 64 Bytes per clock at the slow CMX frequency – if MC is enabled this reduces to 32
         // Bytes per clock on ODU
         if (wl.op == Operation::ELTWISE) {

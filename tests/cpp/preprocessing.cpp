@@ -14,6 +14,8 @@
 #include "vpu/compatibility/types11.h"
 #include "vpu/compatibility/types12.h"
 
+#include "vpu_cost_model.h"
+
 #include "common_helpers.h"
 
 namespace VPUNN_unit_tests {
@@ -469,6 +471,7 @@ TEST_F(TestPreprocessing_Interface11, Test_spatial_memory_tensor_input_2_7) {
     verify_input_WH(wl_SOH, {0, 0, 3, 4, 0, 0}, 58 /*65-3-4*/, 12 /*12*/, 64, 1);
 
     //ISIStrategy CLUSTERING
+    /* coverity[copy_instead_of_move] */
     DPUWorkload wl_CLU{wl_SOH};
     wl_CLU.isi_strategy=ISIStrategy::CLUSTERING;
 
@@ -945,7 +948,7 @@ protected:
     void SetUp() override {
     }
     const DPUWorkload wl = {
-            VPUDevice::VPU_2_7,
+            VPUDevice::NPU_RESERVED,
             Operation::CONVOLUTION,
             {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // input dimensions
             {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // output dimensions
@@ -970,28 +973,24 @@ protected:
             }                                  // halo
     };
 
-    const int descriptor_expected_size{124};
-    const int tensorDescriptorSize =
-            4 + (int)intf_12::DataType::__size + (int)intf_12::Layout::__size + 1;  // 4 + 12 +9+1 =26
+    const int descriptor_expected_size{44};
+    const int tensorDescriptorSize = 4 + (int)intf_12::DataType::__size;
 
     const int op_idx = 0;
-    const int in_0_idx{op_idx + (int)intf_12::Operation::__size};  //
-    const int in_1_idx{in_0_idx + tensorDescriptorSize};
-    const int out_0_idx{in_1_idx + tensorDescriptorSize};
-
+    const int in_0_idx{op_idx + (int)intf_12::Operation::__size};
+    const int in_1_dtype_idx{in_0_idx + tensorDescriptorSize};
+    const int out_0_idx{in_1_dtype_idx + (int)intf_12::DataType::__size};
     const int ksp_idx = out_0_idx + tensorDescriptorSize;
-
-    const int swizz_idx =
-            ksp_idx + 8 /*kernel:2 +strides:2+padding:4*/ + (int)intf_12::ExecutionMode::__size + 2 /*sparsities:2*/;
-    // const int swizz_size{(int)intf_12::Swizzling::__size};
-    const int swizz_size{1};
-
-    const int halo_idx = swizz_idx + (3 * swizz_size) + 1 /*owt*/;
+    const int execution_mode_idx = ksp_idx + 8; /*kernel:2 +strides:2+padding:4*/
+    const int sparsities_idx = execution_mode_idx + (int)intf_12::ExecutionMode::__size;
+    const int odu_permute_idx = sparsities_idx + 2; /*sparsities:2*/
+    const int end_idx = odu_permute_idx + (int)intf_12::Layout::__size;
 };
 
 // Demonstrate some basic assertions.
 TEST_F(TestPreprocessing_Interface12, SingleWLTestPreprocessing) {
-    EXPECT_EQ(descriptor_expected_size, 124);
+    EXPECT_EQ(end_idx + 1, descriptor_expected_size);
+    EXPECT_EQ(descriptor_expected_size, 44);
     // Instantiate the preprocessing class
     auto pp = Preprocessing_Interface12<float>();
     // Transform a single workload
@@ -1004,344 +1003,12 @@ TEST_F(TestPreprocessing_Interface12, CreationAndSize) {
     EXPECT_EQ(pp.output_size(), descriptor_expected_size);  //
 
     EXPECT_EQ(pp.interface_version(), pp.getInterfaceVersion()) << " dynamic and static version must be equal";
-    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_12_HALO);
+    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_12_NPU_RESERVED);
     size_t data_written = 0;
     std::vector<float> result = pp.generate_descriptor(wl, data_written);
     EXPECT_EQ(data_written, descriptor_expected_size);  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-}
-
-TEST_F(TestPreprocessing_Interface12, DescriptorContentTest) {
-    const DPUWorkload wl2 = {
-            VPUDevice::VPU_2_7,
-            Operation::ELTWISE,
-            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
-            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
-            {1, 2},                                                             // kernels
-            {3, 4},                                                             // strides
-            {5, 6, 7, 8},                                                       // padding
-            ExecutionMode::CUBOID_4x16,                                         //
-            ActivationFunction::NONE,                                           //
-            0.11F,                                                              // act sparsity
-            0.22F,                                                              // weight_sparsity
-            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
-            {Swizzling::KEY_0},                                                 // swiz out
-            100,                                                                // owtiles
-            {0, 0, 0, 0},                                                       // offsets,
-            ISIStrategy::SPLIT_OVER_K,                                          //
-            false,                                                              // weight_sparsity_enabled
-            {
-                    {1, 2, 3, 4, 5, 6},        // input_0_halo
-                    {7, 8, 9, 10, 11, 12},     // output_0_halo
-                    {13, 14, 15, 16, 17, 18},  // output_0_halo_broadcast_cnt
-                    {19, 20, 21, 22, 23, 24},  // output_0_inbound_halo
-            }                                  // halo
-    };
-
-    auto pp = Preprocessing_Interface12<float>();
-    size_t data_written = 0;
-    std::vector<float> result = pp.generate_descriptor(wl2, data_written);
-    EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
-
-    EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
-
-    for (auto x : result) {
-        std::cout << " " << x /*std::lround(x) */ << " ";
-    }
-    std::cout << "\n" << wl2 << "\n";
-
-    // const int dev_idx = 0;
-    // EXPECT_EQ(std::lround(result[dev_idx + (int)wl2.device]), 1);  // as long as no enum change in specific
-    // interface
-
-    EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]),
-              1);  // as long as no enum change in specific interface
-
-    EXPECT_EQ(std::lround(result[in_0_idx]), wl2.inputs[0].width());
-    EXPECT_EQ(std::lround(result[in_0_idx + 1]), wl2.inputs[0].height());
-    EXPECT_EQ(std::lround(result[in_0_idx + 2]), wl2.inputs[0].z());
-    EXPECT_EQ(std::lround(result[in_0_idx + 3]), wl2.inputs[0].b());
-
-    EXPECT_EQ(std::lround(result[out_0_idx + 0]), wl2.outputs[0].width());
-    EXPECT_EQ(std::lround(result[out_0_idx + 1]), wl2.outputs[0].height());
-    EXPECT_EQ(std::lround(result[out_0_idx + 2]), wl2.outputs[0].z());
-    EXPECT_EQ(std::lround(result[out_0_idx + 3]), wl2.outputs[0].b());
-
-    EXPECT_EQ(std::lround(result[in_1_idx + 0]), std::lround(result[in_0_idx + 1]));
-    EXPECT_EQ(std::lround(result[in_1_idx + 1]), std::lround(result[in_0_idx + 2]));
-    EXPECT_EQ(std::lround(result[in_1_idx + 2]), std::lround(result[in_0_idx + 0]));
-    EXPECT_EQ(std::lround(result[in_1_idx + 3]), std::lround(result[in_0_idx + 3]));
-
-    EXPECT_EQ(std::lround(result[ksp_idx + 0]), 1);
-    EXPECT_EQ(std::lround(result[ksp_idx + 1]), 2);
-    EXPECT_EQ(std::lround(result[ksp_idx + 2]), 3);
-    EXPECT_EQ(std::lround(result[ksp_idx + 3]), 4);
-    EXPECT_EQ(std::lround(result[ksp_idx + 4]), 5);
-    EXPECT_EQ(std::lround(result[ksp_idx + 5]), 6);
-    EXPECT_EQ(std::lround(result[ksp_idx + 6]), 7);
-    EXPECT_EQ(std::lround(result[ksp_idx + 7]), 8);
-
-    // EXPECT_EQ(swizz_size, (int)intf_12::Swizzling::__size);
-    EXPECT_EQ(swizz_size, 1);
-
-    EXPECT_EQ(std::lround(result[swizz_idx + 0]), 1) << swizz_idx;
-    // EXPECT_EQ(std::lround(result[swizz_idx + 0 + 1]), 0);
-
-    EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size]), 1) << swizz_idx;
-    // EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size + 1]), 0);
-    EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size]), 0) << swizz_idx;
-    // EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size + 1]), 0);
-
-    EXPECT_EQ(std::lround(result[halo_idx + 0]), 1);
-    EXPECT_EQ(std::lround(result[halo_idx + 1]), 2);
-    EXPECT_EQ(std::lround(result[halo_idx + 2]), 3);
-    EXPECT_EQ(std::lround(result[halo_idx + 3]), 4);
-    EXPECT_EQ(std::lround(result[halo_idx + 4]), 5);
-    EXPECT_EQ(std::lround(result[halo_idx + 5]), 6);
-    EXPECT_EQ(std::lround(result[halo_idx + 6]), 7);
-    EXPECT_EQ(std::lround(result[halo_idx + 7]), 8);
-    EXPECT_EQ(std::lround(result[halo_idx + 8]), 9);
-    EXPECT_EQ(std::lround(result[halo_idx + 9]), 10);
-    EXPECT_EQ(std::lround(result[halo_idx + 10]), 11);
-    EXPECT_EQ(std::lround(result[halo_idx + 11]), 12);
-
-    EXPECT_EQ(std::lround(result[halo_idx + 12]), 13);
-    EXPECT_EQ(std::lround(result[halo_idx + 13]), 14);
-    EXPECT_EQ(std::lround(result[halo_idx + 14]), 15);
-    EXPECT_EQ(std::lround(result[halo_idx + 15]), 16);
-    EXPECT_EQ(std::lround(result[halo_idx + 16]), 17);
-    EXPECT_EQ(std::lround(result[halo_idx + 17]), 18);
-}
-
-TEST_F(TestPreprocessing_Interface12, SwizzlingContentTest) {
-    const DPUWorkload wl2 = {
-            VPUDevice::VPU_2_7,
-            Operation::ELTWISE,
-            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
-            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
-            {1, 2},                                                             // kernels
-            {3, 4},                                                             // strides
-            {5, 6, 7, 8},                                                       // padding
-            ExecutionMode::CUBOID_4x16,                                         //
-            ActivationFunction::NONE,                                           //
-            0.11F,                                                              // act sparsity
-            0.22F,                                                              // weight_sparsity
-            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
-            {Swizzling::KEY_0},                                                 // swiz out
-    };
-    const DPUWorkload wl3 = {
-            VPUDevice::VPU_2_7,
-            Operation::MAXPOOL,
-            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, false)},  // input dimensions
-            {VPUTensor(15, 1972, 16, 1, DataType::UINT8, Layout::ZXY, true)},   // output dimensions
-            {1, 2},                                                             // kernels
-            {3, 4},                                                             // strides
-            {5, 6, 7, 8},                                                       // padding
-            ExecutionMode::CUBOID_4x16,                                         //
-            ActivationFunction::NONE,                                           //
-            0.11F,                                                              // act sparsity
-            0.22F,                                                              // weight_sparsity
-            {Swizzling::KEY_5, Swizzling::KEY_1},                               // swiz in
-            {Swizzling::KEY_0},                                                 // swiz out
-    };
-
-    auto pp = Preprocessing_Interface12<float>();
-    size_t data_written = 0;
-    std::vector<float> result = pp.generate_descriptor(wl2, data_written);
-    EXPECT_EQ(swizz_size, 1);
-
-    struct TestExpected {
-        int swizIn0;
-        int swizIn1;
-        int swizOut0;
-    };
-
-    auto executeTest = [&pp, this](const DPUWorkload& tin, const TestExpected& texp) {
-        size_t data_written = 0;
-        std::vector<float> result = pp.generate_descriptor(tin, data_written);
-
-        // for (auto x : result) {
-        //     std::cout << " " << x /*std::lround(x) */ << " ";
-        // }
-
-        EXPECT_EQ(std::lround(result[swizz_idx + 0]), texp.swizIn0) << swizz_idx << std::endl << tin;
-        // EXPECT_EQ(std::lround(result[swizz_idx + 0 + 1]), 0);
-
-        EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size]), texp.swizIn1) << swizz_idx << std::endl << tin;
-        // EXPECT_EQ(std::lround(result[swizz_idx + 1 * swizz_size + 1]), 0);
-        EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size]), texp.swizOut0) << swizz_idx << std::endl << tin;
-        // EXPECT_EQ(std::lround(result[swizz_idx + 2 * swizz_size + 1]), 0);
-    };
-
-    auto gen = [](Swizzling in0, Swizzling in1, Swizzling out0, const DPUWorkload& prototype) {
-        DPUWorkload wl{prototype};
-        wl.input_swizzling[0] = in0;
-        wl.input_swizzling[1] = in1;
-        wl.output_swizzling[0] = out0;
-        return wl;
-    };
-
-    const DPUWorkload elm_proto{wl2};
-    const DPUWorkload conv_proto{wl};
-    const DPUWorkload maxp_proto{wl3};
-
-    struct Test {
-        const DPUWorkload tin;
-        const TestExpected texp;
-    };
-
-    std::vector<Test> tests{
-            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, elm_proto), {0, 0, 0}},
-            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, elm_proto), {0, 0, 1}},
-            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, elm_proto), {1, 1, 0}},
-            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, elm_proto), {1, 1, 0}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, elm_proto), {1, 1, 0}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, elm_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, elm_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, elm_proto), {1, 1, 1}},
-
-            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, conv_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, conv_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, conv_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, conv_proto), {1, 1, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, conv_proto), {1, 1, 1}},
-
-            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
-            {gen(Swizzling::KEY_0, Swizzling::KEY_0, Swizzling::KEY_1, maxp_proto), {1, 0, 1}},
-            {gen(Swizzling::KEY_0, Swizzling::KEY_1, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
-            {gen(Swizzling::KEY_1, Swizzling::KEY_0, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_0, maxp_proto), {1, 0, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_1, maxp_proto), {1, 0, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_5, Swizzling::KEY_5, maxp_proto), {1, 0, 1}},
-            {gen(Swizzling::KEY_5, Swizzling::KEY_0, Swizzling::KEY_5, maxp_proto), {1, 0, 1}},
-    };
-
-    for (auto& t : tests) {
-        executeTest(t.tin, t.texp);
-    }
-}
-
-TEST_F(TestPreprocessing_Interface12, DescriptorContentTest_FLOAT_INT) {
-    class Builder {
-    public:
-        static DPUWorkload makeSameWl(DataType Tin, DataType Tout) {
-            return DPUWorkload{
-                    VPUDevice::VPU_2_7,
-                    Operation::ELTWISE,
-                    {VPUTensor(15, 1972, 16, 1, Tin)},   // input dimensions
-                    {VPUTensor(15, 1972, 16, 1, Tout)},  // output dimensions
-                    {1, 1},                              // kernels
-                    {1, 1},                              // strides
-                    {0, 0, 0, 0},                        // padding
-                    ExecutionMode::CUBOID_4x16,          //
-                    ActivationFunction::NONE,            //
-                    0.F,                                 // act sparsity
-                    0.F,                                 // weight_sparsity
-                    {swz_def, swz_def},                  // input_swizzling
-                    {swz_def},                           // output_swizzling
-                    1,                                   // owtiles
-                    {0, 0, 0, 0},                        // offsets,
-                    ISIStrategy::CLUSTERING,             //
-                    false,                               // weight_sparsity_enabled
-                    {
-                            {1, 2, 3, 4, 41, 42},      // input_0_halo
-                            {5, 6, 7, 8, 81, 82},      // output_0_halo
-                            {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
-                            {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
-                    }                                  // halo
-            };
-        }
-    };
-
-    const DPUWorkload wl_int_int{Builder::makeSameWl(DataType::UINT8, DataType::UINT8)};
-    const DPUWorkload wl_float_float{Builder::makeSameWl(DataType::FLOAT16, DataType::FLOAT16)};
-    const DPUWorkload wl_float_int{Builder::makeSameWl(DataType::FLOAT16, DataType::UINT8)};
-    const DPUWorkload wl_int_float{Builder::makeSameWl(DataType::UINT8, DataType::FLOAT16)};
-
-    auto show_desc = [](const std::vector<float>& result, std::string prefix) {
-        std::cout << prefix;
-        for (auto x : result) {
-            std::cout << " " << std::lround(x) << " ";
-        }
-    };
-
-    auto pp = Preprocessing_Interface12<float>();
-    size_t data_written = 0;
-    std::vector<float> result_i_i = pp.generate_descriptor(wl_int_int, data_written);
-    std::vector<float> result_f_i = pp.generate_descriptor(wl_float_int, data_written);
-    std::vector<float> result_i_f = pp.generate_descriptor(wl_int_float, data_written);
-    std::vector<float> result_f_f = pp.generate_descriptor(wl_float_float, data_written);
-
-    std::cout << "\n descriptors\n";
-
-    show_desc(result_i_i, "\nii:");
-    show_desc(result_f_i, "\nfi:");
-    show_desc(result_i_f, "\nif:");
-    show_desc(result_f_f, "\nff:");
-    std::cout << std::endl;
-
-    // EXPECT_EQ(result_i_i, result_i_f);
-
-    using datatypeContent = std::array<int, (int)intf_12::DataType::__size>;
-    const datatypeContent uint8_content{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    const datatypeContent f16_content{0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    const int cntToCheck{(int)std::tuple_size<decltype(uint8_content)>{}};
-
-    const int dtype_idx = 4;
-
-    {
-        auto& r = result_i_i;
-        auto& exp_in_0{uint8_content};
-        auto& exp_in_1{uint8_content};
-        auto& exp_out_0{uint8_content};
-
-        for (int i = 0; i < cntToCheck; ++i) {
-            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
-            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
-            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
-        }
-    }
-    {
-        auto& r = result_i_f;
-        auto& exp_in_0{uint8_content};
-        auto& exp_in_1{uint8_content};
-        auto& exp_out_0{f16_content};
-
-        for (int i = 0; i < cntToCheck; ++i) {
-            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
-            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
-            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
-        }
-    }
-    {
-        auto& r = result_f_i;
-        auto& exp_in_0{f16_content};
-        auto& exp_in_1{f16_content};
-        auto& exp_out_0{uint8_content};
-
-        for (int i = 0; i < cntToCheck; ++i) {
-            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
-            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
-            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
-        }
-    }
-    {
-        auto& r = result_f_f;
-        auto& exp_in_0{f16_content};
-        auto& exp_in_1{f16_content};
-        auto& exp_out_0{f16_content};
-
-        for (int i = 0; i < cntToCheck; ++i) {
-            EXPECT_EQ(std::lround(r[in_0_idx + dtype_idx + i]), exp_in_0[i]) << i;
-            EXPECT_EQ(std::lround(r[in_1_idx + dtype_idx + i]), exp_in_1[i]) << i;
-            EXPECT_EQ(std::lround(r[out_0_idx + dtype_idx + i]), exp_out_0[i]) << i;
-        }
-    }
 }
 
 }  // namespace VPUNN_unit_tests

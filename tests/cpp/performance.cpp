@@ -15,10 +15,12 @@
 #include <algorithm>
 
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 class VPUNNPerformanceTest : public ::testing::Test {
 public:
 protected:
+    const VPUDevice ignnore_old_devices{VPUDevice::VPU_2_0};
     void SetUp() override {
     }
 
@@ -41,11 +43,14 @@ private:
 
 // Demonstrate runtime compliance.NOte: disabled because the results are dependent on CPU load
 // If another build is done in parallel (CI use case) the runtime will be high
-TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
+TEST_F(VPUNNPerformanceTest, Standard_InferenceLatency_stochastic) {
     unsigned int n_workloads = 1000;
-    //EXPECT_TRUE(false);
+    // EXPECT_TRUE(false);
 
-    for (auto& model_info : the_NN_models.all_model_paths) {
+    for (auto& model_info : the_NN_models.standard_model_paths) {
+        if (model_info.second <= ignnore_old_devices) {
+            continue;  // ignore this because is not in focus for runtime
+        }
         const auto& model_path = model_info.first;
         // Use no cache
         VPUNN::VPUCostModel model{model_path, false, 0};  // no cache, batch =1
@@ -58,8 +63,8 @@ TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device));
 
         std::cout << std::endl
-                  << "** WL Latency Info for " << model_path << "   Target Latency:" << target_latency << " milliseconds"
-                  << std::endl
+                  << "** WL Latency Info for " << model_path << "   Target Latency:" << target_latency
+                  << " milliseconds" << std::endl
                   << "Compiled in a time relevant mode (NDEBUG): " << time_relevance << std::endl;
         for (int r = 1; r <= 1; ++r) {  // repeat runs
 
@@ -95,7 +100,8 @@ TEST_F(VPUNNPerformanceTest, ALL_InferenceLatency_stochastic) {
                           << ",  90th%: " << at90percentile << std::endl
                           << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
                 EXPECT_LE(wl_latency, target_latency)
-                        << " WL Latency Info for " << model_path << "   Target Latency[ms]:" << target_latency << std::endl
+                        << " WL Latency Info for " << model_path << "   Target Latency[ms]:" << target_latency
+                        << std::endl
                         << "   T: 1xN: 1 wl avg latency: " << wl_latency << " Test with: " << n_workloads
                         << " sequentially executed. "
                         << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat << ", Med: " << median
@@ -113,6 +119,9 @@ TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
     unsigned int n_workloads = 1000;
 
     for (auto& model_info : the_NN_models.fast_model_paths) {
+        if (model_info.second <= ignnore_old_devices) {
+            continue;  // ignore this because is not in focus for runtime
+        }
         const auto& model_path = model_info.first;
         // Use no cache
         VPUNN::VPUCostModel model{model_path, false, 0};  // no cache, batch =1

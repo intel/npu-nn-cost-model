@@ -1,10 +1,10 @@
-// Copyright © 2024 Intel Corporation
+// Copyright ¬© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the ìSoftware Packageî)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the ‚ÄúSoftware Package‚Äù)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the ìthird-party-programs.txtî or other similarly-named text file included with the
+// Please refer to the ‚Äúthird-party-programs.txt‚Äù or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef VPUNN_SERIALIZER_H
@@ -25,6 +25,7 @@
 #include "core/utils.h"
 #include "vpu/dpu_types.h"
 #include "vpu/utils.h"
+#include "vpu/serializer_utils.h"
 
 namespace VPUNN {
 
@@ -628,9 +629,12 @@ public:
 
                                     // Handle special case for std::function<VPUNN::DimType(VPUNN::DimType)> - Needs to
                                     // be generalized
-                                    if constexpr (std::is_same_v<_argtype,
-                                                                 std::function<VPUNN::DimType(VPUNN::DimType)>>) {
-                                        write_tokens[idx] = std::to_string(_arg(0));
+                                    if constexpr (std::is_same_v<_argtype, VPUNN::SetGet_MemberMapValues>) {
+                                        // _arg have two parameters first one is false and that means that _arg is in
+                                        // get_mode
+                                        // (function will just return a value), second parameter could be any value, in
+                                        // get_mode its value doesn't matter
+                                        write_tokens[idx] = std::to_string(_arg(false, ""));
                                     } else {
                                         // All types are stored as references in the member map, so needs to be further
                                         // decayed into underying type
@@ -707,21 +711,29 @@ public:
 
             // Check if currently evaluated type has a member map
             if constexpr (has_member_map_v<argtype>) {
-                // Iterate over the member map and deserialize each member if it exists in the index map
-                for (auto& [key, value] : arg._member_map) {
-                    if (index_map.count(key) > 0 && index_map.at(key) < static_cast<int>(read_tokens.size())) {
-                        std::istringstream ss(read_tokens[index_map.at(key)]);
-                        const auto key_var{key};
+                const auto member_names = argtype::_get_member_names();
+                auto member_map = arg._member_map;
+                // Iterate over the member_names and deserialize each member if it exists in the index map
+                for (auto& key_member : member_names) {
+                    const auto it = arg._member_map.find(key_member);
+                    if (index_map.count(key_member) > 0 &&
+                        index_map.at(key_member) < static_cast<int>(read_tokens.size())) {
+                        std::istringstream ss(read_tokens[index_map.at(key_member)]);
+
+                        const auto key_var{key_member};
 
                         // Member map is a heterogeneous map, so we need to use std::visit to handle different types
                         std::visit(
                                 [&ss, &key_var](auto&& _arg) {
                                     // Special case - getter/setter style field - TODO: generalize
                                     if constexpr (std::is_same_v<std::decay_t<decltype(_arg)>,
-                                                                 std::function<VPUNN::DimType(VPUNN::DimType)>>) {
-                                        VPUNN::DimType val;
+                                                                 VPUNN::SetGet_MemberMapValues>) {
+                                        std::string val;
                                         ss >> val;
-                                        _arg(val);
+                                        // arg have two parameters first one is true and that means that arg is in
+                                        // set_mode, second parameter is the read value we want to assign to a variable
+                                        /* coverity[copy_instead_of_move] */
+                                        _arg(true, val);
                                     } else {
                                         ss >> _arg.get();  // Base case - convert to type of arg, throw if conversion
                                                            // fails
@@ -735,7 +747,24 @@ public:
                                         }
                                     }
                                 },
-                                value);
+                                it->second /*value*/);
+                    } else {  // field not found in index_map, its value can be computed based on a set of rules or
+                              // could be default, we handle this case in lambda functions
+                        std::visit(
+                                [](auto&& _arg) {
+                                    // special case when value can be computed, handled in lambda function
+                                    if constexpr (std::is_same_v<std::decay_t<decltype(_arg)>,
+                                                                 VPUNN::SetGet_MemberMapValues>) {
+
+                                        // arg have two parameters first one is true and that means that arg is in
+                                        // set_mode, the second parameter, which is an empty string, indicates that the
+                                        // value will be set by the lambda function either to the default value or based
+                                        // on certain rules
+                                        _arg(true, "");
+                                    }
+                                    // else case means that value is initialized with its default value
+                                },
+                                it->second /*value*/);
                     }
                 }
             } else if constexpr (is_serializable_field_v<argtype>) {  // Handle argument of type SerializableField

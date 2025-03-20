@@ -40,14 +40,16 @@ public:
 
 protected:
     /// @brief copy ctor, default like implementation
-    ShaveOpExecutor(const std::string& name): operation_name(name) {
+    ShaveOpExecutor(const std::string& name, const unsigned int num_expected_params = 0): operation_name(name), num_expected_params(num_expected_params) {
     }
 
     /// Destructor is not public, so no user can delete this object of it has a naked pointer to it
     virtual ~ShaveOpExecutor() = default;
-
+    
 private:
     std::string operation_name;  ///< shave function name
+
+    const unsigned int num_expected_params;  ///< number of expected (variadic) parameters passed through SHAVEWorkload
 
     /// @brief the friend class can delete the instance
     friend class DeviceShaveContainer;
@@ -66,6 +68,10 @@ public:  // extended interface
      */
     virtual CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
                                           const int present_shv_frq) const = 0;
+
+    unsigned int getNumExpectedParams() const {
+        return num_expected_params;
+    }
 };
 
 }  // namespace VPUNN

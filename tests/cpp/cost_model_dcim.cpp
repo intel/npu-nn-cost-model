@@ -61,7 +61,9 @@ protected:
             return g_model_2_7;
         case VPUDevice::VPU_4_0:
             return g_model_4_0;
-        break;
+        default:
+            return g_model_invalid;
+            break;
         };
     };
 };

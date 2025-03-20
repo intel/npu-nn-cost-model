@@ -44,7 +44,6 @@ protected:
     DMACostModel<DMANNWorkload_NPU27> dma_model_invalid{""};
     DMACostModel<DMANNWorkload_NPU40> dma_model_4_0{VPU_DMA_4_0_MODEL_PATH};
     DMACostModel<DMANNWorkload_NPU27> dma_model_2_7{VPU_DMA_2_7_MODEL_PATH};
-    DMACostModel<DMANNWorkload_NPU40> dma_model_5_0{NPU_DMA_5_0_MODEL_PATH};
 
     VPULayerCostModel model_invalid_without_dma{""};
     VPULayerCostModel model_invalid{&dma_model_invalid, ""};
@@ -243,6 +242,104 @@ protected:
         return wl_ref;
     };
 };
+
+TEST_F(VPULayerCostModelTest, DISABLED_ERROR_TILE_OUTPUT_LayerInvestigation_SOHO_NPU40) {
+    const VPUNN::DPUWorkload wl1{
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(28, 28, 512, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(28, 28, 128, 1, VPUNN::DataType::UINT8)},   // output dimensions
+            {1, 1},                                                        // kernels
+            {1, 1},                                                        // strides
+            {0, 0, 0, 0},                                                  // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                            // execution mode
+            VPUNN::ActivationFunction::NONE,                               // activation
+            0.0F,                                                          // act_sparsity
+            0.0F,                                                     // weight_sparsity
+            {swz_def, swz_def},                                            // input_swizzling
+            {swz_def},                                                     // output_swizzling
+            1,                                                             // output_write_tiles
+            {0, 0, 0, 0},                                                  // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                                // isi_strategy
+            false,                                                          // weight_sparsity_enabled
+    };
+    show_split = true;
+    const bool prefetch{true};
+    {
+        const VPUNN::DPULayer tst_layer(wl1);
+        const std::vector<TestCase> tests{
+                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 5500,
+                  5500 + 1000}, 
+                 " SOHO + 4tiles, no memmove, "},
+
+                {{tst_layer, {1U, 1U, 5U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                 {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 4000, 4000 + 1000},
+                 " SOHO + 5tiles , no memmove, "},
+
+                {{tst_layer, {1U, 1U, 5U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
+                 {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 4000, 4000 + 1000},
+                 " SOHO + BR + 5tiles, no memmove, "},
+
+                 {{tst_layer, {1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                 {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 3000, 3000 + 800},
+                 " SOHO + 6tiles, no memmove, "},
+
+                {{tst_layer, {1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                 {Cycles::NO_ERROR, true, 1000, 1000 + 600},
+                 " SOK, no memmove, "},
+        };
+        executeTests(tests);
+    }
+}
+
+
+TEST_F(VPULayerCostModelTest, DISABLED_ERROR_TILE_OUTPUT_LayerInvestigation_SOK_NPU40) {
+    const VPUNN::DPUWorkload wl1{
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(13, 65, 960, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(13, 65, 320, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {1, 1},                                                      // kernels
+            {1, 1},                                                      // strides
+            {0, 0, 0, 0},                                                // padding
+            VPUNN::ExecutionMode::CUBOID_16x16,                          // execution mode
+            VPUNN::ActivationFunction::NONE,                             // activation
+            0.0F,                                                        // act_sparsity
+            0.0F,                                                        // weight_sparsity
+            {swz_def, swz_def},                                          // input_swizzling
+            {swz_def},                                                   // output_swizzling
+            1,                                                           // output_write_tiles
+            {0, 0, 0, 0},                                                // offsets
+            VPUNN::ISIStrategy::CLUSTERING,                              // isi_strategy
+            false,                                                       // weight_sparsity_enabled
+    };
+    show_split = true;
+    const bool prefetch{true};
+    {
+        const VPUNN::DPULayer tst_layer(wl1);
+        const std::vector<TestCase> tests{
+                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 9000, 9000 + 1000},
+                 " SOHO , no memmove, "},
+
+                {{tst_layer, {1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                 {Cycles::ERROR_TILE_OUTPUT, true, 9000, 9000 + 1000},
+                 " SOK + 4tiles, no memmove, "},
+
+                {{tst_layer, {1U, 1U, 5U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                 {Cycles::ERROR_TILE_OUTPUT, true, 9000, 9000 + 1000},
+                 " SOK + 5tiles, no memmove, "},
+
+                {{tst_layer, {1U, 1U, 6U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                 {Cycles::ERROR_TILE_OUTPUT, true, 9000, 9000 + 1000},
+                 " SOK + 6tiles, no memmove, "},
+        };
+        executeTests(tests);
+    }
+}
+
+
 TEST_F(VPULayerCostModelTest, LayerLoadModels) {
     EXPECT_EQ(model_2_0.nn_initialized(), true);
     EXPECT_EQ(model_2_7.nn_initialized(), true);
@@ -926,6 +1023,7 @@ TEST_F(VPULayerCostModelTest, CONVOLUTION_Concrete_Multiply6326_FI_VPU27) {
         tst_layer.weight_sparsity_enabled = true;
         tst_layer.weight_sparsity = 0.723158f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
@@ -1154,6 +1252,7 @@ TEST_F(VPULayerCostModelTest, 01_C01_CONVOLUTION_Multiply_6346) {
         tst_layer.weight_sparsity_enabled = true;
         tst_layer.weight_sparsity = 0.950016f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
@@ -1184,6 +1283,7 @@ TEST_F(VPULayerCostModelTest, 01_C02_CONVOLUTION_Multiply_6356) {
         tst_layer.weight_sparsity_enabled = true;
         tst_layer.weight_sparsity = 0.880725f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
@@ -1241,6 +1341,7 @@ TEST_F(VPULayerCostModelTest, 01_C03_ConvolutionBackpropData_1055) {
         tst_layer.weight_sparsity_enabled = true;
         tst_layer.weight_sparsity = 0.36438f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
@@ -1272,6 +1373,7 @@ TEST_F(VPULayerCostModelTest, 01_C04_ConvolutionBackpropData_1183) {
         tst_layer.weight_sparsity_enabled = true;
         tst_layer.weight_sparsity = 0.0664062f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
@@ -1396,6 +1498,7 @@ TEST_F(VPULayerCostModelTest, Model_C1_v2_a_0_int8_NCHW_FP16_LATENCY_API10_MLIR)
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 2000, 4000},
@@ -1420,6 +1523,7 @@ TEST_F(VPULayerCostModelTest, Model_G_v1_a_0_fp16_NCHW_FP16_LATENCY_API10_MLIR) 
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 18000, 18000 + 8000},  // big
@@ -1445,6 +1549,7 @@ TEST_F(VPULayerCostModelTest, Model_L_v1_a_1_int8_NCHW_FP16_LATENCY_API10_MLIR) 
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 92000, 92000 + 4000},  // v16 94856 , v17 95654
@@ -1470,6 +1575,7 @@ TEST_F(VPULayerCostModelTest, Model_L_v1_a_1_int8_NCHW_FP16_LATENCY_API10_MLIR_S
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 92000, 92000 + 4000},  // v16 94856 , v17 95654
@@ -1494,6 +1600,7 @@ TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_LATENCY_MLIR_MO
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1, VPUNN::Cycles::START_ERROR_RANGE - 1},
@@ -1518,6 +1625,7 @@ TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_INT8_LATENCY_ML
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 57700, 57700 + 5000},
@@ -1543,6 +1651,7 @@ TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_INT8_LATENCY_ML
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 100000, 100000 + 17000},  // v16 104000 , v17 114995
@@ -1576,6 +1685,7 @@ TEST_F(VPULayerCostModelTest, ELTWISE_diff_swizz_NPU40) {
         };
         return wl;
     };
+    /* coverity[pass_by_value] */
     auto test_message = [](DPUWorkload wl, std::string text) {
         // clang-format off
         std::string message = text +
@@ -1691,6 +1801,7 @@ TEST_F(VPULayerCostModelTest, deeplab_v3_SOH_HALO_EISXW_79152) {
     {
         auto tst_layer = tst_layer_ref;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
@@ -1764,7 +1875,8 @@ TEST_F(VPULayerCostModelTest, SOH_HALO_EISXW_87028) {
     const VPUNN::DPULayer tst_layer_ref{wl_as_layer};
     {
         auto tst_layer = tst_layer_ref;
-
+        
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {Cycles::NO_ERROR, true, 19000, 19000 + 2000},
@@ -1825,6 +1937,7 @@ TEST_F(VPULayerCostModelTest, scale_mobilenet_ssd_FP16_MLIR) {
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 7000, 7000 + 1000},
@@ -1849,6 +1962,7 @@ TEST_F(VPULayerCostModelTest, scale_Sphereface_FP16_INT8_MLIR) {
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 10000, 10000 + 5000},  // big
@@ -1903,6 +2017,7 @@ TEST_F(VPULayerCostModelTest,
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 55000, 55000 + 5000},
@@ -1927,6 +2042,7 @@ TEST_F(VPULayerCostModelTest, midas_672x384_onnx_dense_IRv10_INT8_NHWC_NHWC_U8_F
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 54000, 54000 + 6000},
@@ -1951,6 +2067,7 @@ TEST_F(VPULayerCostModelTest, midas_672x384_onnx_dense_IRv10_INT8_NHWC_NHWC_U8_F
         tst_layer.weight_sparsity_enabled = false;
         tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 99000, 99000 + 30000},  // big
@@ -2663,6 +2780,7 @@ TEST_F(VPULayerCostModelTest, DISABLED_Z_InvestigationTest) {
         // tst_layer.weight_sparsity_enabled = false;
         // tst_layer.weight_sparsity = 0.0f;
 
+        /* coverity[copy_instead_of_move] */
         const std::vector<TestCase> tests{
                 {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 0, 0 + 0},
@@ -2974,6 +3092,47 @@ protected:
             VPUNN::Logger::deactivate2ndlog();
        }*/
 };
+
+TEST_F(VPULayerCM_InvestigationTest, UnimplementedStrategies_ResultsTest) {
+    const bool force_fail{false};        // controls force failing assertion
+    const int fail{force_fail ? 0 : 1};  // 1 neutral, 0 fail
+
+    show_split = false;
+
+    DPUWorkload wl_ref{
+            VPUDevice::VPU_4_0,
+            Operation::CONVOLUTION,
+            {VPUTensor(28, 28, 256, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
+            {VPUTensor(28, 28, 128, 1, DataType::UINT8, Layout::ZXY)},  // output dimensions
+            {1, 1},                                                     // kernels
+            {1, 1},                                                     // strides
+            {0, 0, 0, 0},                                               // padding
+            ExecutionMode::CUBOID_16x16,                                // execution mode
+            ActivationFunction::NONE,                                   // activation
+            0.0F,                                                       // act_sparsity
+            0.0F,                                                       // weight_sparsity
+            {swz_def, swz_def},                                         // input_swizzling
+            {swz_def},                                                  // output_swizzling
+            1,                                                          // output_write_tiles
+            {0, 0, 0, 0},                                               // offsets
+            ISIStrategy::CLUSTERING,                                    // isi_strategy
+            false,                                                      // weight_sparsity_enabled
+    };
+    const bool prefetch{true};
+
+    
+        const DPULayer tst_layer(wl_ref);
+        // TODO: test should be SOHO wins,
+        const std::vector<TestCase> tests{
+                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+                 {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 1000, fail * 1000 + 1000}, 
+                 "SOW "},
+
+        };
+        executeTests(tests);
+    
+}
+
 
 TEST_F(VPULayerCM_InvestigationTest, MEXP_C2_ELTWISE_1662_EISXW_126389_NPU40) {
     const bool force_fail{false};        // controls force failing assertion
@@ -3869,7 +4028,7 @@ TEST_F(VPULayerCM_InvestigationTest, DWConv_SOK_SOH_Comparison_EISXW_92399) {
     }
 }
 
-TEST_F(VPULayerCM_InvestigationTest, CONV_TILE_Teammate_EISXW_9xxxxx) {
+TEST_F(VPULayerCM_InvestigationTest, CONV_TILE_Mineeva_EISXW_9xxxxx) {
     // Investigation on October 2023, older VPU version used. refresh provided
     const DPUWorkload wl_T1_3{
             VPUDevice::VPU_2_7,
@@ -5016,7 +5175,7 @@ TEST_F(VPULayerCM_InvestigationTest, DWConv_SOK_SOH_decision_EISXW_117314_2d_3_N
         // SOH H is inefficient. having a halo row degrades a lot vs that row in overlapped memory
     }
 }
-TEST_F(VPULayerCM_InvestigationTest, SOHO_ELTWISE_EISXW_127594_Teammate10June_NPU40) {
+TEST_F(VPULayerCM_InvestigationTest, SOHO_ELTWISE_EISXW_127594_MIneeva10June_NPU40) {
     const bool force_fail{false};        // controls force failing assertion
     const int fail{force_fail ? 0 : 1};  // 1 neutral, 0 fail
     show_split = true;
@@ -5591,6 +5750,7 @@ TEST_F(VPULayerCM_InvestigationTest, Model_E_v9_CONV_EISXW_127649_NPU40) {
     // low level WL
     {
         // CONV4 soho
+        /* coverity[copy_instead_of_move] */
         DPUWorkload conv4_SOHO_T{conv4s};
         conv4_SOHO_T.inputs[0] = VPUTensor(56, 7, 64, 1, DataType::UINT8);
         conv4_SOHO_T.outputs[0] = VPUTensor(56, 6, 64, 1, DataType::UINT8);
@@ -6053,6 +6213,7 @@ TEST_F(VPULayerCM_InvestigationTest, WhisperFP16_BIG_CONV_EISXW_131119_NPU40) {
             MemorySize mem;
             {
                 std::cout << "\n   ---- SOK , CLU, no halo  ------- ";
+                /* coverity[copy_instead_of_move] */
                 DPUWorkload wl = wl_SOK_TOP_CLU_16x;
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
                 EXPECT_LE(mem.cmx, (1024 * 1024 + 1024 * 512)) << "\nMemory size: " << mem << wl << std::endl;
@@ -6067,6 +6228,7 @@ TEST_F(VPULayerCM_InvestigationTest, WhisperFP16_BIG_CONV_EISXW_131119_NPU40) {
             }
             {
                 std::cout << "\n   ---- SOK broadcast, WITH halo  ------- ";
+                /* coverity[copy_instead_of_move] */
                 DPUWorkload wl = wl_SOK_TOP_halo_16x;
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
                 EXPECT_GE(mem.cmx, (1024 * 1024 + 1024 * 512)) << "\nMemory size: " << mem << wl << std::endl;
@@ -6345,6 +6507,7 @@ TEST_F(VPULayerCostModelTest, Layer_Detailed_SEP_split_EISXW_132541_NPU40) {
     };
     using SEP_TestsVector = std::vector<SEP_TestCase>;
 
+    /* coverity[pass_by_value] */
     auto verify_SEP_split_equiv = [](SEP_TestCase t) {
         const DPULayer layer(t.t_in.wl);
         std::vector<DPULayer> tiles_layer = layer.splitAcrossTiles(t.t_in.strategy, t.t_in.n_tiles);
@@ -6451,6 +6614,7 @@ TEST_F(VPULayerCostModelTest, Test_layer_SEP_split_value_propagation_EISXW_13254
     };
     using SEP_TestsVector = std::vector<SEP_TestCase>;
 
+    /* coverity[pass_by_value] */
     auto verify_SEP_split_equiv = [this](SEP_TestCase t) {
         DPULayer layer(t.t_in.wl);
 

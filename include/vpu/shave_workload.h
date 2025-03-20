@@ -36,6 +36,8 @@ private:
     // combinations are possible
     std::vector<VPUTensor> inputs;   ///< The input tensors. Mainly shape and datatype are used
     std::vector<VPUTensor> outputs;  ///< The output tensors. Mainly shape and datatype are used
+    std::string            loc_name; ///< The location name
+
 public:
     using Param = std::variant<int, float>;
     using Parameters = std::vector<SHAVEWorkload::Param>;
@@ -46,8 +48,8 @@ private:
 public:
     /// @brief ctor must exist since we have aggregate initialization possible on this type (abstract type)
     SHAVEWorkload(const std::string& operation_name, const VPUDevice& device, const std::vector<VPUTensor>& inputs,
-                  const std::vector<VPUTensor>& outputs, const Parameters& params = {})
-            : name(operation_name), device{device}, inputs{inputs}, outputs{outputs}, call_params{params} {
+                  const std::vector<VPUTensor>& outputs, const Parameters& params = {}, const std::string& loc_name = "")
+            : name(operation_name), device{device}, inputs{inputs}, outputs{outputs}, loc_name(loc_name), call_params{params} {
     }
 
     SHAVEWorkload(const SHAVEWorkload&) = default;
@@ -69,6 +71,10 @@ public:
     };
     const Parameters& get_params() const {
         return call_params;
+    };
+
+    const std::string& get_loc_name() const {
+        return loc_name;
     };
 
     std::string toString() const {

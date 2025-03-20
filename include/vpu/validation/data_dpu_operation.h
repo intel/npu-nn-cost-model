@@ -10,6 +10,7 @@
 #ifndef VPUNN_VPU_VALIDATOR_DATA_DPU_OPERATION_H
 #define VPUNN_VPU_VALIDATOR_DATA_DPU_OPERATION_H
 
+#include <functional>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -17,12 +18,12 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <functional>
 
 #include "core/serializer.h"
 #include "vpu/dpu_defaults.h"
 #include "vpu/dpu_types.h"
 #include "vpu/dpu_workload.h"
+#include "vpu/serializer_utils.h"
 
 namespace VPUNN {
 
@@ -125,6 +126,10 @@ struct DPUOperation {
     /// output tensor can be the same as the input tensor, for Elementwise ops only
     bool in_place_output_memory{false};
 
+    /// Superdense memory. ODU specific?
+    /// optional. By default(no value) is considered as missing = false
+    bool superdense{false};
+
     using _ref_supported_type =
             std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<Operation>,
                          std::reference_wrapper<DataType>, std::reference_wrapper<Layout>,
@@ -132,7 +137,7 @@ struct DPUOperation {
                          std::reference_wrapper<ExecutionMode>, std::reference_wrapper<ISIStrategy>,
                          std::reference_wrapper<DimType>, std::reference_wrapper<long long>,
                          std::reference_wrapper<int>, std::reference_wrapper<float>, std::reference_wrapper<bool>,
-                         std::function<VPUNN::DimType(VPUNN::DimType)>>;
+                         VPUNN::SetGet_MemberMapValues>;
 
     void set_intended_split(ISIStrategy strategy, unsigned int nTiles) {
         isi_strategy = strategy;
@@ -155,7 +160,8 @@ struct DPUOperation {
               halo{w.halo},                      // copy halo
               sep_activators{w.sep_activators},  // copy sep
               weightless_operation{w.is_weightless_operation()},
-              in_place_output_memory{w.is_inplace_output_memory()} {
+              in_place_output_memory{w.is_inplace_output_memory()},
+              superdense{w.is_superdense()} {
         // from WL to tensors
         input_0.swizzling = w.input_swizzling[0];
         input_0.sparsity = w.act_sparsity;
@@ -190,7 +196,8 @@ struct DPUOperation {
               output_0_memory_dense{r.output_0_memory_dense},
               sep_activators{r.sep_activators}, /*_member_map{}*/
               weightless_operation{r.weightless_operation},
-              in_place_output_memory{r.in_place_output_memory} {
+              in_place_output_memory{r.in_place_output_memory},
+              superdense{r.superdense} {
     }
 
     DPUOperation(DPUOperation&) = delete;
@@ -247,6 +254,8 @@ struct DPUOperation {
 
         wl.weightless_operation = weightless_operation;
         wl.set_inplace_output_memory(in_place_output_memory);
+
+        wl.set_superdense(superdense);
 
         return wl;
     }
@@ -382,64 +391,101 @@ struct DPUOperation {
 
             {"sep_enabled", std::ref(sep_activators.sep_activators)},
             {"sep_w",
-             [this](VPUNN::DimType width) -> VPUNN::DimType {
-                 if (width != 0) {
-                     sep_activators.storage_elements_pointers.set_width(width);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.storage_elements_pointers.set_width(value);
+                     }
                  }
                  return sep_activators.storage_elements_pointers.width();
              }},
             {"sep_h",
-             [this](VPUNN::DimType height) -> VPUNN::DimType {
-                 if (height != 0) {
-                     sep_activators.storage_elements_pointers.set_height(height);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.storage_elements_pointers.set_height(value);
+                     }
                  }
                  return sep_activators.storage_elements_pointers.height();
              }},
             {"sep_c",
-             [this](VPUNN::DimType ch) -> VPUNN::DimType {
-                 if (ch != 0) {
-                     sep_activators.storage_elements_pointers.set_channels(ch);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.storage_elements_pointers.set_channels(value);
+                     }
                  }
                  return sep_activators.storage_elements_pointers.channels();
              }},
             {"sep_b",
-             [this](VPUNN::DimType b) -> VPUNN::DimType {
-                 if (b != 0) {
-                     sep_activators.storage_elements_pointers.set_batches(b);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.storage_elements_pointers.set_batches(value);
+                     }
                  }
                  return sep_activators.storage_elements_pointers.batches();
              }},
             {"sep_act_w",
-             [this](VPUNN::DimType width) -> VPUNN::DimType {
-                 if (width != 0) {
-                     sep_activators.actual_activators_input.set_width(width);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.actual_activators_input.set_width(value);
+                     }
                  }
                  return sep_activators.actual_activators_input.width();
              }},
             {"sep_act_h",
-             [this](VPUNN::DimType height) -> VPUNN::DimType {
-                 if (height != 0) {
-                     sep_activators.actual_activators_input.set_height(height);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.actual_activators_input.set_height(value);
+                     }
                  }
                  return sep_activators.actual_activators_input.height();
              }},
             {"sep_act_c",
-             [this](VPUNN::DimType ch) -> VPUNN::DimType {
-                 if (ch != 0) {
-                     sep_activators.actual_activators_input.set_channels(ch);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.actual_activators_input.set_channels(value);
+                     }
                  }
                  return sep_activators.actual_activators_input.channels();
              }},
             {"sep_act_b",
-             [this](VPUNN::DimType b) -> VPUNN::DimType {
-                 if (b != 0) {
-                     sep_activators.actual_activators_input.set_batches(b);
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     VPUNN::DimType value;
+                     if (is_unsigned_int(s, value)) {
+                         sep_activators.actual_activators_input.set_batches(value);
+                     }
                  }
                  return sep_activators.actual_activators_input.batches();
              }},
             {"sep_no_sparse_map", std::ref(sep_activators.no_sparse_map)},
-            {"weightless_operation", std::ref(weightless_operation)},
-            {"in_place_output_memory", std::ref(in_place_output_memory)},
+            {"weightless_operation",
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     setWeightlessOperation(s);
+                 }
+                 return weightless_operation;
+             }},
+            {"in_place_output_memory",
+             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+                 if (set_mode) {
+                     setInPlaceOutputMemory(s);
+                 }
+                 return in_place_output_memory;
+             }},
+            {"superdense", std::ref(superdense)},
     };
 
     static const std::vector<std::string>& _get_member_names() {
@@ -520,8 +566,7 @@ struct DPUOperation {
                 "sep_no_sparse_map",
                 "weightless_operation",
                 "in_place_output_memory",
-                "weightless_operation",
-                "in_place_output_memory",
+                "superdense",
         };
 
         return names;
@@ -533,19 +578,126 @@ struct DPUOperation {
             std::visit(
                     [&combined_hash](auto&& arg) {
                         if constexpr (std::is_same_v<std::decay_t<std::remove_reference_t<decltype(arg)>>,
-                                                     std::function<VPUNN::DimType(VPUNN::DimType)>>) {
-                            combined_hash ^=
-                                    std::hash<int>{}(arg(0)) + 0x9e3779b9 + (combined_hash << 6) + (combined_hash >> 2);
+                                                     VPUNN::SetGet_MemberMapValues>) {
+                            // arg have two parameters first one is false and that means that arg is in get_mode
+                            // (function will just return a value), second parameter could be any value, in get_mode
+                            // its value doesn't matter 
+                            combined_hash ^= std::hash<int>{}(arg(false, "")) + 0x9e3779b9 + (combined_hash << 6) +
+                                    (combined_hash >> 2);
                         } else {
                             using argtype = std::decay_t<std::remove_reference_t<decltype(arg.get())>>;
                             combined_hash ^= std::hash<argtype>{}(arg) + 0x9e3779b9 + (combined_hash << 6) +
-                                                (combined_hash >> 2);
+                                             (combined_hash >> 2);
                         }
                     },
                     value);
         }
         return combined_hash;
-    }   
+    }  
+
+    /// detect if operation is elementwise fammily
+    bool is_elementwise_like_operation() const {
+        return ((operation == Operation::ELTWISE) ||  //
+                (operation == Operation::ELTWISE_MUL));
+    }
+
+    protected:
+    // test if a number is an unsigned int, if true we assign to result the value
+    // if number is not an unsigned int, we return false, else return true
+    static bool is_unsigned_int(const std::string& s, VPUNN::DimType& result) {
+        // empty string
+        if (s.empty())
+            return false;
+
+        int value;
+
+        try {
+            value = std::stoi(s);  // string to int
+
+            // if result is negative => invalid value
+            if (value < 0)
+                return false;
+
+        } catch (const std::invalid_argument&) {  // s is not a valid number, can contain characters that are not digits
+                                                  // or number sign
+            return false;
+        } catch (const std::out_of_range&) {
+            return false;
+        }
+
+        result = static_cast<unsigned int>(value);
+        return true;
+    }
+
+    void setInPlaceOutputMemory(const std::string& s) {
+        in_place_output_memory = false;  // default value
+
+        VPUNN::DimType value;
+        if (is_unsigned_int(s, value)) {  // valid input
+            if (value != 0) {
+                in_place_output_memory = true;
+            }
+        } else {  // no input so we compute internal the value
+            if (is_elementwise_like_operation() && is_preconditions_for_inplace_output()) {
+                in_place_output_memory = true;
+            }
+        }
+    }
+
+    void setWeightlessOperation(const std::string& s) {
+        weightless_operation = false;  // default value
+
+        VPUNN::DimType value;
+        if (is_unsigned_int(s, value)) {  // valid input
+            if (value != 0) {
+                weightless_operation = true;
+            }
+        } else {  // no input so we compute internal the value
+            if (is_elementwise_like_operation() && is_special_No_weights_situation()) {
+                weightless_operation = true;
+            }
+        }
+    }
+
+
+    /// @brief checks if the memory for input and output have the preconditions to be 1-1 in order to support in place
+    /// does not look at operation specific fields, like kernels, etc
+    ///
+    /// @param w is the workload for which the memory to be computed
+    /// @returns true if the preconditions are met, this does not imply that is possible
+    bool is_preconditions_for_inplace_output() const {
+        const TensorInfo& in{input_0};
+        const TensorInfo& out{output_0};
+        if ((in.layout== out.layout)                             // same layout
+            && (is_same_datatype_footprint(in.datatype, out.datatype))  // same type size
+        ) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /// @brief finds out if (assuming elementwise situation) the input_1 is not existing, no weighs
+    /// This is in case we have a NCEPermute or Quantize/DeQuantize operation
+    ///
+    /// @param w is the workload for which the memory to be computed
+    /// @returns true if looks like  input_1 is not to be considered
+    bool is_special_No_weights_situation() const {
+        const TensorInfo& in{input_0};
+        const TensorInfo& out{output_0};
+
+        // this is a temporary speculative(contextual) implementation. The final solution will have a explicit field in
+        // the workload specifying that the weights are not present
+
+        if ((in.layout != out.layout)  // layout change
+            || (!is_same_datatype_footprint(in.datatype,
+                                            out.datatype))  // from a type size to another, not only F16 to [u]int8
+        ) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& stream, const TensorInfo& d) {
@@ -601,10 +753,10 @@ inline std::ostream& operator<<(std::ostream& stream, const DPUOperation& d) {
            << d.sep_activators                                                                     //
            << " weightless_operation: \t" << std::to_string(d.weightless_operation) << " ;\n"      //
            << " in_place_output_memory: \t" << std::to_string(d.in_place_output_memory) << " ;\n"  //
+           << " superdense: \t" << std::to_string(d.superdense) << " ;\n"            //
             ;
     return stream;
 }
-
 }  // namespace VPUNN
 
 #endif  //

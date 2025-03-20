@@ -669,8 +669,8 @@ public:
             break;
         case VPUDevice::VPU_2_7:
         case VPUDevice::VPU_4_0:
-        case VPUDevice::NPU_RESERVED1:
-        case VPUDevice::NPU_RESERVED1_W:
+        case VPUDevice::NPU_RESERVED:
+        case VPUDevice::NPU_RESERVED_W:
             this->execution_order = ExecutionMode::CUBOID_16x16;
             break;
         default:
@@ -689,8 +689,8 @@ public:
             break;
         case VPUDevice::VPU_2_7:
         case VPUDevice::VPU_4_0:
-        case VPUDevice::NPU_RESERVED1:
-        case VPUDevice::NPU_RESERVED1_W:
+        case VPUDevice::NPU_RESERVED:
+        case VPUDevice::NPU_RESERVED_W:
             this->execution_order = ExecutionMode::CUBOID_16x16;
             break;
         default:
@@ -975,7 +975,6 @@ private:
         }
     }
 
-
     DPULayerModes() = default;  // no instance possible
 
 public:
@@ -990,9 +989,7 @@ public:
             return getValidExecutionMode_2_0(wl);
         }
         case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_4_0:
-        case VPUDevice::NPU_RESERVED1:
-        case VPUDevice::NPU_RESERVED1_W: {
+        case VPUDevice::VPU_4_0: {
             return getValidExecutionMode_2_7(wl);
         }
         default:

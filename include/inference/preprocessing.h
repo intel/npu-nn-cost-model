@@ -310,16 +310,17 @@ protected:
         return size_required;
     }
 
+
     ///// COmputes the memory  input tensor , regarding  the spatial W and H dimensions. It uses only real HALO specific
     ///// to VPU2.7, (positive HALO).
     ///// Scope is to generate the input tensor that was used when training the NPU2.7 NN.
     /////
     ///// @returns the new input tensor, only H and W are changed, and only by becoming smaller.
-    // VPUTensor computeActualSpatialMemoryNoHaloTensor(const VPUTensor& origT, const HaloWorkload& halo) const {
-    //     const auto& in_halo{halo.input_0_halo};
-    //     //  extension will be negative(memory reduction) if halo(positive halo),
-    //     // or positive (memory increase) ,memory is larger, if negative halo, but we consume less (prev layer wrote
-    //     //  more): DO NOT CARE
+    //VPUTensor computeActualSpatialMemoryNoHaloTensor(const VPUTensor& origT, const HaloWorkload& halo) const {
+    //    const auto& in_halo{halo.input_0_halo};
+    //    //  extension will be negative(memory reduction) if halo(positive halo),
+    //    // or positive (memory increase) ,memory is larger, if negative halo, but we consume less (prev layer wrote
+    //    //  more): DO NOT CARE
 
     //    auto newDimension = [](const long long crtDimension, const int oneEndHalo, const int otherEndHalo) {
     //        const int oneExt{oneEndHalo > 0 ? -oneEndHalo : 0};  // only if halo memory
@@ -332,8 +333,7 @@ protected:
     //    const auto w{newDimension(origT.width(), in_halo.left, in_halo.right)};
 
     //    const std::array<unsigned int, 4> newshape{static_cast<unsigned int>(w), static_cast<unsigned int>(h),  //
-    //                                               origT.channels(), origT.batches()};                          //
-    //                                               whcb
+    //                                               origT.channels(), origT.batches()};                          // whcb
     //    const VPUTensor ret(newshape, origT);
     //    return ret;
     //}
@@ -364,6 +364,7 @@ public:
         return static_cast<D*>(this)->template transformOnly<false>(workload, debug_offset);
     };
 };
+
 
 }  // namespace VPUNN
 #endif

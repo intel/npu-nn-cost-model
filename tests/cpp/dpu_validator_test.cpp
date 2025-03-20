@@ -30,16 +30,43 @@ protected:
     VPUNN::DPU_OperationValidator dut;  // no overhead by default
 
     const int cmx_overhead{0 /*80 * 1024 + 16 * 1024*/};  // cmx_memory_aligned_overhead
-    const int alignment{16384};                           // alignement_size_bytes
+    // const int alignment{16384};                           // alignement_size_bytes
 
-    bool isAligned(long long mem_size) const {
-        return ((mem_size % alignment) != 0) ? false : true;
+    const std::map<VPUDevice, int> alignement_data{
+            {VPUDevice::VPU_2_0, 16 * 1024},    //
+            {VPUDevice::VPU_2_1, 16 * 1024},    //
+            {VPUDevice::VPU_2_7, 16 * 1024},    //
+            {VPUDevice::VPU_4_0, 16 * 1024},    //
+            {VPUDevice::NPU_RESERVED, 32 * 1024},  //
+            {VPUDevice::NPU_RESERVED_W, 32 * 1024},  //
+    };
+
+    int get_alignment(const VPUDevice device) const {
+        auto it = alignement_data.find(device);
+        if (it != alignement_data.end()) {
+            return it->second;
+        }
+        return 0;  // no alignment
     }
 
-    long long int align(long long mem_size) const {
+    bool isAligned(long long mem_size, int alignment) const {
+        return ((mem_size % alignment) != 0) ? false : true;
+    }
+    bool isAligned(long long mem_size, const VPUDevice device) const {
+        /* coverity[divide_by_zero] */
+        return ((mem_size % get_alignment(device)) != 0) ? false : true;
+    }
+
+    long long int align(long long mem_size, int alignment) const {
         const auto rem = mem_size % alignment;
         return (rem == 0) ? mem_size : mem_size + (alignment - rem);
     }
+    long long int align(long long mem_size, const VPUDevice device) const {
+        /* coverity[divide_by_zero] */
+        const auto rem = mem_size % get_alignment(device);
+        return (rem == 0) ? mem_size : mem_size + (get_alignment(device) - rem);
+    }
+
     DPU_OperationValidator_Test() {
     }
 
@@ -73,7 +100,7 @@ TEST_F(DPU_OperationValidator_Test, elementwiseMemorySize_Test) {
         auto wl{wl_ref};
         EXPECT_TRUE(dut.is_supported(wl.device));
 
-        EXPECT_TRUE(isAligned(56 * 56 * 256));
+        EXPECT_TRUE(isAligned(56 * 56 * 256, VPUDevice::VPU_2_7));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -145,9 +172,9 @@ TEST_F(DPU_OperationValidator_Test, SEPMemorySize_Test) {
         auto wl{wl_107262};
         EXPECT_TRUE(dut.is_supported(wl.device));
         const int in_compute_tensor{2050 * 22 * 64 * 2};
-        const int al_in_ct{(int)align(in_compute_tensor)};
+        const int al_in_ct{(int)align(in_compute_tensor, wl.device)};
 
-        EXPECT_TRUE(isAligned(al_in_ct));
+        EXPECT_TRUE(isAligned(al_in_ct, wl.device));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -169,10 +196,10 @@ TEST_F(DPU_OperationValidator_Test, SEPMemorySize_Test) {
         const int AST{(2050 * 22 * 64) / 8};  // to be aligned at 16?, already aligned 2050*11* 2*8
         const int SEPsize{2050 * 22 * 4};
 
-        const int sep_input{(int)align(actual_in + AST + SEPsize)};  // aligned to 16K
+        const int sep_input{(int)align(actual_in + AST + SEPsize, wl.device)};  // aligned to 16K
 
         const int wt{(int)std::ceil((4 * 4 * 64 * 64 * 2) * (1.0F - 0.984375F))};
-        const int wt_aligned{(int)align(wt)};
+        const int wt_aligned{(int)align(wt, wl.device)};
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -302,6 +329,7 @@ TEST_F(DPU_OperationValidator_Test, InputSparsity_and_SEP_memory_test) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -481,6 +509,7 @@ TEST_F(DPU_OperationValidator_Test, OutputSparsity_and_SEP_memory_test) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -693,6 +722,7 @@ TEST_F(DPU_OperationValidator_Test, Output_sparsity_memory_computation_test) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -763,7 +793,7 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
             false,                                           // weight_sparsity_enabled
     };
 
-    {  //weightless operation
+    {  // weightless operation
         auto wl{wl_};
         wl.weightless_operation = true;
         wl.in_place_output_memory = false;
@@ -772,13 +802,13 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
         long long in_mem_bytes{180 * 4 * 640 * 2};   // float 16
         long long out_mem_bytes{180 * 4 * 640 * 1};  // int8
 
-        EXPECT_FALSE(isAligned(in_mem_bytes));
-        auto alignedInMemory{align(in_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedInMemory));
+        EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
+        auto alignedInMemory{align(in_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedInMemory, wl.device));
 
-        EXPECT_FALSE(isAligned(out_mem_bytes));
-        auto alignedOutMemory{align(out_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedOutMemory));
+        EXPECT_FALSE(isAligned(out_mem_bytes, wl.device));
+        auto alignedOutMemory{align(out_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedOutMemory, wl.device));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -790,7 +820,7 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
         EXPECT_EQ(mem.cmx, cmx_overhead + mem.input_0 + mem.input_1 + mem.output_0) << mem << std::endl;
     }
 
-        {  // inplace out 
+    {  // inplace out
         auto wl{wl_};
         wl.weightless_operation = false;
         wl.in_place_output_memory = true;
@@ -798,13 +828,13 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
         long long in_mem_bytes{180 * 4 * 640 * 2};   // float 16
         long long out_mem_bytes{180 * 4 * 640 * 1};  // int8
 
-        EXPECT_FALSE(isAligned(in_mem_bytes));
-        auto alignedInMemory{align(in_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedInMemory));
+        EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
+        auto alignedInMemory{align(in_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedInMemory, wl.device));
 
-        EXPECT_FALSE(isAligned(out_mem_bytes));
-        auto alignedOutMemory{align(out_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedOutMemory));
+        EXPECT_FALSE(isAligned(out_mem_bytes, wl.device));
+        auto alignedOutMemory{align(out_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedOutMemory, wl.device));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -816,7 +846,7 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
         EXPECT_EQ(mem.cmx, cmx_overhead + mem.input_0 + mem.input_1 + 0)
                 << mem << std::endl;  // +0 because wl.in_place_output_memory = true;
     }
-    
+
     {  // inplace out mem and weightless operation
         auto wl{wl_};
         wl.weightless_operation = true;
@@ -825,13 +855,13 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
         long long in_mem_bytes{180 * 4 * 640 * 2};   // float 16
         long long out_mem_bytes{180 * 4 * 640 * 1};  // int8
 
-        EXPECT_FALSE(isAligned(in_mem_bytes));
-        auto alignedInMemory{align(in_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedInMemory));
+        EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
+        auto alignedInMemory{align(in_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedInMemory, wl.device));
 
-        EXPECT_FALSE(isAligned(out_mem_bytes));
-        auto alignedOutMemory{align(out_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedOutMemory));
+        EXPECT_FALSE(isAligned(out_mem_bytes, wl.device));
+        auto alignedOutMemory{align(out_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedOutMemory, wl.device));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -840,7 +870,8 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
         EXPECT_EQ(mem.output_0, alignedOutMemory) << mem << std::endl;
         EXPECT_EQ(mem.input_1, 0) << mem << std::endl;
         EXPECT_EQ(mem.inplace_output, true) << mem << std::endl;
-        EXPECT_EQ(mem.cmx, cmx_overhead + mem.input_0 + mem.input_1 + 0) << mem << std::endl; // +0 because wl.in_place_output_memory = true;
+        EXPECT_EQ(mem.cmx, cmx_overhead + mem.input_0 + mem.input_1 + 0)
+                << mem << std::endl;  // +0 because wl.in_place_output_memory = true;
     }
 }
 // test situations :
@@ -911,13 +942,13 @@ TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Te
         long long in_mem_bytes{180 * 4 * 640 * 2};   // float 16
         long long out_mem_bytes{180 * 4 * 640 * 1};  // int8
 
-        EXPECT_FALSE(isAligned(in_mem_bytes));
-        auto alignedInMemory{align(in_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedInMemory));
+        EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
+        auto alignedInMemory{align(in_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedInMemory, wl.device));
 
-        EXPECT_FALSE(isAligned(out_mem_bytes));
-        auto alignedOutMemory{align(out_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedOutMemory));
+        EXPECT_FALSE(isAligned(out_mem_bytes, wl.device));
+        auto alignedOutMemory{align(out_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedOutMemory, wl.device));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -934,13 +965,13 @@ TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Te
         long long in_mem_bytes{180 * 4 * 640 * 1};   // int8
         long long out_mem_bytes{180 * 4 * 640 * 1};  // int8
 
-        EXPECT_FALSE(isAligned(in_mem_bytes));
-        auto alignedInMemory{align(in_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedInMemory));
+        EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
+        auto alignedInMemory{align(in_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedInMemory, wl.device));
 
-        EXPECT_FALSE(isAligned(out_mem_bytes));
-        auto alignedOutMemory{align(out_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedOutMemory));
+        EXPECT_FALSE(isAligned(out_mem_bytes, wl.device));
+        auto alignedOutMemory{align(out_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedOutMemory, wl.device));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -957,13 +988,13 @@ TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Te
         long long in_mem_bytes{180 * 4 * 640 * 2};   // FP16
         long long out_mem_bytes{180 * 4 * 640 * 1};  // int8
 
-        EXPECT_FALSE(isAligned(in_mem_bytes));
-        auto alignedInMemory{align(in_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedInMemory));
+        EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
+        auto alignedInMemory{align(in_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedInMemory, wl.device));
 
-        EXPECT_FALSE(isAligned(out_mem_bytes));
-        auto alignedOutMemory{align(out_mem_bytes)};
-        EXPECT_TRUE(isAligned(alignedOutMemory));
+        EXPECT_FALSE(isAligned(out_mem_bytes, wl.device));
+        auto alignedOutMemory{align(out_mem_bytes, wl.device)};
+        EXPECT_TRUE(isAligned(alignedOutMemory, wl.device));
 
         VPUNN::MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -1001,13 +1032,13 @@ TEST_F(DPU_OperationValidator_Test, convolutionMemorySize_Test) {
     const auto output_0_raw{7 * 7 * 512};
     const auto input_1_raw{3 * 3 * 512 * 512 + 512 * 16};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
-    const auto input_1{align(input_1_raw)};
+    const auto input_0{align(input_0_raw, VPUDevice::VPU_2_7)};
+    const auto output_0{align(output_0_raw, VPUDevice::VPU_2_7)};
+    const auto input_1{align(input_1_raw, VPUDevice::VPU_2_7)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
-    EXPECT_TRUE(isAligned(input_1));
+    EXPECT_TRUE(isAligned(input_0, VPUDevice::VPU_2_7));
+    EXPECT_TRUE(isAligned(output_0, VPUDevice::VPU_2_7));
+    EXPECT_TRUE(isAligned(input_1, VPUDevice::VPU_2_7));
 
     {  // no ISI strategy
         auto wl{wl_ref};
@@ -1097,12 +1128,12 @@ TEST_F(DPU_OperationValidator_Test, HALOconvolutionMemorySize_SmokeTest) {
     const auto output_0_raw{7 * 7 * 512};
     // const auto input_1_raw{3 * 3 * 512 * 512 + 512 * 16};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
+    const auto input_0{align(input_0_raw, VPUDevice::VPU_2_7)};
+    const auto output_0{align(output_0_raw, VPUDevice::VPU_2_7)};
     // const auto input_1{align(input_1_raw)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
+    EXPECT_TRUE(isAligned(input_0, VPUDevice::VPU_2_7));
+    EXPECT_TRUE(isAligned(output_0, VPUDevice::VPU_2_7));
     //    EXPECT_TRUE(isAligned(input_1));
     ASSERT_TRUE(dut.is_supported(wl_ref.device));
 
@@ -1120,6 +1151,7 @@ TEST_F(DPU_OperationValidator_Test, HALOconvolutionMemorySize_SmokeTest) {
         MemorySize mem_H1;
         {
             MemorySize& mem{mem_H1};
+            /* coverity[copy_instead_of_move] */
             auto wl{wl_ref_halo};
             EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
@@ -1135,6 +1167,7 @@ TEST_F(DPU_OperationValidator_Test, HALOconvolutionMemorySize_SmokeTest) {
         MemorySize mem_H2;
         {
             MemorySize& mem{mem_H2};
+            /* coverity[copy_instead_of_move] */
             auto wl{wl_ref_halo2};
             EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
@@ -1201,12 +1234,13 @@ TEST_F(DPU_OperationValidator_Test, InputHALOTest) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref_halo};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-                EXPECT_EQ(mem.input_0, align(t.t_exp.mem_size_exp_not_aligned))
+                EXPECT_EQ(mem.input_0, align(t.t_exp.mem_size_exp_not_aligned, wl.device))
                         << mem << std::endl
-                        << align(t.t_exp.mem_size_exp_not_aligned) << std::endl;
+                        << align(t.t_exp.mem_size_exp_not_aligned, wl.device) << std::endl;
             }
             i++;
         }
@@ -1405,12 +1439,13 @@ TEST_F(DPU_OperationValidator_Test, OutputHALOTest) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref_halo};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned))
+                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned, wl.device))
                         << mem << std::endl
-                        << align(t.t_exp.mem_size_exp_not_aligned) << std::endl;
+                        << align(t.t_exp.mem_size_exp_not_aligned, wl.device) << std::endl;
             }
             i++;
         }
@@ -1713,12 +1748,13 @@ TEST_F(DPU_OperationValidator_Test, OutputHALO_Inbound_Test) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref_halo};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned))
+                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned, wl.device))
                         << mem << std::endl
-                        << align(t.t_exp.mem_size_exp_not_aligned) << std::endl;
+                        << align(t.t_exp.mem_size_exp_not_aligned, wl.device) << std::endl;
             }
             i++;
         }
@@ -1820,12 +1856,13 @@ TEST_F(DPU_OperationValidator_Test, InputHALOTest_different_H_and_W_wl) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref_halo};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-                EXPECT_EQ(mem.input_0, align(t.t_exp.mem_size_exp_not_aligned))
+                EXPECT_EQ(mem.input_0, align(t.t_exp.mem_size_exp_not_aligned, wl.device))
                         << mem << std::endl
-                        << align(t.t_exp.mem_size_exp_not_aligned) << std::endl;
+                        << align(t.t_exp.mem_size_exp_not_aligned, wl.device) << std::endl;
             }
             i++;
         }
@@ -1972,12 +2009,13 @@ TEST_F(DPU_OperationValidator_Test, OutputHALOTest_different_H_and_W_wl) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref_halo};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned))
+                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned, wl.device))
                         << mem << std::endl
-                        << align(t.t_exp.mem_size_exp_not_aligned) << std::endl;
+                        << align(t.t_exp.mem_size_exp_not_aligned, wl.device) << std::endl;
             }
             i++;
         }
@@ -2196,12 +2234,13 @@ TEST_F(DPU_OperationValidator_Test, OutputHALO_Inbound_Test_different_H_and_W_wl
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_ref_halo};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned))
+                EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp_not_aligned, wl.device))
                         << mem << std::endl
-                        << align(t.t_exp.mem_size_exp_not_aligned) << std::endl;
+                        << align(t.t_exp.mem_size_exp_not_aligned, wl.device) << std::endl;
             }
             i++;
         }
@@ -2304,6 +2343,7 @@ TEST_F(DPU_OperationValidator_Test, Weight_sparsity_memory_test) {
             MemorySize memory;
             {
                 MemorySize& mem{memory};
+                /* coverity[copy_instead_of_move] */
                 auto wl{wl_sparse};
 
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
@@ -2348,7 +2388,7 @@ TEST_F(DPU_OperationValidator_Test, Check_input1_and_input0_memory_when_datatype
             1,                                                               // output_write_tiles
             {0, 0, 0, 0},                                                    // offsets
             VPUNN::ISIStrategy::CLUSTERING,                                  // isi_strategy
-            false,                                                            // weight_sparsity_enabled
+            false,                                                           // weight_sparsity_enabled
             {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
             {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
             VPUNN::DataType::INT4,                                           // input1 data type
@@ -2359,8 +2399,9 @@ TEST_F(DPU_OperationValidator_Test, Check_input1_and_input0_memory_when_datatype
         MemorySize& mem{memory};
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl_wt_dtype_INT4)) << wl_wt_dtype_INT4 << std::endl;
         EXPECT_LT(mem.input_1, mem.input_0) << mem << std::endl;
-        EXPECT_EQ(mem.input_0, align(2097152)); /* =64*64*512*1*1(last 1 is the number of bytes for dtype */
-        EXPECT_EQ(mem.input_1, align(1187840)); /* input1 shape: 1x1x4608x512 */  
+        EXPECT_EQ(mem.input_0,
+                  align(2097152, wl_wt_dtype_INT4.device)); /* =64*64*512*1*1(last 1 is the number of bytes for dtype */
+        EXPECT_EQ(mem.input_1, align(1187840, wl_wt_dtype_INT4.device)); /* input1 shape: 1x1x4608x512 */
     }
 
     {
@@ -2369,8 +2410,124 @@ TEST_F(DPU_OperationValidator_Test, Check_input1_and_input0_memory_when_datatype
         MemorySize& mem{memory};
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl_wt_dtype_INT8)) << wl_wt_dtype_INT8 << std::endl;
         EXPECT_GT(mem.input_1, mem.input_0) << mem << std::endl;
-        EXPECT_EQ(mem.input_0, align(2097152)); /* =64*64*512*1*1(last 1 is the number of bytes for dtype */
-        EXPECT_EQ(mem.input_1, align(2367488)); /* input1 shape: 1x1x4608x512 */
+        EXPECT_EQ(mem.input_0,
+                  align(2097152, wl_wt_dtype_INT8.device)); /* =64*64*512*1*1(last 1 is the number of bytes for dtype */
+        EXPECT_EQ(mem.input_1, align(2367488, wl_wt_dtype_INT8.device)); /* input1 shape: 1x1x4608x512 */
+    }
+}
+
+TEST_F(DPU_OperationValidator_Test, Check_Memory_size_32Bit_output_NPU40) {
+    const VPUDevice device_req{VPUDevice::VPU_4_0};
+    const DPUWorkload wl_{
+            device_req,
+            Operation::CONVOLUTION,
+            {VPUTensor(64, 64, 512, 1, DataType::UINT8)},                    // input dimensions
+            {VPUTensor(21, 21, 512, 1, DataType::FLOAT32)},                  // output dimensions
+            {3, 3},                                                          // kernels
+            {3, 3},                                                          // strides
+            {0, 0, 0, 0},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                                     // execution mode
+            ActivationFunction::NONE,                                        // activation
+            0.0F,                                                            // act_sparsity
+            0.0F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // output_write_tiles
+            {0, 0, 0, 0},                                                    // offsets
+            ISIStrategy::CLUSTERING,                                         // isi_strategy
+            false,                                                           // weight_sparsity_enabled
+            {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
+            {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
+            DataType::UINT8,                                                 // input1 data type
+    };
+
+    MemorySize memory;
+    {
+        MemorySize& mem{memory};
+        EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl_)) << wl_ << std::endl;
+        // EXPECT_EQ(mem.input_1, mem.input_0) << mem << std::endl;
+        EXPECT_EQ(mem.input_0, align(2097152, device_req)); /* =64*64*512*1*1(last 1 is the number of bytes for dtype */
+        EXPECT_EQ(mem.input_1, align(2367488, device_req)); /* input1 shape: 1x1x4608x512 */
+        EXPECT_EQ(mem.output_0, align(21 * 21 * 512 * 1 * 4, device_req)); /* 21, 21, 512, 1 */
+    }
+
+    {
+        DPUWorkload wl_x{wl_};
+        wl_x.outputs[0].change_datatype_superficial(DataType::FLOAT32);
+        EXPECT_EQ(wl_x.outputs[0].get_dtype(), DataType::FLOAT32);
+
+        MemorySize& mem{memory};
+        EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl_x)) << wl_x << std::endl;
+        // EXPECT_GT(mem.input_1, mem.input_0) << mem << std::endl;
+        EXPECT_EQ(mem.input_0, align(2097152, device_req)); /* =64*64*512*1*1(last 1 is the number of bytes for dtype */
+        EXPECT_EQ(mem.input_1, align(2367488, device_req)); /* input1 shape: 1x1x4608x512 */
+        EXPECT_EQ(mem.output_0, align(21 * 21 * 512 * 1 * 4, device_req)); /* 21, 21, 512, 1 */
+    }
+
+    const DPUWorkload wl_2{
+            device_req,
+            Operation::CONVOLUTION,
+            {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
+            {VPUTensor(21, 21, 512 - 16, 1, DataType::FLOAT32)},             // output dimensions
+            {3, 3},                                                          // kernels
+            {3, 3},                                                          // strides
+            {0, 0, 0, 0},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                                     // execution mode
+            ActivationFunction::NONE,                                        // activation
+            0.0F,                                                            // act_sparsity
+            0.0F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // output_write_tiles
+            {0, 0, 0, 0},                                                    // offsets
+            ISIStrategy::CLUSTERING,                                         // isi_strategy
+            false,                                                           // weight_sparsity_enabled
+            {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
+            {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
+            DataType::UINT8,                                                 // input1 data type
+    };
+
+    {
+        DPUWorkload wl_x{wl_2};
+        MemorySize& mem{memory};
+        EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl_x)) << wl_x << std::endl;
+        // EXPECT_GT(mem.input_1, mem.input_0) << mem << std::endl;
+        EXPECT_EQ(mem.input_0, align(262144, device_req));                        /* */
+        EXPECT_EQ(mem.input_1, align(294912, device_req)) << mem;                 /* aligned to 32 channels */
+        EXPECT_EQ(mem.output_0, align(21 * 21 * (512 - 16) * 1 * 4, device_req)); /* 21, 21, 512, 1 */
+    }
+
+    const DPUWorkload wl_3{
+            device_req,
+            Operation::CONVOLUTION,
+            {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
+            {VPUTensor(21, 21, 512, 1, DataType::FLOAT32)},                  // output dimensions
+            {3, 3},                                                          // kernels
+            {3, 3},                                                          // strides
+            {0, 0, 0, 0},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                                     // execution mode
+            ActivationFunction::NONE,                                        // activation
+            0.0F,                                                            // act_sparsity
+            0.0F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // output_write_tiles
+            {0, 0, 0, 0},                                                    // offsets
+            ISIStrategy::CLUSTERING,                                         // isi_strategy
+            false,                                                           // weight_sparsity_enabled
+            {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
+            {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
+            DataType::UINT8,                                                 // input1 data type
+    };
+
+    {
+        DPUWorkload wl_x{wl_3};
+        MemorySize& mem{memory};
+        EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl_x)) << wl_x << std::endl;
+        // EXPECT_GT(mem.input_1, mem.input_0) << mem << std::endl;
+        EXPECT_EQ(mem.input_0, align(262144, device_req));                   /* */
+        EXPECT_EQ(mem.input_1, align(311296, device_req)) << mem;            /* aligned to 32 channels */
+        EXPECT_EQ(mem.output_0, align(21 * 21 * (512) * 1 * 4, device_req)); /* 21, 21, 512, 1 */
     }
 }
 
@@ -2484,8 +2641,9 @@ TEST_F(DPU_OperationValidator_Test, Check_halo_inputs_test) {
 
 // here we split an initial wl into 2 tensors to see if memory is calculated correctly when using halo information
 TEST_F(DPU_OperationValidator_Test, Convolution_3x3_HALOTest) {
+    const VPUDevice device_req{VPUDevice::VPU_2_7};
     const VPUNN::DPUWorkload wl_ref_3x3{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(14, 14, 512, 1, VPUNN::DataType::UINT8)},      // input dimensions
             {VPUNN::VPUTensor(7, 7, 512, 1, VPUNN::DataType::UINT8)},        // output dimensions
@@ -2509,7 +2667,7 @@ TEST_F(DPU_OperationValidator_Test, Convolution_3x3_HALOTest) {
 
     // top
     const VPUNN::DPUWorkload top_wl_ref_3x3{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(14, 6, 512, 1, VPUNN::DataType::UINT8)},       // input dimensions WHCB
             {VPUNN::VPUTensor(7, 3, 512, 1, VPUNN::DataType::UINT8)},        // output dimensions WHCB
@@ -2531,7 +2689,7 @@ TEST_F(DPU_OperationValidator_Test, Convolution_3x3_HALOTest) {
 
     // bottom
     const VPUNN::DPUWorkload btm_wl_ref_3x3{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(14, 8, 512, 1, VPUNN::DataType::UINT8)},       // input dimensions WHCB
             {VPUNN::VPUTensor(7, 4, 512, 1, VPUNN::DataType::UINT8)},        // output dimensions WHCB
@@ -2557,31 +2715,31 @@ TEST_F(DPU_OperationValidator_Test, Convolution_3x3_HALOTest) {
     const auto input_0_raw{14 * 14 * 512};
     const auto output_0_raw{7 * 7 * 512};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
+    const auto input_0{align(input_0_raw, device_req)};
+    const auto output_0{align(output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
+    EXPECT_TRUE(isAligned(input_0, device_req));
+    EXPECT_TRUE(isAligned(output_0, device_req));
 
     // top wl
     const auto top_input_0_raw{14 * 6 * 512};
     const auto top_output_0_raw{7 * 3 * 512};
 
-    const auto top_input_0{align(top_input_0_raw)};
-    const auto top_output_0{align(top_output_0_raw)};
+    const auto top_input_0{align(top_input_0_raw, device_req)};
+    const auto top_output_0{align(top_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(top_input_0));
-    EXPECT_TRUE(isAligned(top_output_0));
+    EXPECT_TRUE(isAligned(top_input_0, device_req));
+    EXPECT_TRUE(isAligned(top_output_0, device_req));
 
     // bottom wl
     const auto btm_input_0_raw{14 * 8 * 512};
     const auto btm_output_0_raw{7 * 4 * 512};
 
-    const auto btm_input_0{align(btm_input_0_raw)};
-    const auto btm_output_0{align(btm_output_0_raw)};
+    const auto btm_input_0{align(btm_input_0_raw, device_req)};
+    const auto btm_output_0{align(btm_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(btm_input_0));
-    EXPECT_TRUE(isAligned(btm_output_0));
+    EXPECT_TRUE(isAligned(btm_input_0, device_req));
+    EXPECT_TRUE(isAligned(btm_output_0, device_req));
 
     ASSERT_TRUE(dut.is_supported(wl_ref_3x3.device));
     ASSERT_TRUE(dut.is_supported(top_wl_ref_3x3.device));
@@ -2634,8 +2792,9 @@ TEST_F(DPU_OperationValidator_Test, Convolution_3x3_HALOTest) {
 }
 
 TEST_F(DPU_OperationValidator_Test, Convolution_5x5_HALOTest) {
+    const VPUDevice device_req {VPUDevice::VPU_2_7};
     const VPUNN::DPUWorkload wl_ref_5x5 = {
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(128, 128, 16, 1, VPUNN::DataType::FLOAT16)},   // input dimensions
             {VPUNN::VPUTensor(128, 128, 16, 1, VPUNN::DataType::FLOAT16)},   // output dimensions
@@ -2656,7 +2815,7 @@ TEST_F(DPU_OperationValidator_Test, Convolution_5x5_HALOTest) {
     };
 
     const VPUNN::DPUWorkload top_wl_ref_5x5 = {
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(128, 64, 16, 1, VPUNN::DataType::FLOAT16)},    // input dimensions WHCB
             {VPUNN::VPUTensor(128, 64, 16, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
@@ -2677,7 +2836,7 @@ TEST_F(DPU_OperationValidator_Test, Convolution_5x5_HALOTest) {
     };
 
     const VPUNN::DPUWorkload btm_wl_ref_5x5 = {
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(128, 64, 16, 1, VPUNN::DataType::FLOAT16)},    // input dimensions WHCB
             {VPUNN::VPUTensor(128, 64, 16, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
@@ -2701,31 +2860,31 @@ TEST_F(DPU_OperationValidator_Test, Convolution_5x5_HALOTest) {
     const auto input_0_raw{128 * 128 * 16};
     const auto output_0_raw{128 * 128 * 16};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
+    const auto input_0{align(input_0_raw, device_req)};
+    const auto output_0{align(output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
+    EXPECT_TRUE(isAligned(input_0, device_req));
+    EXPECT_TRUE(isAligned(output_0, device_req));
 
     // top wl
     const auto top_input_0_raw{64 * 128 * 16};
     const auto top_output_0_raw{64 * 128 * 16};
 
-    const auto top_input_0{align(top_input_0_raw)};
-    const auto top_output_0{align(top_output_0_raw)};
+    const auto top_input_0{align(top_input_0_raw, device_req)};
+    const auto top_output_0{align(top_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(top_input_0));
-    EXPECT_TRUE(isAligned(top_output_0));
+    EXPECT_TRUE(isAligned(top_input_0, device_req));
+    EXPECT_TRUE(isAligned(top_output_0, device_req));
 
     // bottom wl
     const auto btm_input_0_raw{64 * 128 * 16};
     const auto btm_output_0_raw{64 * 128 * 16};
 
-    const auto btm_input_0{align(btm_input_0_raw)};
-    const auto btm_output_0{align(btm_output_0_raw)};
+    const auto btm_input_0{align(btm_input_0_raw, device_req)};
+    const auto btm_output_0{align(btm_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(btm_input_0));
-    EXPECT_TRUE(isAligned(btm_output_0));
+    EXPECT_TRUE(isAligned(btm_input_0, device_req));
+    EXPECT_TRUE(isAligned(btm_output_0, device_req));
 
     ASSERT_TRUE(dut.is_supported(wl_ref_5x5.device));
     ASSERT_TRUE(dut.is_supported(top_wl_ref_5x5.device));
@@ -2773,8 +2932,9 @@ TEST_F(DPU_OperationValidator_Test, Convolution_5x5_HALOTest) {
     }
 }
 TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest) {
+    const VPUDevice device_req{VPUDevice::VPU_2_7};
     const VPUNN::DPUWorkload wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::MAXPOOL,                                       ///
             {VPUNN::VPUTensor(7, 7, 32, 1, VPUNN::DataType::UINT8)},         // input dimensions
             {VPUNN::VPUTensor(6, 6, 32, 1, VPUNN::DataType::UINT8)},         // output dimensions
@@ -2795,7 +2955,7 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest) {
     };
 
     const VPUNN::DPUWorkload top_wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::MAXPOOL,                                       ///
             {VPUNN::VPUTensor(7, 3, 32, 1, VPUNN::DataType::UINT8)},         // input dimensions WHCB
             {VPUNN::VPUTensor(6, 2, 32, 1, VPUNN::DataType::UINT8)},         // output dimensions
@@ -2816,7 +2976,7 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest) {
     };
 
     const VPUNN::DPUWorkload btm_wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::MAXPOOL,                                       ///
             {VPUNN::VPUTensor(7, 4, 32, 1, VPUNN::DataType::UINT8)},         // input dimensions
             {VPUNN::VPUTensor(6, 4, 32, 1, VPUNN::DataType::UINT8)},         // output dimensions
@@ -2840,31 +3000,31 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest) {
     const auto input_0_raw{7 * 7 * 32};
     const auto output_0_raw{6 * 6 * 32};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
+    const auto input_0{align(input_0_raw, device_req)};
+    const auto output_0{align(output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
+    EXPECT_TRUE(isAligned(input_0, device_req));
+    EXPECT_TRUE(isAligned(output_0, device_req));
 
     // top wl
     const auto top_input_0_raw{7 * 3 * 32};
     const auto top_output_0_raw{6 * 2 * 32};
 
-    const auto top_input_0{align(top_input_0_raw)};
-    const auto top_output_0{align(top_output_0_raw)};
+    const auto top_input_0{align(top_input_0_raw, device_req)};
+    const auto top_output_0{align(top_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(top_input_0));
-    EXPECT_TRUE(isAligned(top_output_0));
+    EXPECT_TRUE(isAligned(top_input_0, device_req));
+    EXPECT_TRUE(isAligned(top_output_0, device_req));
 
     // bottom wl
     const auto btm_input_0_raw{7 * 4 * 32};
     const auto btm_output_0_raw{6 * 4 * 32};
 
-    const auto btm_input_0{align(btm_input_0_raw)};
-    const auto btm_output_0{align(btm_output_0_raw)};
+    const auto btm_input_0{align(btm_input_0_raw, device_req)};
+    const auto btm_output_0{align(btm_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(btm_input_0));
-    EXPECT_TRUE(isAligned(btm_output_0));
+    EXPECT_TRUE(isAligned(btm_input_0, device_req));
+    EXPECT_TRUE(isAligned(btm_output_0, device_req));
 
     ASSERT_TRUE(dut.is_supported(wl_ref.device));
     ASSERT_TRUE(dut.is_supported(top_wl_ref.device));
@@ -2912,8 +3072,9 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest) {
     }
 }
 TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest2) {
+    const VPUDevice device_req{VPUDevice::VPU_4_0};
     const VPUNN::DPUWorkload wl_ref{
-            VPUNN::VPUDevice::VPU_4_0,
+            device_req,
             VPUNN::Operation::MAXPOOL,
             {VPUNN::VPUTensor(112, 112, 64, 1, VPUNN::DataType::UINT8)},     // input dimensions
             {VPUNN::VPUTensor(56, 56, 64, 1, VPUNN::DataType::UINT8)},       // output dimensions
@@ -2934,7 +3095,7 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest2) {
     };
 
     const VPUNN::DPUWorkload top_wl_ref{
-            VPUNN::VPUDevice::VPU_4_0,
+            device_req,
             VPUNN::Operation::MAXPOOL,
             {VPUNN::VPUTensor(112, 28, 64, 1, VPUNN::DataType::UINT8)},      // input dimensions
             {VPUNN::VPUTensor(56, 14, 64, 1, VPUNN::DataType::UINT8)},       // output dimensions
@@ -2955,7 +3116,7 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest2) {
     };
 
     const VPUNN::DPUWorkload middle1_wl_ref{
-            VPUNN::VPUDevice::VPU_4_0,
+            device_req,
             VPUNN::Operation::MAXPOOL,
             {VPUNN::VPUTensor(112, 31, 64, 1, VPUNN::DataType::UINT8)},      // input dimensions
             {VPUNN::VPUTensor(56, 15, 64, 1, VPUNN::DataType::UINT8)},       // output dimensions
@@ -2976,7 +3137,7 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest2) {
     };
 
     const VPUNN::DPUWorkload middle2_wl_ref{
-            VPUNN::VPUDevice::VPU_4_0,
+            device_req,
             VPUNN::Operation::MAXPOOL,
             {VPUNN::VPUTensor(112, 24, 64, 1, VPUNN::DataType::UINT8)},      // input dimensions
             {VPUNN::VPUTensor(56, 12, 64, 1, VPUNN::DataType::UINT8)},       // output dimensions
@@ -2997,7 +3158,7 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest2) {
     };
 
     const VPUNN::DPUWorkload btm_wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,//VPUNN::VPUDevice::VPU_2_7,
             VPUNN::Operation::MAXPOOL,
             {VPUNN::VPUTensor(112, 29, 64, 1, VPUNN::DataType::UINT8)},      // input dimensions
             {VPUNN::VPUTensor(56, 15, 64, 1, VPUNN::DataType::UINT8)},       // output dimensions
@@ -3021,51 +3182,51 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest2) {
     const auto input_0_raw{112 * 112 * 64};
     const auto output_0_raw{56 * 56 * 64};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
+    const auto input_0{align(input_0_raw, device_req)};
+    const auto output_0{align(output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
+    EXPECT_TRUE(isAligned(input_0, device_req));
+    EXPECT_TRUE(isAligned(output_0, device_req));
 
     // top wl
     const auto top_input_0_raw{112 * 28 * 64};
     const auto top_output_0_raw{56 * 14 * 64};
 
-    const auto top_input_0{align(top_input_0_raw)};
-    const auto top_output_0{align(top_output_0_raw)};
+    const auto top_input_0{align(top_input_0_raw, device_req)};
+    const auto top_output_0{align(top_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(top_input_0));
-    EXPECT_TRUE(isAligned(top_output_0));
+    EXPECT_TRUE(isAligned(top_input_0, device_req));
+    EXPECT_TRUE(isAligned(top_output_0, device_req));
 
     // middle1 wl
     const auto mid1_input_0_raw{112 * 31 * 64};
     const auto mid1_output_0_raw{56 * 15 * 64};
 
-    const auto mid1_input_0{align(mid1_input_0_raw)};
-    const auto mid1_output_0{align(mid1_output_0_raw)};
+    const auto mid1_input_0{align(mid1_input_0_raw, device_req)};
+    const auto mid1_output_0{align(mid1_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(mid1_input_0));
-    EXPECT_TRUE(isAligned(mid1_output_0));
+    EXPECT_TRUE(isAligned(mid1_input_0, device_req));
+    EXPECT_TRUE(isAligned(mid1_output_0, device_req));
 
     // middle2 wl
     const auto mid2_input_0_raw{112 * 24 * 64};
     const auto mid2_output_0_raw{56 * 12 * 64};
 
-    const auto mid2_input_0{align(mid2_input_0_raw)};
-    const auto mid2_output_0{align(mid2_output_0_raw)};
+    const auto mid2_input_0{align(mid2_input_0_raw, device_req)};
+    const auto mid2_output_0{align(mid2_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(mid2_input_0));
-    EXPECT_TRUE(isAligned(mid2_output_0));
+    EXPECT_TRUE(isAligned(mid2_input_0, device_req));
+    EXPECT_TRUE(isAligned(mid2_output_0, device_req));
 
     // bottom wl
     const auto btm_input_0_raw{112 * 29 * 64};
     const auto btm_output_0_raw{56 * 15 * 64};
 
-    const auto btm_input_0{align(btm_input_0_raw)};
-    const auto btm_output_0{align(btm_output_0_raw)};
+    const auto btm_input_0{align(btm_input_0_raw, device_req)};
+    const auto btm_output_0{align(btm_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(btm_input_0));
-    EXPECT_TRUE(isAligned(btm_output_0));
+    EXPECT_TRUE(isAligned(btm_input_0, device_req));
+    EXPECT_TRUE(isAligned(btm_output_0, device_req));
 
     ASSERT_TRUE(dut.is_supported(wl_ref.device));
     ASSERT_TRUE(dut.is_supported(top_wl_ref.device));
@@ -3146,8 +3307,9 @@ TEST_F(DPU_OperationValidator_Test, Maxpool_HALOTest2) {
 }
 
 TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest) {
+    const VPUDevice device_req{VPUDevice::VPU_2_7};
     const VPUNN::DPUWorkload wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(17, 17, 288, 1, VPUNN::DataType::FLOAT16)},    // input dimensions
             {VPUNN::VPUTensor(17, 17, 288, 1, VPUNN::DataType::FLOAT16)},    // output dimensions
@@ -3167,7 +3329,7 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest) {
             {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects TBLR
     };
     const VPUNN::DPUWorkload top_wl_ref = {
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(17, 7, 288, 1, VPUNN::DataType::FLOAT16)},     // input dimensions
             {VPUNN::VPUTensor(17, 7, 288, 1, VPUNN::DataType::FLOAT16)},     // output dimensions
@@ -3187,7 +3349,7 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest) {
             {{0, 2, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects TBLR
     };
     const VPUNN::DPUWorkload middle_wl_ref = {
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(17, 4, 288, 1, VPUNN::DataType::FLOAT16)},     // input dimensions
             {VPUNN::VPUTensor(17, 4, 288, 1, VPUNN::DataType::FLOAT16)},     // output dimensions
@@ -3207,7 +3369,7 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest) {
             {{2, 2, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects TBLR
     };
     const VPUNN::DPUWorkload btm_wl_ref = {
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(17, 6, 288, 1, VPUNN::DataType::FLOAT16)},     // input dimensions
             {VPUNN::VPUTensor(17, 6, 288, 1, VPUNN::DataType::FLOAT16)},     // output dimensions
@@ -3231,41 +3393,41 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest) {
     const auto input_0_raw{17 * 17 * 288};
     const auto output_0_raw{17 * 17 * 288};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
+    const auto input_0{align(input_0_raw, device_req)};
+    const auto output_0{align(output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
+    EXPECT_TRUE(isAligned(input_0, device_req));
+    EXPECT_TRUE(isAligned(output_0, device_req));
 
     // top wl
     const auto top_input_0_raw{17 * 7 * 288};
     const auto top_output_0_raw{17 * 7 * 288};
 
-    const auto top_input_0{align(top_input_0_raw)};
-    const auto top_output_0{align(top_output_0_raw)};
+    const auto top_input_0{align(top_input_0_raw, device_req)};
+    const auto top_output_0{align(top_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(top_input_0));
-    EXPECT_TRUE(isAligned(top_output_0));
+    EXPECT_TRUE(isAligned(top_input_0, device_req));
+    EXPECT_TRUE(isAligned(top_output_0, device_req));
 
     // middle wl
     const auto mid_input_0_raw{17 * 4 * 288};
     const auto mid_output_0_raw{17 * 4 * 288};
 
-    const auto mid_input_0{align(mid_input_0_raw)};
-    const auto mid_output_0{align(mid_output_0_raw)};
+    const auto mid_input_0{align(mid_input_0_raw, device_req)};
+    const auto mid_output_0{align(mid_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(mid_input_0));
-    EXPECT_TRUE(isAligned(mid_output_0));
+    EXPECT_TRUE(isAligned(mid_input_0, device_req));
+    EXPECT_TRUE(isAligned(mid_output_0, device_req));
 
     // bottom wl
     const auto btm_input_0_raw{17 * 6 * 288};
     const auto btm_output_0_raw{17 * 6 * 288};
 
-    const auto btm_input_0{align(btm_input_0_raw)};
-    const auto btm_output_0{align(btm_output_0_raw)};
+    const auto btm_input_0{align(btm_input_0_raw, device_req)};
+    const auto btm_output_0{align(btm_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(btm_input_0));
-    EXPECT_TRUE(isAligned(btm_output_0));
+    EXPECT_TRUE(isAligned(btm_input_0, device_req));
+    EXPECT_TRUE(isAligned(btm_output_0, device_req));
 
     ASSERT_TRUE(dut.is_supported(wl_ref.device));
     ASSERT_TRUE(dut.is_supported(top_wl_ref.device));
@@ -3337,8 +3499,9 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest) {
 }
 
 TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest2) {
+    const VPUDevice device_req{VPUDevice::VPU_2_7};
     const VPUNN::DPUWorkload wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(32, 32, 64, 1, VPUNN::DataType::UINT8)},       // input dimensions
             {VPUNN::VPUTensor(4, 4, 64, 1, VPUNN::DataType::UINT8)},         // output dimensions
@@ -3360,7 +3523,7 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest2) {
 
     // top
     const VPUNN::DPUWorkload top_wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(32, 10, 64, 1, VPUNN::DataType::UINT8)},       // input dimensions WHCB
             {VPUNN::VPUTensor(4, 1, 64, 1, VPUNN::DataType::UINT8)},         // output dimensions
@@ -3382,7 +3545,7 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest2) {
 
     //  middle
     const VPUNN::DPUWorkload middle_wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(32, 10, 64, 1, VPUNN::DataType::UINT8)},       // input dimensions
             {VPUNN::VPUTensor(4, 2, 64, 1, VPUNN::DataType::UINT8)},         // output dimensions
@@ -3403,7 +3566,7 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest2) {
     };
 
     const VPUNN::DPUWorkload btm_wl_ref{
-            VPUNN::VPUDevice::VPU_2_7,
+            device_req,
             VPUNN::Operation::DW_CONVOLUTION,
             {VPUNN::VPUTensor(32, 12, 64, 1, VPUNN::DataType::UINT8)},       // input dimensions
             {VPUNN::VPUTensor(4, 1, 64, 1, VPUNN::DataType::UINT8)},         // output dimensions
@@ -3427,41 +3590,41 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest2) {
     const auto input_0_raw{32 * 32 * 64};
     const auto output_0_raw{4 * 4 * 64};
 
-    const auto input_0{align(input_0_raw)};
-    const auto output_0{align(output_0_raw)};
+    const auto input_0{align(input_0_raw, device_req)};
+    const auto output_0{align(output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(input_0));
-    EXPECT_TRUE(isAligned(output_0));
+    EXPECT_TRUE(isAligned(input_0, device_req));
+    EXPECT_TRUE(isAligned(output_0, device_req));
 
     // top wl
     const auto top_input_0_raw{32 * 10 * 64};
     const auto top_output_0_raw{4 * 1 * 64};
 
-    const auto top_input_0{align(top_input_0_raw)};
-    const auto top_output_0{align(top_output_0_raw)};
+    const auto top_input_0{align(top_input_0_raw, device_req)};
+    const auto top_output_0{align(top_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(top_input_0));
-    EXPECT_TRUE(isAligned(top_output_0));
+    EXPECT_TRUE(isAligned(top_input_0, device_req));
+    EXPECT_TRUE(isAligned(top_output_0, device_req));
 
     // middle wl
     const auto mid_input_0_raw{32 * 10 * 64};
     const auto mid_output_0_raw{4 * 2 * 64};
 
-    const auto mid_input_0{align(mid_input_0_raw)};
-    const auto mid_output_0{align(mid_output_0_raw)};
+    const auto mid_input_0{align(mid_input_0_raw, device_req)};
+    const auto mid_output_0{align(mid_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(mid_input_0));
-    EXPECT_TRUE(isAligned(mid_output_0));
+    EXPECT_TRUE(isAligned(mid_input_0, device_req));
+    EXPECT_TRUE(isAligned(mid_output_0, device_req));
 
     // bottom wl
     const auto btm_input_0_raw{32 * 12 * 64};
     const auto btm_output_0_raw{4 * 1 * 64};
 
-    const auto btm_input_0{align(btm_input_0_raw)};
-    const auto btm_output_0{align(btm_output_0_raw)};
+    const auto btm_input_0{align(btm_input_0_raw, device_req)};
+    const auto btm_output_0{align(btm_output_0_raw, device_req)};
 
-    EXPECT_TRUE(isAligned(btm_input_0));
-    EXPECT_TRUE(isAligned(btm_output_0));
+    EXPECT_TRUE(isAligned(btm_input_0, device_req));
+    EXPECT_TRUE(isAligned(btm_output_0, device_req));
 
     ASSERT_TRUE(dut.is_supported(wl_ref.device));
     ASSERT_TRUE(dut.is_supported(top_wl_ref.device));
@@ -3529,8 +3692,9 @@ TEST_F(DPU_OperationValidator_Test, DW_Convolution_HALOTest2) {
 }
 
 TEST_F(DPU_OperationValidator_Test, VPU40_presence_Test) {
+    const VPUDevice device_req{VPUDevice::VPU_4_0};
     const VPUNN::DPUWorkload wl_ref{
-            VPUNN::VPUDevice::VPU_4_0,
+            device_req,
             VPUNN::Operation::ELTWISE,
             {VPUNN::VPUTensor(56, 56, 256, 1, VPUNN::DataType::UINT8)},  // input dimensions
             {VPUNN::VPUTensor(56, 56, 256, 1, VPUNN::DataType::UINT8)},  // output dimensions
@@ -4317,6 +4481,7 @@ TEST_F(DPU_WorkloadValidatorTest, HALOInvalid_smokeTest) {
         }
 
         {
+            /* coverity[copy_instead_of_move] */
             auto wl{wl_ref_halo};
             EXPECT_NO_THROW(dut.check_data_consistency(wl, sane)) << wl;
 
@@ -4325,6 +4490,7 @@ TEST_F(DPU_WorkloadValidatorTest, HALOInvalid_smokeTest) {
                     << wl;
         }
         {
+            /* coverity[copy_instead_of_move] */
             auto wl{wl_ref_halo2};
             EXPECT_NO_THROW(dut.check_data_consistency(wl, sane)) << wl;
 
@@ -4336,6 +4502,7 @@ TEST_F(DPU_WorkloadValidatorTest, HALOInvalid_smokeTest) {
             VPUNN::DPUWorkload wl_halo{wl_ref};
             wl_halo.halo = h1_ref3;  // bad info, padding conflict
 
+            /* coverity[copy_instead_of_move] */
             auto wl{wl_halo};
             EXPECT_NO_THROW(dut.check_data_consistency(wl, sane)) << wl;
 
@@ -4343,6 +4510,187 @@ TEST_F(DPU_WorkloadValidatorTest, HALOInvalid_smokeTest) {
                     << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
                     << wl;
         }
+    }
+}
+
+TEST_F(DPU_WorkloadValidatorTest, Memory_Output_32Bits_NPU40) {
+    DPU_OperationSanitizer dut;
+    const VPUDevice device_req{VPUDevice::VPU_4_0};
+    VPUNN::SanityReport sane;
+
+    const DPUWorkload wl_ref{
+            device_req,
+            Operation::CONVOLUTION,
+            {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
+            {VPUTensor(21, 21, 512 + 48, 1, DataType::FLOAT32)},             // output dimensions
+            {3, 3},                                                          // kernels
+            {3, 3},                                                          // strides
+            {0, 0, 0, 0},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                                     // execution mode
+            ActivationFunction::NONE,                                        // activation
+            0.0F,                                                            // act_sparsity
+            0.0F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // output_write_tiles
+            {0, 0, 0, 0},                                                    // offsets
+            ISIStrategy::CLUSTERING,                                         // isi_strategy
+            false,                                                           // weight_sparsity_enabled
+            {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
+            {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
+            DataType::UINT8,                                                 // input1 data type
+    };
+
+    {  //
+        auto wl{wl_ref};
+        dut.check_data_consistency(wl, sane);
+
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+
+        dut.check_and_sanitize(wl, sane);
+        EXPECT_EQ(sane.value(), V(Cycles::ERROR_INPUT_TOO_BIG))
+                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+    }
+    const DPUWorkload wl_ref_less{
+            device_req,
+            Operation::CONVOLUTION,
+            {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
+            {VPUTensor(21, 21, 512 + 32, 1, DataType::FLOAT32)},             // output dimensions
+            {3, 3},                                                          // kernels
+            {3, 3},                                                          // strides
+            {0, 0, 0, 0},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                                     // execution mode
+            ActivationFunction::NONE,                                        // activation
+            0.0F,                                                            // act_sparsity
+            0.0F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // output_write_tiles
+            {0, 0, 0, 0},                                                    // offsets
+            ISIStrategy::CLUSTERING,                                         // isi_strategy
+            false,                                                           // weight_sparsity_enabled
+            {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
+            {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
+            DataType::UINT8,                                                 // input1 data type
+    };
+    {  //
+        auto wl{wl_ref_less};
+        dut.check_data_consistency(wl, sane);
+
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+
+        dut.check_and_sanitize(wl, sane);
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+    }
+
+    const DPUWorkload wl_ref2{
+            device_req,
+            Operation::ELTWISE,
+            {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
+            {VPUTensor(64, 64, 64, 1, DataType::FLOAT32)},                   // output dimensions
+            {1, 1},                                                          // kernels
+            {1, 1},                                                          // strides
+            {0, 0, 0, 0},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                                     // execution mode
+            ActivationFunction::NONE,                                        // activation
+            0.0F,                                                            // act_sparsity
+            0.0F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // output_write_tiles
+            {0, 0, 0, 0},                                                    // offsets
+            ISIStrategy::CLUSTERING,                                         // isi_strategy
+            false,                                                           // weight_sparsity_enabled
+            {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
+            {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
+            DataType::UINT8,                                                 // input1 data type
+            "",                                                              // layer_info
+            false,                                                           ///< operation does not have weights
+            false                                                            // in_place_output_memory{};
+    };
+    {  //
+        auto wl{wl_ref2};
+        dut.check_data_consistency(wl, sane);
+
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+
+        dut.check_and_sanitize(wl, sane);
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+    }
+    {  //
+        auto wl{wl_ref2};
+        dut.check_data_consistency(wl, sane);
+
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+
+        dut.check_and_sanitize(wl, sane);
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+    }
+    const DPUWorkload wl_ref2_large{
+            device_req,
+            Operation::ELTWISE,
+            {VPUTensor(65, 64, 64, 1, DataType::UINT8)},                     // input dimensions
+            {VPUTensor(65, 64, 64, 1, DataType::FLOAT32)},                   // output dimensions
+            {1, 1},                                                          // kernels
+            {1, 1},                                                          // strides
+            {0, 0, 0, 0},                                                    // padding
+            ExecutionMode::CUBOID_16x16,                                     // execution mode
+            ActivationFunction::NONE,                                        // activation
+            0.0F,                                                            // act_sparsity
+            0.0F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // output_write_tiles
+            {0, 0, 0, 0},                                                    // offsets
+            ISIStrategy::CLUSTERING,                                         // isi_strategy
+            false,                                                           // weight_sparsity_enabled
+            {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}},  // halo aspects
+            {false, {0, 0, 0, 0}, {0, 0, 0, 0}, false},                      // SEP
+            DataType::UINT8,                                                 // input1 data type
+            "",                                                              // layer_info
+            false,                                                           ///< operation does not have weights
+            false                                                            // in_place_output_memory{};
+    };
+    {  //
+        auto wl{wl_ref2_large};
+        dut.check_data_consistency(wl, sane);
+
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+
+        dut.check_and_sanitize(wl, sane);
+        EXPECT_EQ(sane.value(), V(Cycles::ERROR_INPUT_TOO_BIG))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+    }
+    {  //
+        auto wl{wl_ref2_large};
+        dut.check_data_consistency(wl, sane);
+
+        EXPECT_EQ(sane.value(), V(Cycles::NO_ERROR))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
+
+        dut.check_and_sanitize(wl, sane);
+        EXPECT_EQ(sane.value(), V(Cycles::ERROR_INPUT_TOO_BIG))
+                << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+                << wl;
     }
 }
 

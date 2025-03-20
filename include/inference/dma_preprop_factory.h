@@ -1,10 +1,10 @@
-// Copyright © 2024 Intel Corporation
+// Copyright ¬© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the ìSoftware Packageî)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the ‚ÄúSoftware Package‚Äù)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the ìthird-party-programs.txtî or other similarly-named text file included with the
+// Please refer to the ‚Äúthird-party-programs.txt‚Äù or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef DMA_PREPROC_FACTORY_H
@@ -19,6 +19,7 @@
 #include "dma_preprocessing.h"
 
 #include "vpu/compatibility/dma_types_01x.h"  // detailed implementations  pp_v01
+
 
 // #include "preprocessing.h"
 
@@ -40,7 +41,6 @@ class DMAVersionsMap : DMAVersionsMapTypes<DMADesc> {};
 template <>
 class DMAVersionsMap<DMANNWorkload_NPU27> : DMAVersionsMapTypes<DMANNWorkload_NPU27> {
     Preprocessing_Interface01_DMA<float> pp_v01;
-
 public:
     /// @brief the map of versions mapped to preprocessing concrete objects
     const PreprocessingMap pp_map{
@@ -49,9 +49,8 @@ public:
 };
 
 template <>
-class DMAVersionsMap<DMANNWorkload_NPU40> : DMAVersionsMapTypes<DMANNWorkload_NPU40> {
+class DMAVersionsMap<DMANNWorkload_NPU40_RESERVED> : DMAVersionsMapTypes<DMANNWorkload_NPU40_RESERVED> {
     Preprocessing_Interface02_DMA<float> pp_v02;
-
 public:
     /// @brief the map of versions mapped to preprocessing concrete objects
     const PreprocessingMap pp_map{

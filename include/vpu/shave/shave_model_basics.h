@@ -155,6 +155,7 @@ public:
      */
     template <typename... Ts>
     CyclesInterfaceType getDPUCyclesAnotherFreqDPU_SHV(const int present_dpu_frq, const int present_shv_frq,
+                                                       /* coverity[pass_by_value] */
                                                        Ts... args) const {
         const int shaveCycles = static_cast<const Derived*>(this)->getShaveCycles(args...);
         return converter.toDPUCyclesFromShaveCycles(shaveCycles, present_dpu_frq, present_shv_frq);

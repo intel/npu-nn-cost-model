@@ -75,12 +75,23 @@ private:
     inline static const int weigths_alignment_def{32};
     inline static const int input_heigth_start_factor_SOH_def{1};
 
-    // input and output data types should be the same
-    inline static const Values<DataType> valid_in_out_datatypes{
+    static constexpr int alignement_size_bytes_def{16384};  // 16KB or 32KB?
+
+    // input datatypes. smaller than output
+    inline static const Values<DataType> valid_in_datatypes{
             DataType::INT8,      //
             DataType::UINT8,     //
             DataType::FLOAT16,   //
             DataType::BFLOAT16,  //
+    };
+
+    // out datatypes can be extended
+    inline static const Values<DataType> valid_out_datatypes{
+            DataType::INT8,      //
+            DataType::UINT8,     //
+            DataType::FLOAT16,   //
+            DataType::BFLOAT16,  //
+            DataType::FLOAT32,   // ODU
     };
 
     inline static const Values<DataType> valid_wt_datatypes{
@@ -95,18 +106,18 @@ private:
     inline static const IDeviceValidValues::ValidDatatypes valid_datatypes_map_default{
             // valid data types based on operations
             {
-                    {Operation::CONVOLUTION, valid_in_out_datatypes},     //
-                    {Operation::DW_CONVOLUTION, valid_in_out_datatypes},  //
-                    {Operation::CM_CONVOLUTION, valid_in_out_datatypes},  //
-                    {Operation::ELTWISE, valid_in_out_datatypes},         //
-                    {Operation::MAXPOOL, valid_in_out_datatypes},         //
+                    {Operation::CONVOLUTION, valid_in_datatypes},     //
+                    {Operation::DW_CONVOLUTION, valid_in_datatypes},  //
+                    {Operation::CM_CONVOLUTION, valid_in_datatypes},  //
+                    {Operation::ELTWISE, valid_in_datatypes},         //
+                    {Operation::MAXPOOL, valid_in_datatypes},         //
             },
             {
-                    {Operation::CONVOLUTION, valid_in_out_datatypes},     //
-                    {Operation::DW_CONVOLUTION, valid_in_out_datatypes},  //
-                    {Operation::CM_CONVOLUTION, valid_in_out_datatypes},  //
-                    {Operation::ELTWISE, valid_in_out_datatypes},         //
-                    {Operation::MAXPOOL, valid_in_out_datatypes},         //
+                    {Operation::CONVOLUTION, valid_out_datatypes},     //
+                    {Operation::DW_CONVOLUTION, valid_out_datatypes},  //
+                    {Operation::CM_CONVOLUTION, valid_out_datatypes},  //
+                    {Operation::ELTWISE, valid_out_datatypes},         //
+                    {Operation::MAXPOOL, valid_out_datatypes},         //
             },
             {
                     {Operation::CONVOLUTION, valid_wt_datatypes},     //
@@ -139,7 +150,8 @@ public:
                                  weigths_alignment_def,              //
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
-                                 valid_operations_default){};
+                                 valid_operations_default,           //
+                                 alignement_size_bytes_def){};
 
     /// constructor with link to operations dynamic behavior, input channels rules and restrictions
     VPU4_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
@@ -155,7 +167,8 @@ public:
                                  weigths_alignment_def,              //
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
-                                 valid_operations_default),
+                                 valid_operations_default,           //
+                                 alignement_size_bytes_def),
               input_channels_restrictions{input_channels_restrictions_} {};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden (and input channels
@@ -174,7 +187,8 @@ public:
                                  weigths_alignment_def,           //
                                  input_heigth_start_factor_SOH_,  // special
                                  valid_datatypes_map_default,     //
-                                 valid_operations_default),
+                                 valid_operations_default,        //
+                                 alignement_size_bytes_def),
               input_channels_restrictions{input_channels_restrictions_} {};
 
     SmartRanges get_output_channels_restriction(const DPUOperation&) const override {

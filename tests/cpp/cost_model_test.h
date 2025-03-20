@@ -32,26 +32,27 @@ using namespace VPUNN;
 class TestCostModel : public ::testing::Test {
 public:
 protected:
-    VPUNN::DPUWorkload wl_glob_27{VPUNN::VPUDevice::VPU_2_7,
-                                  VPUNN::Operation::CONVOLUTION,
-                                  {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                                  {VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                                  {3, 3},                                                     // kernels
-                                  {1, 1},                                                     // strides
-                                  {1, 1, 1, 1},                                               // padding
-                                  VPUNN::ExecutionMode::CUBOID_16x16};
-    VPUNN::DPUWorkload wl_glob_20;
-    VPUNN::DPUWorkload wl_glob_40;
+    DPUWorkload wl_glob_27{VPUDevice::VPU_2_7,
+                           Operation::CONVOLUTION,
+                           {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
+                           {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
+                           {3, 3},                                       // kernels
+                           {1, 1},                                       // strides
+                           {1, 1, 1, 1},                                 // padding
+                           ExecutionMode::CUBOID_16x16};
+    DPUWorkload wl_glob_20;
+    DPUWorkload wl_glob_40;
+    DPUWorkload wl_glob_50;
 
-    VPUNN::VPUCostModel model{};
+    VPUCostModel model{};
 
     void SetUp() override {
         wl_glob_20 = wl_glob_27;
-        wl_glob_20.device = VPUNN::VPUDevice::VPU_2_0;
-        wl_glob_20.execution_order = VPUNN::ExecutionMode::MATRIX;
+        wl_glob_20.device = VPUDevice::VPU_2_0;
+        wl_glob_20.execution_order = ExecutionMode::MATRIX;
 
         wl_glob_40 = wl_glob_27;
-        wl_glob_40.device = VPUNN::VPUDevice::VPU_4_0;
+        wl_glob_40.device = VPUDevice::VPU_4_0;
 
         Logger::clear2ndlog();
         // Logger::activate2ndlog();
@@ -310,11 +311,12 @@ protected:
 
         std::cout << t_header << (Cycles::isErrorCode(cost_cyc) ? " *** ERROR code: " : " *** Cycles code: ")
                   << cost_cyc << " " << ((Cycles::isErrorCode(cost_cyc)) ? Cycles::toErrorText(cost_cyc) : "")
-                  << " expected in " << interval
-                  << ((-1 != t_in.GT_val) ? std::move(delta_info) : "")
+                  << " expected in " << interval << ((-1 != t_in.GT_val) ? std::move(delta_info) : "")
                   << (((-1 != t_in.GT_val) && (is_excep_allowed) && (t_exp.e_min_cyc != 0 && t_exp.e_max_cyc != 0) &&
                        ((t_exp.e_min_cyc <= cost_cyc && t_exp.min_cyc > cost_cyc) ||
-                        (t_exp.e_max_cyc >= cost_cyc && t_exp.max_cyc < cost_cyc))) ? std::move(exception_info): "")
+                        (t_exp.e_max_cyc >= cost_cyc && t_exp.max_cyc < cost_cyc)))
+                              ? std::move(exception_info)
+                              : "")
                   << Logger::get2ndlog() << (show_info ? std::move(info) : "\n") << std::endl
                   << "------------------------------------------------------------------------" << std::endl;
     }

@@ -24,7 +24,7 @@
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
-//@todo: Better Packmodes implementation. INT4 support to be reviewed. 
+//@todo: Better Packmodes implementation. INT4 support to be reviewed.
 
 class VPUTensorTest : public ::testing::Test {
 public:
@@ -100,7 +100,6 @@ protected:
 
         return tensor.sizeOfRemaininElem_B(dim, contiguousSeq_elm);
     }
-
 };
 TEST_F(VPUTensorTest, Tensor_size_packmode_0) {
     using TestsVector = std::vector<TestCase<int>>;
@@ -112,6 +111,12 @@ TEST_F(VPUTensorTest, Tensor_size_packmode_0) {
 
             {{{2, 1, 2, 1}, DataType::INT8}, {4}, "TENSOR 2x1x2x1, INT8"},
             {{{2, 1, 2, 1}, DataType::FLOAT16}, {8}, "TENSOR 2x1x2x1, FLOAT16"},
+
+            {{{1, 1, 1, 1}, DataType::INT32}, {4}, "TENSOR 1x1x1x1, INT32"},
+            {{{1, 1, 1, 1}, DataType::FLOAT32}, {4}, "TENSOR 1x1x1x1, FLOAT32"},
+
+            {{{2, 1, 2, 1}, DataType::INT32}, {16}, "TENSOR 2x1x2x1, INT32"},
+            {{{2, 1, 2, 1}, DataType::FLOAT32}, {16}, "TENSOR 2x1x2x1, FLOAT32"},
 
             // INT4
             {{{3, 1, 2, 1}, DataType::INT4}, {3}, "TENSOR 3x1x2x1, INT4"},
@@ -155,6 +160,8 @@ TEST_F(VPUTensorTest, Tensor_size_packmode_1) {
             // ZXY layout
             {{{1, 1, 1, 1}, DataType::INT8}, {1}, "TENSOR 1x1x1x1, INT8"},
             {{{1, 1, 2, 1}, DataType::FLOAT16}, {4}, "TENSOR 1x1x2x1, FLOAT16"},
+            {{{1, 1, 1, 1}, DataType::INT32}, {4}, "TENSOR 1x1x1x1, INT32"},
+            {{{1, 1, 2, 1}, DataType::FLOAT32}, {8}, "TENSOR 1x1x2x1, FLOAT32"},
 
             // INT4
             {{{3, 1, 2, 1}, DataType::INT4}, {3}, "TENSOR 3x1x2x1, INT4"},
@@ -200,6 +207,8 @@ TEST_F(VPUTensorTest, Tensor_size_packmode_2) {
             // ZXY layout
             {{{1, 1, 1, 1}, DataType::INT8}, {1}, "TENSOR 1x1x1x1, INT8"},
             {{{1, 1, 2, 1}, DataType::FLOAT16}, {4}, "TENSOR 1x1x2x1, FLOAT16"},
+            {{{1, 1, 1, 1}, DataType::INT32}, {4}, "TENSOR 1x1x1x1, INT32"},
+            {{{1, 1, 2, 1}, DataType::FLOAT32}, {8}, "TENSOR 1x1x2x1, FLOAT32"},
 
             // INT4
             {{{3, 1, 2, 1}, DataType::INT4}, {3}, "TENSOR 3x1x2x1, INT4"},
@@ -244,6 +253,8 @@ TEST_F(VPUTensorTest, Tensor_size_packmode_3) {
             // ZXY layout
             {{{1, 1, 1, 1}, DataType::INT8}, {1}, "TENSOR 1x1x1x1, INT8"},
             {{{1, 1, 2, 1}, DataType::FLOAT16}, {4}, "TENSOR 1x1x2x1, FLOAT16"},
+            {{{1, 1, 1, 1}, DataType::INT32}, {4}, "TENSOR 1x1x1x1, INT32"},
+            {{{1, 1, 2, 1}, DataType::FLOAT32}, {8}, "TENSOR 1x1x2x1, FLOAT32"},
 
             // INT4
             {{{3, 1, 2, 1}, DataType::INT4}, {3}, "TENSOR 3x1x2x1, INT4"},
@@ -315,9 +326,11 @@ TEST_F(VPUTensorTest, Tensor_constructor) {  // tests are for pk 3 only!
 
             {{{1U, 1U, 2U, 1U}, DataType::INT8}, {false}, "Tensor 1x1x2x1, INT8, no throw"},
             {{{1U, 1U, 2U, 1U}, DataType::FLOAT16}, {false}, "Tensor 1x1x2x1, FLOAT16, no throw"},
+            {{{1U, 1U, 2U, 1U}, DataType::FLOAT32}, {false}, "Tensor 1x1x2x1, FLOAT32, no throw"},
 
             {{{2U, 1U, 2U, 1U}, DataType::INT8}, {false}, "Tensor 2x1x2x1, INT8, no throw"},
             {{{2U, 1U, 2U, 1U}, DataType::FLOAT16}, {false}, "Tensor 2x1x2x1, FLOAT16, no throw"},
+            {{{2U, 1U, 2U, 1U}, DataType::FLOAT32}, {false}, "Tensor 2x1x2x1, FLOAT32, no throw"},
 
             {{{1U, 1U, 1U, 1U}, DataType::INT4}, {true}, "Tensor 1x1x1x1, INT4, throws"},
             {{{1U, 1U, 2U, 1U}, DataType::INT4}, {false}, "Tensor 1x1x2x1, INT4, no throw"},
@@ -341,7 +354,7 @@ TEST_F(VPUTensorTest, Tensor_constructor) {  // tests are for pk 3 only!
 
     };
     auto test_if_constructor_throws = [](const TestsVector& tests) {
-        for (const auto &t : tests) {
+        for (const auto& t : tests) {
             VPUTensor tens_copy{};  // copy (=) operator does not  invoke constructor
             if (t.t_exp.value_expected) {
                 EXPECT_NO_THROW(tens_copy = VPUTensor(t.t_in.dim[0], t.t_in.dim[1], t.t_in.dim[2], t.t_in.dim[3],
@@ -358,11 +371,11 @@ TEST_F(VPUTensorTest, Tensor_constructor) {  // tests are for pk 3 only!
     test_if_constructor_throws(tests);
 }
 
-//test for function computeContiguousElementCountAndSize()
+// test for function computeContiguousElementCountAndSize()
 TEST_F(VPUTensorTest, Contiguous_Element_Count_And_Size_Test) {
     using TestsVector = std::vector<TestCase<std::pair<const int, const int>>>;
 
-     auto test_message = [](VPUTensor tensor) {
+    auto test_message = [](VPUTensor tensor) {
         // clang-format off
         std::string message = "Tensor shape: {" +
                               std::to_string(tensor.get_shape()[0]) + ", " +
@@ -379,20 +392,22 @@ TEST_F(VPUTensorTest, Contiguous_Element_Count_And_Size_Test) {
     };
 
     const TestsVector tests = {
-        // ZXY layout
+            // ZXY layout
 
-        {{{112, 32, 121, 1}, DataType::INT8}, {std::make_pair(1, 1)}},
-        {{{45, 56, 22, 1}, DataType::FLOAT16}, {std::make_pair(1, 2)}},
+            {{{112, 32, 121, 1}, DataType::INT8}, {std::make_pair(1, 1)}},
+            {{{45, 56, 22, 1}, DataType::FLOAT16}, {std::make_pair(1, 2)}},
 
-        {{{203, 133, 24, 1}, DataType::INT4}, {std::make_pair(2, 1)}},
-        {{{62, 167, 222, 1}, DataType::INT2}, {std::make_pair(4, 1)}},
-        {{{132, 41, 21, 1}, DataType::INT1}, {std::make_pair(8, 1)}},
+            {{{203, 133, 24, 1}, DataType::INT4}, {std::make_pair(2, 1)}},
+            {{{62, 167, 222, 1}, DataType::INT2}, {std::make_pair(4, 1)}},
+            {{{132, 41, 21, 1}, DataType::INT1}, {std::make_pair(8, 1)}},
+
+            {{{112, 32, 121, 1}, DataType::INT32}, {std::make_pair(1, 4)}},
+            {{{45, 56, 22, 1}, DataType::FLOAT32}, {std::make_pair(1, 4)}},
     };
 
-        auto lambda = [test_message](const TestsVector& tests) {
+    auto lambda = [test_message](const TestsVector& tests) {
         for (const auto& t : tests) {
-           
-          VPUTensor tensor{t.t_in.dim, t.t_in.dtype};
+            VPUTensor tensor{t.t_in.dim, t.t_in.dtype};
             std::cout << test_message(tensor);
 
             std::pair<const int, const int> result = computeContigElemCntAndSize(tensor);
@@ -404,7 +419,7 @@ TEST_F(VPUTensorTest, Contiguous_Element_Count_And_Size_Test) {
     lambda(tests);
 }
 
-//test for computeAlignedSequencesSize_B()
+// test for computeAlignedSequencesSize_B()
 TEST_F(VPUTensorTest, Aligned_Sequences_Size_Test) {
     using TestsVector = std::vector<TestCase<std::array<int, 3>>>;
 
@@ -425,16 +440,19 @@ TEST_F(VPUTensorTest, Aligned_Sequences_Size_Test) {
     };
 
     const TestsVector tests = {
-           
-           // expected value is an array containing the size in bytes of the total number of sequences,
-           // when innermost dimension (which is the parameter of the function computeAlignedSequencesSize_B() )
-           //  is first W, then H, then C
-            {{{112, 32, 121, 1}, DataType::INT8},  {{112, 32, 121}}},
+
+            // expected value is an array containing the size in bytes of the total number of sequences,
+            // when innermost dimension (which is the parameter of the function computeAlignedSequencesSize_B() )
+            //  is first W, then H, then C
+            {{{112, 32, 121, 1}, DataType::INT8}, {{112, 32, 121}}},
             {{{45, 56, 22, 1}, DataType::FLOAT16}, {{90, 112, 44}}},
 
-            {{{203, 133, 24, 1}, DataType::INT4}, {{101, 66, 12}}}, 
+            {{{203, 133, 24, 1}, DataType::INT4}, {{101, 66, 12}}},
             {{{62, 167, 222, 1}, DataType::INT2}, {{15, 41, 55}}},
-            {{{132, 41, 21, 1}, DataType::INT1},  {{16, 5, 2}}},
+            {{{132, 41, 21, 1}, DataType::INT1}, {{16, 5, 2}}},
+
+            {{{112, 32, 121, 1}, DataType::INT32}, {{112 * 4, 32 * 4, 121 * 4}}},
+            {{{45, 56, 22, 1}, DataType::FLOAT32}, {{45 * 4, 56 * 4, 22 * 4}}},
     };
 
     auto lambda = [test_message](const TestsVector& tests) {
@@ -447,14 +465,12 @@ TEST_F(VPUTensorTest, Aligned_Sequences_Size_Test) {
 
                 EXPECT_EQ(result, t.t_exp.value_expected[i]);
             }
-
-
         }
     };
     lambda(tests);
 }
 
-//test for sizeOfRemaininElem_B
+// test for sizeOfRemaininElem_B
 TEST_F(VPUTensorTest, RemainingElem_Test) {
     using TestsVector = std::vector<TestCase<std::array<int, 3>>>;
 
@@ -479,12 +495,15 @@ TEST_F(VPUTensorTest, RemainingElem_Test) {
             // expected value is an array containing the size in bytes of the total number of sequences,
             // when innermost dimension (which is the parameter of the function sizeOfRemaininElem_B() )
             //  is first W, then H, then C
-            {{{112, 32, 121, 1}, DataType::INT8}, {{0, 0, 0}}}, //number of remaining elem: 0, 0, 0
-            {{{45, 56, 22, 1}, DataType::FLOAT16}, {{0, 0, 0}}}, //number of remaining elem: 0, 0, 0
+            {{{112, 32, 121, 1}, DataType::INT8}, {{0, 0, 0}}},   // number of remaining elem: 0, 0, 0
+            {{{45, 56, 22, 1}, DataType::FLOAT16}, {{0, 0, 0}}},  // number of remaining elem: 0, 0, 0
 
-            {{{203, 133, 24, 1}, DataType::INT4}, {{1, 1, 0}}}, //number of remaining elem: 1, 1, 0
-            {{{62, 167, 222, 1}, DataType::INT2}, {{1, 1, 1}}}, //number of remaining elem: 2, 3, 1
-            {{{132, 41, 21, 1}, DataType::INT1}, {{1, 1, 1}}}, //number of remaining elem: 4, 1, 5
+            {{{203, 133, 24, 1}, DataType::INT4}, {{1, 1, 0}}},  // number of remaining elem: 1, 1, 0
+            {{{62, 167, 222, 1}, DataType::INT2}, {{1, 1, 1}}},  // number of remaining elem: 2, 3, 1
+            {{{132, 41, 21, 1}, DataType::INT1}, {{1, 1, 1}}},   // number of remaining elem: 4, 1, 5
+
+            {{{112, 32, 121, 1}, DataType::INT32}, {{0, 0, 0}}},  // number of remaining elem: 0, 0, 0
+            {{{45, 56, 22, 1}, DataType::FLOAT32}, {{0, 0, 0}}},  // number of remaining elem: 0, 0, 0
     };
 
     auto lambda = [test_message](const TestsVector& tests) {

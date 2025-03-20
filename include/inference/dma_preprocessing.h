@@ -1,10 +1,10 @@
-// Copyright © 2024 Intel Corporation
+// Copyright ¬© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the ìSoftware Packageî)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the ‚ÄúSoftware Package‚Äù)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the ìthird-party-programs.txtî or other similarly-named text file included with the
+// Please refer to the ‚Äúthird-party-programs.txt‚Äù or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef DMA_PREPROCESSING_H
@@ -271,102 +271,9 @@ public:
 /// @brief enum for NN descriptor versions (input versions)
 enum class NNVersionsDMA : int {
     VERSION_00_LATEST_NONE = 0,  ///< no version OR last version
-    VERSION_01_27 = 1,           ///< initial version, first one fro 2.7
-    VERSION_02_40 = 2,           ///< 6D dedicated to 4.0
+    VERSION_01_27 = 1,           ///< initial version, first one for 2.7
+    VERSION_02_40 = 2,           ///< 6D dedicated to 4.0+
 };
-
-/**
- * @brief Latest evolution of the Preprocessing for latest interfaces
- */
-// template <class T>
-// class PreprocessingLatestDMA : public PreprocessingInserterDMA<T, PreprocessingLatestDMA<T>> {
-// private:
-//     // const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
-// protected:
-//     using PreprocessingInserterDMA<T, PreprocessingLatestDMA<T>>::insert;  ///< exposes the non virtual insert
-//     methods friend class PreprocessingInserterDMA<T, PreprocessingLatestDMA<T>>;
-//
-//     ///// @brief insert specialization for VPUTensor
-//     // template <bool only_simulate>
-//     // size_t insert(const VPUTensor& data, size_t offset) {
-//     //     offset = this->insert<only_simulate>(data.get_shape(), offset);
-//     //     offset = this->insert<only_simulate>(data.get_dtype(), offset);
-//     //     offset = this->insert<only_simulate>(data.get_layout(), offset);
-//     //     offset = this->insert<only_simulate>(data.get_sparsity(), offset);
-//     //     return offset;
-//     // }
-//
-//     /**
-//      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
-//      * Here the concrete descriptor is created/populated according to established convention/interface
-//      *
-//      * @param workload a DPUWorkload
-//      * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions
-//      were
-//      * written
-//      * @tparam only_simulate, if true then no data is actually written, only the offset is computed
-//      * @return std::vector<T>& a DPUWorkload descriptor
-//      */
-//     template <bool only_simulate>
-//     const std::vector<T>& transformOnly(const DMANNWorkload_NPU27& workload, size_t& debug_offset) {
-//         // Build the vector from the inputs
-//         size_t offset = 0;
-//         // offset = this->insert<only_simulate>(workload.device, offset);
-//         offset = this->insert<only_simulate>(workload.num_planes, offset);
-//         offset = this->insert<only_simulate>(workload.length, offset);
-//
-//         offset = this->insert<only_simulate>(workload.src_width, offset);
-//         offset = this->insert<only_simulate>(workload.dst_width, offset);
-//         offset = this->insert<only_simulate>(workload.src_stride, offset);
-//         offset = this->insert<only_simulate>(workload.dst_stride, offset);
-//
-//         offset = this->insert<only_simulate>(workload.src_plane_stride, offset);
-//         offset = this->insert<only_simulate>(workload.dst_plane_stride, offset);
-//
-//         offset = this->insert<only_simulate>(workload.transfer_direction, offset);
-//
-//         debug_offset = offset;
-//
-//         // Return the output as a pointer to the data
-//         return this->processed_output;
-//     }
-//
-//     const size_t size_of_descriptor;  ///< how big the descriptor is, fixed at constructor
-//
-// public:
-//     /// @brief the descriptor interface that this type was designed to fill/comply with
-//     static int getInterfaceVersion() {
-//         return static_cast<std::underlying_type_t<NNVersionsDMA>>(
-//                 NNVersionsDMA::VERSION_00_LATEST_NONE);  // 0 is a reserved interface type for latest evolution,
-//                 draft
-//                                                          // changes
-//     }
-//
-//     /**
-//      * @brief Tells what other interface is equal to this latest version, use with care
-//      * A latest interface might have already a defined interface version (a specialization with version), or a new
-//      * version is planned and this latest will become that version.
-//      * If this latest is equal with a particular version it is worth to use the latests since it is faster at
-//      execution.
-//      *
-//      * @return the version of compatible/equal interface version, 0 otherwise
-//      */
-//     static int implements_also_interface() {
-//         return static_cast<std::underlying_type_t<NNVersionsDMA>>(NNVersionsDMA::VERSION_01_27);
-//     }
-//
-//     /**
-//      * @brief Ctor , inits the content with expected size
-//      */
-//     PreprocessingLatestDMA(): size_of_descriptor(this->calculate_size()) {
-//         this->set_size(size_of_descriptor);
-//     };
-//
-//     /**
-//      * @brief default virtual destructor
-//      */
-//     virtual ~PreprocessingLatestDMA() = default;
-// };
 
 }  // namespace VPUNN
 #endif

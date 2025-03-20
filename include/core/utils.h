@@ -1,24 +1,24 @@
-// Copyright © 2024 Intel Corporation
+// Copyright ¬© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the ìSoftware Packageî)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the ‚ÄúSoftware Package‚Äù)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the ìthird-party-programs.txtî or other similarly-named text file included with the
+// Please refer to the ‚Äúthird-party-programs.txt‚Äù or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef VPUNN_CORE_UTILS_H
 #define VPUNN_CORE_UTILS_H
 
 #include <iostream>
-#include <sstream>
 #include <string>
-#include <thread>
 #include <unordered_map>
+#include <sstream>
 #include <vector>
+#include <thread>
 
 namespace VPUNN {
-
+	
 static inline void set_env_var(const std::string& name, const std::string& value) {
 #ifdef _WIN32
     std::string envString = name + "=" + value;
@@ -60,11 +60,11 @@ static inline std::string generate_uid() {
     const auto file_name_postfix = get_env_vars({"VPUNN_FILE_NAME_POSTFIX"}).at("VPUNN_FILE_NAME_POSTFIX");
     std::ostringstream ss;
     ss << std::this_thread::get_id() << "_" << file_name_postfix;
-    // std::string uid = ss.str();  // std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    //std::string uid = ss.str();  // std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
 
     return ss.str();
 }
 
-}  // namespace VPUNN
+}
 
 #endif  // VPUNN_CORE_UTILS_H

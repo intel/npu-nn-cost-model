@@ -203,15 +203,15 @@ protected:
     const std::string csv_cache_misses{csv_file_OneCache};
 
     const std::string mult_csv_folder_OneCache{
-            //        "/home/xxxxxxxx/source/vpux-plugin/thirdparty/vpucostmodel/build/tests/cpp/"
-            "/home/xxxxx/mlir_serializer/cache_13/"
-            //"c:\\Users\\xxxxxx\\OneDrive - Intel Corporation"
+            //        "/home/abalanes/source/vpux-plugin/thirdparty/vpucostmodel/build/tests/cpp/"
+            "/home/epele/mlir_serializer/cache_13/"
+            //"c:\\Users\\fistoc\\OneDrive - Intel Corporation"
             //"\\Models_logs\\logs\\SJvpunn-1.6.8-post8-without-extra-swizzling\\cache_12_NN41\\"
     };  // 3, 4, 5.....
 
     const std::string cache_input_normal{
-            //        "/home/xxxxxxxx/source/vpux-plugin/thirdparty/vpucostmodel/models/vpu_4_0.cache_bin"
-            "/home/xxxxx/mlir_serializer/cache_13/vpu_4_0.cache_bin"
+            //        "/home/abalanes/source/vpux-plugin/thirdparty/vpucostmodel/models/vpu_4_0.cache_bin"
+            "/home/epele/mlir_serializer/cache_13/vpu_4_0.cache_bin"
             // mult_csv_folder_OneCache + "vpu_4_1.cache_bin"
     };
 
@@ -798,6 +798,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
     std::cout << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     // std::filesystem::path csv_file_now{csv_file};
+    /* coverity[copy_instead_of_move] */
     std::filesystem::path cache_file_output{cache_file_input};
     cache_file_output.replace_filename(cache_file_output.stem() += "_output");
     cache_file_output.replace_extension("cache_bin");
@@ -936,6 +937,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
     std::cout << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     // std::filesystem::path csv_file_now{csv_file};
+    /* coverity[copy_instead_of_move] */
     std::filesystem::path cache_file_output{cache_file_input};
     cache_file_output.replace_filename(cache_file_output.stem() += "_output");
     cache_file_output.replace_extension("cache_bin");
@@ -1080,6 +1082,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
                 const auto sane = normalConfig.sanitizerModel.sanitize_workload(dpu_wl, sanityInfo);
 
                 std::string model_run_info{};
+                /* coverity[copy_instead_of_move] */
                 const auto cycleTime{model_active_cache.DPU(wl_model, model_run_info)};
 
                 if (sane) {
@@ -1181,6 +1184,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
                 const auto sane = normalConfig.sanitizerModel.sanitize_workload(dpu_wl, sanityInfo);
 
                 std::string model_run_info{};
+                /* coverity[copy_instead_of_move] */
                 const auto cycleTime{model_active_cache.DPU(wl_model, model_run_info)};
 
                 if (sane) {

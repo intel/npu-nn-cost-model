@@ -49,10 +49,6 @@ static_assert(false, "VPU_4_1_MODEL_PATH is not defined, please define it in CMa
 #define VPU_DMA_4_0_MODEL_PATH "../../../../models/dma_4_0.vpunn"
 #endif
 
-#ifndef NPU_DMA_5_0_MODEL_PATH
-#define NPU_DMA_5_0_MODEL_PATH VPU_DMA_4_0_MODEL_PATH
-#endif
-
 namespace VPUNN_unit_tests {
 
 /// @brief class to help extracting paths and names of neural network model

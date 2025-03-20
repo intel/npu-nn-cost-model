@@ -26,10 +26,11 @@ struct SWOperation {
     VPUDevice device;                      ///< The VPU device
     const std::vector<VPUTensor> inputs;   ///< The input tensors
     const std::vector<VPUTensor> outputs;  ///< The output tensors
+    const std::string            loc_name; ///< The location name
 
     /// @brief ctor must exist since we have aggregate initialization possible on this type (abstract type)
-    SWOperation(const VPUDevice& device, const std::vector<VPUTensor>& inputs, const std::vector<VPUTensor>& outputs)
-            : device{device}, inputs{inputs}, outputs{outputs} {
+    SWOperation(const VPUDevice& device, const std::vector<VPUTensor>& inputs, const std::vector<VPUTensor>& outputs, const std::string& loc_name = "")
+            : device{device}, inputs{inputs}, outputs{outputs}, loc_name(loc_name) {
     }
 
     /**

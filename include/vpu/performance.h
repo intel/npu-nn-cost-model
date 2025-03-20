@@ -34,8 +34,8 @@ inline constexpr unsigned int get_dpu_fclk(const VPUDevice device) {
         return 1300;
     case VPUDevice::VPU_4_0:
         return 1700;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 1950;  // at 0.78V KPI point
     default:
         return 700;
@@ -58,8 +58,8 @@ inline constexpr unsigned int get_cmx_fclk(const VPUDevice device) {
         return 975;
     case VPUDevice::VPU_4_0:
         return 975;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 1114;  // at KPI point
     default:
         return 700;
@@ -80,8 +80,8 @@ inline constexpr unsigned int get_cmx_word_size_bytes(VPUDevice device) {
         return 16;
     case VPUDevice::VPU_4_0:
         return 32;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 32;  // no change
     default:
         return 16;
@@ -102,8 +102,8 @@ inline constexpr unsigned int get_DMA_DDR_interface_bytes(VPUDevice device) {
         return 32;
     case VPUDevice::VPU_4_0:
         return 64;  // 512 bits AXI
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 64;  // no change
     default:
         return 0;
@@ -124,8 +124,8 @@ inline constexpr unsigned int get_dpu_cmx_num_read_ports(VPUDevice device) {
     case VPUDevice::VPU_2_7:
         return 8;  // RO
     case VPUDevice::VPU_4_0:
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 8;  // 4x RO, 4x RW
     default:
         return 8;
@@ -147,8 +147,8 @@ inline constexpr float get_dram_bandwidth_MBps(VPUDevice device) {
         return 27000.0f;
     case VPUDevice::VPU_4_0:
         return 45000.0f;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 45000.0f;  //?
     default:
         return 1;
@@ -202,6 +202,7 @@ inline float get_bandwidth_cycles_per_bytes(const VPUTensor& tensor, VPUDevice d
         return get_dpu_fclk(device) / get_dram_bandwidth_MBps(device);
     default:
         // SRAM bw is twice in compression mode
+        /* coverity[divide_by_zero] */
         return (float)get_dpu_fclk(device) / (float)get_cmx_fclk(device) /
                ((float)get_sram_word_size(tensor, compression, permute, half_duplex));
     }
@@ -260,9 +261,9 @@ inline constexpr CyclesInterfaceType get_DMA_latency(VPUDevice device, MemoryLoc
 
         return (location == MemoryLocation::DRAM) ? dram_DPUCycles : cmx_DPUCycles;
     } break;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W: {  //@todo: update for VPU_RESERVED1 actual latency (now a clone of 2.7)
-        constexpr VPUDevice const_device{VPUDevice::NPU_RESERVED1};
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W: {  
+        constexpr VPUDevice const_device{VPUDevice::NPU_RESERVED};
         constexpr int dramLatency_Nanoseconds{956};   // nanoseconds
         constexpr int cmxLatency_CMXClockCycles{16};  // 16 clock cycles at VPU frequency
 
@@ -294,8 +295,8 @@ inline constexpr unsigned int get_nr_macs(VPUDevice device) {
     case VPUDevice::VPU_2_7:
     case VPUDevice::VPU_4_0:
         return 2048;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 4096;
     default:
         return 2048;
@@ -332,8 +333,8 @@ inline constexpr unsigned int get_nr_ppe(VPUDevice device) {
     case VPUDevice::VPU_2_7:
     case VPUDevice::VPU_4_0:
         return 64;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 32;  // less ppe
     default:
         return 64;
@@ -404,8 +405,8 @@ inline constexpr int get_dma_ports(VPUDevice device) {
         return 2;
     case VPUDevice::VPU_4_0:
         return 2;
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return 2;
     default:
         return 1;
@@ -424,8 +425,8 @@ inline constexpr float get_profiling_clk_MHz(VPUDevice device) {
     case VPUDevice::VPU_2_7:
         return PROF_CLK_MHz;
     case VPUDevice::VPU_4_0:
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return PROF_CLK_MHz / 2.0f;
     default:
         return 0;
@@ -444,8 +445,8 @@ inline constexpr int get_profiling_clk_Hz(VPUDevice device) {
     case VPUDevice::VPU_2_7:
         return PROF_CLK;
     case VPUDevice::VPU_4_0:
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return PROF_CLK / 2;
     default:
         return 0;

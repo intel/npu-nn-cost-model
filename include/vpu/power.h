@@ -105,9 +105,10 @@ private:
                 {VPUDevice::VPU_2_0, vpu_2_0_values},
                 {VPUDevice::VPU_2_7, vpu_2_7_values},
                 {VPUDevice::VPU_4_0, vpu_4_0_values},
-                {VPUDevice::NPU_RESERVED1, vpu_2_7_values},
+                {VPUDevice::NPU_RESERVED, vpu_2_7_values},
         };
 
+        /* coverity[copy_instead_of_move] */
         return pf_lut_l;
     }
 
@@ -212,7 +213,7 @@ public:
             fp_to_int_ratio = 1.3f;
         else if (device == VPUDevice::VPU_4_0)
             fp_to_int_ratio = 1.3f;  // mock
-        else if (device == VPUDevice::NPU_RESERVED1 || device == VPUDevice::NPU_RESERVED1_W)
+        else if (device == VPUDevice::NPU_RESERVED || device == VPUDevice::NPU_RESERVED_W)
             fp_to_int_ratio = 1.3f;  // mock
         else
             fp_to_int_ratio = 1.0f;

@@ -12,4 +12,4 @@
 #include <vpu_dma_cost_model.h>
 
 template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU27>;  ///< explicit instantiation 
-template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU40>;  ///< explicit instantiation 
+template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU40_RESERVED>;  ///< explicit instantiation 

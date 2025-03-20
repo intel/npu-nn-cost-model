@@ -1,10 +1,10 @@
-// Copyright © 2024 Intel Corporation
+// Copyright ¬© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the ìSoftware Packageî)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the ‚ÄúSoftware Package‚Äù)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the ìthird-party-programs.txtî or other similarly-named text file included with the
+// Please refer to the ‚Äúthird-party-programs.txt‚Äù or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef VPUNN_DMA_TYPES_01X_H
@@ -148,9 +148,9 @@ class Preprocessing_Interface01_DMA :
 private:
     // const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
-    // using PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>,
-    //                                DMANNWorkload_NPU27>::insert;  ///< exposes the non virtual insert
-    ///< methods
+   // using PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>,
+   //                                DMANNWorkload_NPU27>::insert;  ///< exposes the non virtual insert
+                                                                  ///< methods
     friend class PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>, DMANNWorkload_NPU27>;
 
     /**
@@ -168,7 +168,7 @@ protected:
         // Build the vector from the inputs
         size_t offset = 0;
         // offset = this->insert<only_simulate>(workload.device, offset);
-        offset = this->template insert<only_simulate>(workload.num_planes, offset);
+        offset = this-> template insert<only_simulate>(workload.num_planes, offset);
         offset = this->template insert<only_simulate>(workload.length, offset);
 
         offset = this->template insert<only_simulate>(workload.src_width, offset);
@@ -206,18 +206,18 @@ public:
 };
 
 /**
- * @brief For interface of NPU4.0 . Descriptor and interface datatype are dedicated
+ * @brief For interface of NPU4.0+ . Descriptor and interface datatype are dedicated
  */
 template <typename T>
 class Preprocessing_Interface02_DMA :
-        public PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40> {
+        public PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40_RESERVED> {
 private:
     // const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
-    // using PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>,
-    //                                DMANNWorkload_NPU40>::insert;  ///< exposes the non virtual insert
-    ///< methods
-    friend class PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40>;
+   // using PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>,
+   //                                DMANNWorkload_NPU40>::insert;  ///< exposes the non virtual insert
+                                                                  ///< methods
+    friend class PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40_RESERVED>;
 
     /**
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
@@ -230,7 +230,7 @@ protected:
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    const std::vector<T>& transformOnly(const DMANNWorkload_NPU40& workload, size_t& debug_offset) {
+    const std::vector<T>& transformOnly(const DMANNWorkload_NPU40_RESERVED& workload, size_t& debug_offset) {
         // Build the vector from the inputs
         size_t offset = 0;
 
@@ -248,9 +248,8 @@ protected:
             offset = this->template insert<only_simulate>(d.src_dim_size, offset);
         }
 
-        offset = this->template insert<only_simulate>(
-                intf_dma_01x::convert<intf_dma_01x::Num_DMA_Engine>(workload.num_engine),
-                offset);  // enum 2
+        offset = this->template insert<only_simulate>(intf_dma_01x::convert<intf_dma_01x::Num_DMA_Engine>(workload.num_engine),
+                                             offset);  // enum 2
         offset = this->template insert<only_simulate>(
                 intf_dma_01x::convert<intf_dma_01x::MemoryDirection>(workload.transfer_direction), offset);  // enum 4
 

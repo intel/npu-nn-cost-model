@@ -1,10 +1,10 @@
-// Copyright © 2024 Intel Corporation
+// Copyright Â© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the â€œSoftware Packageâ€)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Please refer to the â€œthird-party-programs.txtâ€ or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef PREPROCESSING_ADAPTERS_H
@@ -68,14 +68,14 @@ public:
         const auto datatype{
                 (in_datatype == DataType::BF8) || (in_datatype == DataType::HF8)
                         ? DataType::UINT8  // all 8 bit Float expected to be around I8, except Elmwise :around FP16
-                        : in_datatype};
+                        : (((in_datatype == DataType::FLOAT32) || (in_datatype == DataType::INT32))
+                                   ? DataType::FLOAT16  // NOt yet supporting 32 bits ODU
+                                   : in_datatype)};
         return datatype;
     }
 
     /// some operations are replaced to supported ones
-    /// NPU_RESERVED1 ones here!
     static Operation mock_replace_operations(const Operation in_operation) {
-        // operation mock for NPU_RESERVED1
         auto operation{in_operation};
 
         switch (operation) {
@@ -91,14 +91,13 @@ public:
     }
 
     /// some devices are replaced to supported ones
-    /// NPU_RESERVED1 & NPU4 ones here!
     static VPUDevice mock_replace_devices(const VPUDevice in_device) {
         // device 4.0 is not supported for now we are mocking VPU_4_0 with 2.7. This has to be removed when we have a
         // VPU4.0 trained NN
-        // Same for NPU_RESERVED1, MOCK
         const auto device{(in_device == VPUDevice::VPU_4_0)  // mock 4.0
-                                          || ((in_device == VPUDevice::NPU_RESERVED1) ||
-                                              (in_device == VPUDevice::NPU_RESERVED1_W))
+                                          || ((in_device == VPUDevice::NPU_RESERVED) ||
+                                              (in_device == VPUDevice::NPU_RESERVED_W) 
+                                              )
                                   ? VPUDevice::VPU_2_7  // all mocked via 2.7
                                   : in_device};
 
@@ -248,13 +247,11 @@ public:
     // }
 
     ///// some operations are replaced to supported ones
-    ///// NPU_RESERVED1 ones here!
     // static Operation mock_replace_operations(const Operation in_operation) {
     //     return NN27InputAdapter::mock_replace_operations(in_operation);
     // }
 
     ///// some devices are replaced to supported ones
-    ///// NPU_RESERVED1 & NPU4 ones here!
     // static VPUDevice mock_replace_devices(const VPUDevice in_device) {
     //     return NN27InputAdapter::mock_replace_devices(in_device);
     // }
@@ -338,7 +335,6 @@ public:
     }
 
     /// some operations are replaced to supported ones
-    /// NPU_RESERVED1 ones here!
     static Operation mock_replace_operations(const Operation in_operation) {
         auto op = NN27InputAdapter::mock_replace_operations(in_operation);
         //// Temporarily, for 4.0 NN, we don't have support for CM_CONV
@@ -370,16 +366,15 @@ public:
     }
 
     /// some devices are replaced to supported ones
-    /// NPU_RESERVED1 here!
     static VPUDevice mock_replace_devices(const VPUDevice in_device) {
-        // device RESERVED1 is not supported for now we are mocking VPU_RESERVED1 with 4.0. This has to be removed when
-        // we have a VPU_RESERVED1 trained NN
-        const auto device{(((in_device == VPUDevice::NPU_RESERVED1) ||
-                            (in_device == VPUDevice::NPU_RESERVED1_W)  // mock RESERVED1 family
-                            ) ||
-                           (in_device > VPUDevice::NPU_RESERVED1_W))
-                                  ? VPUDevice::VPU_4_0  // all mocked via 40
-                                  : in_device};
+        // device RESERVED is not supported for now we are mocking VPU_RESERVED with 4.0. This has to be removed when we
+        // have a VPU_RESERVED trained NN
+        const auto device{
+                (((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W) 
+                  ) ||
+                 (in_device > VPUDevice::NPU_RESERVED_W))
+                        ? VPUDevice::VPU_4_0  // all mocked via 40
+                        : in_device};
 
         return device;
     }
@@ -517,6 +512,80 @@ public:
             std::get<1>(resulted_swizz) = Swizzling::KEY_0;
         }
         return resulted_swizz;
+    }
+};
+
+/// adapting input to NPU40
+class NN5XInputAdapter {
+public:
+    /// ISI Strategy (up to v11) might not be compatible in any combination. Reasons are rather based on data
+    /// available for training and training over-fitting.
+    ///
+    /// a) CLUSTERING + OWT=2+ : not possible,           :replaced with SOK+OWT=2+ (both do no use input HALO),
+    /// filter with step b) next
+    ///
+    /// b) SOK + ELEMENTWISE   : not possible to profile : replace with CLU+OWT=1  (slightly smaller then real
+    /// due to owt=1),
+    ///
+    /// c) [SOH] :invalid in : replace  with CLU , ,
+    /// filter with a) next.
+    ///
+    /// d) limit owt to 6! Even if NPU40 supports more
+    ///
+    /// order of calls: c, a, b , d
+    ///
+    static FilteredFields avoid_untrained_space(const DPUWorkload& w) {
+        FilteredFields ff{w.isi_strategy, w.output_write_tiles};
+
+        // auto a0_SOK_NA_temporarly = [](FilteredFields& f) {  // a0)
+        //     if (ISIStrategy::SPLIT_OVER_K == f.isi) {
+        //         f.isi = ISIStrategy::CLUSTERING;  // SOK not trained, replace with CLU
+        //         f.owt = 1;                        // OWT=1 forcefully
+        //     }
+        // };
+
+        auto a_check_CLU_2 = [](FilteredFields& f) {  // a)
+            if ((ISIStrategy::CLUSTERING == f.isi) && (1 < f.owt)) {
+                f.isi = ISIStrategy::SPLIT_OVER_K;  // SOK is replacing CLU for OWT>1,, next should be check for b)
+            }
+        };
+
+        // NEW ELEMENTWISE SUPPORTS SOK
+        // auto b_check_SOK_ELM = [&w](FilteredFields& f) {  // b)
+        //     if ((ISIStrategy::SPLIT_OVER_K == f.isi) && (Operation::ELTWISE == w.op)) {
+        //         f.isi = ISIStrategy::CLUSTERING;
+        //         // should go to state a) check
+        //         // a_check_CLU_2(f); do not call A, you will go in circles
+        //         // change  owt to be compatible with  a) rule
+        //         f.owt = 1;
+        //     }
+        // };
+
+        auto c_check_SOH_INVALID = [](FilteredFields& f) {  // c)
+            if (ISIStrategy::SPLIT_OVER_H == f.isi) {
+                f.isi = ISIStrategy::CLUSTERING;
+                // should go to state a) afterwards
+            }
+        };
+
+        // limit owt to 6. This was trained on NPU40
+        auto d_limit_owt_to_3 = [](FilteredFields& f) {  // d)
+            if (3 < f.owt) {
+                f.owt = 3;
+            }
+        };
+        // In practice was observed that OWT=2,3,4,5,6 has the same constant impact
+
+        // ff is the data  holder changed in the next chain of calls
+
+        c_check_SOH_INVALID(ff);
+        a_check_CLU_2(ff);
+        // b_check_SOK_ELM(ff);  // ELM with broadcast is not allowed/supported . Is this a problem? SHuld be
+        // trainable!?
+
+        d_limit_owt_to_3(ff);  // only
+
+        return ff;
     }
 };
 

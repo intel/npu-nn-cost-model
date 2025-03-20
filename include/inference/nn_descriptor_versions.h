@@ -1,10 +1,10 @@
-// Copyright © 2024 Intel Corporation
+// Copyright ¬© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the ìSoftware Packageî)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the ‚ÄúSoftware Package‚Äù)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the ìthird-party-programs.txtî or other similarly-named text file included with the
+// Please refer to the ‚Äúthird-party-programs.txt‚Äù or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef NN_DESCRIPTOR_VERSIONS_H
@@ -22,8 +22,9 @@ enum class NNVersions : int {
 
     VERSION_11_V89_COMPTBL = 89,  ///< v11 for NPU27 NNs where no swizzling or trainingspace limitations are active.
                                   ///< Compatibility mode for intial release (NOv 2024 vs Oct 2023)
-    VERSION_11_NPU40 = 4011,      ///< version 11 used for NPU40 trained NNs
-    VERSION_11_NPU41 = 4111,      ///< version 11 used for NPU40 trained NNs with swizz0,5 support.
+    VERSION_11_NPU40 = 4011,         ///< version 11 used for NPU40 trained NNs
+    VERSION_11_NPU41 = 4111,     ///< version 11 used for NPU40 trained NNs with swizz0,5 support.
+    VERSION_12_NPU_RESERVED = 5112,  ///< version 12 used for NPU_RESERVED trained NNs
 };
 
 }  // namespace VPUNN

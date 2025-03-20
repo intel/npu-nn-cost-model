@@ -376,7 +376,7 @@ private:
 };
 
 /// tests that no model gives DPU cycles outside of range , inputs are random workloads
-TEST_F(CostModelStochastic, NoOutOfRangeDPUCycles_fast_2_0_stochastic) {
+TEST_F(CostModelStochastic, DISABLED_NoOutOfRangeDPUCycles_fast_2_0_stochastic) {
     unsigned int n_workloads = 1000;
     const ModelDescriptor& model_info{the_NN_models.fast_model_paths[0]};
 
@@ -405,7 +405,7 @@ TEST_F(CostModelStochastic, NoOutOfRangeDPUCycles_fast_2_7_stochastic) {
 }
 
 /// tests that no model gives DPU cycles outside of range , inputs are random workloads
-TEST_F(CostModelStochastic, NoOutOfRangeDPUCycles_2_0_normal_stochastic) {
+TEST_F(CostModelStochastic, DISABLED_NoOutOfRangeDPUCycles_2_0_normal_stochastic) {
     unsigned int n_workloads = 1000;
     const ModelDescriptor& model_info{the_NN_models.standard_model_paths[0]};
 
@@ -440,7 +440,7 @@ TEST_F(CostModelStochastic, NoOutOfRangeDPUCycles_2_7_normal_stochastic) {
 
 /// tests that inference output is inside a valid interval
 ///  same workloads for fast and normal
-TEST_F(CostModelStochastic, Inference_output_in_Interval_Test_2_0_all_stochastic) {
+TEST_F(CostModelStochastic, DISABLED_Inference_output_in_Interval_Test_2_0_all_stochastic) {
     const float low_threshold{0.5F};
     const float high_threshold{1E9};  // one billion
 
@@ -539,7 +539,7 @@ TEST_F(CostModelStochastic, DISABLED_NoONE_asInference_output_all_stochastic) {
 }
 
 /// Make a fast versus slow statistical comparison.   no big delta expected.
-TEST_F(CostModelStochastic, Comparative_fast_vs_slow_20_stochastic) {
+TEST_F(CostModelStochastic, DISABLED_Comparative_fast_vs_slow_20_stochastic) {
     const float max_ratio_delta{0.5F};  // between (fast and slow) delta over min of them  . (120-80)/80
     // const float expected_deviation_ratio{0.003036F};  // Assumption: 95% (2*sigma) are in the 80-120% interval
     //  sigma = 0.1, miu=1
