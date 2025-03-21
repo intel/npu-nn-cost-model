@@ -120,7 +120,7 @@ static std::vector<unsigned int> getSplitsFromRange(const unsigned int maxSplitR
  */
 static bool requireMaxZTile(const DPULayer& layer) {
     if (layer.device == VPUDevice::VPU_2_7 || layer.device == VPUDevice::VPU_4_0 ||
-        layer.device == VPUDevice::NPU_RESERVED1 || layer.device == VPUDevice::NPU_RESERVED1_W) {
+        layer.device == VPUDevice::NPU_RESERVED || layer.device == VPUDevice::NPU_RESERVED_W) {
         if (layer.op == Operation::CM_CONVOLUTION || layer.op == Operation::MAXPOOL ||
             layer.op == Operation::DW_CONVOLUTION || layer.op == Operation::AVEPOOL) {
             return true;

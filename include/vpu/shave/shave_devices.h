@@ -131,6 +131,7 @@ private:
 
     ShaveCache shaveCache;  ///< all devices cache/LUT for shave ops. Populated in ctor
     SHAVE_Workloads_Sanitizer sanitizer; ///< sanitizes the workload before processing
+    mutable CSVSerializer serializer;            ///< serializes workloads to a CSV file 
 
     const ShaveSelector& getSelector(VPUDevice desired_device) const {
         switch (desired_device) {
@@ -152,6 +153,111 @@ private:
         }
     }
 
+    std::vector<std::string> get_names_for_shave_serializer() const {
+        auto fields = std::vector<std::string>({"device",
+                                                "operation",
+                                                "input_0_batch",
+                                                "input_0_channels",
+                                                "input_0_height",
+                                                "input_0_width",
+                                                "input_0_sparsity_enabled",
+                                                "input_0_datatype",
+                                                "input_0_layout",
+                                                "input_1_batch",
+                                                "input_1_channels",
+                                                "input_1_height",
+                                                "input_1_width",
+                                                "input_1_sparsity_enabled",
+                                                "input_1_datatype",
+                                                "input_1_layout",
+                                                "output_0_batch",
+                                                "output_0_channels",
+                                                "output_0_height",
+                                                "output_0_width",
+                                                "output_0_datatype",
+                                                "output_0_layout",
+                                                "output_0_sparsity_enabled"});
+
+        fields.emplace_back("shave_model_kind");
+        fields.emplace_back("cycles");
+
+        std::vector<int> all_num_params{};
+        for (int i = 0; i < static_cast<int>(VPUDevice::__size); i++) {
+            const auto& sel = getSelector(static_cast<VPUDevice>(i));
+            const auto& shv_list = sel.getShaveList();
+            for (const auto& name : shv_list) {
+                all_num_params.push_back(sel.getShaveFuntion(name).getNumExpectedParams());
+            }
+        }
+
+        auto max_num_params = *std::max_element(all_num_params.begin(), all_num_params.end());
+
+        for (int i = 0; i <= max_num_params; i++) {
+            fields.emplace_back("param_" + std::to_string(i));
+        }
+
+        fields.emplace_back("loc_name");
+        fields.emplace_back("info");
+        fields.emplace_back("workload_uid");
+
+        return fields;
+    }
+
+    void serialize_shave(const SHAVEWorkload& shave_wl) const {
+        const auto& inputs = shave_wl.get_inputs();
+        const auto& outputs = shave_wl.get_outputs();
+        const auto& params = shave_wl.get_params();
+
+        serializer.serialize(SerializableField<VPUDevice>{"device", shave_wl.get_device()});
+        serializer.serialize(SerializableField<std::string>{"operation", shave_wl.get_name()});
+
+        for (size_t i = 0; i < inputs.size(); i++) {
+            serializer.serialize(
+                    SerializableField<unsigned int>{"input_" + std::to_string(i) + "_batch", inputs[i].batches()});
+            serializer.serialize(
+                    SerializableField<unsigned int>{"input_" + std::to_string(i) + "_channels", inputs[i].channels()});
+            serializer.serialize(
+                    SerializableField<unsigned int>{"input_" + std::to_string(i) + "_height", inputs[i].height()});
+            serializer.serialize(
+                    SerializableField<unsigned int>{"input_" + std::to_string(i) + "_width", inputs[i].width()});
+            serializer.serialize(
+                    SerializableField<DataType>{"input_" + std::to_string(i) + "_datatype", inputs[i].get_dtype()});
+            serializer.serialize(
+                    SerializableField<Layout>{"input_" + std::to_string(i) + "_layout", inputs[i].get_layout()});
+            serializer.serialize(
+                    SerializableField<bool>{"input_" + std::to_string(i) + "_sparsity_enabled", inputs[i].get_sparsity()});
+        }
+
+        for (size_t i = 0; i < outputs.size(); i++) {
+            serializer.serialize(
+                    SerializableField<unsigned int>{"output_" + std::to_string(i) + "_batch", outputs[i].batches()});
+            serializer.serialize(
+                    SerializableField<unsigned int>{"output_" + std::to_string(i) + "_channels", outputs[i].channels()});
+            serializer.serialize(
+                    SerializableField<unsigned int>{"output_" + std::to_string(i) + "_height", outputs[i].height()});
+            serializer.serialize(
+                    SerializableField<unsigned int>{"output_" + std::to_string(i) + "_width", outputs[i].width()});
+            serializer.serialize(
+                    SerializableField<DataType>{"output_" + std::to_string(i) + "_datatype", outputs[i].get_dtype()});
+            serializer.serialize(
+                    SerializableField<Layout>{"output_" + std::to_string(i) + "_layout", outputs[i].get_layout()});
+            serializer.serialize(
+                    SerializableField<bool>{"output_" + std::to_string(i) + "_sparsity_enabled", outputs[i].get_sparsity()});
+        }
+
+        int param_idx = 0;
+        for (const auto& param : params) {
+            std::visit(
+                    [&](auto&& arg) {
+                        using T = std::decay_t<decltype(arg)>;
+
+                        serializer.serialize(SerializableField<T>{"param_" + std::to_string(param_idx), arg});
+                    },
+                    param);
+        }
+    }
+
+
 protected:
     /**
     @brief Sanitizes the workload before processing
@@ -171,6 +277,10 @@ protected:
     }
 
 public:
+    ShaveConfiguration() {
+        serializer.initialize("shave_workloads", FileMode::READ_WRITE, get_names_for_shave_serializer());
+    }
+
     CyclesInterfaceType computeCycles(const SHAVEWorkload& swl, std::string& infoOut, bool skipCacheSearch) const {
         // finds func inmpl, executes it, handles errors
         try {
@@ -194,6 +304,20 @@ public:
 
             const auto& shaveInstance = sel.getShaveFuntion(swl.get_name());  // may throw
             const auto cycles = shaveInstance.dpuCycles(swl);
+
+            if (serializer.is_serialization_enabled()) {
+                try {
+                    serializer.serialize(SerializableField<std::string>{"loc_name", swl.get_loc_name()});
+                    serializer.serialize(SerializableField<std::string>{"shave_model_kind", "shave_2"});
+                    serializer.serialize(SerializableField<decltype(cycles)>{"cycles", cycles});
+                    serialize_shave(swl);
+                    serializer.end();
+                } catch (const std::exception& e) {
+                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                    serializer.clean_buffers();
+                }
+            }
+
             return cycles;
         } catch (const std::exception& e) {
             std::stringstream buffer;

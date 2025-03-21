@@ -13,7 +13,7 @@
 #include <vpu/layer.h>
 #include <vpu/types.h>
 #include <vpu/utils.h>
-// #include <vpunn.h>
+//#include <vpunn.h>
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -60,7 +60,7 @@ ExecutionMode select_optimal_nthw_ntk(VPUCostModel& model, const DPULayer& layer
                                               ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_4x16,
                                               ExecutionMode::CUBOID_8x16}) {
     if (layer.device != VPUDevice::VPU_2_7 && layer.device != VPUDevice::VPU_4_0 &&
-        layer.device != VPUDevice::NPU_RESERVED1 && layer.device != VPUDevice::NPU_RESERVED1_W) {
+        layer.device != VPUDevice::NPU_RESERVED && layer.device != VPUDevice::NPU_RESERVED_W) {
         Logger::error() << "Invalid VPU device type. Only 2.7, 4.0 and 5.0 available";
     }
 
@@ -75,8 +75,8 @@ ExecutionMode select_optimal_execution_mode(VPUCostModel& model, const DPULayer&
         return select_optimal_grid(model, layer);
     case VPUDevice::VPU_2_7:
     case VPUDevice::VPU_4_0:
-    case VPUDevice::NPU_RESERVED1:
-    case VPUDevice::NPU_RESERVED1_W:
+    case VPUDevice::NPU_RESERVED:
+    case VPUDevice::NPU_RESERVED_W:
         return select_optimal_nthw_ntk(model, layer);
     default:
         Logger::error() << "Invalid VPU device type";

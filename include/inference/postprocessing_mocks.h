@@ -1,10 +1,10 @@
-// Copyright © 2024 Intel Corporation
+// Copyright Â© 2024 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
-// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// LEGAL NOTICE: Your use of this software and any required dependent software (the â€œSoftware Packageâ€)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
 // which may also include notices, disclaimers, or license terms for third party or open source software
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
-// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Please refer to the â€œthird-party-programs.txtâ€ or other similarly-named text file included with the
 // Software Package for additional details.
 
 #ifndef POSTPROCESSING_MOCKS_H
@@ -100,7 +100,7 @@ private:
 
     constexpr static int kToIndex0to2(const int kw, const int kh) {
         if ((kw == 3) /* && (kh == 3) */) {  //?x3 was before discovering the Fathom issue. now is 3x?
-            return 1;                        // optimized row
+            return 1;                       // optimized row
         } else if ((kw == 1) || (kh == 1)) {
             // 3x1 yes,
             // 1x3 no, is optimized!?
@@ -183,7 +183,7 @@ private:
 
     constexpr static const DWFactorsArray& getTypeBasedFactorsArray(const DataType t) {
         if (dtype_to_bytes(t) > 1) {
-            return factor_array_16Bit;
+            return factor_array_16Bit;//or more than 16bit
         } else {
             return factor_array_8Bit;
         }
@@ -222,10 +222,10 @@ public:
         // Mock implementation of the process method
         if (w.device >= VPUDevice::VPU_4_0) {
             float processed{nn_val};
-            // if ((w.op == Operation::CM_CONVOLUTION) && !is_NN_value_invalid(nn_val)) {
-            //     const float factor{getCMFactor(w)};  // neutral
-            //     processed *= factor;
-            // }
+            //if ((w.op == Operation::CM_CONVOLUTION) && !is_NN_value_invalid(nn_val)) {
+            //    const float factor{getCMFactor(w)};  // neutral
+            //    processed *= factor;
+            //}
             return processed;
         } else {
             return nn_val;

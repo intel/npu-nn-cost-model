@@ -111,7 +111,7 @@ public:
     CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
                                   const int present_shv_frq) const override {
         // Check for the parameter 1 that tells us the selected axis
-        if (w.get_params().size() != 1) {
+        if (w.get_params().size() != getNumExpectedParams()) {
             return Cycles::ERROR_SHAVE_PARAMS;
         }
         const int selected_dimension{std::get<int>(w.get_params()[0])};
@@ -156,7 +156,7 @@ public:
     SoftmaxActivationExec(const std::string& name, float baseSlope, float baseIntercept, SoftmaxEquationParams e1,
                           SoftmaxEquationParams e2, SoftmaxEquationParams e4, SoftmaxEquationParams e8,
                           SoftmaxEquationParams e16, SoftmaxEquationParams e32)
-            : ShaveOpExecutor(name),
+            : ShaveOpExecutor(name, 1),
               model(dtype, baseSlope, baseIntercept, e1, e2, e4, e8, e16, e32, DpuFreq, ShvFreq) {
     }
 
@@ -181,7 +181,7 @@ private:
 public:
         GatherActivationExec(const std::string& name, float base_slope, float base_intercept, float inter_slope, 
                              float worst_slope, float vector_offset)
-                            : ShaveOpExecutor(name),
+                            : ShaveOpExecutor(name, 2),
                               model(dtype, base_slope,base_intercept, worst_slope, inter_slope, vector_offset, 
                               VectorSize, DpuFreq, ShvFreq){
                               }
@@ -193,7 +193,7 @@ public:
         CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
                                       const int present_shv_frq) const override {
             // We need to have 2 parameters, the first one is the axis and the second one is the batch dims
-            if (w.get_params().size() != 2) {
+            if (w.get_params().size() != getNumExpectedParams()) {
 				return Cycles::ERROR_SHAVE_PARAMS;
 			}
             
@@ -248,7 +248,7 @@ public:
     CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
                                   const int present_shv_frq) const override {
         // Check for the parameter 1 that tells us the selected axis
-        if (w.get_params().size() != 1) {
+        if (w.get_params().size() != getNumExpectedParams()) {
             return Cycles::ERROR_SHAVE_PARAMS;
         }
         const int selected_dimension{std::get<int>(w.get_params()[0])};
@@ -281,7 +281,7 @@ public:
     NormalizeL2OnlyCActivationExec(const std::string& name, float baseTimeSlope, float baseTimeIntercept,
                                    float baseVectorOffset, float baseTimeSlopeW, float baseTimeInterceptW,
                                    float slopeW1, float slopeW8, float slopeW9, float baseVectorOffsetW)
-            : ShaveOpExecutor(name),
+            : ShaveOpExecutor(name, 1),
               model(dtype, baseTimeSlope, baseTimeIntercept, baseVectorOffset, baseTimeSlopeW, baseTimeInterceptW,
                     slopeW1, slopeW8, slopeW9, baseVectorOffsetW, DpuFreq, ShvFreq) {
     }
@@ -430,7 +430,7 @@ public:
     CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq, const int present_shv_frq,
                                   bool nominal_freqs) const {
         // for how many axes? Nr of axes is param 1, as int
-        if (w.get_params().size() < 1) {
+        if (w.get_params().size() < getNumExpectedParams()) {
             return Cycles::ERROR_SHAVE_PARAMS;
         }
         const int selected_dim_number{std::get<int>(w.get_params()[0])};
@@ -471,7 +471,7 @@ public:
                               const MVN6Parameters p3,  //
                               const MVN6Parameters p4   //
                               )
-            : ShaveOpExecutor(name),
+            : ShaveOpExecutor(name, 1),
               models{{
                       {dtype, p1.slope, p1.intercept, p1.alpha, p1.worst_case_slope, p1.slope_delta_diff, DpuFreq,
                        ShvFreq},
@@ -606,7 +606,7 @@ public:
     CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq, const int present_shv_frq,
                                   bool nominal_freqs) const {
         // for how many axes? Nr of axes is param 1, as int
-        if (w.get_params().size() < 1) {
+        if (w.get_params().size() < getNumExpectedParams()) {
             return Cycles::ERROR_SHAVE_PARAMS;
         }
 
@@ -644,7 +644,7 @@ public:
     MVN_GenericActivationExec(const std::string& name,  //
                               const ShaveOpExecutor& r_mvn_s2, const ShaveOpExecutor& r_mvn_s3,
                               const ShaveOpExecutor& r_mvn6)
-            : ShaveOpExecutor(name), mvn6{r_mvn6}, mvn_s2{r_mvn_s2}, mvn_s3{r_mvn_s3} {
+            : ShaveOpExecutor(name, 1), mvn6{r_mvn6}, mvn_s2{r_mvn_s2}, mvn_s3{r_mvn_s3} {
     }
 
     std::string toString() const override {

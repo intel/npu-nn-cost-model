@@ -33,8 +33,8 @@ namespace VPUNN {
 
 /// @brief reunites the dynamic behaviors for known operations
 /// workload level operations dynamic behavior
-using OperationsBehaviour = Behaviours<CONVOLUTION_Constraints, DW_CONVOLUTION_Constraints, CM_CONVOLUTION_Constraints,
-                                       ELTWISE_Constraints, MAXPOOL_Constraints>;
+using OperationsBehaviour = Behaviours<CONVOLUTION_Constraints, DW_CONVOLUTION_Constraints, CM_CONVOLUTION_Constraints, ELTWISE_Constraints,
+                   MAXPOOL_Constraints, LAYERNORM_Constraints, ELTWISE_MUL_Constraints>;
 
 template <class BehaviorsContext>
 class ContextualMemoryCalculator {

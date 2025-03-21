@@ -42,16 +42,19 @@ private:
     Preprocessing_Interface4011<float> pp_v4011;
     Preprocessing_Interface4111<float> pp_v4111;
     Preprocessing_Interface12<float> pp_v12;
-    Preprocessing_Interface15911<float> pp_v89_11;  // special v159
+    Preprocessing_Interface15911<float> pp_v89_11; //special v159
 
     /// @brief the map of versions mapped to preprocessing concrete objects
-    const PreprocessingMap pp_map{//{pp_v00_latest.getInterfaceVersion(), pp_v00_latest},
-                                  {pp_v01_base.getInterfaceVersion(), pp_v01_base},  //
-                                  {pp_v10.getInterfaceVersion(), pp_v10},            //
-                                  {pp_v11.getInterfaceVersion(), pp_v11},            //
-                                  {pp_v89_11.getInterfaceVersion(), pp_v89_11},      //
-                                  {pp_v4011.getInterfaceVersion(), pp_v4011},
-                                  {pp_v4111.getInterfaceVersion(), pp_v4111}};
+    const PreprocessingMap pp_map{
+            //{pp_v00_latest.getInterfaceVersion(), pp_v00_latest},
+            {pp_v01_base.getInterfaceVersion(), pp_v01_base},  //
+            {pp_v10.getInterfaceVersion(), pp_v10},            //
+            {pp_v11.getInterfaceVersion(), pp_v11},            //
+            {pp_v89_11.getInterfaceVersion(), pp_v89_11},      //
+            {pp_v4011.getInterfaceVersion(), pp_v4011},
+            {pp_v4111.getInterfaceVersion(), pp_v4111},
+            {pp_v12.getInterfaceVersion(), pp_v12}
+    };
 
 public:
     /// @brief True if a preprocessor exists for required/interrogated version

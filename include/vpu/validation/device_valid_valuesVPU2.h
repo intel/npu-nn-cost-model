@@ -70,6 +70,8 @@ private:
     inline static const int weigths_alignment_def{16};
     inline static const int input_heigth_start_factor_SOH_def{1};
 
+    static constexpr int alignement_size_bytes_def{16384};  // 16KB
+
     // input and output data types should be the same
     inline static const Values<DataType> valid_in_out_datatypes{
             DataType::INT8,
@@ -130,7 +132,8 @@ public:
                                  weigths_alignment_def,              //
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
-                                 valid_operations_default){};
+                                 valid_operations_default,           //
+                                 alignement_size_bytes_def){};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden
     VPU2_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
@@ -146,7 +149,8 @@ public:
                                  weigths_alignment_def,           //
                                  input_heigth_start_factor_SOH_,  // special
                                  valid_datatypes_map_default,     //
-                                 valid_operations_default){};
+                                 valid_operations_default,        //
+                                 alignement_size_bytes_def){};
 
 protected:
     SmartRanges get_output_channels_restriction(const DPUOperation&) const override {

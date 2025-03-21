@@ -92,10 +92,16 @@ set(MODEL41_REAL "${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_4_1_MODEL_PATH="${MODEL41_REAL}")
 
 
+set(MODEL50_REAL "${CMAKE_SOURCE_DIR}/models/vpu_5_1.vpunn")
+#set(MODEL50_MOCK "${MODEL40}")
+set(MODEL50 "${MODEL50_REAL}")
+target_compile_definitions(test_cost_model PRIVATE NPU_5_0_MODEL_PATH="${MODEL50}")
+
 #DMA models
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
+target_compile_definitions(test_cost_model PRIVATE VPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
 
 add_dependencies(test_cost_model cpp_schema)
 target_link_libraries(

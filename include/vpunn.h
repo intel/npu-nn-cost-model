@@ -15,7 +15,6 @@
 #include "inference/model.h"
 #include "inference/model_version.h"
 
-
 /// @brief top namespace for VPUNN cost model library
 namespace VPUNN {
 

@@ -195,6 +195,7 @@ public:
             }
             out_fields.emplace_back(output0_cycles_tag);  // output 0, normally a identity resim with input pred cycles
             out_fields.emplace_back(output2_cycles_tag);  // add new fields
+            /* coverity[copy_instead_of_move] */
             serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, out_fields);
             EXPECT_TRUE(serializer_out.is_initialized());
         }
@@ -229,6 +230,7 @@ public:
                 std::string info_mock, info_real;
                 const CyclesInterfaceType cycles_mock =
                         model_4_0_mock.DPU(dpu_wl, info_mock);  // SEH exception how to catch?
+                /* coverity[copy_instead_of_move] */
                 const CyclesInterfaceType cycles_LNLpost8 = model_4_0_Post8.DPU(dpu_wl, info_real);
 
                 constexpr int lastIndex{std::tuple_size_v<decltype(readFields)> - 1};
@@ -276,6 +278,7 @@ public:
             }
             out_fields.emplace_back(output0_cycles_tag);  // output 0, normally a identity resim with input pred cycles
             out_fields.emplace_back(output2_cycles_tag);  // add new fields
+            /* coverity[copy_instead_of_move] */
             serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, out_fields);
             EXPECT_TRUE(serializer_out.is_initialized());
         }
@@ -311,6 +314,7 @@ public:
                 std::string info_mock, info_real;
                 const CyclesInterfaceType cycles_mock =
                         model_4_0_mock.DPU(dpu_wl, info_mock);  // SEH exception how to catch?
+                /* coverity[copy_instead_of_move] */
                 const CyclesInterfaceType cycles_LNLpost8 = model_4_0_Post8.DPU(dpu_wl, info_real);
 
                 // constexpr int lastIndex{std::tuple_size_v<decltype(readFields)> - 1};
@@ -362,6 +366,7 @@ public:
 
         Serializer<FileFormat::CSV> serializer_out{true};
         {
+            /* coverity[copy_instead_of_move] */
             serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, output_fields_names);
             EXPECT_TRUE(serializer_out.is_initialized());
         }
@@ -399,6 +404,7 @@ public:
                 const CyclesInterfaceType cycles_mock =
                         model_4_0_mock.DPU(dpu_wl, info_mock);  // SEH exception how to catch?
 
+                /* coverity[copy_instead_of_move] */
                 const CyclesInterfaceType cycles_LNLpost6 = model_4_0_Post6.DPU(dpu_wl);
 
                 gt_UT_buff.value = getGTfromInfo(info_buff.value) + "";
@@ -457,6 +463,7 @@ public:
 
         Serializer<FileFormat::CSV> serializer_out{true};
         {
+            /* coverity[copy_instead_of_move] */
             serializer_out.initialize(outputCSV + "_Resim", FileMode::READ_WRITE, output_fields_names);
             EXPECT_TRUE(serializer_out.is_initialized());
         }
@@ -526,6 +533,7 @@ public:
 
         Serializer<FileFormat::CSV> serializer_out{true};
         {
+            /* coverity[copy_instead_of_move] */
             serializer_out.initialize(inputCSV + "_Investigate", FileMode::READ_WRITE, output_fields_names);
             EXPECT_TRUE(serializer_out.is_initialized());
         }
@@ -605,6 +613,7 @@ public:
                                   const std::vector<VPUCostModel*>& models) {
         const std::string theFullName{folder + input_csv};
         const std::string theInputName{removeExtension(theFullName)};
+        /* coverity[copy_instead_of_move] */
         const std::string theOutputName{addSubFolderInName(theInputName, subfolderOutput)};
 
         std::cout << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
@@ -839,6 +848,7 @@ TEST_F(SerializerSimulator, DISABLED_Model_Merge_All_AGNOSTIC) {
             std::vector<std::string> output_fields_names{serializer_IN.get_field_names()};
             output_fields_names.emplace_back(model_file_tag);
 
+            /* coverity[copy_instead_of_move] */
             serializer_out.initialize(outputCSV + "_", FileMode::READ_WRITE, output_fields_names);
             EXPECT_TRUE(serializer_out.is_initialized());
 
@@ -871,7 +881,9 @@ protected:
     }
 
     void executeModels(std::string folderOfCSV, std::string csv_input) {
+        /* coverity[copy_instead_of_move] */
         const std::string folder{folderOfCSV};
+        /* coverity[copy_instead_of_move] */
         const std::string csv_param{csv_input};
 
         std::vector<VPUCostModel*> models_ptr;

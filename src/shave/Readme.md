@@ -195,7 +195,7 @@ These operators below are not taking any extra parameters, The represent the Act
 
 ## VPUEM Operators Usage
   
-All these operation are available for VPU2.7 and VPU4.0, it is only necessary to change the values of the parameters corresponding to the generation of the device. 
+All these operation are available for VPU2.7, VPU4., it is only necessary to change the values of the parameters corresponding to the generation of the device. 
 The name convention is achieved by concatenating the specific prefix and the name of each operation to highlight that the computing logic from VPUEM is used.
 
 To check the parameters use toString() function to display it. 
@@ -231,7 +231,6 @@ Available Softmax Operation from VPUEM:
 Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
 
-
 ## VPUEM Operators VPU4.0
 
 A Piecewise Operation is a simple operation based on a 3 slopes equation. Available Piecewise Operations from VPUEM:
@@ -252,4 +251,3 @@ Available Softmax Operation from VPUEM:
 
 Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
-

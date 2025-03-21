@@ -47,7 +47,8 @@ protected:
                                             input_heigth_start_factor_SOH_,  // special
 
                                             valid_datatypes_map_default,  //
-                                            valid_operations_default) {
+                                            valid_operations_default,     //
+                                            alignement_size_bytes_def) {
         }
 
         // const VPUNN::Channels& get_output_channels_range(const VPUNN::DPUOperation&) const override {
@@ -130,6 +131,8 @@ protected:
 
         inline static const int weigths_alignment_def{16};
         inline static const int input_heigth_start_factor_SOH_def{1};
+
+        inline static const int alignement_size_bytes_def{16 * 1024};
 
         inline static const Values<DataType> valid_datatypes_subset{
                 {DataType::UINT8, DataType::INT8, DataType::FLOAT16, DataType::BFLOAT16}};
@@ -280,6 +283,7 @@ TEST_F(IntfDeviceValidValuesTest, defaultSwizz) {
         }
     };
 
+    /* coverity[copy_instead_of_move] */
     const TestsVector tests = {
             {{wl2_0}, allFive, "VPU2_0, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
             {{wl2_7}, allFive, "VPU2_7, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
@@ -614,8 +618,8 @@ TEST_F(IntfDeviceValidValuesTest, Restrict_DataTypes_Test) {
     EXPECT_EQ(dut.restrict_datatype(DataType::FLOAT16), DataType::FLOAT16);
     EXPECT_EQ(dut.restrict_datatype(DataType::BFLOAT16), DataType::FLOAT16);
 
-    EXPECT_EQ(dut.restrict_datatype(DataType::HF8), DataType::BF8);
-    EXPECT_EQ(dut.restrict_datatype(DataType::BF8), DataType::BF8);
+    EXPECT_EQ(dut.restrict_datatype(DataType::HF8), DataType::HF8);
+    EXPECT_EQ(dut.restrict_datatype(DataType::BF8), DataType::HF8);
 }
 
 class DPUOperationTest : public ::testing::Test {
@@ -748,6 +752,7 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
         w.weight_type = wl_ref2.weight_type;
         w.weightless_operation = wl_ref2.weightless_operation;
         w.in_place_output_memory = wl_ref2.in_place_output_memory;
+        w.superdense_memory = wl_ref2.superdense_memory;
         EXPECT_EQ(w, wl_ref2);
 
         EXPECT_FALSE(w == wl_ref1);
@@ -760,6 +765,7 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
         w.weight_type = wl_ref1.weight_type;
         w.weightless_operation = wl_ref1.weightless_operation;
         w.in_place_output_memory = wl_ref1.in_place_output_memory;
+        w.superdense_memory = wl_ref1.superdense_memory;
         EXPECT_EQ(w, wl_ref1);
 
         EXPECT_FALSE(w == wl_ref2);
@@ -774,6 +780,7 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
         EXPECT_FALSE(w == wref3);
         w.weightless_operation = wref3.weightless_operation;
         w.in_place_output_memory = wref3.in_place_output_memory;
+        w.superdense_memory = wref3.superdense_memory;
         EXPECT_EQ(w, wref3);
 
         EXPECT_FALSE(w == wl_ref2);
@@ -782,6 +789,42 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
     {  // add tests where the clone is equal
        // 1 not an elementwise
        // 2 elementwise with weigthles and inplace set up manually (not default mode)
+    }
+    {  // test for superdense
+        {
+            DPUWorkload wref3{wl_ref1};
+            wref3.set_superdense(true);  // set a specific value for the optional
+
+            DPUOperation dpu(wref3);
+            DPUWorkload w{dpu.clone_as_DPUWorkload()};
+
+            EXPECT_FALSE(w == wref3);
+            w.weight_type = wref3.weight_type;
+            w.weightless_operation = wref3.weightless_operation;
+            w.in_place_output_memory = wref3.in_place_output_memory;
+
+            EXPECT_EQ(w, wref3);
+
+            EXPECT_FALSE(w == wl_ref2);
+            EXPECT_FALSE(w == wl_ref1);
+        }
+        {
+            DPUWorkload wref3{wl_ref1};
+            wref3.set_superdense(false);  // set a specific value for the optional
+
+            DPUOperation dpu(wref3);
+            DPUWorkload w{dpu.clone_as_DPUWorkload()};
+
+            EXPECT_FALSE(w == wref3);
+            w.weight_type = wref3.weight_type;
+            w.weightless_operation = wref3.weightless_operation;
+            w.in_place_output_memory = wref3.in_place_output_memory;
+
+            EXPECT_EQ(w, wref3);
+
+            EXPECT_FALSE(w == wl_ref2);
+            EXPECT_FALSE(w == wl_ref1);
+        }
     }
 }
 

@@ -35,7 +35,9 @@ inline T compute_size_in_bytes(const T elements_count, const DataType& datatype)
         // if type is a submultiple of 8 bits multiple elements of this type can fit into one byte
         if (type_dimension == 1) {
             const int elements_per_byte{types_per_byte(datatype)};
+            /* coverity[divide_by_zero] */
             const int reminder = elements_count % elements_per_byte;
+            /* coverity[divide_by_zero] */
             const T fullBytes{(elements_count / elements_per_byte)};
             size = ((reminder != 0) ? (fullBytes + 1) : fullBytes);
         } else {
@@ -60,6 +62,7 @@ inline long compute_elements_count_from_bytes(const long size_in_bytes, const Da
             const int elements_per_byte{types_per_byte(datatype)};
             return elements_per_byte * size_in_bytes;
         }
+        /* coverity[divide_by_zero] */
         return size_in_bytes / bytes_per_type;
     } else {
         return 0;

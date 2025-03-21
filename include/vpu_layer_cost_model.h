@@ -70,8 +70,8 @@ inline std::ostream& operator<<(std::ostream& stream, const VPULayerStrategy& d)
 }
 
 /// Variant used to hold any available DMACostModel<> - Currently DMACostModel<DMANNWorkload_NPU27> and
-/// DMACostModel<DMANNWorkload_NPU40> The ownership is not transferred, the client must ensure the lifetime of the model
-using DMACostModelVariant = std::variant<DMACostModel<DMANNWorkload_NPU27>*, DMACostModel<DMANNWorkload_NPU40>*>;
+/// DMACostModel<DMANNWorkload_NPU40_RESERVED> The ownership is not transferred, the client must ensure the lifetime of the model
+using DMACostModelVariant = std::variant<DMACostModel<DMANNWorkload_NPU27>*, DMACostModel<DMANNWorkload_NPU40_RESERVED>*>;
 
 /// @brief The VPUNN layer cost model (also called VPUNN Level2 API)
 class VPUNN_API(VPULayerCostModel): public VPUCostModel {

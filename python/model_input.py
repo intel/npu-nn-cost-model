@@ -67,6 +67,8 @@ def generate_model_input(args, wl_type=VPUNN_lib.DPUWorkload):
             )
         ]
 
+        wl.weight_type = str2enum(wl_ns.input_1_datatype)
+
         wl.weight_sparsity_enabled = wl_ns.weight_sparsity_enabled
 
         wl.outputs = [

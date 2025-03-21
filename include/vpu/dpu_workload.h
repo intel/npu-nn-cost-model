@@ -82,19 +82,19 @@ struct DPUWorkload {
     /// for pointers=> memory tensor is different than compute tensor.
     SEPModeInfo sep_activators{};
 
-    /// add type of weights, if different than input_0 type (EISXW-103211)
+    /// add type of weights, if different than input_0 type
     std::optional<DataType> weight_type{};
 
     /// textual information about the belonging of this workload. NOt mandatory, used only for logging
     std::string layer_info{""};
 
-    // Todo: weightless operation. describes an operation that does not have weights
-    // Todo: inplace memory , for elmwise ops: the output tensor can be the same as the input tensor
-
     std::optional<bool> weightless_operation{};  ///< operation does not have weights
 
     /// output tensor can be the same as the input tensor, for Elementwise ops only
     std::optional<bool> in_place_output_memory{};
+
+    /// Superdense memory. ODU specific?
+    std::optional<bool> superdense_memory{};
 
     std::string get_layer_info() const {
         return layer_info;
@@ -139,6 +139,19 @@ struct DPUWorkload {
     bool is_elementwise_like_operation() const {
         return ((op == Operation::ELTWISE) ||  //
                 (op == Operation::ELTWISE_MUL));
+    }
+
+    /// superdense setter. becomes with value
+    void set_superdense(bool superdense) {
+        superdense_memory = superdense;
+    }
+    /// superdense getter
+    bool is_superdense() const {
+        if (superdense_memory.has_value()) {
+            return superdense_memory.value();
+        } else {  // optional not set. using older/initial mechanism
+            return false;
+        }
     }
 
 protected:
@@ -222,6 +235,7 @@ public:
 
         r = r && (weightless_operation == b.weightless_operation);      // weightless_operation
         r = r && (in_place_output_memory == b.in_place_output_memory);  // in_place_output_memory
+        r = r && (superdense_memory == b.superdense_memory);            // superdense_memory
         return r;
     }
 };
@@ -276,6 +290,8 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& 
            << (d.weightless_operation.has_value() ? std::to_string(d.weightless_operation.value()) : "NA") << " ;\n"  //
            << " in_place_output_memory: \t"
            << (d.in_place_output_memory.has_value() ? std::to_string(d.in_place_output_memory.value()) : "NA")
+           << " superdense_memory: \t"
+           << (d.superdense_memory.has_value() ? std::to_string(d.superdense_memory.value()) : "NA")
            << " ;\n"                           //
            << out_terminator() << "Workload "  // terminator
             ;

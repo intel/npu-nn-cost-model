@@ -948,7 +948,7 @@ public:
      * @param infoOut  a string that will contain informative error information (in case of error)
      * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
      */
-    CyclesInterfaceType SHAVE_2(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
+    CyclesInterfaceType SHAVE_2(const SHAVEWorkload& shave_wl, std::string& infoOut) {
         return shave_gen_2.computeCycles(shave_wl, infoOut);
     }
 

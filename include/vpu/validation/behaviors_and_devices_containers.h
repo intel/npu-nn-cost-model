@@ -74,6 +74,16 @@ public:
             return std::get<4>(op_list);
             break;
 
+        case Operation::LAYER_NORM:
+            static_assert((std::tuple_size<OpList>::value) > 5, "check tuple");
+            return std::get<5>(op_list);
+            break;
+
+        case Operation::ELTWISE_MUL:
+            static_assert((std::tuple_size<OpList>::value) > 6, "check tuple");
+            return std::get<6>(op_list);
+            break;
+
         default: {
             // should throw!
             std::stringstream buffer;
@@ -109,6 +119,7 @@ protected:
             &(std::get<1>(specific_vv)),  //
 
             &(std::get<2>(specific_vv)),  //
+           // &(std::get<3>(specific_vv))   //
     };
 
 public:

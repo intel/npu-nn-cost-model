@@ -145,10 +145,11 @@ struct DMANNWorkload_NPU27 {
 };
 
 /// placeholder/reserved name
-/// DMA descriptor for NPU4.0
+/// DMA descriptor for NPU4.0++
 /// 6D addressing mode
-struct DMANNWorkload_NPU40 {
-    VPUDevice device{VPUDevice::VPU_4_0};  ///< NPU device
+struct DMANNWorkload_NPU40_RESERVED {
+    VPUDevice device;  ///< NPU device,  creation via create_DMANNWorkload_NPUXX functions ensures also proper init,
+                       ///< otherwise please init explicitly
 
     // dimension zero, innermost. Stride is considered 1(compact data) for innermost dimension!?
     int src_width{0};  ///> represent the number of linear bytes in the fastest incrementing dimension.
@@ -169,7 +170,7 @@ struct DMANNWorkload_NPU40 {
         int dst_dim_size{0};
     };
     // 5 extra dimensions
-    std::array<SizeStride, MaxExtraDimensions> e_dim;
+    std::array<SizeStride, MaxExtraDimensions> e_dim{};
 
     Num_DMA_Engine num_engine{Num_DMA_Engine::Num_Engine_1};  ///> number of engine used. normally 1 or 2
 
@@ -185,6 +186,22 @@ struct DMANNWorkload_NPU40 {
         return bytes_accessed;
     }
 };
+
+/// DMA descriptor aliases
+using DMANNWorkload_NPU40 = DMANNWorkload_NPU40_RESERVED;
+using DMANNWorkload_NPU_RESERVED = DMANNWorkload_NPU40_RESERVED;
+
+inline constexpr DMANNWorkload_NPU40 create_DMANNWorkload_NPU40() {
+    return DMANNWorkload_NPU40{VPUDevice::VPU_4_0};
+}
+
+inline constexpr DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED() {
+    return DMANNWorkload_NPU_RESERVED{VPUDevice::NPU_RESERVED};
+}
+
+inline constexpr DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED_W() {
+    return DMANNWorkload_NPU_RESERVED{VPUDevice::NPU_RESERVED_W};
+}
 
 /**
  * @brief Encodes a simple 1D DMA transfer

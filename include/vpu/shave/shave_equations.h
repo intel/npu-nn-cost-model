@@ -286,6 +286,7 @@ public:
         
         int hw_elements_size = 1;
         int h_elements_size = 1;
+        /* coverity[divide_by_zero] */
         int c_elements_size = c_output_size_bytes / dtype_to_bytes(dtype);
 
         if (hw_output_size_bytes != 1) {
@@ -373,6 +374,7 @@ public:
     }
 
     int compute_spatial_shave_cycles(DataType dtype, const int output_size_bytes) {
+        /* coverity[divide_by_zero] */
         int c_elements_size = output_size_bytes / dtype_to_bytes(dtype);
         float slope = costFunctionSpatialData_.slope[0];
         int cycles = (int) (1 / slope) * (c_elements_size);

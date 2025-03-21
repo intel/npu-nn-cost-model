@@ -51,6 +51,12 @@ class MAXPOOL_Constraints_Layer : public MAXPOOL_Constraints {
 protected:
 };
 
+class LAYERNORM_Constraints_Layer : public LAYERNORM_Constraints {
+};
+
+class ELTWISE_MUL_Constraints_Layer : public ELTWISE_MUL_Constraints {
+};
+
 }  // namespace VPUNN
 
 #endif  //

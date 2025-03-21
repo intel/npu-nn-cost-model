@@ -85,7 +85,7 @@ public:
     long long input_1_aligned_size_bytes(const IDeviceValidValues& config,
                                          const DPUOperation& dpu) const noexcept override final {
         const auto size_nonaligned{Base_Constraints::input_1_contiguous_size_bytes(config, dpu)};  // non polymorphic
-        return config.align_to(size_nonaligned, config.alignement_size_bytes);  // # align to 16KB chunks
+        return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
     }
 
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the weights
@@ -118,7 +118,7 @@ public:
     long long input_0_aligned_size_bytes(const IDeviceValidValues& config,
                                          const DPUOperation& dpu) const noexcept override final {
         const auto size_nonaligned{Base_Constraints::input_0_contiguous_size_bytes(config, dpu)};  // non polymorphic
-        return config.align_to(size_nonaligned, config.alignement_size_bytes);  // # align to 16KB chunks
+        return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
     }
 
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the activators
@@ -180,7 +180,7 @@ public:
     long long output_0_aligned_size_bytes(const IDeviceValidValues& config,
                                           const DPUOperation& dpu) const noexcept override final {
         const auto size_nonaligned{Base_Constraints::output_0_contiguous_size_bytes(config, dpu)};  // non polymorphic
-        return config.align_to(size_nonaligned, config.alignement_size_bytes);  // # align to 16KB chunks
+        return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
     }
 
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the output. the actual memory occupied
@@ -325,7 +325,7 @@ protected:
         w.width = 1;
         {
             // this rule is here only for Fathom compliance, must be clarified in the future what's actually required
-            const int multiple{w.sparsity_enabled || dtype_to_bytes(w.datatype) > 1
+            const int multiple{(w.sparsity_enabled || (dtype_to_bytes(w.datatype) > 1))
                                        ? 16
                                        : config.get_specific_weigths_alignment()};
             w.channels = config.align_to(in_0.channels * kernel.height * kernel.width, multiple);
@@ -579,6 +579,9 @@ protected:
         w.width = 0;
     }
 };
+
+class LAYERNORM_Constraints : public CONVOLUTION_Constraints {};
+class ELTWISE_MUL_Constraints : public ELTWISE_Constraints {};
 
 }  // namespace VPUNN
 

@@ -84,7 +84,7 @@ public:
         bool inplace_output{false};  //< ignore or no the output to the total memory sum
 
         // special case for in-place-output for ELEMENTWISE
-        if (w.operation == Operation::ELTWISE) {
+        if (w.operation == Operation::ELTWISE || w.operation == Operation::ELTWISE_MUL) {
             if (w.in_place_output_memory /*is_preconditions_for_inplace_output(w)*/) {
                 // in-place output is not valid in case the output is not matching input
                 inplace_output = true;
@@ -95,9 +95,9 @@ public:
             }
         }
 
-        const long long cmx_sum = (ignore_cmx_overhead ? 0 : config.cmx_memory_aligned_overhead) +  //
-                                  (in_0_aligned_size) +                                             //
-                                  (in_1_aligned_size) +                                             //
+        const long long cmx_sum = (ignore_cmx_overhead ? 0 : config.get_cmx_memory_aligned_overhead()) +  //
+                                  (in_0_aligned_size) +                                                   //
+                                  (in_1_aligned_size) +                                                   //
                                   (inplace_output ? 0 : out_0_aligned_size);
 
         return MemorySize{cmx_sum,
@@ -105,7 +105,7 @@ public:
                           in_1_aligned_size,
                           out_0_aligned_size,
                           inplace_output,
-                          config.cmx_memory_aligned_overhead,
+                          config.get_cmx_memory_aligned_overhead(),
                           ignore_cmx_overhead};
     }
     /**

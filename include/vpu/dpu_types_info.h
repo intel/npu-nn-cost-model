@@ -26,13 +26,31 @@ namespace VPUNN {
  * @return size in bytes.
  */
 inline constexpr unsigned int dtype_to_bytes(const DataType dtype) noexcept {
-    // only handle the types that are 8bit or more, rest is 1 byte (cannot be less)
+    // intermediate 1+ bytes are not handled, will be when present
     switch (dtype) {
+    case DataType::INT32:
+    case DataType::FLOAT32:
+        return 4;
+
     case DataType::FLOAT16:
     case DataType::BFLOAT16:
         return 2;
-    default:
+
+    // 1 byte size
+    case DataType::UINT8:
+    case DataType::INT8:
+    case DataType::BF8:
+    case DataType::HF8:
+    case DataType::UINT4:
+    case DataType::INT4:
+    case DataType::UINT2:
+    case DataType::INT2:
+    case DataType::UINT1:
+    case DataType::INT1:
         return 1;
+
+    default:  // unknown types
+        return 0;
     }
 }
 
@@ -44,9 +62,17 @@ inline constexpr unsigned int dtype_to_bytes(const DataType dtype) noexcept {
 inline constexpr int dtype_to_bits(const DataType dtype) noexcept {
     //@todo: handle all possible types from the enum
     switch (dtype) {
+    case DataType::INT32:
+    case DataType::FLOAT32:
+        return 32;
     case DataType::FLOAT16:
     case DataType::BFLOAT16:
         return 16;
+    case DataType::UINT8:
+    case DataType::INT8:
+    case DataType::BF8:
+    case DataType::HF8:
+        return 8;
     case DataType::UINT4:
     case DataType::INT4:
         return 4;
@@ -56,12 +82,9 @@ inline constexpr int dtype_to_bits(const DataType dtype) noexcept {
     case DataType::UINT1:
     case DataType::INT1:
         return 1;
-    case DataType::UINT8:
-    case DataType::INT8:
-    case DataType::BF8:
-    case DataType::HF8:
-    default:
-        return 8;
+
+    default:  // unknown types
+        return 0;
     }
 }
 
@@ -81,6 +104,7 @@ inline int types_per_byte(const DataType datatype) {
     const int datatype_size_in_bits{dtype_to_bits(datatype)};  // number of bits for datatype
 
     if (datatype_size_in_bits <= 8) {
+        /* coverity[divide_by_zero] */
         return 8 / datatype_size_in_bits;  // number of elements fitting into 8 bits
     } else {
         return 0;

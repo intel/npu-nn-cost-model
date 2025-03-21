@@ -249,7 +249,7 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
  * DATA CHANGES:
  * 1) mock BF8 and HF8 to uint8
  * 2) mock_replace_devices:   all > 2.7 to 2.7
- * 3) mock_replace_operations : operation mock for NPU_RESERVED1: LAYER_NORM & ELTWISE_MUL mapped to ELTWISE;
+ * 3) mock_replace_operations : LAYER_NORM & ELTWISE_MUL mapped to ELTWISE;
  * 4) establishUniqueSwizzling    : 5 for all except ELMWISE where 0 is also accepted.   All should be the same, if at
  * least one is different than zero than we consider it to be all 5
  * 5) owt and ISI:  avoid_untrained_space, order of calls: c, a, b
@@ -312,11 +312,10 @@ protected:
 
         {  // device 4.0 is not supported for now we are mocking VPU_4_0 with 2.7. This has to be removed when we have a
             // VPU4.0 trained NN
-            // Same for NPU_RESERVED1, MOCK
             const auto device{DeviceAdapter::mock_replace_devices(workload.device)};
             offset = this->insert<only_simulate>(intf_11::convert<intf_11::VPUDevice>(device), offset);
         }
-        {  // operation mock for NPU_RESERVED1
+        { 
             const auto operation{DeviceAdapter::mock_replace_operations(workload.op)};
             offset = this->insert<only_simulate>(intf_11::convert<intf_11::Operation>(operation), offset);
         }

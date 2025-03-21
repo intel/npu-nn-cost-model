@@ -103,7 +103,8 @@ protected:
                        const int& weigths_alignment_,                                       //
                        const int& input_heigth_start_factor_SOH_,                           //
                        const IDeviceValidValues::ValidDatatypes& valid_datatypes,           //
-                       const Values<Operation>& valid_operations_                           //
+                       const Values<Operation>& valid_operations_,                          //
+                       const int& alignement_size_bytes_                                    // page size, NPU specific
                        )
             : operations_dynamic_behavior{op_dynamic_constraints},            //
               valid_execution_order{valid_execution_order_},                  //
@@ -116,7 +117,8 @@ protected:
               weigths_alignment{weigths_alignment_},                          //
               input_heigth_start_factor_SOH{input_heigth_start_factor_SOH_},  //
               valid_datatypes_map{valid_datatypes},
-              valid_operations{valid_operations_} {
+              valid_operations{valid_operations_},
+              alignement_size_bytes{alignement_size_bytes_} {
     }
 
 protected:
@@ -272,6 +274,14 @@ public:
     const Values<bool>& get_boolean_datatypes() const {
         return boolean_datatypes;
     }
+    /// bytes alignment fro the memory chunks
+    int get_page_alignment() const {
+        return alignement_size_bytes;
+    }
+
+    int get_cmx_memory_aligned_overhead() const {
+        return cmx_memory_80K_fixed_overhead + get_page_alignment();
+    }
 
 protected:
     /// @brief what's the maximum kernel size if operation is known?
@@ -302,18 +312,17 @@ protected:
     const ValidDatatypes valid_datatypes_map;  ///< valid data types for each operation
 
     const Values<Operation> valid_operations;  ///< valid operations for this device
+
+    const int alignement_size_bytes;  // page size, NPU specific
+
     // const fixed here
 private:
     inline static const Values<bool> boolean_datatypes{true, false};
 
 public:
-    static constexpr int alignement_size_bytes{16384};  // 16KB
-    static constexpr int cmx_memory_aligned_overhead{
-            (80 * 1024)    // runtime size
-            + (16 * 1024)  // hardware profile block (hwp)
-    };
-
 protected:
+    static constexpr int cmx_memory_80K_fixed_overhead{80 * 1024};  ///< 80K fixed for all now
+
     static constexpr int input_spatial_dim_max{8192};  ///< 1-8K. MAX HW dim
     static constexpr int cm_conv_channels_max{16};     ///< CM convolution is limited to C<=16 ,
 
@@ -331,7 +340,7 @@ protected:
             {DataType::INT2, DataType::UINT2},        //
             {DataType::INT1, DataType::UINT1},        //
             {DataType::BFLOAT16, DataType::FLOAT16},  //
-            {DataType::HF8, DataType::BF8},           //
+            {DataType::BF8, DataType::HF8},           //
     };
 
 public:

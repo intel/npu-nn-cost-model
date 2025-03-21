@@ -48,8 +48,11 @@ public:
      */
     explicit VPUTensor(const std::array<unsigned int, 4>& shape = {1, 1, 1, 1}, DataType dtype = DataType::UINT8,
                        Layout layout = Layout::ZXY /*ZMAJOR equivalent*/, bool sparsity = false)
-            : shape(shape), dtype(dtype), layout(layout), sparsity(sparsity) {
-                  // throw_if_invalid();
+            : shape(shape),
+              dtype(dtype),
+              layout(layout),
+              sparsity(sparsity){
+                      // throw_if_invalid();
               };
 
     /**
@@ -65,7 +68,7 @@ public:
      */
     explicit VPUTensor(unsigned int width, unsigned int height, unsigned int channels, unsigned int batch,
                        DataType dtype, Layout layout = Layout::ZXY /*ZMAJOR equivalent*/, bool sparsity = false)
-            : VPUTensor({width, height, channels, batch}, dtype, layout, sparsity) {};
+            : VPUTensor({width, height, channels, batch}, dtype, layout, sparsity){};
 
     /**
      * @brief Construct a new VPUTensor object based on a shape , and taken the rest of attributes from another tensor
@@ -74,7 +77,7 @@ public:
      * @param rest a reference to a tensor that provides all info besides shape
      */
     explicit VPUTensor(const std::array<unsigned int, 4>& shape_, const VPUTensor& rest)
-            : VPUTensor(shape_, rest.get_dtype(), rest.get_layout(), rest.get_sparsity()) {};
+            : VPUTensor(shape_, rest.get_dtype(), rest.get_layout(), rest.get_sparsity()){};
 
     /// @brief Get the x dimension
     unsigned int x() const noexcept {
@@ -126,6 +129,7 @@ public:
     /// @return true if floating point type
     bool is_float() const noexcept {
         switch (dtype) {
+        case DataType::FLOAT32:
         case DataType::FLOAT16:
         case DataType::BFLOAT16:
         case DataType::BF8:
@@ -256,6 +260,7 @@ private:
 
         // the number of elements that can be placed in memory one after the other without an element spanning more
         // bytes than type_dimension_B indicates
+        /* coverity[divide_by_zero] */
         const int contiguousSeq_elem = 8 / overflowBits;
 
         // the size in bytes for such a contiguous sequence
@@ -336,53 +341,6 @@ private:
 
         return static_cast<unsigned int>(size);
     }
-
-    // static constexpr int getTypeContinuousSequenceBytes(DataType d) {
-    //     switch (d) {
-    //     case DataType::INT1:
-    //     case DataType::UINT1:
-    //     case DataType::INT2:
-    //     case DataType::UINT2:
-    //     case DataType::INT4:
-    //     case DataType::UINT4:
-    //     case DataType::INT8:
-    //     case DataType::UINT8:
-    //     case DataType::BF8:
-    //     case DataType::HF8:
-    //         return 1;
-    //     case DataType::FLOAT16:
-    //     case DataType::BFLOAT16:
-    //         return 2;
-    //     default:
-    //         return 0;
-    //     }
-    // }
-
-    // unsigned int size_packmode_00() const {
-    //     const auto order = layout_to_order(layout);
-    //     const auto innermost_dim{shape[order[0]]};
-
-    //    const int type_dimBits = dtype_to_bits(dtype);
-
-    //    const int contSeqB = getTypeContinuousSequenceBytes(dtype);
-    //    const int contSeqBits = contSeqB * 8;
-    //    const int contSeqElems = contSeqBits / type_dimBits;
-
-    //    // how many continuous sequences do we have
-    //    const int completeSequences = innermost_dim / contSeqElems;
-    //    const int completeSequencesBytes = completeSequences * contSeqB;
-
-    //    // how many elements are remained of complete seqs
-    //    const int remainingElems = innermost_dim % contSeqElems;
-    //    // bytes occupied by remaining elements
-    //    const int remainingBytes = ((remainingElems > 0) ? ((remainingElems * type_dimBits) / 8 + 1) : (0));
-
-    //    const int innmermost_dim_size_B = completeSequencesBytes + remainingBytes;
-
-    //    int size = innmermost_dim_size_B * shape[order[1]] * shape[order[2]] * shape[order[3]];
-
-    //    return static_cast<unsigned int>(size);
-    //}
 
     /// a sample cannot span a number of bytes larger than what it normally occupies, a byte can
     /// contain 2 dimensions
@@ -471,6 +429,7 @@ private:
         // number of elements of that type that you can place in memory one after one without exceeding the allowed
         // number of bytes an element can span example: INT4, INT2, INT1, INT3 cannot fit in 2 bytes, max 1 INT12,
         // INT13, INT16 cannot fit in 3 bytes, max 2
+        /* coverity[divide_by_zero] */
         const int contiguousCapacity = 8 / overflowBits;
 
         //  remaining elements that do not form a complete cycle
@@ -505,6 +464,7 @@ private:
         // number of elements of that type that you can place in memory one after one without exceeding the allowed
         // number of bytes an element can span example: INT4, INT2, INT1, INT3 cannot fit in 2 bytes, max 1 INT12,
         // INT13, INT16 cannot fit in 3 bytes, max 2
+        /* coverity[divide_by_zero] */
         const int contiguousCapacity = 8 / overflowBits;
 
         //  remaining elements that do not form a complete cycle
@@ -540,6 +500,7 @@ private:
                 (occupied_bits == 0) ? 0 : (8 - occupied_bits);  // unoccupied bits from the last byte
 
         // we verify if there is still enough space in the last byte to put another element
+        /* coverity[divide_by_zero] */
         if ((unoccupied_bits / dtype_to_bits(dtype)) != 0) {
             return false;
         }
@@ -555,6 +516,7 @@ private:
                 (occupied_bits == 0) ? 0 : (8 - occupied_bits);  // unoccupied bits from the last byte
 
         // we verify if there is still enough space in the last byte to put another element
+        /* coverity[divide_by_zero] */
         if ((unoccupied_bits / dtype_to_bits(dtype)) != 0) {
             return false;
         }
