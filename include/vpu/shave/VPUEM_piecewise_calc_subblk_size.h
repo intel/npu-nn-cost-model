@@ -81,7 +81,7 @@ public:
                 }
             }
 
-            if (m == 2) {
+            if (m == 3) {
                 blk_tensor.set_shape(m - 3, round_dim(max_num_data,
                                                       (blk_tensor.get_shape()[m - 1] * blk_tensor.get_shape()[m - 2])));
                 if (blk_tensor.get_shape()[m - 3] > int(ts.get_shape()[m - 2])) {
