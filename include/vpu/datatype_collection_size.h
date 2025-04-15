@@ -24,22 +24,22 @@ namespace VPUNN {
  *
  * @param elements_count the number of elements
  * @param datatype elements type
- * @returns number of bytes(memory) necessary to hold the elements
+ * @returns if elements_count<=0 or invalid datatype return 0 else return the number of bytes(memory) necessary to hold the elements
  */
 template <class T>
 inline T compute_size_in_bytes(const T elements_count, const DataType& datatype) noexcept {
     static_assert(std::is_integral_v<T>);
     T size{0};
-    const unsigned int type_dimension{dtype_to_bytes(datatype)};
-    if (elements_count > 0) {
+    const int type_dimension{dtype_to_bytes(datatype)};
+    if (elements_count > 0 && type_dimension > 0) {
         // if type is a submultiple of 8 bits multiple elements of this type can fit into one byte
         if (type_dimension == 1) {
             const int elements_per_byte{types_per_byte(datatype)};
-            /* coverity[divide_by_zero] */
-            const int reminder = elements_count % elements_per_byte;
-            /* coverity[divide_by_zero] */
-            const T fullBytes{(elements_count / elements_per_byte)};
-            size = ((reminder != 0) ? (fullBytes + 1) : fullBytes);
+            if (elements_per_byte > 0) {
+                const int reminder = elements_count % elements_per_byte;
+                const T fullBytes{(elements_count / elements_per_byte)};
+                size = ((reminder != 0) ? (fullBytes + 1) : fullBytes);
+            }
         } else {
             size = elements_count * type_dimension;
         }
@@ -55,14 +55,13 @@ inline T compute_size_in_bytes(const T elements_count, const DataType& datatype)
  * @return a long that represent number of elements
  */
 inline long compute_elements_count_from_bytes(const long size_in_bytes, const DataType& datatype) noexcept {
-    const unsigned int bytes_per_type{dtype_to_bytes(datatype)};
+    const int bytes_per_type{dtype_to_bytes(datatype)};
 
     if (size_in_bytes > 0) {
         if (bytes_per_type == 1) {
             const int elements_per_byte{types_per_byte(datatype)};
             return elements_per_byte * size_in_bytes;
         }
-        /* coverity[divide_by_zero] */
         return size_in_bytes / bytes_per_type;
     } else {
         return 0;

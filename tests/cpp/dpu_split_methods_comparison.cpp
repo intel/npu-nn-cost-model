@@ -154,13 +154,13 @@ TEST_F(TestSplitMethodsComparisons, Convolution_3x3) {
     };
     {
         std::string tst = " 3x3H16 ";
-        DPUWorkload wl{tst_refH16};
+        DPUWorkload wl{std::move(tst_refH16)};
         check_Cluster_vs_SOH(wl, tst);
     }
 
     {
         std::string tst = " 3x3H19 ";
-        DPUWorkload wl{tst_refH19};
+        DPUWorkload wl{std::move(tst_refH19)};
         check_Cluster_vs_SOH(wl, tst);
     }
     check_Cluster_vs_SOH(tst_refH38, " 3x3H38 ");

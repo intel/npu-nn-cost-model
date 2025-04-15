@@ -212,7 +212,7 @@ private:
     friend std::ostream& operator<<(std::ostream& stream, const VPUNN::VPUEMSpatialModel& d);
 
 public:
-    VPUEMSpatialModel(DataType dtype, const CostFunctionSpatialDescriptor costFunctionSpatialData,
+    VPUEMSpatialModel(DataType dtype, const CostFunctionSpatialDescriptor& costFunctionSpatialData,
                       unsigned int DpuFreq, unsigned int ShvFreq)
             : VPUEMShaveCyclesProvider<VPUEMSpatialModel>{DpuFreq, ShvFreq}, dtype_(dtype), costFunction_(costFunctionSpatialData) {}
 

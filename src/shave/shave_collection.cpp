@@ -341,4 +341,7 @@ void ShaveInstanceHolder_NPU40::populate() {
 
     // clang-format on
 }
+
+//////////////////////////////////////////////
+
 }  // namespace VPUNN

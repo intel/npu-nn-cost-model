@@ -44,7 +44,7 @@ public:
     ~VPU2_0_WorkloadValidValues() = default;
 
 private:
-    inline static const Values<ExecutionMode> valid_execution_order_def{
+    inline static const Values<ExecutionMode> valid_execution_order_all{
             ExecutionMode::VECTOR_FP16,
             ExecutionMode::VECTOR,
             ExecutionMode::MATRIX,
@@ -118,11 +118,21 @@ private:
             Operation::MAXPOOL,         //
     };
 
+    inline static const IDeviceValidValues::ValidExecutionModes valid_execution_order_map_default{
+            // valid execution modes based on operations
+            {
+                    {Operation::CONVOLUTION, valid_execution_order_all},     //
+                    {Operation::DW_CONVOLUTION, valid_execution_order_all},  //
+                    {Operation::CM_CONVOLUTION, valid_execution_order_all},  //
+                    {Operation::ELTWISE, valid_execution_order_all},         //
+                    {Operation::MAXPOOL, valid_execution_order_all},         //
+            }};
+
 public:
     /// constructor with link to operations dynamic behavior
     VPU2_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
             : IDeviceValidValues(op_dynamic_constraints,
-                                 valid_execution_order_def,          //
+                                 valid_execution_order_map_default,  //
                                  valid_swizzlings_def,               //
                                  valid_layouts_def,                  //
                                  devices_def,                        //
@@ -139,17 +149,17 @@ public:
     VPU2_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
                                const int& input_heigth_start_factor_SOH_)
             : IDeviceValidValues(op_dynamic_constraints,
-                                 valid_execution_order_def,       //
-                                 valid_swizzlings_def,            //
-                                 valid_layouts_def,               //
-                                 devices_def,                     //
-                                 cmx_KB_sizes_def,                //
-                                 output_write_tile_options_def,   //
-                                 isi_stategy_options_def,         //
-                                 weigths_alignment_def,           //
-                                 input_heigth_start_factor_SOH_,  // special
-                                 valid_datatypes_map_default,     //
-                                 valid_operations_default,        //
+                                 valid_execution_order_map_default,  //
+                                 valid_swizzlings_def,               //
+                                 valid_layouts_def,                  //
+                                 devices_def,                        //
+                                 cmx_KB_sizes_def,                   //
+                                 output_write_tile_options_def,      //
+                                 isi_stategy_options_def,            //
+                                 weigths_alignment_def,              //
+                                 input_heigth_start_factor_SOH_,     // special
+                                 valid_datatypes_map_default,        //
+                                 valid_operations_default,           //
                                  alignement_size_bytes_def){};
 
 protected:
@@ -205,6 +215,10 @@ public:
                                                                : output_channels_restrictions;
     }
 
+    bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept override {
+        return false;  // layer is above the workload, no need to check
+    };
+
 protected:
 };
 
@@ -217,6 +231,10 @@ public:
     /// constructor with link to operations dynamic behavior
     VPU2_0_LayerOnTileValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_cosntraints)
             : VPU2_0_WorkloadValidValues(op_dynamic_cosntraints){};
+
+    bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept override {
+        return false;  // layer is above the workload, no need to check
+    };
 
 protected:
 };

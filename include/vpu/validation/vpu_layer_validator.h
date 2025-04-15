@@ -35,7 +35,8 @@ namespace VPUNN {
 /// layer level operations dynamic behavior
 using LayerOperationsBehaviour =
         Behaviours<CONVOLUTION_Constraints_Layer, DW_CONVOLUTION_Constraints_Layer, CM_CONVOLUTION_Constraints_Layer,
-                   ELTWISE_Constraints_Layer, MAXPOOL_Constraints_Layer, LAYERNORM_Constraints_Layer, ELTWISE_MUL_Constraints_Layer>;
+                   ELTWISE_Constraints_Layer, MAXPOOL_Constraints_Layer, LAYERNORM_Constraints_Layer,
+                   ELTWISE_MUL_Constraints_Layer, AVGPOOL_Constraints_Layer>;
 
 /// @brief services for Layer validation
 class VPU_LayerValidator :
@@ -87,6 +88,8 @@ public:
         };
 
         const WHCBTensorShape extended_border_coeff{border_coeff(strategy, nTiles)};
+        const bool extend_horizonatal_dimension_range{TilingStrategyInfo::isHorizontalTiling(strategy)};
+        const bool extend_vertical_dimension_range{TilingStrategyInfo::isVerticalTiling(strategy)};
 
         Checker checker;
         try {
@@ -124,11 +127,13 @@ public:
                 const auto& in0{w.input_0};
                 // what to do with batch??
 
-                std::pair<int, int> height_interval{config.get_input_height_interval(w)};
+                std::pair<int, int> height_interval{
+                        config.get_input_height_interval(w, extend_vertical_dimension_range)};
                 height_interval.second = height_interval.second * extended_border_coeff.height();
                 checker.check_is_in_interval((int)in0.height, height_interval, "input_0.height");
 
-                std::pair<int, int> width_interval{config.get_input_width_interval(w)};
+                std::pair<int, int> width_interval{
+                        config.get_input_width_interval(w, extend_horizonatal_dimension_range)};
                 width_interval.second = width_interval.second * extended_border_coeff.width();
                 checker.check_is_in_interval((int)in0.width, width_interval, "input_0.width");
 
@@ -173,11 +178,17 @@ public:
                 checker.check_is_in_requirements((int)w.output_0.channels, output_range, "output_0.channels");
 
                 {  // special SOH situation ;  to do: should be captured in the generic approach
-                    if (w.isi_strategy ==
-                        ISIStrategy::SPLIT_OVER_H) {  // SOH or SOHO, be careful to set this correctly for layer
+                    if (TilingStrategyInfo::isVerticalTiling(strategy)) {  // SOH
                         if (w.output_0.height <= 1) {
-                            // cannot do split
-                            checker.add_check_failed("can't do SPLIT_OVER_H if output_0_.height is <= 1");
+                            checker.add_check_failed("can't do H split if output_0_.height is <= 1");
+                        } else {
+                            // check special corner case  for se_sp_size_se_size se_sp_size1_se_size
+                            //   @todo ?
+                        }
+                    }
+                    if (TilingStrategyInfo::isHorizontalTiling(strategy)) {  // SOW
+                        if (w.output_0.width <= 1) {
+                            checker.add_check_failed("can't do W split  if output_0_.width is <= 1");
                         } else {
                             // check special corner case  for se_sp_size_se_size se_sp_size1_se_size
                             //   @todo ?
@@ -197,10 +208,13 @@ public:
                 const auto& in1{w.input_1};
                 checker.check_is_in_list(in1.datatype, config.get_weights_valid_datatypes(w), "input_1.datatype");
             }
-            {  // sparsity check on all channels
+            {  // sparsity check on all channels (duplicated code with operations checker)
 
                 if ((w.input_0.sparsity < 0.0F) || (w.input_0.sparsity > 1.0F)) {
                     checker.add_check_failed("input_0.sparsity not in interval [0.0, 1.0] !");
+                }
+                if (w.input_0.sparsity_enabled && w.input_0.sparsity < 0.01F) {  // extra check for activations
+                    checker.add_check_failed("input_0.sparsity is enabled but too low, almost zero!");
                 }
 
                 if ((w.input_1.sparsity < 0.0F) || (w.input_1.sparsity > 1.0F)) {
@@ -212,7 +226,12 @@ public:
                         checker.add_check_failed(info_out);
                 }
             }
-            { checker.check_is_in_list(w.execution_order, config.get_valid_execution_order(), "Execution_Order"); }
+            {  // no low level checks at LAYER level
+               // if (config.mustExecuteHWLowLevelChecks(w)) {  // do not skip
+               //     checker.check_is_in_list(w.execution_order, config.get_valid_execution_order(w),
+               //     "Execution_Order");
+               // }
+            }
             // no padding optimization checked
 
             {  // check correlation between in-out tensors

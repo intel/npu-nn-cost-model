@@ -24,6 +24,7 @@
 #include "core/logger.h"
 #include "core/utils.h"
 #include "vpu/dpu_types.h"
+#include "vpu/dma_types.h"
 #include "vpu/utils.h"
 #include "vpu/serializer_utils.h"
 
@@ -389,6 +390,9 @@ public:
 
         if constexpr (FMT == FileFormat::CSV) {
             // Decode CSV line
+            // TODO: Handle cells where content is between quotes
+            // eg. cell1, cell2, "cell3,other stuff"
+            // should be decoded into 3 cells instead of 4
             while (std::getline(iss, token, ',')) {  // fails to read and empty info after last  delimiter
                 read_tokens.push_back(token);
             }
@@ -711,20 +715,21 @@ public:
 
             // Check if currently evaluated type has a member map
             if constexpr (has_member_map_v<argtype>) {
-                const auto member_names = argtype::_get_member_names();
-                auto member_map = arg._member_map;
+                const auto& member_names = argtype::_get_member_names();
                 // Iterate over the member_names and deserialize each member if it exists in the index map
                 for (auto& key_member : member_names) {
                     const auto it = arg._member_map.find(key_member);
                     if (index_map.count(key_member) > 0 &&
                         index_map.at(key_member) < static_cast<int>(read_tokens.size())) {
                         std::istringstream ss(read_tokens[index_map.at(key_member)]);
+                        if (ss.str().length() <= 0) continue;  // empty value, skip
 
                         const auto key_var{key_member};
 
                         // Member map is a heterogeneous map, so we need to use std::visit to handle different types
                         std::visit(
                                 [&ss, &key_var](auto&& _arg) {
+                                    
                                     // Special case - getter/setter style field - TODO: generalize
                                     if constexpr (std::is_same_v<std::decay_t<decltype(_arg)>,
                                                                  VPUNN::SetGet_MemberMapValues>) {
@@ -732,8 +737,7 @@ public:
                                         ss >> val;
                                         // arg have two parameters first one is true and that means that arg is in
                                         // set_mode, second parameter is the read value we want to assign to a variable
-                                        /* coverity[copy_instead_of_move] */
-                                        _arg(true, val);
+                                        _arg(true, std::move(val));
                                     } else {
                                         ss >> _arg.get();  // Base case - convert to type of arg, throw if conversion
                                                            // fails

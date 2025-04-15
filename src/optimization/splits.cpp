@@ -7,6 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
+#include "vpu/optimization/splits.h"
 #include "vpu/optimization/tiler.h"
 
 namespace VPUNN {
@@ -22,7 +23,7 @@ static DPUWorkload createIncompleteTile(const DPULayer& layer, const std::array<
     return split;
 }
 
-static DPUWorkload createTileHW(const DPULayer& layer, const unsigned int width, const unsigned int height,
+ DPUWorkload createTileHW(const DPULayer& layer, const unsigned int width, const unsigned int height,
                                 const unsigned int offset_width, const unsigned int offset_height, HaloWorkload halo) {
     DPUWorkload wl{
             createIncompleteTile(layer, {width, height, layer.outputs[0].z(), 1}, {offset_width, offset_height, 0, 0})};
@@ -30,7 +31,7 @@ static DPUWorkload createTileHW(const DPULayer& layer, const unsigned int width,
     return wl;
 }
 
-static DPUWorkload createTileZ(const DPULayer& layer, const unsigned int channels, const unsigned int offset_channels) {
+ DPUWorkload createTileZ(const DPULayer& layer, const unsigned int channels, const unsigned int offset_channels) {
     return createIncompleteTile(layer, {layer.outputs[0].x(), layer.outputs[0].y(), channels, 1},
                                 {0, 0, offset_channels, 0});
 }
@@ -41,6 +42,7 @@ static bool isValidZ(unsigned int channels, const std::vector<unsigned int>& val
     return std::find(validZTiles.begin(), validZTiles.end(), channels) != validZTiles.end();
 }
 
+// @todo redesign at least here, if not also above!
 void splitOverZ(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                 const unsigned int nWorkloads, const std::vector<unsigned int>& validZTiles) {
     DPUWorkloadsWithCyclesSplit workloads_split;
@@ -74,7 +76,7 @@ void splitOverZ(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& s
         channels -= actual_channels;
     }
     ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(workloads_split, mode, layer);  // computes also input tensor
-    splitPool.push_back(workloads_split);
+    splitPool.push_back(std::move(workloads_split));
 }
 
 void splitOverHW(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& splitPool,
@@ -180,7 +182,7 @@ void splitOverHW(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& 
 
     ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(
             workloads_split, mode, layer);  // computes also input tensor, and halo inoput sanitisation
-    splitPool.push_back(workloads_split);
+    splitPool.push_back(std::move(workloads_split));
 }
 
 }  // namespace VPUNN

@@ -76,17 +76,17 @@ else()
     endif()
 endif()
 
-add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/../../include/vpunn_generated.h"
-    COMMAND ${flatc_COMMAND} --cpp -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "vpunn.fbs"
-    DEPENDS "vpunn.fbs"
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/../../include/vpunn_generated.h" "${CMAKE_CURRENT_BINARY_DIR}/../../include/cycles_cache_generated.h"
+    COMMAND ${flatc_COMMAND} --cpp -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "vpunn.fbs" "cycles_cache.fbs"
+    DEPENDS "vpunn.fbs" "cycles_cache.fbs"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/schema"
     COMMENT "Generating c++ schema files")
 
 add_custom_target(cpp_schema
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/../../include/vpunn_generated.h")
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/../../include/vpunn_generated.h" "${CMAKE_CURRENT_BINARY_DIR}/../../include/cycles_cache_generated.h")
 
 add_custom_target(python_schema ALL
-    COMMAND ${flatc_COMMAND} --python -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "../src/schema/vpunn.fbs"
+    COMMAND ${flatc_COMMAND} --python -o "${CMAKE_CURRENT_BINARY_DIR}/../../include" "../src/schema/vpunn.fbs" "../src/schema/cycles_cache.fbs"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/python"
     COMMENT "Generating python schema files")
 

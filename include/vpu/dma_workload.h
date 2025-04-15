@@ -129,6 +129,7 @@ public:
                 0,                 // dst_plane_stride;
                 memory_direction,  // transfer_direction
         };
+        /* coverity[copy_instead_of_move] */
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
 
@@ -146,21 +147,21 @@ public:
             (in.get_dtype() != out.get_dtype()) ||  // not same datatype
             (in.get_layout() != out.get_layout())   // not same layout
         ) {
-            throw std::runtime_error("Cannot create a DMANNWorkload_NPU40_5RESERVED from a DMAWorkload if size or datatype or "
+            throw std::runtime_error("Cannot create a DMANNWorkload_NPU40_RESERVED from a DMAWorkload if size or datatype or "
                                      "layout are changing!");
         }
         // check if memory direction is representable
         const MemoryDirection memory_direction{create_direction(dma.input_location, dma.output_location)};
         if (memory_direction == MemoryDirection::__size) {
             throw std::runtime_error(
-                    "Cannot create a DMANNWorkload_NPU40_50 from a DMAWorkload : unknown memory direction");
+                    "Cannot create a DMANNWorkload_NPU40_RESERVED from a DMAWorkload : unknown memory direction");
         }
 
         // safe to try representation
 
         const int dim_in_bytes{static_cast<int>(dma.input.size())};
 
-        DMANNWorkload_NPU40_RESERVED equivalentWorkload{
+        const DMANNWorkload_NPU40_RESERVED equivalentWorkload{
                 dma.device,    // VPUDevice device;  ///< NPU device
                 dim_in_bytes,  // int src_width;
                 dim_in_bytes,  // int dst_width;
@@ -169,6 +170,7 @@ public:
                 Num_DMA_Engine::Num_Engine_1,
                 memory_direction  // MemoryDirection transfer_direction;
         };
+        /* coverity[copy_instead_of_move] */
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
 
@@ -180,7 +182,7 @@ public:
         return create_NPU40_RESERVED_workload(dma);
     }
 
-protected:
+public:
     using LocationKey = std::pair<MemoryLocation, MemoryLocation>;  // DRAM, CMX, CSRAM, UPA
     using DirectionMap = std::map<LocationKey, MemoryDirection>;
 
@@ -230,7 +232,7 @@ public:
                 0,                     // dst_plane_stride;
                 dma.memory_direction,  // transfer_direction
         };
-
+        /* coverity[copy_instead_of_move] */
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
 };
@@ -283,7 +285,7 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMANNWorkload
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMANNWorkload_NPU40_RESERVED& d) {
-    stream << "DMANNWorkload_NPU40_RESERVED: \n"                                                                            //
+    stream << "DMANNWorkload_NPU40_RESERVED: \n"                                                                         //
            << "device: \t" << (int)d.device << " : " << VPUDevice_ToText.at(static_cast<int>(d.device)) << " ;\n"  //
            << "src_width: \t" << d.src_width << " ;\n"
            << "dst_width: \t" << d.dst_width << " ;\n"

@@ -218,7 +218,7 @@ protected:
             {Swizzling::KEY_0},                                          // output_swizzling
             1,                                                           // output_write_tiles
             {0, 0, 0, 0},                                                // offsets
-            ISIStrategy::SPLIT_OVER_H,                                   // isi_strategy
+            ISIStrategy::CLUSTERING,                                   // isi_strategy
             false,                                                       // weight_sparsity_enabled
     };
     inline static const DPUWorkload s5_elmws_c1{s5_elmws_c0};
@@ -441,8 +441,8 @@ TEST_F(TestResnet50_3Layers, Energy_ResNet50F3_EISXW_101805) {
             {{s4_conv_c1, s4_conv_name}, {3452, 3136.0F}, 30.0f},     // old 4745,  v16 4369    v17 4324   gt 3452.8 big
             {{s5_elmws_c1, s5_elmws_name}, {23705, 245.0F}, 20.0f}};  // old 3909,  v16 26334   v17 28362  gt 23705.5
 
-    test_energy_and_cyc(tests_cluster_0, 50U, 50.0F, 5.0F);
-    test_energy_and_cyc(tests_cluster_1, 50U, 50.0F, 5.0F);
+    test_energy_and_cyc(std::move(tests_cluster_0), 50U, 50.0F, 5.0F);
+    test_energy_and_cyc(std::move(tests_cluster_1), 50U, 50.0F, 5.0F);
 
     /*
         std::cout << "\n ------------------------------------------------------------------------\n ";
@@ -482,15 +482,13 @@ protected:
         return wl;
     }
 
-    /* coverity[pass_by_value] */
-    std::string wl_info(DPUWorkload wl) {
+    std::string wl_info(const DPUWorkload &wl) {
         return " Op: " + Operation_ToText.at(static_cast<int>(wl.op)) +
                " in0_swizz: " + Swizzling_ToText.at(static_cast<int>(wl.input_swizzling[0])) +
                " out0_swizz: " + Swizzling_ToText.at(static_cast<int>(wl.output_swizzling[0])) + "\n ";
     }
 
-    /* coverity[pass_by_value] */
-    std::array<std::string, 4> name_wl(std::array<DPUWorkload, 4> wls) {
+    std::array<std::string, 4> name_wl(const std::array<DPUWorkload, 4>& wls) {
         std::array<std::string, 4> named_wls{};
         for (int i = 0; i < 4; i++) {
             named_wls[i] = wl_info(wls[i]);
@@ -529,12 +527,10 @@ TEST_P(DifferentSwizz, Diff_In_Out_Swizz_Cycles_Comparing_NPU40) {
     DPUWorkload wl_K50 = changeSwizz(wl, Swizzling::KEY_5, Swizzling::KEY_0);
     DPUWorkload wl_K55 = changeSwizz(wl, Swizzling::KEY_5, Swizzling::KEY_5);
 
-    /* coverity[copy_instead_of_move] */
-    std::array<DPUWorkload, 4> wls{wl_K00, wl_K05, wl_K50, wl_K55};
+    std::array<DPUWorkload, 4> wls{std::move(wl_K00), std::move(wl_K05), std::move(wl_K50), std::move(wl_K55)};
     std::array<std::string, 4> named_wls{name_wl(wls)};
 
-    /* coverity[pass_by_value] */
-    auto lambda = [this, &tst_info, &tolerance](std::array<DPUWorkload, 4> wls, std::array<std::string, 4> named_wls) {
+    auto lambda = [this, &tst_info, &tolerance](const std::array<DPUWorkload, 4>& wls, std::array<std::string, 4> &named_wls) {
         unsigned cost_cyc{};
         std::string info;
         std::array<unsigned int, 4> wls_cost_cyc;
@@ -566,7 +562,6 @@ TEST_P(DifferentSwizz, Diff_In_Out_Swizz_Cycles_Comparing_NPU40) {
                 << " should be greater than cost cycle for workload " << named_wls[swizz05] << "\n";
     };
 
-    /* coverity[copy_instead_of_move] */
     lambda(wls, named_wls);
 }
 

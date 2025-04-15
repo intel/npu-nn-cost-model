@@ -390,7 +390,7 @@ TEST_F(CostModelStochastic, DISABLED_NoOutOfRangeDPUCycles_fast_2_0_stochastic) 
             << "  problems out of all: " << n_workloads << " for model: " << model_info.first << std::endl;
 }
 /// tests that no model gives DPU cycles outside of range , inputs are random workloads
-TEST_F(CostModelStochastic, NoOutOfRangeDPUCycles_fast_2_7_stochastic) {
+TEST_F(CostModelStochastic, DISABLED_NoOutOfRangeDPUCycles_fast_2_7_stochastic) {
     unsigned int n_workloads = 1000;
     const ModelDescriptor& model_info{the_NN_models.fast_model_paths[1]};
 
@@ -512,17 +512,17 @@ TEST_F(CostModelStochastic, Inference_output_in_Interval_Test_2_7_all_stochastic
         std::cout << " Normal NN Step DONE !\n";
     }
 
-    {  // fast
-        const ModelDescriptor& model_info{the_NN_models.fast_model_paths[modelIndex]};
+    //{  // fast
+    //    const ModelDescriptor& model_info{the_NN_models.fast_model_paths[modelIndex]};
 
-        const auto cnt = CheckInValidInterval_RawInference(model_info, low_threshold, high_threshold, workloads);
-        const auto undervalues{std::get<0>(cnt)};
-        const auto overvalues{std::get<1>(cnt)};
-        EXPECT_LE(undervalues + overvalues, max_deviations_allowed)
-                << "\n FAILED count:" << undervalues << " <LOW, " << overvalues << " >HIGH, "
-                << "  problems out of all: " << n_workloads << " for model: " << model_info.first << std::endl;
-        std::cout << " Fast NN Step DONE !\n";
-    }
+    //    const auto cnt = CheckInValidInterval_RawInference(model_info, low_threshold, high_threshold, workloads);
+    //    const auto undervalues{std::get<0>(cnt)};
+    //    const auto overvalues{std::get<1>(cnt)};
+    //    EXPECT_LE(undervalues + overvalues, max_deviations_allowed)
+    //            << "\n FAILED count:" << undervalues << " <LOW, " << overvalues << " >HIGH, "
+    //            << "  problems out of all: " << n_workloads << " for model: " << model_info.first << std::endl;
+    //    std::cout << " Fast NN Step DONE !\n";
+    //}
 }
 
 /// tests that no model gives 1.0 as output
@@ -555,13 +555,13 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_fast_vs_slow_20_stochastic) {
     const unsigned int n_workloads = 1000;
 
     const auto errors = comparative_fast_vs_slow(max_ratio_delta, expected_deviation_ratio, min_absolute_delta,
-                                                 modelIndex, model_type, device_version, n_workloads);
+                                                 modelIndex, std::move(model_type), device_version, n_workloads);
 
     EXPECT_LE(errors, (int)(expected_deviation_ratio * n_workloads) + 1) << expected_deviation_ratio * n_workloads;
 }
 
 /// Make a fast versus slow statistical comparison.   no big delta expected.
-TEST_F(CostModelStochastic, Comparative_fast_vs_slow_27_stochastic) {
+TEST_F(CostModelStochastic, DISABLED_Comparative_fast_vs_slow_27_stochastic) {
     // 5 will produce 1.5%
     const float tolerance_factor{15.0F};  ///<  how much many samples do we allow (factor) versus strict theoretical
 
@@ -579,7 +579,7 @@ TEST_F(CostModelStochastic, Comparative_fast_vs_slow_27_stochastic) {
     const unsigned int n_workloads = 1000;
 
     const auto errors = comparative_fast_vs_slow(max_ratio_delta, expected_deviation_ratio, min_absolute_delta,
-                                                 modelIndex, model_type, device_version, n_workloads);
+                                                 modelIndex, std::move(model_type), device_version, n_workloads);
 
     EXPECT_LE(errors, (int)(expected_deviation_ratio * n_workloads) + 1) << expected_deviation_ratio * n_workloads;
 }

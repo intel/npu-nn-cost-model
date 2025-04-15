@@ -8,6 +8,9 @@
 // Software Package for additional details.
 
 #include "vpu/optimization/tiler.h"
+#include "vpu/optimization/splits.h"
+
+#include "vpu/optimization/dimension_tiler.h"
 
 namespace VPUNN {
 
@@ -86,8 +89,7 @@ static void inferInputTensorShape(DPUWorkload& wl, const DPULayer& originalLayer
 }
 
 void ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(DPUWorkloadsWithCyclesSplit& workloads_split,
-                                                          const ExecutionMode mode,
-                                                          const DPULayer& originalLayer) {
+                                                          const ExecutionMode mode, const DPULayer& originalLayer) {
     for (auto& wl : workloads_split.workloads) {
         wl.execution_order = mode;
         inferInputTensorShape(wl, originalLayer);
@@ -115,14 +117,18 @@ static std::vector<unsigned int> getSplitsFromRange(const unsigned int maxSplitR
 
 /**
  * @brief Return true if the layer require a maximum size in Z
+ * ALso NOT suitable for HW tiling!
+ * CM_CONV is not allowed for split, (Hw due to this presence)??
  *
  * @param layer the DPULayer object to optimize
  */
 static bool requireMaxZTile(const DPULayer& layer) {
-    if (layer.device == VPUDevice::VPU_2_7 || layer.device == VPUDevice::VPU_4_0 ||
-        layer.device == VPUDevice::NPU_RESERVED || layer.device == VPUDevice::NPU_RESERVED_W) {
-        if (layer.op == Operation::CM_CONVOLUTION || layer.op == Operation::MAXPOOL ||
-            layer.op == Operation::DW_CONVOLUTION || layer.op == Operation::AVEPOOL) {
+    if (layer.device >= VPUDevice::VPU_2_7) {
+        if (                                          /*layer.op == Operation::CM_CONVOLUTION || */
+            layer.op == Operation::MAXPOOL ||         //
+            layer.op == Operation::DW_CONVOLUTION ||  //
+            layer.op == Operation::AVEPOOL            //
+        ) {
             return true;
         }
     }
@@ -130,14 +136,14 @@ static bool requireMaxZTile(const DPULayer& layer) {
 }
 
 std::list<DPUWorkloadsWithCyclesSplit> ITilerAlgorithm::split_tile_in_workloads(const ExecutionMode mode,
-                                                                 const unsigned int nWorkloads) {
+                                                                                const unsigned int nWorkloads) {
     std::list<DPUWorkloadsWithCyclesSplit> splitPool;
-    // Optimized for 1 workloads
+    // Optimized for 1 workloads  (todo Analyse if necessary,  what if it is not valid?)
     if (nWorkloads == 1) {
         DPUWorkloadsWithCyclesSplit workloads_split{{Cycles::NO_ERROR}, {layer_on_tile}};  // same as original
         ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(workloads_split, mode,
                                                              layer_on_tile);  // computes also input tensor
-        splitPool.push_back(workloads_split);
+        splitPool.push_back(std::move(workloads_split));
     } else {
         tileMultipleWl(splitPool, mode, nWorkloads);
     }
@@ -151,6 +157,14 @@ std::list<DPUWorkloadsWithCyclesSplit> ITilerAlgorithm::split_tile_in_workloads(
  */
 class ZTiling : public ITilerAlgorithm {
 public:
+    static constexpr bool force_LegacyZTiling{
+    // this is used only in .cpp, cmake control should properly affect only  this component
+#ifdef VPUNN_OPT_LEGACY_ZTILING
+            true
+#else
+            false
+#endif
+    };
     /**
      * @brief Using the Tiler class constructor
      *
@@ -166,9 +180,8 @@ public:
      */
     std::set<unsigned int> generateSplitPool(const unsigned int numDPU,
                                              const ExecutionMode& valid_execution_mode) const override {
-        if (numDPU == 1 && (this->layer_on_tile.op == VPUNN::Operation::CONVOLUTION ||
-                            this->layer_on_tile.op == VPUNN::Operation::ELTWISE)) {
-            return {1U};  // why?
+        if (numDPU == 1 && isNoSplitOperation(this->layer_on_tile.op)) {
+            return {1U};  // why? CONV and ELEMwisae are not split?
         }
 
         // Enable ZTiling only for VPU2.0 in vector mode for non conv layers
@@ -220,14 +233,67 @@ public:
      */
     void tileMultipleWl(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                         const unsigned int nWorkloads) override {
-        // Some layers have a max size in Z by specification
-        const auto validZTiles{requireMaxZTile(layer_on_tile) ? std::vector<unsigned int>({16, 32, 64})
-                                                              : std::vector<unsigned int>({})};
-        splitOverZ(layer_on_tile, splitPool, mode, nWorkloads, validZTiles);
+        if (layer_on_tile.device < VPUDevice::NPU_RESERVED  //
+            || (force_LegacyZTiling)                   // Every device runs as before
+        ) {                                            // Some layers have a max size in Z by specification
+            const auto validZTiles{requireMaxZTile(layer_on_tile) ? std::vector<unsigned int>({16, 32, 64})
+                                                                  : std::vector<unsigned int>({})};
+            splitOverZ(layer_on_tile, splitPool, mode, nWorkloads, validZTiles);
+        } else {  // experimental for new devices
+            const SplitDimension splitter{
+                    requireMaxZTile(layer_on_tile) ? SmartRanges{16, 64, 16, 32}  // 16,32,64
+                                                   : SmartRanges{1, 8192, 16}     // div 16
+            };
+            splitInNOverZ(layer_on_tile, splitPool, mode, nWorkloads, splitter);
+        }
     }
 
     std::string name() const override {
         return "ZTiling";
+    }
+
+protected:
+    /// these operations do not require a split in Z (under some external conditions)
+    bool isNoSplitOperation(Operation op) const {
+        return (op == Operation::CONVOLUTION        //
+                || op == Operation::ELTWISE         //
+                || op == Operation::CM_CONVOLUTION  //
+                || op == Operation::LAYER_NORM      //
+                || op == Operation::ELTWISE_MUL);
+    }
+
+    void splitInNOverZ(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& splitPool,
+                       const ExecutionMode mode, const unsigned int nWorkloads, const SplitDimension& theSpliter) {
+        SplitDimension::SplitContainer split_bins{};  // empty
+        const int dimensionToSplit{static_cast<int>(layer.outputs[0].channels())};
+        const bool split_status = theSpliter.divideBalanced(dimensionToSplit, nWorkloads, split_bins);
+
+        if (!split_status) {
+            return;  // no valid split
+        }
+        if (split_bins.size() != nWorkloads) {
+            return;  // no valid split, ERROR in splitter
+        }
+
+        DPUWorkloadsWithCyclesSplit workloads_split;
+        int offset_channels{0};  // used/incremented  in  loop
+        for (const auto& split : split_bins) {
+            const auto actual_channels{split};
+
+            if (actual_channels <= 0) {
+                return;  // invalid split
+            }
+
+            workloads_split.workloads.emplace_back(
+                    createTileZ(layer, static_cast<unsigned>(actual_channels), static_cast<unsigned>(offset_channels)));
+            workloads_split.cycles.emplace_back(Cycles::NO_ERROR);
+
+            offset_channels += static_cast<unsigned>(actual_channels);  // for next iteration
+        }
+
+        ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(workloads_split, mode,
+                                                             layer);  // computes also input tensor
+        splitPool.push_back(workloads_split);
     }
 };
 
@@ -312,8 +378,7 @@ protected:
      * @param mode the selected ExecutionMode
      */
     void tileOverHW(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const unsigned int widthFactor,
-                    const unsigned int heightFactor,
-                    const ExecutionMode mode) {
+                    const unsigned int heightFactor, const ExecutionMode mode) {
         splitOverHW(layer_on_tile, splitPool, widthFactor, heightFactor, mode);
     }
 

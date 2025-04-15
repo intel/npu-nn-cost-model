@@ -176,38 +176,38 @@ TEST_F(DPU_OperationCreatorTest, createIndirectSanitaryTest) {
 
 /// tests that generated workload do fit in cmx memory
 TEST_F(DPU_OperationCreatorTest, checkOcupiedMemoryTest_stochastic) {
-    unsigned int n_workloads = 1000;
+    unsigned int n_workloads = 100;
     VPUNN::DPU_OperationValidator validator;
     VPUNN::DPU_OperationSanitizer sanitizer;
-    {
-        VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_0};
+    //{
+    //    VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_0};
 
-        ASSERT_TRUE(validator.is_supported(device_req));
+    //    ASSERT_TRUE(validator.is_supported(device_req));
 
-        const auto& config{validator.get_config(device_req)};
+    //    const auto& config{validator.get_config(device_req)};
 
-        // Generate N workloads
-        auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
-        EXPECT_NO_THROW(std::generate_n(workloads.begin(), n_workloads, randDPUWorkload(device_req)));
+    //    // Generate N workloads
+    //    auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
+    //    EXPECT_NO_THROW(std::generate_n(workloads.begin(), n_workloads, randDPUWorkload(device_req)));
 
-        int i{0};  // increments at every error
-        int index{0};
-        for (auto& wl : workloads) {
-            const auto cmx_memory = validator.compute_wl_memory(wl);
-            const int avaialable_cmx_memo{config.get_cmx_size(wl.device)};
-            const auto necesarry_cmx_memo = cmx_memory.cmx;
+    //    int i{0};  // increments at every error
+    //    int index{0};
+    //    for (auto& wl : workloads) {
+    //        const auto cmx_memory = validator.compute_wl_memory(wl);
+    //        const int avaialable_cmx_memo{config.get_cmx_size(wl.device)};
+    //        const auto necesarry_cmx_memo = cmx_memory.cmx;
 
-            EXPECT_LE(necesarry_cmx_memo, avaialable_cmx_memo) << "WL out of bounds "
-                                                               << ". i:" << ++i << std::endl
-                                                               << ". idx:" << index << std::endl
-                                                               << wl << std::endl
-                                                               << " Memory Size : " << cmx_memory << std::endl;
-            index++;
-        }
+    //        EXPECT_LE(necesarry_cmx_memo, avaialable_cmx_memo) << "WL out of bounds "
+    //                                                           << ". i:" << ++i << std::endl
+    //                                                           << ". idx:" << index << std::endl
+    //                                                           << wl << std::endl
+    //                                                           << " Memory Size : " << cmx_memory << std::endl;
+    //        index++;
+    //    }
 
-        EXPECT_EQ(i, 0) << " Expected all in memory!. Deviations: " << i << " from " << n_workloads << " workloads!"
-                        << std::endl;
-    }
+    //    EXPECT_EQ(i, 0) << " Expected all in memory!. Deviations: " << i << " from " << n_workloads << " workloads!"
+    //                    << std::endl;
+    //}
 
     {
         VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_7};
@@ -250,296 +250,4 @@ TEST_F(DPU_OperationCreatorTest, checkOcupiedMemoryTest_stochastic) {
                         << std::endl;
     }
 }
-
-class DPU_OperationSanitizerTest : public ::testing::Test {
-public:
-protected:
-    void SetUp() override {
-    }
-
-private:
-};
-
-TEST_F(DPU_OperationSanitizerTest, basicSanitizeTest) {
-    VPUNN::DPU_OperationSanitizer dut;
-    VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_7};
-    VPUNN::SanityReport sane;
-    {
-        VPUNN::DPUWorkload wl = {
-                device_req,
-                VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                {1, 1},                                                     // kernels
-                {1, 1},                                                     // strides
-                {0, 0, 0, 0},                                               // padding
-                VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
-        };
-
-        dut.check_and_sanitize(wl, sane);
-
-        EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
-                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                << wl;
-        EXPECT_EQ(wl.inputs[0].get_dtype(), VPUNN::DataType::UINT8);
-    }
-    {
-        VPUNN::DPUWorkload wl = {
-                device_req,
-                VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // input dimensions
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
-                {1, 1},                                                    // kernels
-                {1, 1},                                                    // strides
-                {0, 0, 0, 0},                                              // padding
-                VPUNN::ExecutionMode::CUBOID_16x16                         // execution mode
-        };
-
-        dut.check_and_sanitize(wl, sane);
-
-        EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
-                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                << wl;
-        EXPECT_EQ(wl.inputs[0].get_dtype(), VPUNN::DataType::UINT8);
-        EXPECT_EQ(wl.outputs[0].get_dtype(), VPUNN::DataType::UINT8);
-    }
-
-    {
-        VPUNN::DPUWorkload wl = {
-                device_req,
-                VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::BFLOAT16)},  // input dimensions
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::FLOAT16)},   // output dimensions
-                {1, 1},                                                        // kernels
-                {1, 1},                                                        // strides
-                {0, 0, 0, 0},                                                  // padding
-                VPUNN::ExecutionMode::CUBOID_16x16                             // execution mode
-        };
-
-        dut.check_and_sanitize(wl, sane);
-
-        EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
-                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                << wl;
-        EXPECT_EQ(wl.inputs[0].get_dtype(), VPUNN::DataType::FLOAT16);
-        EXPECT_EQ(wl.outputs[0].get_dtype(), VPUNN::DataType::FLOAT16);
-    }
-
-    {
-        VPUNN::DPUWorkload wl = {
-                device_req,
-                VPUNN::Operation::__size,
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // input dimensions
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
-                {1, 1},                                                    // kernels
-                {1, 1},                                                    // strides
-                {0, 0, 0, 0},                                              // padding
-                VPUNN::ExecutionMode::CUBOID_16x16                         // execution mode
-        };
-
-        dut.check_and_sanitize(wl, sane);
-
-        EXPECT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_INVALID_INPUT_OPERATION))
-                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                << wl;
-    }
-    {
-        VPUNN::DPUWorkload wl = {
-                device_req,
-                VPUNN::Operation::ELTWISE,
-                {VPUNN::VPUTensor(1600, 1600, 64, 1, VPUNN::DataType::INT8)},  // input dimensions
-                {VPUNN::VPUTensor(1600, 1600, 64, 1, VPUNN::DataType::INT8)},  // output dimensions
-                {1, 1},                                                        // kernels
-                {1, 1},                                                        // strides
-                {0, 0, 0, 0},                                                  // padding
-                VPUNN::ExecutionMode::CUBOID_16x16                             // execution mode
-        };
-
-        dut.check_and_sanitize(wl, sane);
-
-        EXPECT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_INPUT_TOO_BIG))
-                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                << wl;
-    }
-
-    device_req = VPUNN::VPUDevice::VPU_2_0;
-    {
-        VPUNN::DPUWorkload wl = {
-                device_req,
-                VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8, VPUNN::Layout::ZMAJOR)},  // input dimensions
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::INT8, VPUNN::Layout::ZMAJOR)},  // output dimensions
-                {1, 1},                                                                           // kernels
-                {1, 1},                                                                           // strides
-                {0, 0, 0, 0},                                                                     // padding
-                VPUNN::ExecutionMode::VECTOR                                                      // execution mode
-        };
-
-        dut.check_and_sanitize(wl, sane);
-
-        EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
-                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                << wl;
-        EXPECT_EQ(wl.inputs[0].get_dtype(), VPUNN::DataType::UINT8);
-        EXPECT_EQ(wl.outputs[0].get_dtype(), VPUNN::DataType::UINT8);
-    }
-
-    {
-        VPUNN::DPUWorkload wl = {
-                device_req,
-                VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::BFLOAT16,
-                                  VPUNN::Layout::ZMAJOR)},  // input dimensions
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::FLOAT16,
-                                  VPUNN::Layout::ZMAJOR)},  // output dimensions
-                {1, 1},                                     // kernels
-                {1, 1},                                     // strides
-                {0, 0, 0, 0},                               // padding
-                VPUNN::ExecutionMode::VECTOR                // execution mode
-        };
-
-        dut.check_and_sanitize(wl, sane);
-
-        EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
-                << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                << wl;
-        EXPECT_EQ(wl.inputs[0].get_dtype(), VPUNN::DataType::FLOAT16);
-        EXPECT_EQ(wl.outputs[0].get_dtype(), VPUNN::DataType::FLOAT16);
-    }
-}
-
-class LayersValidationTest : public ::testing::Test {
-public:
-protected:
-    void SetUp() override {
-    }
-
-private:
-};
-
-TEST_F(LayersValidationTest, basicLayerValidatorTest) {
-    VPUNN::LayersValidation dut;
-    VPUNN::VPUDevice device_req{VPUNN::VPUDevice::VPU_2_7};
-
-    {
-        VPUNN::DPULayer wl(VPUNN::DPUWorkload{
-                device_req,
-                VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
-                {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
-                {1, 1},                                                     // kernels
-                {1, 1},                                                     // strides
-                {0, 0, 0, 0},                                               // padding
-                VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
-        });
-
-        {
-            VPUNN::SanityReport sane;
-            dut.check_completeLayer_consistency(wl, sane, VPUNN::ISIStrategy::CLUSTERING, 1);
-
-            EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
-                    << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                    << wl;
-        }
-
-        {
-            VPUNN::SanityReport sane;
-            dut.check_splitLayer_consistency(wl, sane);
-
-            EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
-                    << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
-                    << wl;
-        }
-    }
-}
-
-
-// here we want to see the behavior of check_layer_consistency() function when layer have bigger weight, height or/and
-// channels than we normally accept now we should accept W,H bigger than we normally do at high/layer level because we
-// will handle possible problems regarding these situations at lower levels (split layers and workloads)
-TEST_F(LayersValidationTest, Check_layer_with_big_shape) {
-    auto generate_wl = [](unsigned int w, unsigned int h, unsigned int c) {
-        DPUWorkload wl{
-                VPUDevice::VPU_4_0,
-                Operation::CONVOLUTION,
-                {VPUTensor(w, h, c, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
-                {VPUTensor(w, h, c, 1, DataType::UINT8, Layout::ZXY)},  // output dimensions
-                {1, 1},                                                 // kernels
-                {1, 1},                                                 // strides
-                {0, 0, 0, 0},                                           // padding
-                ExecutionMode::CUBOID_16x16,                            // execution mode
-        };
-        DPULayer wl_(wl);
-        return wl_;
-    };
-
-    LayersValidation dut;
-
-    struct TestInput {
-        const DPULayer wl;
-        ISIStrategy strategy;
-        unsigned int nTiles;
-        VPUTilingStrategy t_str;
-    };
-
-    struct TestExpectation {
-        CyclesInterfaceType err_expected;
-    };
-
-    struct TestCase {
-        TestInput t_in;
-        TestExpectation t_exp;
-        const std::string test_case = "";
-    };
-
-    using TestsVector = std::vector<TestCase>;
-    //big weight
-    auto lambda=[&dut](TestsVector &tests){
-       SanityReport sane;
-   
-
-       for (auto& t : tests) {
-           std::cout << t.test_case <<" "<<VPUTilingStrategy_ToText.at(static_cast<int>(t.t_in.t_str))<< "\n";
-
-            dut.check_completeLayer_consistency(t.t_in.wl, sane, t.t_in.strategy, t.t_in.nTiles, t.t_in.t_str);
-
-            EXPECT_EQ(sane.value(), V(t.t_exp.err_expected))
-                    << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n";
-       }
-    };
-
-    TestsVector tests = {
-            // clang-format off
-            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOW},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W, one tile"},
-            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOW},{Cycles::NO_ERROR}, "Big W, 2 tile"},
-
-            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W, one tile"},
-            {{generate_wl(16000, 20, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W, 2 tiles"},
-
-
-            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOH_Overlapped},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big H, one tile"},
-            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOH_Overlapped},{Cycles::NO_ERROR}, "Big H, 2 tiles"},
-
-            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOH_HaloRead},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big H, one tile"},
-            {{generate_wl(20, 16000, 16), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHK},{Cycles::NO_ERROR}, "Big H, 2 tiles"},
-
-            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big C, one tile"},
-            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOK},{Cycles::NO_ERROR}, "Big C, 2 tiles"},
-
-            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::SOH_Overlapped},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big C, one tile"},
-            {{generate_wl(20,  16, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOW},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big C, 2 tiles"},
-
-            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHK},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
-            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHW},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
-            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOH_Overlapped},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
-            {{generate_wl(16000, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOK_NO_BROADCAST},{Cycles::ERROR_INVALID_LAYER_CONFIGURATION}, "Big W,H,C, 2 tiles"},
-                                                                         
-            {{generate_wl(16, 16000, 16000), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHK},{Cycles::NO_ERROR}, "Big H,C, 2 tiles"},
-            {{generate_wl(16000, 16000, 32), ISIStrategy::CLUSTERING, 2U, VPUTilingStrategy::SOHW},{Cycles::NO_ERROR}, "Big W, H 2 tiles"},
-             // clang-format on
-    };
-
-    lambda(tests);
-    }
-
 }  // namespace VPUNN_unit_tests

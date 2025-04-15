@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+#include "vpu/utils.h"
+
 namespace VPUNN {
 // policy for defining a range based on divisibility by a number
 class SmartRanges {
@@ -29,7 +31,7 @@ private:
 
 public:
     using value_type = int;
-    SmartRanges(int lowerBound_, int upperBound_, int divisor_ = 1, std::optional<int> second_div = std::nullopt)
+    SmartRanges(int lowerBound_, int upperBound_, int divisor_ = 1, std::optional<int> second_div = {})
             : lowerBound(lowerBound_), upperBound(upperBound_), divisor(divisor_), second_divisor{second_div} {
         // maybe we need here to verify if range is valid, something like lowerBound<upperBound
         // take care when range is [-3, -2] if multiplier is positive eg: multiplier=2 when you want to extend
@@ -44,20 +46,31 @@ public:
     /// @param text: a string with information when value does not respect all the requirements
     /// @return true if value respect all the requirements, false if not
     bool is_in(int value, std::string& text) const {
-        const bool belongs{(value >= lowerBound) && (value <= upperBound)};
-        const bool divisible{belongs ? ((value % divisor) == 0 ? true : false) : true};  // test only if belongs
+        // const bool belongs{(value >= lowerBound) && (value <= upperBound)};
+        // const bool divisible{belongs ? ((value % divisor) == 0 ? true : false) : true};  // test only if belongs
 
-        const bool second_check_enabled{(belongs && divisible) ? second_divisor.has_value()
-                                                               : false};  // test only if belongs and divisible
-        const bool second_divisible_OK{
-                (second_check_enabled && (value >= *second_divisor))         // cases when we are interested
-                        ? ((value % (*second_divisor)) == 0 ? true : false)  // has to be divisible by second_divisor
-                        : true  // OK because either not enabled or other conditions not met
-        };
+        // const bool second_check_enabled{(belongs && divisible) ? second_divisor.has_value()
+        //                                                        : false};  // test only if belongs and divisible
+        // const bool second_divisible_OK{
+        //         (second_check_enabled && (value >= *second_divisor))         // cases when we are interested
+        //                 ? ((value % (*second_divisor)) == 0 ? true : false)  // has to be divisible by second_divisor
+        //                 : true  // OK because either not enabled or other conditions not met
+        // };
 
-        const bool part_of_range{belongs && divisible && second_divisible_OK};
+        const bool part_of_range{is_in(value)};
 
         if (!part_of_range) {
+            const bool belongs{(value >= lowerBound) && (value <= upperBound)};
+            const bool divisible{belongs ? ((value % divisor) == 0 ? true : false) : true};  // test only if belongs
+
+            const bool second_check_enabled{(belongs && divisible) ? second_divisor.has_value()
+                                                                   : false};  // test only if belongs and divisible
+            const bool second_divisible_OK{
+                    (second_check_enabled && (value >= *second_divisor))  // cases when we are interested
+                            ? ((value % (*second_divisor)) == 0 ? true
+                                                                : false)  // has to be divisible by second_divisor
+                            : true  // OK because either not enabled or other conditions not met
+            };
             // error handling only if error, otherwise do not waist time
             text = "";
 
@@ -77,10 +90,73 @@ public:
 
         return part_of_range;
     }
+    bool is_in(int value) const {
+        const bool belongs{(value >= lowerBound) && (value <= upperBound)};
+        const bool divisible{belongs ? ((value % divisor) == 0 ? true : false) : true};  // test only if belongs
+
+        const bool second_check_enabled{(belongs && divisible) ? second_divisor.has_value()
+                                                               : false};  // test only if belongs and divisible
+        const bool second_divisible_OK{
+                (second_check_enabled && (value >= *second_divisor))         // cases when we are interested
+                        ? ((value % (*second_divisor)) == 0 ? true : false)  // has to be divisible by second_divisor
+                        : true  // OK because either not enabled or other conditions not met
+        };
+
+        const bool part_of_range{belongs && divisible && second_divisible_OK};
+
+        return part_of_range;
+    }
+
+    bool is_roundToNextLarger(int& value) const {
+        std::vector<int> candidates{};
+        candidates.reserve(2);
+
+        if (betweenLimits(value)) {
+            // first criteria  divisibility
+            {
+                const int div1_value{round_up(value, divisor)};
+                if (betweenLimits(div1_value)) {
+                    candidates.push_back(div1_value);  // candidate 1
+                }
+            }
+
+            {
+                if (second_divisor.has_value()) {
+                    const int div2_value{round_up(value , *second_divisor)};
+                    if (betweenLimits(div2_value)) {
+                        candidates.push_back(div2_value);  // candidate 2
+                    }
+                }
+            }
+        }
+
+        // chose smallest candidate that fits to the range
+        std::sort(candidates.begin(), candidates.end());
+        // iterate candidates and chose the first that fits to the range
+        for (const auto& candidate : candidates) {
+            if (is_in(candidate)) {
+                value = candidate;  // FOUND!
+                return true;
+            }
+        }
+
+        return false;  // no candidate found
+    };
+
+    std::optional<int> roundToNextLarger(int value) const {
+        if (is_roundToNextLarger(value)) {
+            return value;
+        }
+        return std::nullopt;
+    }
+
+    bool betweenLimits(int value) const {
+        return (value >= lowerBound) && (value <= upperBound);
+    }
 
     /// @brief multiplies the upper bound of the range by the given value
     /// @param multiplier used to adjust the range upper bound
-    /// 
+    ///
     /// @return a new SmartRanges with the upper bound of the range updated based on the multiplier
     SmartRanges multiply_upper(int multiplier) const {
         SmartRanges newRange{getLowerBound(), getUpperBound() * multiplier, divisor, second_divisor};
@@ -121,45 +197,6 @@ public:
     int getLowerBound() const {
         return this->lowerBound;
     }
-
-    ///// @return the number of elements that are in "this" range
-    // int range_size() const {
-    //     int total_range_elem_count;
-
-    //    if ((second_divisor.has_value()) && (second_divisor.value() >= lowerBound && second_divisor <= upperBound)) {
-    //        const int commonMultiple{std::lcm(divisor, second_divisor.value())};
-
-    //        // here we compute numbers of elements in range [lowerBound, second_divisor-1] <=> how many numbers in
-    //        range
-    //        // are divisible with divisor, but are not divisible with second_divisor
-    //        const int interBound{second_divisor.value() - 1};
-
-    //        const int firstDivisibleByDivisor{
-    //                lowerBound % divisor == 0 ? lowerBound : lowerBound + (divisor - (lowerBound % divisor))};
-    //        const int secondDivisibleByDivisor{
-    //                interBound % divisor == 0 ? interBound : interBound - (interBound % divisor)};
-
-    //        const int first_elem_count = (secondDivisibleByDivisor - firstDivisibleByDivisor) / divisor + 1;
-
-    //        // here we compute numbers of elements in range [second_divisor, upperBound] <=> how many numbers in range
-    //        // are divisible with both divisor and second_divisor and are greater than second_divisor
-    //        const int firstDivisibleByBoth{commonMultiple};
-    //        const int secondDivisibleByBoth{upperBound - (upperBound % commonMultiple)};
-
-    //        const int second_elem_count = (secondDivisibleByBoth - firstDivisibleByBoth) / commonMultiple + 1;
-
-    //        total_range_elem_count = first_elem_count + second_elem_count;
-
-    //    } else {
-    //        const int firstDivisible{lowerBound % divisor == 0 ? lowerBound
-    //                                                           : lowerBound + (divisor - (lowerBound % divisor))};
-    //        const int secondDivisible{upperBound - (upperBound % divisor)};
-
-    //        total_range_elem_count = (secondDivisible - firstDivisible) / divisor + 1;
-    //    }
-
-    //    return total_range_elem_count;
-    //}
 };
 
 }  // namespace VPUNN

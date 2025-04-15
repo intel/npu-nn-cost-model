@@ -10,6 +10,9 @@
 #ifndef VPUNN_CACHE_DESCRIPTORS
 #define VPUNN_CACHE_DESCRIPTORS
 
+// OBSOLETE/TENTATIVE DEVELOPMENT NOW
+
+
 #include <list>
 #include <map>
 #include <stdexcept>

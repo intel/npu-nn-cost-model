@@ -60,6 +60,7 @@ public:
 
     DeviceShaveContainer(const DeviceShaveContainer&) = delete;
     DeviceShaveContainer(DeviceShaveContainer&&) = default;
+    virtual ~DeviceShaveContainer() = default;
 
 public:
     VPUDevice getDevice() const {

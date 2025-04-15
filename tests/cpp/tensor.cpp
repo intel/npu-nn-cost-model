@@ -45,7 +45,7 @@ TEST_F(TestTensor, CreationNoInit) {
         VPUNN::Tensor<float> t(tst.dimensions);
         EXPECT_EQ(t.size(), tst.expected_size) << "size is not matching";
 
-        auto t_dim = t.shape();
+        const auto& t_dim = t.shape();
         ASSERT_EQ(t_dim.size(), tst.dimensions.size()) << "tensor dimensionality is not matching";
         ASSERT_EQ(t_dim, tst.dimensions);
 
@@ -70,7 +70,7 @@ TEST_F(TestTensor, CreationwithInit) {
         VPUNN::Tensor<float> t(tst.dimensions, tst.init_val);
         EXPECT_EQ(t.size(), tst.expected_size) << "size is not matching";
 
-        auto t_dim = t.shape();
+        const auto& t_dim = t.shape();
         ASSERT_EQ(t_dim.size(), tst.dimensions.size()) << "tensor dimensionality is not matching";
         ASSERT_EQ(t_dim, tst.dimensions);
 
@@ -101,7 +101,7 @@ TEST_F(TestTensor, CreationExternalData) {
         VPUNN::Tensor<float> t(memory, tst.dimensions);
         EXPECT_EQ(t.size(), tst.expected_size) << "size is not matching";
 
-        auto t_dim = t.shape();
+        const auto& t_dim = t.shape();
         ASSERT_EQ(t_dim.size(), tst.dimensions.size()) << "tensor dimensionality is not matching";
         ASSERT_EQ(t_dim, tst.dimensions);
 

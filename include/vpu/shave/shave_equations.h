@@ -277,17 +277,20 @@ class VPUEMSoftmaxEq {
 public:
     const CostFunctionSoftmaxDescriptor costFunctionSoftmaxData_;
 
-    VPUEMSoftmaxEq(const CostFunctionSoftmaxDescriptor costFunctionSoftmaxData)
+    VPUEMSoftmaxEq(const CostFunctionSoftmaxDescriptor& costFunctionSoftmaxData)
             : costFunctionSoftmaxData_(costFunctionSoftmaxData) {
     }
     
     int compute_softmax_shave_cycles(DataType dtype, const int h_output_size_bytes, const int hw_output_size_bytes, const int c_output_size_bytes,
                                            float cost_ratio = 1.0) {
-        
+        const int dtype_in_bytes = dtype_to_bytes(dtype);
+
+        if (dtype_in_bytes <= 0)
+            return -1;
+
         int hw_elements_size = 1;
         int h_elements_size = 1;
-        /* coverity[divide_by_zero] */
-        int c_elements_size = c_output_size_bytes / dtype_to_bytes(dtype);
+        int c_elements_size = c_output_size_bytes / dtype_in_bytes;
 
         if (hw_output_size_bytes != 1) {
             hw_elements_size = hw_output_size_bytes;
@@ -295,7 +298,7 @@ public:
             c_elements_size = c_output_size_bytes;
         }
 
-        int vector_size = 16 / dtype_to_bytes(dtype);
+        int vector_size = 16 / dtype_in_bytes;
         int unroll_size = vector_size * costFunctionSoftmaxData_.functionParams_[0].unroll_;
         if (costFunctionSoftmaxData_.spatial_) {
             int temp = h_elements_size;
@@ -374,7 +377,6 @@ public:
     }
 
     int compute_spatial_shave_cycles(DataType dtype, const int output_size_bytes) {
-        /* coverity[divide_by_zero] */
         int c_elements_size = output_size_bytes / dtype_to_bytes(dtype);
         float slope = costFunctionSpatialData_.slope[0];
         int cycles = (int) (1 / slope) * (c_elements_size);

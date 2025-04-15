@@ -18,7 +18,7 @@
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
 
-#include "core/cache_descriptors.h"
+#include "core/cache.h"
 #include "interface_shave_op_executor.h"
 #include "shave_collection_NPU40.h"
 #include "shave_collection_VPU27.h"
@@ -62,7 +62,7 @@ public:
     }
 
     virtual ~ShavePrioritySelector() = default;
-    
+
     const ShaveOpExecutor& getShaveFuntion(const std::string& name) const override {
         if (ShaveSelector::existsShave(name)) {
             return ShaveSelector::getShaveFuntion(name);  // should not throw
@@ -75,36 +75,6 @@ public:
         const auto v2{container2.getShaveList()};
         v1.insert(v1.end(), v2.begin(), v2.end());
         return v1;
-    }
-};
-
-class ShaveCache {
-private:
-    SimpleLUTKeyCache<CyclesInterfaceType, SHAVEWorkload> shaveCacheRaw{1000};
-
-protected:
-    void populate();
-
-public:
-    ShaveCache() {
-        populate();
-    }
-    // bool findCacheCycles(const SHAVEWorkload& swl, CyclesInterfaceType& result) const {
-    //     const CyclesInterfaceType* ret{shaveCache.get(swl)};
-    //     if (ret == nullptr) {
-    //         return false;
-    //     } else {
-    //         result = *ret;
-    //         return true;
-    //     }
-    // }
-    std::optional<CyclesInterfaceType> findCacheCycles(const SHAVEWorkload& swl) const {
-        const CyclesInterfaceType* ret{shaveCacheRaw.get(swl)};
-        if (ret == nullptr) {
-            return {};  // nothing , std::nullopt
-        } else {
-            return *ret;
-        }
     }
 };
 
@@ -129,9 +99,9 @@ private:
     const ShaveSelector selector_27{collections.shaves_27};  ///< only the new list
     const ShaveSelector selector_40{collections.shaves_40};
 
-    ShaveCache shaveCache;  ///< all devices cache/LUT for shave ops. Populated in ctor
-    SHAVE_Workloads_Sanitizer sanitizer; ///< sanitizes the workload before processing
-    mutable CSVSerializer serializer;            ///< serializes workloads to a CSV file 
+    mutable LRUCache<SHAVEWorkload, float> cache;  ///< all devices cache/LUT for shave ops. Populated in ctor
+    SHAVE_Workloads_Sanitizer sanitizer;           ///< sanitizes the workload before processing
+    mutable CSVSerializer serializer;              ///< serializes workloads to a CSV file
 
     const ShaveSelector& getSelector(VPUDevice desired_device) const {
         switch (desired_device) {
@@ -224,15 +194,15 @@ private:
                     SerializableField<DataType>{"input_" + std::to_string(i) + "_datatype", inputs[i].get_dtype()});
             serializer.serialize(
                     SerializableField<Layout>{"input_" + std::to_string(i) + "_layout", inputs[i].get_layout()});
-            serializer.serialize(
-                    SerializableField<bool>{"input_" + std::to_string(i) + "_sparsity_enabled", inputs[i].get_sparsity()});
+            serializer.serialize(SerializableField<bool>{"input_" + std::to_string(i) + "_sparsity_enabled",
+                                                         inputs[i].get_sparsity()});
         }
 
         for (size_t i = 0; i < outputs.size(); i++) {
             serializer.serialize(
                     SerializableField<unsigned int>{"output_" + std::to_string(i) + "_batch", outputs[i].batches()});
-            serializer.serialize(
-                    SerializableField<unsigned int>{"output_" + std::to_string(i) + "_channels", outputs[i].channels()});
+            serializer.serialize(SerializableField<unsigned int>{"output_" + std::to_string(i) + "_channels",
+                                                                 outputs[i].channels()});
             serializer.serialize(
                     SerializableField<unsigned int>{"output_" + std::to_string(i) + "_height", outputs[i].height()});
             serializer.serialize(
@@ -241,8 +211,8 @@ private:
                     SerializableField<DataType>{"output_" + std::to_string(i) + "_datatype", outputs[i].get_dtype()});
             serializer.serialize(
                     SerializableField<Layout>{"output_" + std::to_string(i) + "_layout", outputs[i].get_layout()});
-            serializer.serialize(
-                    SerializableField<bool>{"output_" + std::to_string(i) + "_sparsity_enabled", outputs[i].get_sparsity()});
+            serializer.serialize(SerializableField<bool>{"output_" + std::to_string(i) + "_sparsity_enabled",
+                                                         outputs[i].get_sparsity()});
         }
 
         int param_idx = 0;
@@ -257,7 +227,6 @@ private:
         }
     }
 
-
 protected:
     /**
     @brief Sanitizes the workload before processing
@@ -268,7 +237,7 @@ protected:
     @return true if the workload is sanitized, false otherwise
     */
     bool sanitize_workload(const SHAVEWorkload& swl, SanityReport& result) const {
-        sanitizer.check_and_sanitize_workloads(swl, result);
+        sanitizer.check_and_sanitize(swl, result);
 
         if (!result.is_usable()) {
             return false;
@@ -277,7 +246,14 @@ protected:
     }
 
 public:
-    ShaveConfiguration() {
+    ShaveConfiguration(const unsigned int cache_size /*= 16384*/, const std::string& cache_filename)
+            : cache(cache_size, /*0,*/ cache_filename) {
+        serializer.initialize("shave_workloads", FileMode::READ_WRITE, get_names_for_shave_serializer());
+    }
+
+    ShaveConfiguration(const unsigned int cache_size /* = 16384 */, const char* cache_data /* = nullptr */,
+                       size_t cache_data_length /* = 0 */)
+            : cache(cache_size, /* 0,*/ cache_data, cache_data_length) {
         serializer.initialize("shave_workloads", FileMode::READ_WRITE, get_names_for_shave_serializer());
     }
 
@@ -287,18 +263,18 @@ public:
             if (!skipCacheSearch) {  // before finding the shave imnpl check if already in cache for this request.Thisis
                                      // a one cache for all
                 // @todo: specific cache per selector?
-                const auto cachedData{shaveCache.findCacheCycles(swl)};
+                const auto cachedData{cache.get(swl)};
                 if (cachedData) {
-                    return cachedData.value();
+                    return static_cast<CyclesInterfaceType>(std::floor(*cachedData));
                 }
             }
             // if the swl in not found then it should be sanitized in here
             // This should be specifically only for profiled data. In the cache it can appear with different types
             SanityReport report;
             if (!sanitize_workload(swl, report)) {
-				infoOut = report.info;
-				return report.value();
-			}
+                infoOut = report.info;
+                return report.value();
+            }
 
             const auto& sel = getSelector(swl.get_device());
 
@@ -324,7 +300,7 @@ public:
             buffer << "[EXCEPTION]:could not resolve shave function: " << swl << "\n "
                    << " Original exception: " << e.what() << " File: " << __FILE__ << " Line: " << __LINE__;
             const std::string details = buffer.str();
-            infoOut = details;
+            infoOut = std::move(details);
             return Cycles::ERROR_SHAVE;
         }
     }
@@ -333,13 +309,14 @@ public:
     }
 
     bool isCached(const SHAVEWorkload& swl) const {
-        const auto cachedData{shaveCache.findCacheCycles(swl)};
+        const auto cachedData{cache.get(swl)};
         return (cachedData) ? true : false;
     }
 
     std::vector<std::string> getShaveSupportedOperations(VPUDevice device) const {
         const auto& sel = getSelector(device);
-        const auto list = sel.getShaveList();
+        const std::vector<std::string> list = sel.getShaveList();
+        /* coverity[copy_instead_of_move] */
         return list;
     }
 

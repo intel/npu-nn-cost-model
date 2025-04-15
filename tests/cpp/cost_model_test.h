@@ -42,7 +42,6 @@ protected:
                            ExecutionMode::CUBOID_16x16};
     DPUWorkload wl_glob_20;
     DPUWorkload wl_glob_40;
-    DPUWorkload wl_glob_50;
 
     VPUCostModel model{};
 
@@ -62,7 +61,7 @@ protected:
         Logger::deactivate2ndlog();
     }
 
-    auto read_a_file(const std::string filename) const {
+    auto read_a_file(const std::string& filename) const {
         std::vector<char> buf(0);
         std::ifstream myFile;
         myFile.open(filename, std::ios::binary | std::ios::in);

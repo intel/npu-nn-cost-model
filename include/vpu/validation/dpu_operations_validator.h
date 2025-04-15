@@ -33,8 +33,9 @@ namespace VPUNN {
 
 /// @brief reunites the dynamic behaviors for known operations
 /// workload level operations dynamic behavior
-using OperationsBehaviour = Behaviours<CONVOLUTION_Constraints, DW_CONVOLUTION_Constraints, CM_CONVOLUTION_Constraints, ELTWISE_Constraints,
-                   MAXPOOL_Constraints, LAYERNORM_Constraints, ELTWISE_MUL_Constraints>;
+using OperationsBehaviour =
+        Behaviours<CONVOLUTION_Constraints, DW_CONVOLUTION_Constraints, CM_CONVOLUTION_Constraints, ELTWISE_Constraints,
+                   MAXPOOL_Constraints, LAYERNORM_Constraints, ELTWISE_MUL_Constraints, AVGPOOL_Constraints>;
 
 template <class BehaviorsContext>
 class ContextualMemoryCalculator {
@@ -202,7 +203,9 @@ public:
                 const auto allowed_heights{std::make_pair(expected_out_height_minimum, expected_out_height_maximum)};
                 checker.check_is_in_interval((int)w.output_0.height, allowed_heights, "output_0.height");
 
-                checker.check_is_in_requirements((int)w.output_0.channels, config.get_output_channels_restriction(w), "output_0.channels"); //we check out ch here especially for CONV and CM_CONV
+                checker.check_is_in_requirements(
+                        (int)w.output_0.channels, config.get_output_channels_restriction(w),
+                        "output_0.channels");  // we check out ch here especially for CONV and CM_CONV
 
                 //
                 {  // layout and types for output_0
@@ -217,16 +220,15 @@ public:
                 const auto& in1{w.input_1};
                 checker.check_is_in_list(in1.datatype, config.get_weights_valid_datatypes(w), "input_1.datatype");
             }
-            {  // sparsity check on all channels
+            {  // sparsity check on all channels (duplicate code  with layer checker)
 
-                // checker.check_is_in_list(w.input_0.sparsity_enabled, config.boolean_datatypes,
-                //                          "input_0.sparsity_enabled");
                 if ((w.input_0.sparsity < 0.0F) || (w.input_0.sparsity > 1.0F)) {
                     checker.add_check_failed("input_0.sparsity not in interval [0.0, 1.0] !");
                 }
+                if (w.input_0.sparsity_enabled && w.input_0.sparsity < 0.01F) {  // extra check for activations
+                    checker.add_check_failed("input_0.sparsity is enabled but too low, almost zero!");
+                }
 
-                // checker.check_is_in_list(w.input_1.sparsity_enabled, config.boolean_datatypes,
-                //                          "output_1.sparsity_enabled");
                 if ((w.input_1.sparsity < 0.0F) || (w.input_1.sparsity > 1.0F)) {
                     checker.add_check_failed("output_1.sparsity not in interval [0.0, 1.0] !");
                 }
@@ -236,7 +238,12 @@ public:
                         checker.add_check_failed(info_out);
                 }
             }
-            { checker.check_is_in_list(w.execution_order, config.get_valid_execution_order(), "Execution_Order"); }
+
+            {  // we might be at workload or at split layer , sometimes checks are avoided!
+                if (config.mustExecuteHWLowLevelChecks(w)) {  // do not skip
+                    checker.check_is_in_list(w.execution_order, config.get_valid_execution_order(w), "Execution_Order");
+                }
+            }
             // no padding optimization checked
 
             {  // check correlation between in-out tensors
@@ -305,7 +312,8 @@ using OperationsContext = Behavior_Device_Mapping<OperationsBehaviour,  // opera
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;
 
-/// using the same configuration for SHAVE for now, the DPU behaviour will not affect the Shave needs for memory calculation
+/// using the same configuration for SHAVE for now, the DPU behaviour will not affect the Shave needs for memory
+/// calculation
 using SHAVE_OperationValidator = DPU_OperationValidator;
 }  // namespace VPUNN
 

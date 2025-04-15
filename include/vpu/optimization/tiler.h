@@ -23,44 +23,6 @@
 namespace VPUNN {
 
 /**
- * @brief Split a DPULayer over the Z dimension, appending the result to the splitPool list
- *
- * HALO ASPECTS: all HW direction halos are passed down to split
- * Output_inbound halo for Z/K  direction technically should be adjusted to fit always the full layer memory, but this
- * is not really necessary for the DPUWorload level because is not used for NN, just for fit to memory check. If the
- * layer fits to memory the intra tile split will also fit.
- * Decision(for now) is to pass and leave unaltered also the output_inbound_halo Z direction.
- *
- * @param layer a DPULayer to be split
- * @param splitPool [out] the pool of valid split
- * @param mode the valid ExecutionMode
- * @param nWorkloads number of splits to apply
- * @param validZTiles valid Z dimension for the splits
- */
-void splitOverZ(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
-                const unsigned int nWorkloads, const std::vector<unsigned int>& validZTiles);
-
-/**
- * @brief Split a DPULayer over the H and W dimensions, appending the result to the splitPool list
- *
- * HALO ASPECTS: @todo:
- * Pass halo to intra tile splits. Especially edge tiles are influenced by halo. Important are what NN uses and 2nd the
- * memory aspects
- * Input halo influences NN up to v2.7. To be ported if positive to edge tiles.
- * Output halo + cnt influences NN v4.0 and onwards. To be ported to edge tiles (+ inner tiles if larger than edge tile)
- * output_inbound halo is not used by NN, only for memory, if left unchanged increases memory but the layer was already
- * checked to fit in memory.
- *
- * @param layer a DPULayer
- * @param splitPool the pool of valid split
- * @param widthFactor the number of splits in the X dimension
- * @param heightFactor  the number of splits in the Y dimension
- * @param mode the valid ExecutionMode
- */
-void splitOverHW(const DPULayer& layer, std::list<DPUWorkloadsWithCyclesSplit>& splitPool,
-                 const unsigned int widthFactor, const unsigned int heightFactor, const ExecutionMode mode);
-
-/**
  * @brief A generic interface for intra tile tiling algorithms (splitting a tile(Layer) into more workloads)
  *
  */
@@ -147,6 +109,7 @@ using TilingAlgorithmsContainer = std::list<std::unique_ptr<ITilerAlgorithm>>;
  * @return TilingAlgorithms
  */
 TilingAlgorithmsContainer getTilingAlgorithms(const DPULayer& layer, const SplitOptions& options);
+
 }  // namespace VPUNN
 
 #endif  // VPUNN_TILER_H

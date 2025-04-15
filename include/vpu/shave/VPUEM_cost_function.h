@@ -28,7 +28,7 @@ public:
     const CostFunctionSoftmaxDescriptor costFunctionSoftmaxData_;
 
     // Constructror
-    VPUEMSoftmax_CostFunction(const CostFunctionSoftmaxDescriptor costFunctionSoftmaxData)
+    VPUEMSoftmax_CostFunction(const CostFunctionSoftmaxDescriptor& costFunctionSoftmaxData)
             : costFunctionSoftmaxData_(costFunctionSoftmaxData) {
     }
 
@@ -43,7 +43,7 @@ public:
     const CostFunctionSpatialDescriptor costFunctionSpatialData_;
 
     // Constructror
-    VPUEMSpatial_CostFunction(const CostFunctionSpatialDescriptor costFunctionSpatialData)
+    VPUEMSpatial_CostFunction(const CostFunctionSpatialDescriptor& costFunctionSpatialData)
             : costFunctionSpatialData_(costFunctionSpatialData) {
     }
 
