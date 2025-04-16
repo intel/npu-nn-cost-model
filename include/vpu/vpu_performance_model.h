@@ -21,6 +21,8 @@
 
 #include "vpu/shave_old.h"
 
+#include "performance_mode.h"
+
 namespace VPUNN {
 
 /**
@@ -290,6 +292,7 @@ public:
      *          parallel by DPU. Also considers data type, CMX memory bandwidth and some
      *          other (non-ideal) factors.
      * NO sparsity is considered.
+     * Note: THISIS OBSOLETE/NOT UPDATED
      * @param wl a DPUWorkload
      * @return unsigned long int theoretical execution cycles
      */
@@ -342,14 +345,27 @@ public:
         return std::max<unsigned long>(cycles, nthw_ntk_reads);
     }
 
+    unsigned long int DMATheoreticalCycles(const DMAWorkload& wl) const {
+        if (wl.device < VPUDevice::VPU_4_0) {
+            return DMATheoreticalCyclesLegacyLNL(wl);
+        } else {  // VPU 4.0 and newer
+            if (wl.device == VPUDevice::VPU_4_0 && PerformanceMode::forceLegacy_G4) {
+                return DMATheoreticalCyclesLegacyLNL(wl);
+            } else if (wl.device > VPUDevice::VPU_4_0 && PerformanceMode::forceLegacy_G5) {
+                return DMATheoreticalCyclesLegacyLNL(wl);
+            }
+            return DMATheoreticalCyclesRESERVED_ON(wl);//Updated theoretical model
+        }
+    }
+
     /**
      * @brief Compute the DMA theoretical cycles
      *
      * @param wl a DMAWorkload
-     * @return unsigned long int theoretical execution cycles
+     * @return unsigned long int theoretical execution DPU cycles
      * @deprecated Will be removed in future releases
      */
-    unsigned long int DMATheoreticalCycles(const DMAWorkload& wl) const {
+    unsigned long int DMATheoreticalCyclesLegacyLNL(const DMAWorkload& wl) const {
         // CMX2CMX is half-duplex on NPU 2.x
         const bool is_half_duplex_limitation{((wl.device <= VPUDevice::VPU_2_7)  // specific device
                                               && (wl.input_location == MemoryLocation::CMX) &&
@@ -358,35 +374,198 @@ public:
                                                      : false};
 
         // Get if the input is permuted or compressed
-        const bool is_input_permuted =
-                wl.input.get_layout() != wl.output.get_layout() && wl.input_location == MemoryLocation::CMX;
-        const bool is_input_compressed =
-                wl.input.size() != wl.output.size() && wl.input_location == MemoryLocation::CMX;
+        const bool is_input_permuted = ((wl.input.get_layout() != wl.output.get_layout())  // changing layout
+                                        && (wl.input_location == MemoryLocation::CMX));    // and src from CMX
+
+        const bool is_input_compressed = ((wl.input.size() != wl.output.size())            // changing size
+                                          && (wl.input_location == MemoryLocation::CMX));  // and src from CMX
 
         // Get the bandwidth in DPU cycles/bytes
         const float input_bandwidth =
-                get_bandwidth_cycles_per_bytes(wl.input, wl.device, wl.input_location, is_input_permuted,
-                                               is_input_compressed, is_half_duplex_limitation);
+                get_bandwidth_cycles_per_bytesLegacy(wl.input, wl.device, wl.input_location, is_input_compressed,
+                                                     is_input_permuted, is_half_duplex_limitation);
         // Compute input cycles from dimensions and bw
         const auto input_cycles = Cycles::toCycleInterfaceType((double)wl.input.size() * (double)input_bandwidth);
+
         // Get if the output is permuted or compressed
-        const bool is_output_compressed =
-                wl.input.size() != wl.output.size() && wl.output_location == MemoryLocation::CMX;
-        const bool is_output_permuted =
-                wl.input.get_layout() != wl.output.get_layout() && wl.output_location == MemoryLocation::CMX;
+        const bool is_output_permuted = ((wl.input.get_layout() != wl.output.get_layout())  // changing layout
+                                         && (wl.output_location == MemoryLocation::CMX));   // and dst to CMX
+
+        const bool is_output_compressed = ((wl.input.size() != wl.output.size())             // changing size
+                                           && (wl.output_location == MemoryLocation::CMX));  // and dst to CMX
+
         // Get the bandwidth in DPU cycles/bytes
         const float output_bandwidth =
-                get_bandwidth_cycles_per_bytes(wl.output, wl.device, wl.output_location, is_output_compressed,
-                                               is_output_permuted, is_half_duplex_limitation);
-        // Compute input cycles from dimensions and bw
+                get_bandwidth_cycles_per_bytesLegacy(wl.output, wl.device, wl.output_location, is_output_compressed,
+                                                     is_output_permuted, is_half_duplex_limitation);
+        // Compute output cycles from dimensions and bw
         const auto output_cycles = Cycles::toCycleInterfaceType((double)wl.output.size() * (double)output_bandwidth);
 
         // Get latency in cycles
-        const auto input_latency = (unsigned long)get_DMA_latency(wl.device, wl.input_location);
-        const auto output_latency = (unsigned long)get_DMA_latency(wl.device, wl.output_location);
+        const auto input_latency = (unsigned long)get_DMA_latency_Legacy(wl.device, wl.input_location);
+        const auto output_latency = (unsigned long)get_DMA_latency_Legacy(wl.device, wl.output_location);
 
         // Get the max between input and output cycles
         return Cycles::cost_adder(std::max(input_latency, output_latency), std::max(input_cycles, output_cycles));
+    }
+
+protected:
+    /// CMX2CMX is half-duplex on NPU 2.x
+    bool isHalfDuplexContext(const DMAWorkload& wl) const {
+        return ((wl.device <= VPUDevice::VPU_2_7)  // specific device
+                && (wl.input_location == MemoryLocation::CMX) && (wl.output_location == MemoryLocation::CMX))
+                       ? true
+                       : false;
+    }
+
+    //// CMX CLocks
+    // float compute_DRAM_bandwith_cycPerB(const VPUDevice& device) const {
+    //     // DRAM bw is given in MBps
+    //     const float ddr_cycPerBytes{get_cmx_fclk(device) / get_dram_bandwidth_MBps(device)};
+    //     const float cmx_bounded_maxCyclesPerByte{1.0f / get_DMA_DDR_interface_bytes(device)};
+    //     return std::max(ddr_cycPerBytes, cmx_bounded_maxCyclesPerByte);  // take worst case
+    // }
+    //  cmx clock
+    int compute_DRAM_bandwith_BytesPerCyc(const VPUDevice& device) const {
+        // DRAM bw is given in MBps
+        const int ddr_BytesPerCyc{static_cast<int>(std::floor(get_dram_bandwidth_MBps(device) / get_cmx_fclk(device)))};
+        const int cmx_bounded_maxBytesPerCyc{get_DMA_DDR_interface_bytes(device)};
+        return std::min(ddr_BytesPerCyc, cmx_bounded_maxBytesPerCyc);
+    }
+
+    //// cmx clock
+    // float get_cycles_per_byte_read_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
+    //                                   bool half_duplex = false) const {
+    //     switch (location) {
+    //     case MemoryLocation::DRAM:
+    //         return compute_DRAM_bandwith_cycPerB(device);
+
+    //    case MemoryLocation::CMX:
+    //    case MemoryLocation::CSRAM:  //?
+    //    case MemoryLocation::UPA:    //?
+    //    default:
+    //        return (1.0F / (float)get_sram_word_size(tensor, false, false, half_duplex));
+    //    }
+    //}
+
+    // cmx clock
+    int get_bytes_per_cycle_read_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
+                                    bool half_duplex = false) const {
+        switch (location) {
+        case MemoryLocation::DRAM:
+            return compute_DRAM_bandwith_BytesPerCyc(device);
+
+        case MemoryLocation::CMX:
+        case MemoryLocation::CSRAM:  //?
+        case MemoryLocation::UPA:    //?
+        default:
+            // return (get_sram_word_size(tensor, false, false, half_duplex));
+            return cmx_agregated_bytes_per_cycle_bw(tensor, device, half_duplex, false, false);
+        }
+    }
+    int cmx_raw_word_size(const VPUDevice device, bool half_duplex) const {
+        if (half_duplex) {
+            return get_DMA_DDR_interface_bytes(device) / 2;
+        }
+        return get_DMA_DDR_interface_bytes(device);
+    }
+
+    // CMX clock. COnsiders also limitation like compression...
+    int cmx_agregated_bytes_per_cycle_bw(const VPUTensor& tensor, VPUDevice device, bool half_duplex, bool permute,
+                                         bool compression, float decompression_ratio = 1.0F,
+                                         int compressed_BW_BytesPerCycle = 0) const {
+        // permute limits the bw to one element per cycle
+        if (permute) {
+            return dtype_to_bytes(tensor.get_dtype());  // size of one element (what about half duplex?). should not be
+                                                        // larger than CMX BW?
+        }
+
+        const auto nominal_bw = cmx_raw_word_size(device, half_duplex);  // nominal
+        if (compression) {
+            const auto max_bw = (float)nominal_bw * 2.0f;  // bpclock
+            const auto potential_speed_up_bw = (float)compressed_BW_BytesPerCycle * decompression_ratio;
+            // compression speeds up the bpCyc to compressed_BW_BytesPerCycle*decompression_ratio(>1) but not more than
+            // 2x of SRAM speed
+            const float real_speed_up_bw = std::min(max_bw, potential_speed_up_bw);  //
+
+            return (int)real_speed_up_bw;
+        }
+
+        // normal speed is the constant CMX bytes per cycle
+        return nominal_bw;
+    }
+
+    // float get_cycles_per_bytes_write_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
+    //                                     bool half_duplex = false) const {
+    //     switch (location) {
+    //     case MemoryLocation::DRAM:
+    //         // noy influenced by permuted!
+    //         // not influenced by compression!
+    //         return compute_DRAM_bandwith_cycPerB(device);
+
+    //    case MemoryLocation::CMX:
+    //    case MemoryLocation::CSRAM:  //?
+    //    case MemoryLocation::UPA:    //?
+    //    default:
+
+    //        // SRAM bw is twice in compression mode
+    //        return (1.0F / (float)get_sram_word_size(tensor, false, false, half_duplex));
+    //    }
+    //}
+    int get_bytes_per_cycle_write_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
+                                     bool half_duplex, bool permute, bool compression,
+                                     float decompression_ratio /*= 1.0F*/,
+                                     int compressed_BW_BytesPerCycle /* = 0*/) const {
+        switch (location) {
+        case MemoryLocation::DRAM:
+            // noy influenced by permuted!
+            // not influenced by compression!
+            return compute_DRAM_bandwith_BytesPerCyc(device);
+
+        case MemoryLocation::CMX:
+        case MemoryLocation::CSRAM:  //?
+        case MemoryLocation::UPA:    //?
+        default:
+            return (cmx_agregated_bytes_per_cycle_bw(tensor, device, half_duplex, permute, compression,
+                                                     decompression_ratio, compressed_BW_BytesPerCycle));
+        }
+    }
+
+public:
+    unsigned long int DMATheoreticalCyclesRESERVED_ON(const DMAWorkload& wl) const {
+        const float dpuPerCmx_clock_ratio{(float)get_dpu_fclk(wl.device) / (float)get_cmx_fclk(wl.device)};
+        const bool is_half_duplex_limitation{isHalfDuplexContext(wl)};
+
+        const bool is_cmx2cmx_permutation = ((wl.input.get_layout() != wl.output.get_layout())  // changing layout
+                                             && (wl.input_location == MemoryLocation::CMX)      // and src/dest from CMX
+                                             && (wl.output_location == MemoryLocation::CMX));   // and src/dest from CMX
+
+        const bool is_DDR2CMX_decompresion =
+                ((wl.input.size() < wl.output.size())              // dest size is bigger (decompression)
+                 && (wl.input_location == MemoryLocation::DRAM)    // and src from DDR
+                 && (wl.output_location == MemoryLocation::CMX));  // and dst to CMX
+
+        const float decompression_ratio{is_DDR2CMX_decompresion ? ((float)wl.output.size() / (float)wl.input.size())
+                                                                : 1.0f};
+
+        const unsigned int input_bw_bpc =
+                get_bytes_per_cycle_read_bw(wl.input, wl.device, wl.input_location, is_half_duplex_limitation);
+        const auto CMX_cycles_read = (float)wl.input.size() / (float)input_bw_bpc;
+        const auto input_cycles_DPU = Cycles::toCycleInterfaceType(CMX_cycles_read * dpuPerCmx_clock_ratio);
+
+        const unsigned int output_bw_bpc = get_bytes_per_cycle_write_bw(
+                wl.output, wl.device, wl.output_location, is_half_duplex_limitation, is_cmx2cmx_permutation,
+                is_DDR2CMX_decompresion, decompression_ratio, input_bw_bpc);
+        const auto CMX_cycles_write = (float)wl.output.size() / (float)output_bw_bpc;
+        const auto output_cycles_DPU = Cycles::toCycleInterfaceType(CMX_cycles_write * dpuPerCmx_clock_ratio);
+
+        // Get latency in cycles
+        const auto input_latency_DPU = get_DMA_latency(wl.device, wl.input_location);
+        const auto output_latency_DPU = get_DMA_latency(wl.device, wl.output_location);
+
+        // Get the max between input and output cycles
+        return Cycles::cost_adder(std::max(input_latency_DPU, output_latency_DPU),
+                                  std::max(input_cycles_DPU, output_cycles_DPU));
     }
 
     /**

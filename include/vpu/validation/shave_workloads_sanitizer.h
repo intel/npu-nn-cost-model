@@ -20,7 +20,7 @@ namespace VPUNN {
 class SHAVE_Workloads_Sanitizer : private SHAVE_OperationValidator {
 
 public:
-    void check_and_sanitize_workloads(const SHAVEWorkload& swl, SanityReport& result) const {
+    void check_and_sanitize(const SHAVEWorkload& swl, SanityReport& result) const {
         result.resetOK();
 
         // Check the datatype of the input and output tensors

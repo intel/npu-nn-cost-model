@@ -164,7 +164,7 @@ private:
             operation_generator.generate_sparsity(sampler, config, dpu);
         }
         {                                                                             // execution order
-            dpu.execution_order = sampler.sample_list(config.get_valid_execution_order());  // uniform
+            dpu.execution_order = sampler.sample_list(config.get_valid_execution_order(dpu));  // uniform
         }
         {  // we are not changing halo, all on zero  supposed.
             // memory tensors need to be recomputed since compute tensors have been random generated.
@@ -212,6 +212,7 @@ public:
 
         if (sample_made_OK) {  // generation done, move generated info to the actual WL
             const DPUWorkload wl{dpu.clone_as_DPUWorkload()};
+            /* coverity[copy_instead_of_move] */
             return wl;
         } else {
             std::stringstream buffer;

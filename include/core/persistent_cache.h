@@ -10,6 +10,7 @@
 #ifndef VPUNN_PERSISTENT_CACHE
 #define VPUNN_PERSISTENT_CACHE
 
+#include <atomic>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -20,6 +21,8 @@
 #include <vector>
 
 #include "core/logger.h"
+#include "core/utils.h"
+#include "cycles_cache_generated.h"
 
 namespace VPUNN {
 // A counter to measure the accesses and hits plus misses for a cache
@@ -29,9 +32,10 @@ namespace VPUNN {
 class AccessCounter {
 private:
     // mutable because the reset is const
-    mutable size_t accesses{0};
-    mutable size_t hits{0};
-    mutable size_t misses{0};
+    // atomic to make it thread safe (very small perf hit)
+    mutable std::atomic<size_t> accesses{0};
+    mutable std::atomic<size_t> hits{0};
+    mutable std::atomic<size_t> misses{0};
 
 public:
     AccessCounter() {
@@ -113,205 +117,331 @@ public:
     }
 };
 
-template <class T>
-class FixedCache {
-public:
-    typedef std::map<std::vector<T>, T> PreloadedMap;
-
+// for the moment is caching a key of type uint32_t and a value of type float
+class FixedCache : public ThreadSafeMap<uint32_t, float> {
 private:
-    /// loaded from file, must be loaded from a file with the same descriptor signature
-    PreloadedMap deserialized_table;
-    const size_t interface_size_active{0};
-
-    mutable AccessCounter counter{};  // mutable to allow "get" const methods to update it
+    mutable AccessCounter counter{};
 
 public:
-    FixedCache(size_t interface_size): FixedCache(interface_size, "") {
+    FixedCache(): FixedCache("") {
     }
 
-    FixedCache(size_t interface_size = 0, const std::string& filename = ""): interface_size_active{interface_size} {
-        deserializeCacheFromFile(filename);
+    FixedCache(const std::string& filename) {
+        read_cache(filename);
     }
 
-    FixedCache(size_t interface_size = 0, const char* file_data = nullptr, size_t file_data_length = 0)
-            : interface_size_active{interface_size} {
-        deserializeCacheFromData(file_data, file_data_length);
-    }
-
-    /// test for presence
-    bool contains(const std::vector<T>& wl) const {
-        return deserialized_table.find(wl) != deserialized_table.end();
-    }
-
-    /// getter
-    std::optional<T> get(const std::vector<T>& wl) const {
-        auto it = deserialized_table.find(wl);
-        if (it != deserialized_table.end()) {
-            counter.hit();
-            return it->second;
-        } else {
-            counter.miss();
-            return std::nullopt;
-        }
-    }
-
-    /// setter
-    void set(const std::vector<T>& wl, const T& value) {
-        if (wl.size() != interface_size_active) {
-            std::cerr << "Workload is with different size:  " << wl.size() << ", expecting : " << interface_size_active
-                      << ", ignoring" << std::endl;
-            return;
-        }
-        deserialized_table[wl] = value;
-    }
-
-    const T* get_pointer(const std::vector<T>& wl) const {
-        auto it = deserialized_table.find(wl);
-        if (it != deserialized_table.end()) {
-            counter.hit();
-            return &(it->second);
-        } else {
-            counter.miss();
-            return nullptr;
-        }
-    }
-
-    // for debug mainly
-    const PreloadedMap& getMap() const {
-        return deserialized_table;
-    }
-
-    /**
-     * @brief Deserialize the cache from a binary file
-     *
-     * @param filename the name of the binary file
-     * @param interface_size the size of the workload descriptor
-     */
-    bool deserializeCacheFromFile(const std::string& filename) {
-        if (filename == "") {
-            return false;
-        }
-
-        if (!std::filesystem::exists(filename)) {
-            std::cerr << "Cache file does NOT exists: " << filename << ", ignoring..." << std::endl;
-            return false;
-        }
-
-        std::ifstream file(filename, std::ios::binary);
-        if (!file.is_open()) {
-            std::cerr << "Failed to open cache file for reading: " << filename << ", ignoring..." << std::endl;
-            return false;
-        }
-
-        const size_t interface_size{interface_size_active};
-
-        while (file.peek() != EOF) {
-            std::vector<T> key(interface_size);
-            T value{};
-
-            // Read the key (interface_size values)
-            file.read(reinterpret_cast<char*>(key.data()), interface_size * sizeof(T));
-
-            // Read the value (interface_size+1-th value)
-            file.read(reinterpret_cast<char*>(&value), sizeof(T));
-
-            // Add the item to the deserialized table
-            deserialized_table[key] = value;
-        }
-
-        file.close();
-        return true;
-    }
-
-    bool deserializeCacheFromData(const char* file_data = nullptr, size_t file_data_length = 0) {
-        if (file_data == nullptr) {  // null
-            return false;
-        }
-
-        if (file_data_length == 0) {
-            std::cerr << "Failed to open cache file for reading: size is zero "
-                      << ", ignoring..." << std::endl;
-            return false;
-        }
-
-        const size_t interface_size{interface_size_active};
-        const size_t key_size{interface_size * sizeof(T)};  // bytes
-        const size_t value_size{sizeof(T)};                 // bytes
-        const size_t element_size{key_size + value_size};   // bytes
-
-        {
-            std::vector<T> key(interface_size);
-            T value{};
-
-            size_t crt_pos = 0;
-            while ((crt_pos + element_size) <= file_data_length) {
-                // copy to vector
-                std::memcpy(reinterpret_cast<char*>(key.data()), file_data + crt_pos, key_size);
-                // Read the value (interface_size+1-th value)
-                std::memcpy(reinterpret_cast<char*>(&value), file_data + crt_pos + key_size, value_size);
-
-                // Add the item to the deserialized table
-                deserialized_table[key] = value;
-
-                crt_pos += element_size;  // next element
-            }
-        }
-
-        return true;
-    }
-
-    void readElement(std::ifstream& file, std::vector<T>& key, T& value) const {
-        key.resize(interface_size_active);  // ensure space
-        file.read(reinterpret_cast<char*>(key.data()), interface_size_active * sizeof(T));
-        file.read(reinterpret_cast<char*>(&value), sizeof(T));
-    }
-
-    bool writeElement(std::ofstream& file, const std::vector<T>& key, const T& value) const {
-        if (key.size() != interface_size_active) {
-            std::cerr << "Workload is with different size:  " << key.size() << ", expecting : " << interface_size_active
-                      << ", ignoring" << std::endl;
-            return false;
-        }
-
-        file.write(reinterpret_cast<const char*>(key.data()), interface_size_active * sizeof(T));
-        file.write(reinterpret_cast<const char*>(&value), sizeof(T));
-
-        return true;
-    }
-
-    /// serialize the cache to a binary file
-    bool serializeCacheToFile(const std::string& filename, bool appendIfExists = false) const {
-        if (filename == "") {
-            return false;
-        }
-
-        if (std::filesystem::exists(filename) && !appendIfExists) {
-            std::cerr << "Cache file already exists: " << filename << ", ignoring..." << std::endl;
-            return false;
-        }
-
-        const auto appendOrNew{appendIfExists ? std::ios::app : std::ios::trunc};
-
-        std::ofstream file(filename, std::ios::binary | std::ios::out | appendOrNew);
-        if (!file.is_open()) {
-            std::cerr << "Failed to open cache file for writing: " << filename << ", ignoring..." << std::endl;
-            return false;
-        }
-
-        // iterate and save
-        for (auto const& [key, value] : deserialized_table) {
-            writeElement(file, key, value);
-        }
-
-        file.close();
-        return true;
+    FixedCache(const char* file_data, size_t file_data_length) {
+        read_cache(file_data, file_data_length);
     }
 
     // get debug access to the counter
     const AccessCounter& getCounter() const {
         return counter;
     }
+
+    /// special getter to increment access counter
+    std::optional<float> get(const uint32_t& wl) const {
+        float value = 0;
+        if (ThreadSafeMap::find(wl, value)) {
+            counter.hit();
+            return value;
+        } else {
+            counter.miss();
+            return std::nullopt;
+        }
+    }
+
+    const float* get_pointer(const uint32_t& wl) const {
+        auto* value = ThreadSafeMap::find(wl);
+        if (value != nullptr) {
+            counter.hit();
+        } else {
+            counter.miss();
+        }
+        return value;
+    }
+
+    // for debug mainly
+    const MapType& getMap() const {
+        return _map;
+    }
+
+    bool read_cache(const std::string& filename) {
+        std::ifstream file;
+
+        file.open(filename, std::ios::binary | std::ios::in);
+        if (file.fail()) {
+            return false;
+        }
+        file.seekg(0, std::ios::end);
+        const auto length = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        std::vector<char> buf;
+
+        buf.resize(static_cast<size_t>(length));
+
+        file.read(buf.data(), length);
+        file.close();
+
+        flatbuffers::Verifier verifier(reinterpret_cast<const uint8_t*>(buf.data()), buf.size());
+        if (!(VPUNN_SCHEMA::VerifyCyclesCacheBuffer(verifier))) {
+            return false;
+        }
+
+        auto* cache_content = VPUNN_SCHEMA::GetCyclesCache(buf.data());
+        if (cache_content == nullptr) {
+            return false;
+        }
+
+        for (const auto& entry : *cache_content->cache_map()) {
+            insert(entry->key(), entry->value());
+        }
+
+        return true;
+    }
+
+    bool read_cache(const char* file_data, size_t file_data_length) {
+        flatbuffers::Verifier verifier(reinterpret_cast<const uint8_t*>(file_data), file_data_length);
+        if (!(VPUNN_SCHEMA::VerifyCyclesCacheBuffer(verifier))) {
+            return false;
+        }
+        auto* cache_content = VPUNN_SCHEMA::GetCyclesCache(file_data);
+        if (cache_content == nullptr) {
+            return false;
+        }
+        for (const auto& entry : *cache_content->cache_map()) {
+            insert(entry->key(), entry->value());
+        }
+        return true;
+    }
+
+    bool write_cache(const std::string& filename) {
+        flatbuffers::FlatBufferBuilder fbb;
+        std::vector<flatbuffers::Offset<VPUNN_SCHEMA::Entry>> entries;
+        for (const auto& [key, value] : _map) {
+            auto entry = VPUNN_SCHEMA::CreateEntry(fbb, key, value);
+            entries.push_back(entry);
+        }
+        auto cache_map = fbb.CreateVector(entries);
+        auto cache = VPUNN_SCHEMA::CreateCyclesCache(fbb, cache_map);
+        VPUNN_SCHEMA::FinishCyclesCacheBuffer(fbb, cache);
+        std::ofstream file;
+        file.open(filename, std::ios::binary | std::ios::out);
+        if (file.fail()) {
+            return false;
+        }
+        file.write(reinterpret_cast<const char*>(fbb.GetBufferPointer()), fbb.GetSize());
+        file.close();
+        return true;
+    }
+
+    size_t getCacheSize() const {
+        return _map.size();
+    }
 };
+
+// template <typename KeyType, typename ValueType>
+// class FixedCache {
+// public:
+//     typedef std::map<KeyType, ValueType> PreloadedMap;
+//
+// private:
+//     /// loaded from file, must be loaded from a file with the same descriptor signature
+//     PreloadedMap deserialized_table;
+//     const size_t interface_size_active{0};
+//
+//     mutable AccessCounter counter{};  // mutable to allow "get" const methods to update it
+//
+// public:
+//     FixedCache(size_t interface_size): FixedCache(interface_size, "") {
+//     }
+//
+//     FixedCache(size_t interface_size = 0, const std::string& filename = ""): interface_size_active{interface_size} {
+//         deserializeCacheFromFile(filename);
+//     }
+//
+//     FixedCache(size_t interface_size = 0, const char* file_data = nullptr, size_t file_data_length = 0)
+//             : interface_size_active{interface_size} {
+//         deserializeCacheFromData(file_data, file_data_length);
+//     }
+//
+//     /// test for presence
+//     bool contains(const std::vector<T>& wl) const {
+//         return deserialized_table.find(wl) != deserialized_table.end();
+//     }
+//
+//     /// getter
+//     std::optional<T> get(const std::vector<T>& wl) const {
+//         auto it = deserialized_table.find(wl);
+//         if (it != deserialized_table.end()) {
+//             counter.hit();
+//             return it->second;
+//         } else {
+//             counter.miss();
+//             return std::nullopt;
+//         }
+//     }
+//
+//     /// setter
+//     void set(const std::vector<T>& wl, const T& value) {
+//         if (wl.size() != interface_size_active) {
+//             std::cerr << "Workload is with different size:  " << wl.size() << ", expecting : " <<
+//             interface_size_active
+//                       << ", ignoring" << std::endl;
+//             return;
+//         }
+//         deserialized_table[wl] = value;
+//     }
+//
+//     const T* get_pointer(const std::vector<T>& wl) const {
+//         auto it = deserialized_table.find(wl);
+//         if (it != deserialized_table.end()) {
+//             counter.hit();
+//             return &(it->second);
+//         } else {
+//             counter.miss();
+//             return nullptr;
+//         }
+//     }
+//
+//     // for debug mainly
+//     const PreloadedMap& getMap() const {
+//         return deserialized_table;
+//     }
+//
+//     /**
+//      * @brief Deserialize the cache from a binary file
+//      *
+//      * @param filename the name of the binary file
+//      * @param interface_size the size of the workload descriptor
+//      */
+//     bool deserializeCacheFromFile(const std::string& filename) {
+//         if (filename == "") {
+//             return false;
+//         }
+//
+//         if (!std::filesystem::exists(filename)) {
+//             std::cerr << "Cache file does NOT exists: " << filename << ", ignoring..." << std::endl;
+//             return false;
+//         }
+//
+//         std::ifstream file(filename, std::ios::binary);
+//         if (!file.is_open()) {
+//             std::cerr << "Failed to open cache file for reading: " << filename << ", ignoring..." << std::endl;
+//             return false;
+//         }
+//
+//         const size_t interface_size{interface_size_active};
+//
+//         while (file.peek() != EOF) {
+//             std::vector<T> key(interface_size);
+//             T value{};
+//
+//             // Read the key (interface_size values)
+//             file.read(reinterpret_cast<char*>(key.data()), interface_size * sizeof(T));
+//
+//             // Read the value (interface_size+1-th value)
+//             file.read(reinterpret_cast<char*>(&value), sizeof(T));
+//
+//             // Add the item to the deserialized table
+//             deserialized_table[key] = value;
+//         }
+//
+//         file.close();
+//         return true;
+//     }
+//
+//     bool deserializeCacheFromData(const char* file_data = nullptr, size_t file_data_length = 0) {
+//         if (file_data == nullptr) {  // null
+//             return false;
+//         }
+//
+//         if (file_data_length == 0) {
+//             std::cerr << "Failed to open cache file for reading: size is zero "
+//                       << ", ignoring..." << std::endl;
+//             return false;
+//         }
+//
+//         const size_t interface_size{interface_size_active};
+//         const size_t key_size{interface_size * sizeof(T)};  // bytes
+//         const size_t value_size{sizeof(T)};                 // bytes
+//         const size_t element_size{key_size + value_size};   // bytes
+//
+//         {
+//             std::vector<T> key(interface_size);
+//             T value{};
+//
+//             size_t crt_pos = 0;
+//             while ((crt_pos + element_size) <= file_data_length) {
+//                 // copy to vector
+//                 std::memcpy(reinterpret_cast<char*>(key.data()), file_data + crt_pos, key_size);
+//                 // Read the value (interface_size+1-th value)
+//                 std::memcpy(reinterpret_cast<char*>(&value), file_data + crt_pos + key_size, value_size);
+//
+//                 // Add the item to the deserialized table
+//                 deserialized_table[key] = value;
+//
+//                 crt_pos += element_size;  // next element
+//             }
+//         }
+//
+//         return true;
+//     }
+//
+//     void readElement(std::ifstream& file, std::vector<T>& key, T& value) const {
+//         key.resize(interface_size_active);  // ensure space
+//         file.read(reinterpret_cast<char*>(key.data()), interface_size_active * sizeof(T));
+//         file.read(reinterpret_cast<char*>(&value), sizeof(T));
+//     }
+//
+//     bool writeElement(std::ofstream& file, const std::vector<T>& key, const T& value) const {
+//         if (key.size() != interface_size_active) {
+//             std::cerr << "Workload is with different size:  " << key.size() << ", expecting : " <<
+//             interface_size_active
+//                       << ", ignoring" << std::endl;
+//             return false;
+//         }
+//
+//         file.write(reinterpret_cast<const char*>(key.data()), interface_size_active * sizeof(T));
+//         file.write(reinterpret_cast<const char*>(&value), sizeof(T));
+//
+//         return true;
+//     }
+//
+//     /// serialize the cache to a binary file
+//     bool serializeCacheToFile(const std::string& filename, bool appendIfExists = false) const {
+//         if (filename == "") {
+//             return false;
+//         }
+//
+//         if (std::filesystem::exists(filename) && !appendIfExists) {
+//             std::cerr << "Cache file already exists: " << filename << ", ignoring..." << std::endl;
+//             return false;
+//         }
+//
+//         const auto appendOrNew{appendIfExists ? std::ios::app : std::ios::trunc};
+//
+//         std::ofstream file(filename, std::ios::binary | std::ios::out | appendOrNew);
+//         if (!file.is_open()) {
+//             std::cerr << "Failed to open cache file for writing: " << filename << ", ignoring..." << std::endl;
+//             return false;
+//         }
+//
+//         // iterate and save
+//         for (auto const& [key, value] : deserialized_table) {
+//             writeElement(file, key, value);
+//         }
+//
+//         file.close();
+//         return true;
+//     }
+//
+//     // get debug access to the counter
+//     const AccessCounter& getCounter() const {
+//         return counter;
+//     }
+// };
 
 }  // namespace VPUNN
 

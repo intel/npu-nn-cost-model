@@ -46,7 +46,8 @@ public:
 
     /// @brief checks the layer validity against the rules of an unsplit Layer
     void check_completeLayer_consistency(const DPULayer& layer, SanityReport& result, ISIStrategy presumed_strategy,
-                                         unsigned int nTiles, VPUTilingStrategy strategy=VPUTilingStrategy::NONE) const {
+                                         unsigned int nTiles,
+                                         VPUTilingStrategy strategy = VPUTilingStrategy::NONE) const {
         result.resetOK();  // all OK
         if (!layer_validator.is_supported(layer.device)) {
             result.mark_unknown_device();
@@ -54,6 +55,12 @@ public:
         }
 
         const auto& config = layer_validator.get_config(layer.device);  // previous if prevents throwing
+
+        // check ahead
+        if (!config.is_valid_operation(layer.op)) {
+            result.mark_unknown_operation();
+            return;
+        }
 
         try {
             DPUOperation w(layer, config);  // workload internal representation
@@ -79,6 +86,12 @@ public:
             return;
         }
         const auto& config = splitLayer_validator.get_config(layer.device);  // previous if prevents throwing
+
+        // check ahead
+        if (!config.is_valid_operation(layer.op)) {
+            result.mark_unknown_operation();
+            return;
+        }
 
         try {
             const DPUOperation w(layer, config);  // workload internal representation (throws if bad op)

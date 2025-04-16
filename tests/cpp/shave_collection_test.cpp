@@ -117,12 +117,12 @@ TEST_F(ComplexOpsCollectionTestsNPU40, GatherMakeRegularTest) {
 
     const TestsVector tests{
             {{shaveOp, swl_1}, {139000, 140000}, "Full inner dim"},  // 195.9558724 *1700 ~= 331500
-            {{shaveOp, swl_2}, {6722000, 6723000}, "InterDim"},     // 17.37302728 * 1700 ~= 29534
-            {{shaveOp, swl_3}, {195000, 196000}, "Normal Testcase"}     // 17.37302728 * 1700 ~= 29534
+            {{shaveOp, swl_2}, {6722000, 6723000}, "InterDim"},      // 17.37302728 * 1700 ~= 29534
+            {{shaveOp, swl_3}, {195000, 196000}, "Normal Testcase"}  // 17.37302728 * 1700 ~= 29534
 
     };
 
-    executeTests(tests);    
+    executeTests(tests);
 }
 
 TEST_F(ComplexOpsCollectionTestsNPU40, GatherWrongParamsTest) {
@@ -145,20 +145,18 @@ TEST_F(ComplexOpsCollectionTestsNPU40, GatherWrongParamsTest) {
     SHAVEWorkload swl_4("softmax", VPUDevice::VPU_4_0, {VPUTensor(36, 1, 25, 2, DataType::FLOAT16, Layout::XYZ)},
                         {VPUTensor(36, 1, 25, 2, DataType::FLOAT16, Layout::XYZ)}, axis_wrong_param);
 
-    const TestsVector tests{
-            {{shaveOp, swl_1},
-             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
-             "Error no params testcase"},  
-            {{shaveOp, swl_2},
-             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
-             "Error too many params testcase"},
-            {{shaveOp, swl_3},
-             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
-             "Error wrong batch param testcase"},
-             {{shaveOp, swl_4},
-             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
-             "Error wrong axis param testcase"} 
-    };
+    const TestsVector tests{{{shaveOp, swl_1},
+                             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
+                             "Error no params testcase"},
+                            {{shaveOp, swl_2},
+                             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
+                             "Error too many params testcase"},
+                            {{shaveOp, swl_3},
+                             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
+                             "Error wrong batch param testcase"},
+                            {{shaveOp, swl_4},
+                             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
+                             "Error wrong axis param testcase"}};
 
     executeTests(tests);
 }
@@ -590,7 +588,7 @@ TEST_F(ShaveCollectionTest, DefaultCaseTestNPU40) {
             SHAVEWorkload swl("default", VPUDevice::VPU_4_0, {VPUTensor(101, 101, 2, 1, DataType::FLOAT16)},
                               {VPUTensor(101, 101, 2, 1, DataType::FLOAT16)});
             CyclesInterfaceType cycles = shaveOp.dpuCycles(swl);
-            EXPECT_NEAR(cycles, 101*101*2, 1);
+            EXPECT_NEAR(cycles, 101 * 101 * 2, 1);
         }
         {
             SHAVEWorkload swl("default", VPUDevice::VPU_4_0, {VPUTensor(1, 1, 5, 1, DataType::FLOAT16)},
@@ -817,13 +815,13 @@ protected:
     }
 
 private:
-    const ShaveConfiguration
-            shaves2{};  // must be {} value initized here if const otherwise no default ctor for test class.
+    const ShaveConfiguration shaves2{
+            0, ""};  // must be {} value initized here if const otherwise no default ctor for test class.
 public:
 };
 
 TEST_F(ShaveDevicesTest, config_Smoke) {
-    const ShaveConfiguration shaves;
+    const ShaveConfiguration shaves{0, ""};
 
     {
         VPUDevice d = VPUDevice::VPU_2_0;

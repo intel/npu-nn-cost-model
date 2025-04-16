@@ -47,7 +47,7 @@ public:
      *
      * @param dpu_op a DPU layer
      */
-    VPUComputeNode(const std::shared_ptr<DPULayer> dpu_op): dpu(dpu_op) {
+    VPUComputeNode(const std::shared_ptr<DPULayer>& dpu_op): dpu(dpu_op) {
         std::random_device rd; //create a random device to obtain a seed for the random number generator
         std::mt19937 gen(rd()); //initialize the random number generator with the random seed
         std::uniform_int_distribution<int> distrib(0, RAND_MAX); //uniform distribution, range{0, RAND_MAX}
@@ -61,7 +61,7 @@ public:
      *
      * @param shv_op a SHV layer
      */
-    VPUComputeNode(const std::shared_ptr<SWOperation> shv_op): shv(shv_op) {
+    VPUComputeNode(const std::shared_ptr<SWOperation>& shv_op): shv(shv_op) {
         std::random_device rd;   // create a random device to obtain a seed for the random number generator
         std::mt19937 gen(rd());  // initialize the random number generator with the random seed
         std::uniform_int_distribution<int> distrib(0, RAND_MAX);  // uniform distribution, range{0, RAND_MAX}
@@ -211,7 +211,7 @@ public:
 
         // Add the nodes to the appropriate adjacency list
         predecessors[sink].push_back(source);
-        successors[source].push_back(sink);
+        successors[source].push_back(std::move(sink));
         return *this;
     }
 

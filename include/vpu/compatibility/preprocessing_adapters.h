@@ -83,6 +83,9 @@ public:
         case Operation::ELTWISE_MUL:
             operation = Operation::ELTWISE;  // map to elementwise
             break;
+        case Operation::AVEPOOL:
+            operation = Operation::DW_CONVOLUTION;  // map to DW
+            break;
         default:
             break;  // nothing
         }
@@ -95,9 +98,7 @@ public:
         // device 4.0 is not supported for now we are mocking VPU_4_0 with 2.7. This has to be removed when we have a
         // VPU4.0 trained NN
         const auto device{(in_device == VPUDevice::VPU_4_0)  // mock 4.0
-                                          || ((in_device == VPUDevice::NPU_RESERVED) ||
-                                              (in_device == VPUDevice::NPU_RESERVED_W) 
-                                              )
+                                          || ((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W))
                                   ? VPUDevice::VPU_2_7  // all mocked via 2.7
                                   : in_device};
 
@@ -367,14 +368,13 @@ public:
 
     /// some devices are replaced to supported ones
     static VPUDevice mock_replace_devices(const VPUDevice in_device) {
-        // device RESERVED is not supported for now we are mocking VPU_RESERVED with 4.0. This has to be removed when we
-        // have a VPU_RESERVED trained NN
-        const auto device{
-                (((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W) 
-                  ) ||
-                 (in_device > VPUDevice::NPU_RESERVED_W))
-                        ? VPUDevice::VPU_4_0  // all mocked via 40
-                        : in_device};
+        // device RESERVED is not supported for now we are mocking VPU_RESERVED with 4.0. This has to be removed when we have a
+        // VPU_RESERVED trained NN
+        const auto device{(((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W)  // mock 50 family
+                            ) ||
+                           (in_device > VPUDevice::NPU_RESERVED_W))
+                                  ? VPUDevice::VPU_4_0  // all mocked via 40
+                                  : in_device};
 
         return device;
     }
@@ -518,6 +518,26 @@ public:
 /// adapting input to NPU40
 class NN5XInputAdapter {
 public:
+    /// some operations are replaced to supported ones. 
+    /// This might happen also via the types namespace specific mapping. But is better to be controlled also from here
+    static Operation mock_replace_operations(const Operation in_operation) {
+        auto operation{in_operation};
+
+        switch (operation) {
+        // case Operation::LAYER_NORM:  // cascade, would be better a map available?
+        // case Operation::ELTWISE_MUL:
+        //     operation = Operation::ELTWISE;  // map to elementwise
+        //     break;
+        case Operation::AVEPOOL:
+            operation = Operation::DW_CONVOLUTION;  // map to DW
+            break;
+        default:
+            break;  // nothing
+        }
+
+        return operation;
+    }
+
     /// ISI Strategy (up to v11) might not be compatible in any combination. Reasons are rather based on data
     /// available for training and training over-fitting.
     ///
@@ -569,9 +589,9 @@ public:
         };
 
         // limit owt to 6. This was trained on NPU40
-        auto d_limit_owt_to_3 = [](FilteredFields& f) {  // d)
-            if (3 < f.owt) {
-                f.owt = 3;
+        auto d_limit_owt_to_2 = [](FilteredFields& f) {  // d)
+            if (f.owt > 2) {
+                f.owt = 2;
             }
         };
         // In practice was observed that OWT=2,3,4,5,6 has the same constant impact
@@ -583,7 +603,7 @@ public:
         // b_check_SOK_ELM(ff);  // ELM with broadcast is not allowed/supported . Is this a problem? SHuld be
         // trainable!?
 
-        d_limit_owt_to_3(ff);  // only
+        d_limit_owt_to_2(ff);  // only
 
         return ff;
     }

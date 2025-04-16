@@ -22,8 +22,7 @@ namespace VPUNN {
 
 template <>
 inline SmartRanges::value_type Sampler::sample_list_decrease_prob<SmartRanges>(const SmartRanges& elements) const {
-
-    //lambda function to generate a list of elements for a SmartRanges object
+    // lambda function to generate a list of elements for a SmartRanges object
     auto gen_SmartList = [](const SmartRanges& elements) -> std::vector<SmartRanges::value_type> {
         std::string text{""};
         std::vector<SmartRanges::value_type> result;
@@ -374,6 +373,7 @@ protected:
         }
         w.batch = out_0.channels;
     }
+    friend class AVGPOOL_Constraints;
 };
 
 class CM_CONVOLUTION_Constraints : public GenericConvolution_Constraints {
@@ -470,7 +470,7 @@ protected:
         dpu.input_1.sparsity_enabled = false;
     }
 
-    long long input_1_volume(const TensorInfo& w) const noexcept override {
+    long long input_1_volume(const TensorInfo& w) const noexcept override final {
         return w.height * w.width * w.channels;
     }
 
@@ -527,7 +527,7 @@ protected:
         return v;
     }
 
-    long long get_weight_table_size(const long long) const noexcept override {
+    long long get_weight_table_size(const long long) const noexcept override final {
         return 0;
     }
 };
@@ -565,7 +565,7 @@ protected:
         dpu.input_1.sparsity_enabled = false;
     }
 
-    long long input_1_volume(const TensorInfo&) const noexcept override {
+    long long input_1_volume(const TensorInfo&) const noexcept override final {
         return 0;
     }
 
@@ -578,10 +578,51 @@ protected:
         w.height = 0;
         w.width = 0;
     }
+
+    long long get_weight_table_size(const long long) const noexcept override final {
+        return 0;  // no WT for MAXPOOL
+    }
 };
 
 class LAYERNORM_Constraints : public CONVOLUTION_Constraints {};
 class ELTWISE_MUL_Constraints : public ELTWISE_Constraints {};
+
+/// IS a DW_CONV without weights. BUt we will replace it at the NN descriptor (so some info has to be present)
+class AVGPOOL_Constraints :
+        public GenericConvolution_Constraints /*, public Base_Constraints,
+         public IOperationDynamicGenerator*/
+{
+protected:
+    void generate_operation_dependent_tensors(Sampler& sampler, const IDeviceValidValues& config,
+                                              DPUOperation& dpu) const override {
+        DW_CONVOLUTION_Constraints().generate_operation_dependent_tensors(sampler, config, dpu);
+    }
+
+    bool check_input_output_tensor_corelation(const IDeviceValidValues& config, const DPUOperation& dpu,
+                                              std::string& info) const override {
+        return DW_CONVOLUTION_Constraints().check_input_output_tensor_corelation(config, dpu, info);
+    };
+
+    void generate_sparsity(Sampler&, const IDeviceValidValues&, DPUOperation& dpu) const override {
+        dpu.input_0.sparsity = 0.0F;
+        dpu.input_0.sparsity_enabled = false;
+        dpu.input_1.sparsity = 0.0F;
+        dpu.input_1.sparsity_enabled = false;
+    }
+
+    void deduce_input_1_shape_and_layout(const TensorInfo& in_0, const TensorInfo& out_0,
+                                         const IDeviceValidValues& config, const KernelInfo& kernel,
+                                         TensorInfo& w) const noexcept override {
+        DW_CONVOLUTION_Constraints().deduce_input_1_shape_and_layout(in_0, out_0, config, kernel, w);
+    }
+    long long input_1_volume(const TensorInfo&) const noexcept override final {
+        return 0;
+        // like MAXPOOL , no input_1 wts
+    }
+    long long get_weight_table_size(const long long) const noexcept override final {
+        return 0;
+    }
+};
 
 }  // namespace VPUNN
 

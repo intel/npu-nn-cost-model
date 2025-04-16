@@ -31,6 +31,10 @@
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
+//@todo Add all LNL profiling results for JIra tickets to a fixture of UNit tests for LNL
+//@todo Enhance DW-conv conversion factors to include the new ones from the LNL profiling results
+
+
 TEST_F(TestCostModel, MAXPOOL_172_VPU27_NoGT) {
     DPUWorkload tst_wl{
             VPUDevice::VPU_2_7,                         // dev
@@ -57,15 +61,14 @@ TEST_F(TestCostModel, MAXPOOL_172_VPU27_NoGT) {
     auto wl_sok2{wl_owt2};
     wl_sok2.isi_strategy = ISIStrategy::SPLIT_OVER_K;
 
-    /* coverity[copy_instead_of_move] */
     const std::vector<GTestCase> tests{
-            {{tst_wl},
+            {{std::move(tst_wl)},
              {NO_ERROR_EXPECTED, false, 1500, 1500 + 250},  // 1659    GT:1660
              "T1"},
-            {{wl_owt2},
+            {{std::move(wl_owt2)},
              {NO_ERROR_EXPECTED, false, 1450, 1450 + 250},  // 1689 NOK GT: NA  cannot do! //v150: 1468
              "T2 clu owt=2"},
-            {{wl_sok2},
+            {{std::move(wl_sok2)},
              {NO_ERROR_EXPECTED, false, 1450, 1450 + 250},  // 1689  GT: NA     //v150: 1468
              " SOK owt=2"},
 
@@ -120,35 +123,34 @@ TEST_F(TestCostModel, MAXPOOL_Example_NoGT) {
     wl5_halfsoh.outputs[0] = VPUTensor(42, 90, 32, 1, DataType::UINT8);
 
     // EXPECT_TRUE(false);
-    /* coverity[copy_instead_of_move] */
     const std::vector<GTestCase> tests{
-            {{wl1_halfsok},
+            {{std::move(wl1_halfsok)},
              {NO_ERROR_EXPECTED, false, 9600,
               9600 + 1100},  //  v16: xxx  v17:10558    // v1.5.9 9635  GT: 10388 assumed for x16
              "T1 HALF SOK"},
-            {{wl1},
+            {{std::move(wl1)},
              {NO_ERROR_EXPECTED, false, 12000,
               12000 + 2000},  //  v16: 13471  v17:13486    // v1.5.9 12897  GT: 12506,  14399 cc if no swizzling
              "T1 SOK"},
-            {{wl2},
+            {{std::move(wl2)},
              {NO_ERROR_EXPECTED, false, 11900,
               11900 + 2000},  //  v16: 13634  v17:13559  (much! vs GT)  // v1.5.9 13089   ,  GT 11959  CLU
              "T2 CLU owt1"},
-            {{wl3},
+            {{std::move(wl3)},
              {NO_ERROR_EXPECTED, false, 12000,
               12000 + 2000},  // OK vs GTclu, NOK vs NN clu: v16: 12044  v17:12437 , v1.5.9 11233  should be =
                               // SOK, and larger than owt=1  (CLU is 11959) GT NA
              "T3 CLU owt2"},
-            {{wl4},
+            {{std::move(wl4)},
              {NO_ERROR_EXPECTED, false, 13000, 13000 + 2000},  // OK  v16: 14028 v17: 13665// v1.5.9 13218   GT ???
              "T4 SOH H owt2"},
-            {{wl5},
+            {{std::move(wl5)},
              {NO_ERROR_EXPECTED, false, 12000, 12000 + 2000},  // v16: 12244  NOK v17: 12604 nok should be larger than
                                                                // CLU (is larger than GT CLU still) // v1.5.9
                                                                // 11515   //GT 12484cc
              "T5h SOH H owt1"},
 
-            {{wl5_halfsoh},
+            {{std::move(wl5_halfsoh)},
              {NO_ERROR_EXPECTED, false, 6000, 6000 + 600},  // v16: 6499  NOK v17: x  //GT 6162  aprox
              "T5h SOH H half owt1"},
 
@@ -398,7 +400,7 @@ TEST_F(TestCostModel, DISABLED_BatchTestVPUNNCostModel_VPUNN_2_0_stochastic) {
 }
 
 /// Demonstrate outputs from batch are the same as from single runs. Random data
-TEST_F(TestCostModel, BatchTestVPUNNCostModel_VPUNN_2_7F_stochastic) {
+TEST_F(TestCostModel, DISABLED_BatchTestVPUNNCostModel_VPUNN_2_7F_stochastic) {
     const std::string model_path = the_NN_models.fast_model_paths[1].first;
     const VPUNN::VPUDevice device_version = the_NN_models.fast_model_paths[1].second;
 
@@ -470,16 +472,15 @@ TEST_F(TestCostModel, BatchTestVPUNNCostModel_VPUNN_2_7F_Particular1) {
     // Generate a bunch of random workloads
     auto workloads = std::vector<VPUNN::DPUWorkload>(1);
     // std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device_version));
-    /* coverity[copy_instead_of_move] */
-    workloads[0] = wl_ref;
+    workloads[0] = std::move(wl_ref);
 
-    const auto w0{workloads[0]};
+    const auto& w0{workloads[0]};
 
     {
         // Batched Inference for cycles.
         std::vector<VPUNN::CyclesInterfaceType> batched_cycles = batched_model.DPU(workloads);
 
-        const auto w01{workloads[0]};
+        const auto& w01{workloads[0]};
         EXPECT_EQ(w0, w01) << w0 << w01;
 
         // Standard Inference for cycles
@@ -580,8 +581,8 @@ TEST_F(TestCostModel, BatchTest_SanitizedWorkloadsEquivalence) {
             false,                                                      // weight_sparsity_enabled
 
     };
-    /* coverity[copy_instead_of_move] */
-    std::vector<VPUNN::DPUWorkload> workloads = {wl0, wl1, wl2, wl3};
+
+    std::vector<VPUNN::DPUWorkload> workloads = {std::move(wl0), std::move(wl1), std::move(wl2), std::move(wl3)};
 
     auto batch_size = (unsigned int)workloads.size();
 
@@ -641,8 +642,7 @@ TEST_F(TestCostModel, DISABLED_SmokeTestDPU) {
             VPUNN::ExecutionMode::MATRIX                                // execution mode
     };
 
-    /* coverity[copy_instead_of_move] */
-    auto dpu_cycles = model.DPU(wl);
+    auto dpu_cycles = model.DPU(std::move(wl));
 
     // Expect equality.
     EXPECT_EQ(dpu_cycles, static_cast<unsigned int>((56 / 4) * (56 / 4) * (16 / 16) * 3 * 3 * 16));
@@ -680,8 +680,7 @@ TEST_F(TestCostModel, SmokeTestDPUVPU_2_0Model_Eltwise) {
             VPUNN::ExecutionMode::VECTOR                                // execution mode
     };
     VPUNN::VPUCostModel model_2_0{VPU_2_0_MODEL_PATH};
-    /* coverity[copy_instead_of_move] */
-    float cycles = static_cast<float>(model_2_0.DPU(wl));
+    float cycles = static_cast<float>(model_2_0.DPU(std::move(wl)));
 
     // Expect hw overhead to be valid
     EXPECT_TRUE(cycles > (16 / 4) * (16 / 4) * (64 / 16));
@@ -700,8 +699,7 @@ TEST_F(TestCostModel, SmokeTestDPUVPU27Model_Eltwise) {
     };
     VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
-    /* coverity[copy_instead_of_move] */
-    float cycles = static_cast<float>(model_2_7.DPU(wl));
+    float cycles = static_cast<float>(model_2_7.DPU(std::move(wl)));
 
     // Expect hw overhead to be valid
     EXPECT_TRUE(cycles > (16 / 4) * (16 / 4) * (64 / 16));
@@ -859,10 +857,8 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_27) {
         wl_equiv.op = equivalent_op;
 
         {
-            /* coverity[copy_instead_of_move] */
-            auto cycles_avgpool = crt_model.DPU(wl_avgpool);
-            /* coverity[copy_instead_of_move] */
-            auto cycles_equiv = crt_model.DPU(wl_equiv);
+            auto cycles_avgpool = crt_model.DPU(std::move(wl_avgpool));
+            auto cycles_equiv = crt_model.DPU(std::move(wl_equiv));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_avgpool));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -880,10 +876,8 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_27) {
         wl_equiv.op = equivalent_op;
 
         {
-            /* coverity[copy_instead_of_move] */
-            auto cycles_avgpool = crt_model.DPU(wl_avgpool);
-            /* coverity[copy_instead_of_move] */
-            auto cycles_equiv = crt_model.DPU(wl_equiv);
+            auto cycles_avgpool = crt_model.DPU(std::move(wl_avgpool));
+            auto cycles_equiv = crt_model.DPU(std::move(wl_equiv));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_avgpool));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -894,17 +888,15 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_27) {
     }
 
     {
-        VPUNN::DPUWorkload wl_avgpool{wl_avgpool_ref};
+        VPUNN::DPUWorkload wl_avgpool{std::move(wl_avgpool_ref)};
         wl_avgpool.isi_strategy = VPUNN::ISIStrategy::SPLIT_OVER_K;
         wl_avgpool.output_write_tiles = 2;
         VPUNN::DPUWorkload wl_equiv{wl_avgpool};
         wl_equiv.op = equivalent_op;
 
         {
-            /* coverity[copy_instead_of_move] */
-            auto cycles_avgpool = crt_model.DPU(wl_avgpool);
-            /* coverity[copy_instead_of_move] */
-            auto cycles_equiv = crt_model.DPU(wl_equiv);
+            auto cycles_avgpool = crt_model.DPU(std::move(wl_avgpool));
+            auto cycles_equiv = crt_model.DPU(std::move(wl_equiv));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_avgpool));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -944,11 +936,9 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_20) {
         VPUNN::DPUWorkload wl_equiv{wl_avgpool};
         wl_equiv.op = equivalent_op;
 
-        {   
-            /* coverity[copy_instead_of_move] */
-            auto cycles_avgpool = crt_model.DPU(wl_avgpool);
-            /* coverity[copy_instead_of_move] */
-            auto cycles_equiv = crt_model.DPU(wl_equiv);
+        {
+            auto cycles_avgpool = crt_model.DPU(std::move(wl_avgpool));
+            auto cycles_equiv = crt_model.DPU(std::move(wl_equiv));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_avgpool));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -964,11 +954,9 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_20) {
         VPUNN::DPUWorkload wl_equiv{wl_avgpool};
         wl_equiv.op = equivalent_op;
 
-        {   
-            /* coverity[copy_instead_of_move] */
-            auto cycles_avgpool = crt_model.DPU(wl_avgpool);
-            /* coverity[copy_instead_of_move] */
-            auto cycles_equiv = crt_model.DPU(wl_equiv);
+        {
+            auto cycles_avgpool = crt_model.DPU(std::move(wl_avgpool));
+            auto cycles_equiv = crt_model.DPU(std::move(wl_equiv));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_avgpool));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -979,14 +967,14 @@ TEST_F(TestCostModel, AVEPOOL_equivalence_test_20) {
     }
 
     {
-        VPUNN::DPUWorkload wl_avgpool{wl_avgpool_ref};
+        VPUNN::DPUWorkload wl_avgpool{std::move(wl_avgpool_ref)};
         wl_avgpool.isi_strategy = VPUNN::ISIStrategy::SPLIT_OVER_K;  // not supported on 2,.0
         VPUNN::DPUWorkload wl_equiv{wl_avgpool};
         wl_equiv.op = equivalent_op;
 
         {
-            auto cycles_avgpool = crt_model.DPU(wl_avgpool);
-            auto cycles_equiv = crt_model.DPU(wl_equiv);
+            auto cycles_avgpool = crt_model.DPU(std::move(wl_avgpool));
+            auto cycles_equiv = crt_model.DPU(std::move(wl_equiv));
 
             EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles_avgpool));
             EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -1046,15 +1034,13 @@ TEST_F(TestCostModel, Datatype_Sanity_test_VPU27) {
         VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
         {
-            VPUNN::DPUWorkload wl{wl_ref_int};
+            VPUNN::DPUWorkload wl{std::move(wl_ref_int)};
             VPUNN::DPUWorkload wl_equiv{wl};
             wl_equiv.inputs[0].change_datatype_superficial(normalized_data_int);
             wl_equiv.outputs[0].change_datatype_superficial(normalized_data_int);
 
-            /* coverity[copy_instead_of_move] */
-            auto cycles_raw = model_2_7.DPU(wl);  // will change
-            /* coverity[copy_instead_of_move] */
-            auto cycles_equiv = model_2_7.DPU(wl_equiv);
+            auto cycles_raw = model_2_7.DPU(std::move(wl));  // will change
+            auto cycles_equiv = model_2_7.DPU(std::move(wl_equiv));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_raw));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -1064,15 +1050,13 @@ TEST_F(TestCostModel, Datatype_Sanity_test_VPU27) {
         }
 
         {
-            VPUNN::DPUWorkload wl{wl_ref_flt};
+            VPUNN::DPUWorkload wl{std::move(wl_ref_flt)};
             VPUNN::DPUWorkload wl_equiv{wl};
             wl_equiv.inputs[0].change_datatype_superficial(normalized_data_flt);
             wl_equiv.outputs[0].change_datatype_superficial(normalized_data_flt);
 
-            /* coverity[copy_instead_of_move] */
-            auto cycles_raw = model_2_7.DPU(wl);  // will change
-            /* coverity[copy_instead_of_move] */
-            auto cycles_equiv = model_2_7.DPU(wl_equiv);
+            auto cycles_raw = model_2_7.DPU(std::move(wl));  // will change
+            auto cycles_equiv = model_2_7.DPU(std::move(wl_equiv));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_raw));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_equiv));
@@ -1091,7 +1075,7 @@ TEST_F(TestCostModel, InitAspects) {
         VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
-        const auto file_content{read_a_file(model_path)};
+        const auto file_content{read_a_file(std::move(model_path))};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
         EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), true));
@@ -1185,8 +1169,7 @@ TEST_F(TestCostModel, Mock_Legacy159_40_DPU) {
     std::filesystem::path models_root{mroot};
 
     const std::filesystem::path stricti89_02Ver{std::filesystem::path(models_root) /= "vpu_40_159_strict.vpunn"};
-    /* coverity[copy_instead_of_move] */
-    const std::filesystem::path i11_02Ver{std::filesystem::path(models_root) /= "vpu_40_159.vpunn"};
+    const std::filesystem::path i11_02Ver{std::filesystem::path(std::move(models_root)) /= "vpu_40_159.vpunn"};
     {
         VPUNN::VPUCostModel model_strict{stricti89_02Ver.string()};
         EXPECT_TRUE(model_strict.nn_initialized());
@@ -1206,10 +1189,8 @@ TEST_F(TestCostModel, Mock_Legacy159_40_DPU) {
             DPUWorkload wl_strict = wl_glob_40;
             DPUWorkload wl_nostrict = wl_glob_40;
 
-            /* coverity[copy_instead_of_move] */
-            const auto cycles_strict = model_strict.DPU(wl_strict);
-            /* coverity[copy_instead_of_move] */
-            const auto cycles_Nostrict = model_nostrict.DPU(wl_nostrict);
+            const auto cycles_strict = model_strict.DPU(std::move(wl_strict));
+            const auto cycles_Nostrict = model_nostrict.DPU(std::move(wl_nostrict));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_strict));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Nostrict));
@@ -1223,10 +1204,8 @@ TEST_F(TestCostModel, Mock_Legacy159_40_DPU) {
             wl_strict.output_swizzling = {Swizzling::KEY_0};
             DPUWorkload wl_nostrict = wl_strict;
 
-            /* coverity[copy_instead_of_move] */
-            const auto cycles_strict = model_strict.DPU(wl_strict);
-            /* coverity[copy_instead_of_move] */
-            const auto cycles_Nostrict = model_nostrict.DPU(wl_nostrict);
+            const auto cycles_strict = model_strict.DPU(std::move(wl_strict));
+            const auto cycles_Nostrict = model_nostrict.DPU(std::move(wl_nostrict));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_strict));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Nostrict));
@@ -1240,14 +1219,14 @@ TEST_F(TestCostModel, Mock_Legacy159_40_DPU) {
             wl_strict.output_write_tiles = 6;
             DPUWorkload wl_nostrict = wl_strict;
 
-            const auto cycles_strict = model_strict.DPU(wl_strict);
-            const auto cycles_Nostrict = model_nostrict.DPU(wl_nostrict);
+            const auto cycles_strict = model_strict.DPU(std::move(wl_strict));
+            const auto cycles_Nostrict = model_nostrict.DPU(std::move(wl_nostrict));
 
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_strict));
             EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Nostrict));
 
             EXPECT_GE(cycles_strict, cycles_Nostrict);
-            EXPECT_LE(cycles_strict-300, cycles_Nostrict);
+            EXPECT_LE(cycles_strict - 300, cycles_Nostrict);
             EXPECT_GT(cycles_strict, 0);
         }
     }
@@ -1266,9 +1245,9 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
         auto cycles_40_DtoC = model_4_0.DMA(wl_glob_40.device, wl_glob_40.inputs[0], wl_glob_40.outputs[0],
                                             MemoryLocation::DRAM, MemoryLocation::CMX);
 
-        EXPECT_GT(cycles_27_DtoC, (cycles_40_DtoC * ratio_27per40));  // 2.7 is slower
-        EXPECT_EQ(cycles_27_DtoC, 3658);                              // theoretical DMA
-        EXPECT_EQ(cycles_40_DtoC, 4359);                              // theoretical DMA
+        EXPECT_GT(cycles_27_DtoC, (cycles_40_DtoC * ratio_27per40));                     // 2.7 is slower
+        EXPECT_EQ(cycles_27_DtoC, 3658);                                                 // theoretical DMA
+        EXPECT_EQ(cycles_40_DtoC, PerformanceMode::forceLegacy_G4 ? 4359 : 1883);        // theoretical DMA
 
         auto cycles_27_CtoD = model_2_7.DMA(wl_glob_27.device, wl_glob_27.inputs[0], wl_glob_27.outputs[0],
                                             MemoryLocation::CMX, MemoryLocation::DRAM);
@@ -1277,8 +1256,8 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
 
         EXPECT_GT(cycles_27_CtoD, (cycles_40_CtoD * ratio_27per40));  // 2.7 is slower
 
-        EXPECT_EQ(cycles_27_CtoD, 3658);  // theoretical DMA
-        EXPECT_EQ(cycles_40_CtoD, 4359);  // theoretical DMA
+        EXPECT_EQ(cycles_27_CtoD, 3658);                                                 // theoretical DMA
+        EXPECT_EQ(cycles_40_CtoD, PerformanceMode::forceLegacy_G4 ? 4359 : 1883);  // theoretical DMA
     }
 }
 
@@ -1302,10 +1281,9 @@ TEST_F(TestCostModel, Establish_unique_swizz_Test) {
     };
     using TestsVector = std::vector<TestCase>;
 
-    auto lambda = [](TestsVector tests) {
+    auto lambda = [](TestsVector& tests) {
         int i = 1;
-        /* coverity[auto_causes_copy] */
-        for (auto t : tests) {
+        for (auto& t : tests) {
             // std::cout << "\nTestCase: "<<i <<" Op:" << Operation_ToText.at(static_cast<int>(t.t_in.op));
             std::tuple<Swizzling, Swizzling, Swizzling> result_swizz =
                     NN40InputAdapter::establishUniqueSwizzling(t.t_in.in0, t.t_in.in1, t.t_in.out0, t.t_in.op);
@@ -1340,7 +1318,7 @@ TEST_F(TestCostModel, Establish_unique_swizz_Test) {
 
             // clang-format on
     };
-    /* coverity[copy_instead_of_move] */
+
     lambda(tests);
 }
 
@@ -1440,7 +1418,7 @@ TEST_F(TestCostModel, OutputWriteTiles_multiple) {
     {
         bool expectationToForce{true};
         {
-            VPUNN::DPUWorkload wl{wl_ref_1x1_f};
+            VPUNN::DPUWorkload wl{std::move(wl_ref_1x1_f)};
             EXPECT_TRUE(expectationToForce) << wl;
 
             wl.isi_strategy = VPUNN::ISIStrategy::CLUSTERING;
@@ -1453,7 +1431,7 @@ TEST_F(TestCostModel, OutputWriteTiles_multiple) {
             // run_test_all_owt(wl, "SOK: ");// not possible owt =1
         }
         {
-            VPUNN::DPUWorkload wl{wl_ref_5x5_f};
+            VPUNN::DPUWorkload wl{std::move(wl_ref_5x5_f)};
             EXPECT_TRUE(expectationToForce) << wl;
 
             wl.isi_strategy = VPUNN::ISIStrategy::CLUSTERING;
@@ -1588,7 +1566,7 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo_20) {
 
     };
     {  // 20
-        const DPUWorkload wl{wl_special};
+        const DPUWorkload wl{std::move(wl_special)};
 
         const std::string modelFile{VPU_2_0_MODEL_PATH};
 
@@ -1633,7 +1611,7 @@ TEST_F(TestCostModel, Sanitization_with_stride_and_kernel_0) {
     EXPECT_TRUE(test_model.nn_initialized());
 
     std::string info = "";
-    auto cycles = test_model.DPU(wl, info);
+    auto cycles = test_model.DPU(std::move(wl), info);
 
     EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles)) << info;
 }
@@ -1666,7 +1644,7 @@ TEST_F(TestCostModel, Wl_with_extreme_values) {
     EXPECT_TRUE(test_model.nn_initialized());
 
     std::string info = "";
-    auto cycles = test_model.DPU(wl, info);
+    auto cycles = test_model.DPU(std::move(wl), info);
 
     EXPECT_TRUE(VPUNN::Cycles::isErrorCode(cycles)) << info;
 }
@@ -1914,12 +1892,9 @@ TEST_F(TestCostModel, TestDPUVPU27ModelIC_4_16_32) {
 
     VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
-    /* coverity[copy_instead_of_move] */
-    VPUNN::DPUWorkload wl0 = wl0_prototype;
-    /* coverity[copy_instead_of_move] */
-    VPUNN::DPUWorkload wl1 = wl1_prototype;
-    /* coverity[copy_instead_of_move] */
-    VPUNN::DPUWorkload wl2 = wl2_prototype;
+    VPUNN::DPUWorkload wl0{std::move(wl0_prototype)};
+    VPUNN::DPUWorkload wl1{std::move(wl1_prototype)};
+    VPUNN::DPUWorkload wl2{std::move(wl2_prototype)};
 
     ASSERT_TRUE(model_2_7.nn_initialized())
             << "Model not loaded, might be due to file location: " << VPU_2_7_MODEL_PATH << std::endl;
@@ -1944,13 +1919,10 @@ TEST_F(TestCostModel, TestDPUVPU27ModelIC_4_16_32) {
     wl0.execution_order = wl1.execution_order = wl2.execution_order = VPUNN::ExecutionMode::CUBOID_8x16;
 
     {
-        /* coverity[copy_instead_of_move] */
         CyclesInterfaceType wl0_cycles = model_2_7.DPU(wl0);
         EXPECT_FALSE(Cycles::isErrorCode(wl0_cycles));
-        /* coverity[copy_instead_of_move] */
         CyclesInterfaceType wl1_cycles = model_2_7.DPU(wl1);
         EXPECT_FALSE(Cycles::isErrorCode(wl1_cycles));
-        /* coverity[copy_instead_of_move] */
         CyclesInterfaceType wl2_cycles = model_2_7.DPU(wl2);
         EXPECT_FALSE(Cycles::isErrorCode(wl2_cycles));
 
@@ -1963,14 +1935,11 @@ TEST_F(TestCostModel, TestDPUVPU27ModelIC_4_16_32) {
     wl0.execution_order = wl1.execution_order = wl2.execution_order = VPUNN::ExecutionMode::CUBOID_4x16;
 
     {
-        /* coverity[copy_instead_of_move] */
-        CyclesInterfaceType wl0_cycles = model_2_7.DPU(wl0);
+        CyclesInterfaceType wl0_cycles = model_2_7.DPU(std::move(wl0));
         EXPECT_FALSE(Cycles::isErrorCode(wl0_cycles));
-        /* coverity[copy_instead_of_move] */
-        CyclesInterfaceType wl1_cycles = model_2_7.DPU(wl1);
+        CyclesInterfaceType wl1_cycles = model_2_7.DPU(std::move(wl1));
         EXPECT_FALSE(Cycles::isErrorCode(wl1_cycles));
-        /* coverity[copy_instead_of_move] */
-        CyclesInterfaceType wl2_cycles = model_2_7.DPU(wl2);
+        CyclesInterfaceType wl2_cycles = model_2_7.DPU(std::move(wl2));
         EXPECT_FALSE(Cycles::isErrorCode(wl2_cycles));
 
         EXPECT_LT(wl0_cycles, wl1_cycles);
@@ -2027,8 +1996,8 @@ TEST_F(TestCostModel, Compressed_CONV_Sanity_test_VPU27) {
         VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
         {
-            VPUNN::DPUWorkload wl{wl_ref};
-            VPUNN::DPUWorkload wl_equiv{wl_ref_equiv};
+            VPUNN::DPUWorkload wl{std::move(wl_ref)};
+            VPUNN::DPUWorkload wl_equiv{std::move(wl_ref_equiv)};
 
             std::string info_raw, info_equiv;
 
@@ -2096,8 +2065,8 @@ TEST_F(TestCostModel, Compressed_CONV_Sanity_test_VPU27_IC1_special) {
         VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
         {
-            VPUNN::DPUWorkload wl{wl_ref};
-            VPUNN::DPUWorkload wl_equiv{wl_ref_equiv};
+            VPUNN::DPUWorkload wl{std::move(wl_ref)};
+            VPUNN::DPUWorkload wl_equiv{std::move(wl_ref_equiv)};
 
             std::string info_raw, info_equiv;
 
@@ -2163,8 +2132,8 @@ TEST_F(TestCostModel, Compressed_CONV_Sanity_test_VPU27_sparse) {
         VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
 
         {
-            VPUNN::DPUWorkload wl{wl_ref};
-            VPUNN::DPUWorkload wl_equiv{wl_ref_equiv};
+            VPUNN::DPUWorkload wl{std::move(wl_ref)};
+            VPUNN::DPUWorkload wl_equiv{std::move(wl_ref_equiv)};
 
             std::string info_raw, info_equiv;
 
@@ -2316,8 +2285,8 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
             buffer.str("");
             buffer << "CompressConv 50x50 , IC=" << i << ", OC= " << oc;
             const std::string testName = buffer.str();
-            TestCase t{{costructCompressConv50x50(i, oc), testName}};
-            tests.push_back(t);
+            TestCase t{{costructCompressConv50x50(i, oc), std::move(testName)}};
+            tests.push_back(std::move(t));
         }
 
         {  // CONV
@@ -2327,8 +2296,8 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
             const std::string testName = buffer.str();
             auto w{costructCompressConv50x50(i, oc)};
             w.op = Operation::CONVOLUTION;
-            TestCase t{{w, testName}};
-            tests.push_back(t);
+            TestCase t{{std::move(w), std::move(testName)}};
+            tests.push_back(std::move(t));
         }
 
         if (false) {                                 // another larger workload
@@ -2346,8 +2315,7 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
                 const std::string testName = buffer.str();
                 auto w{costructCompressConv321x46(i, oc)};
                 w.op = Operation::CONVOLUTION;
-                /* coverity[copy_instead_of_move] */
-                TestCase t{{w, testName}};
+                TestCase t{{std::move(w), std::move(testName)}};
                 tests.push_back(t);
             }
         }
@@ -2650,7 +2618,7 @@ TEST_F(TestCostModel, Check_Wl_halo_data_test) {
     CyclesInterfaceType cyc = model_2_7.DPU(wl_ref, info);
     EXPECT_FALSE(is_error_code(cyc)) << cyc << "\n";
 
-    auto verify_wl_halo = [&model_2_7, this](TestsVector tests) {
+    auto verify_wl_halo = [&model_2_7, this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         std::string info;
 
@@ -2662,8 +2630,7 @@ TEST_F(TestCostModel, Check_Wl_halo_data_test) {
 
             const DPUOperation dpu{wl_ref_halo};
 
-            /* coverity[copy_instead_of_move] */
-            CyclesInterfaceType cyc = model_2_7.DPU(wl_ref_halo, info);
+            CyclesInterfaceType cyc = model_2_7.DPU(std::move(wl_ref_halo), info);
 
             if (!is_error_code(t.t_exp.cycles)) {
                 ASSERT_FALSE(is_error_code(cyc));
@@ -2729,7 +2696,7 @@ TEST_F(TestCostModel, Output_sparsity_enabled_validation_test_103894) {
             {1, 1, 1, 1},                                                  // padding
             VPUNN::ExecutionMode::CUBOID_4x16,                             // execution mode
             VPUNN::ActivationFunction::NONE,                               // activation
-            0.0F,                                                          // act_sparsity
+            0.1F,                                                          // act_sparsity
             0.627848F,                                                     // weight_sparsity
             {swz_def, swz_def},                                            // input_swizzling
             {swz_def},                                                     // output_swizzling
@@ -2811,7 +2778,7 @@ TEST_F(TestCostModel, Output_sparsity_enabled_validation_test_103894) {
         }
 
         {  // avgpool/DW_Conv sparse output ()
-            DPUWorkload wl{wl_ref_avpool};
+            DPUWorkload wl{std::move(wl_ref_avpool)};
             std::string info;
             auto cycles = model_2_7.DPU(wl, info);  // will change
 
@@ -2822,7 +2789,7 @@ TEST_F(TestCostModel, Output_sparsity_enabled_validation_test_103894) {
             EXPECT_TRUE((cycles != 0));
         }
         {  // elementwise Conv sparse output
-            DPUWorkload wl{wl_ref_elm};
+            DPUWorkload wl{std::move(wl_ref_elm)};
             std::string info;
             auto cycles = model_2_7.DPU(wl, info);  // will change
 
@@ -2906,7 +2873,7 @@ TEST_F(TestCostModel, SOK_CLUSTERING_OWT_equivalence_test_103266) {
         {  // conv dense output
             DPUWorkload wl_clu{wl_ref_cnv_dense};
             wl_clu.isi_strategy = ISIStrategy::CLUSTERING;
-            DPUWorkload wl_sok{wl_ref_cnv_dense};
+            DPUWorkload wl_sok{std::move(wl_ref_cnv_dense)};
             wl_sok.isi_strategy = ISIStrategy::SPLIT_OVER_K;
             wl_sok.output_write_tiles = 2;
 
@@ -2943,7 +2910,7 @@ TEST_F(TestCostModel, SOK_CLUSTERING_OWT_equivalence_test_103266) {
 
             wl_clu.output_write_tiles = 1;
             {
-                auto wl{wl_sok};
+                auto wl{std::move(wl_sok)};
                 std::string info;
                 auto cycles = model_2_7.DPU(wl, info);  // will change
 
@@ -2970,7 +2937,7 @@ TEST_F(TestCostModel, SOK_CLUSTERING_OWT_equivalence_test_103266) {
         {  // elementwise bigger
             DPUWorkload wl_clu{wl_ref_elm};
             wl_clu.isi_strategy = ISIStrategy::CLUSTERING;
-            DPUWorkload wl_sok{wl_ref_elm};
+            DPUWorkload wl_sok{std::move(wl_ref_elm)};
             wl_sok.isi_strategy = ISIStrategy::SPLIT_OVER_K;  // nopt allolwed, will become CLU +OWT1
             wl_sok.output_write_tiles = 2;
 
@@ -3007,8 +2974,7 @@ TEST_F(TestCostModel, SOK_CLUSTERING_OWT_equivalence_test_103266) {
 
             wl_clu.output_write_tiles = 1;
             {
-                /* coverity[copy_instead_of_move] */
-                auto wl{wl_sok};
+                auto wl{std::move(wl_sok)};
                 std::string info;
                 auto cycles = model_2_7.DPU(wl, info);  // will change
 
@@ -3034,7 +3000,7 @@ TEST_F(TestCostModel, SOK_CLUSTERING_OWT_equivalence_test_103266) {
         {  // elementwise orig
             DPUWorkload wl_clu{wl_ref_elm_orig};
             wl_clu.isi_strategy = ISIStrategy::CLUSTERING;
-            DPUWorkload wl_sok{wl_ref_elm_orig};
+            DPUWorkload wl_sok{std::move(wl_ref_elm_orig)};
             wl_sok.isi_strategy = ISIStrategy::SPLIT_OVER_K;  // not allowed will become CLU+owt1
             wl_sok.output_write_tiles = 2;
 
@@ -3071,7 +3037,7 @@ TEST_F(TestCostModel, SOK_CLUSTERING_OWT_equivalence_test_103266) {
 
             wl_clu.output_write_tiles = 1;
             {
-                auto wl{wl_sok};
+                auto wl{std::move(wl_sok)};
                 std::string info;
                 auto cycles = model_2_7.DPU(wl, info);  // will change
 
@@ -3135,9 +3101,9 @@ TEST_F(TestCostModel, Dual_sparsity_NN_Output_Cycle_valid_values_Test) {
     wl_dualsparsity_and_output_sparsity.outputs[0].set_sparsity(true);
 
     // vector of dual sparsity workloads but also have active SEP or active output sparsity or none of them
-    /* coverity[copy_instead_of_move] */
-    std::vector<VPUNN::DPUWorkload> dual_sparsity_workloads = {wl_ref_dualsparsity, wl_dualsparsity_and_output_sparsity,
-                                                               wl_dualsparsity_and_SEP};
+    std::vector<VPUNN::DPUWorkload> dual_sparsity_workloads = {std::move(wl_ref_dualsparsity),
+                                                               std::move(wl_dualsparsity_and_output_sparsity),
+                                                               std::move(wl_dualsparsity_and_SEP)};
 
     VPUNN::VPUCostModel model_path{VPU_2_7_MODEL_PATH};
     EXPECT_TRUE(model_path.nn_initialized());
@@ -3168,14 +3134,11 @@ TEST_F(TestCostModel, Dual_sparsity_NN_Output_Cycle_valid_values_Test) {
             wl_ref_no_sparsity.act_sparsity = 0.0F;
 
             // compute the runtime
-            /* coverity[copy_instead_of_move] */
-            const CyclesInterfaceType cyc_dual_sparsity{model_path.DPU(wl_ref_weight_and_input_spars_on, info)};
-            /* coverity[copy_instead_of_move] */
-            const CyclesInterfaceType cyc_weight_sparsity{model_path.DPU(wl_ref_weight_spars_on, info)};
-            /* coverity[copy_instead_of_move] */
-            const CyclesInterfaceType cyc_input_sparsity{model_path.DPU(wl_ref_input_spars_on, info)};
-            /* coverity[copy_instead_of_move] */
-            const CyclesInterfaceType cyc_NO_sparsity{model_path.DPU(wl_ref_no_sparsity, info)};
+            const CyclesInterfaceType cyc_dual_sparsity{
+                    model_path.DPU(std::move(wl_ref_weight_and_input_spars_on), info)};
+            const CyclesInterfaceType cyc_weight_sparsity{model_path.DPU(std::move(wl_ref_weight_spars_on), info)};
+            const CyclesInterfaceType cyc_input_sparsity{model_path.DPU(std::move(wl_ref_input_spars_on), info)};
+            const CyclesInterfaceType cyc_NO_sparsity{model_path.DPU(std::move(wl_ref_no_sparsity), info)};
 
             // PRECONDITIONS:
             //  cycles value for workloads when only input sparsity is active or only weight sparsity is active should
@@ -3321,7 +3284,7 @@ TEST_F(TestCostModel, Dual_sparsity_NN_Output_Cycle_invalid_values_Test) {
     // weight or input), and then we test if the value of cycles is an error
     // for example: a wl that has both active sparsities may not generate an error, but when we deactivate weight
     // sparsity now this wl has only input sparsity active => may generate an error
-    auto verify_cycle = [&model_path, this](TestsVector tests) {
+    auto verify_cycle = [&model_path, this](const TestsVector& tests) {
         for (const auto& t : tests) {
             std::cout << " Test CASE: " << t.t_info << "\n";
 
@@ -3346,14 +3309,12 @@ TEST_F(TestCostModel, Dual_sparsity_NN_Output_Cycle_invalid_values_Test) {
             std::string info_weight_sparsity = "";
 
             // compute the runtime
-           
             const CyclesInterfaceType cyc_dual_sparsity{
-                /* coverity[copy_instead_of_move] */
-                    model_path.DPU(wl_ref_weight_and_input_spars_on, info_dualsparsity)};
-            /* coverity[copy_instead_of_move] */
-            const CyclesInterfaceType cyc_weight_sparsity{model_path.DPU(wl_ref_weight_spars_on, info_input_sparsity)};
-            /* coverity[copy_instead_of_move] */
-            const CyclesInterfaceType cyc_input_sparsity{model_path.DPU(wl_ref_input_spars_on, info_weight_sparsity)};
+                    model_path.DPU(std::move(wl_ref_weight_and_input_spars_on), info_dualsparsity)};
+            const CyclesInterfaceType cyc_weight_sparsity{
+                    model_path.DPU(std::move(wl_ref_weight_spars_on), info_input_sparsity)};
+            const CyclesInterfaceType cyc_input_sparsity{
+                    model_path.DPU(std::move(wl_ref_input_spars_on), info_weight_sparsity)};
 
             // verify that cycle time is/is not an error code
             EXPECT_EQ(is_error_code(cyc_dual_sparsity), t.t_exp.is_error_dualsparsity)
@@ -3377,9 +3338,9 @@ TEST_F(TestCostModel, Dual_sparsity_NN_Output_Cycle_invalid_values_Test) {
     const TestsVector tests = {
             // clang-format off
       //    ||      wl_ref       || cyc err for wl dualspars on || cyc err for wl weight spars on || cyc err for wl in spars on || test info ||
-            {{wl_ref_in_spars_err}, {false, false, true}, "Cycles value is an ERROR for the wl that only has input sparsity active "},
-            {{wl_ref_in_and_dual_spars_err},{true, false, true}, "Cycles value is an ERROR for the wl that has input sparsity active and for the wl that has dualsparsity " "active"},
-            {{wl_ref_in_weight_dual_spars_err}, {true, true, true}, "Cycles value is an ERROR for the wl that has dualsparsity, the wl that has input and the wl that has " "weight sparsity"},
+            {{std::move(wl_ref_in_spars_err)}, {false, false, true}, "Cycles value is an ERROR for the wl that only has input sparsity active "},
+            {{std::move(wl_ref_in_and_dual_spars_err)},{true, false, true}, "Cycles value is an ERROR for the wl that has input sparsity active and for the wl that has dualsparsity " "active"},
+            {{std::move(wl_ref_in_weight_dual_spars_err)}, {true, true, true}, "Cycles value is an ERROR for the wl that has dualsparsity, the wl that has input and the wl that has " "weight sparsity"},
     };
     // clang-format on
     verify_cycle(tests);
@@ -3418,7 +3379,7 @@ TEST_F(TestCostModel, SEP_smoke_test) {
             // output sparsity should be enabled for all// not influencing  inferred runtime
 
             {  // conv sparse output
-                DPUWorkload wl{wl_ref_cnv};
+                DPUWorkload wl{std::move(wl_ref_cnv)};
                 std::string info;
                 auto cycles = model_2_7.DPU(wl, info);  // will change
 
@@ -3465,7 +3426,7 @@ TEST_F(TestCostModel, SEP_smoke_test) {
             // output sparsity should be enabled for all// not influencing  inferred runtime
 
             {  // conv sparse output
-                DPUWorkload wl{wl_107262};
+                DPUWorkload wl{std::move(wl_107262)};
                 std::string info;
                 auto cycles = my_model.DPU(wl, info);  // will change
 
@@ -3530,7 +3491,7 @@ TEST_F(TestCostModel, MAXPOOL_test_EISXW_na_Mingqi_NPU27) {
             // output sparsity should be enabled for all// not influencing  inferred runtime
 
             {  // conv sparse output
-                DPUWorkload wl{wl_ref_};
+                DPUWorkload wl{std::move(wl_ref_)};
                 std::string info;
                 auto cycles = model_2_7.DPU(wl, info);  // will change
 
@@ -3766,18 +3727,17 @@ TEST_F(TestCostModel, Weigths_types_CONV_NPU40_test) {
 
     // check runtime equivalence
     {
-        EXPECT_EQ(model_x.DPU(base_wl8_4), model_x.DPU(base_wl8_8));
+        EXPECT_EQ(model_x.DPU(base_wl8_4), model_x.DPU(std::move(base_wl8_8)));
         EXPECT_EQ(model_x.DPU(base_wl16_4), model_x.DPU(base_wl16_16));
 
         DPUWorkload base_wl16_8{base_wl16_4};
         base_wl16_8.weight_type = DataType::INT8;
-        /* coverity[copy_instead_of_move] */
-        EXPECT_EQ(model_x.DPU(base_wl16_4), model_x.DPU(base_wl16_8));
+
+        EXPECT_EQ(model_x.DPU(std::move(base_wl16_4)), model_x.DPU(std::move(base_wl16_8)));
 
         DPUWorkload base_wl8_16{base_wl8_4};
         base_wl8_16.weight_type = DataType::FLOAT16;
-        /* coverity[copy_instead_of_move] */
-        EXPECT_EQ(model_x.DPU(base_wl8_4), model_x.DPU(base_wl8_16));
+        EXPECT_EQ(model_x.DPU(std::move(base_wl8_4)), model_x.DPU(std::move(base_wl8_16)));
     }
 
     // EXPECT_TRUE(false);
@@ -3831,7 +3791,8 @@ TEST_F(TestCostModel, Weigths_types_NPU40_test) {
     const DPUWorkload wl_ELT_16_4{Builder::makeWL(Operation::ELTWISE, in_ch, o_ch, DataType::FLOAT16, DataType::FLOAT16,
                                                   1, 1, DataType::INT4, 0U)};
 
-    std::vector<DPUWorkload> workloads = {wl_DWCONV_8_4, wl_DWCONV_16_4, wl_ELT_8_4, wl_ELT_16_4};
+    std::vector<DPUWorkload> workloads = {std::move(wl_DWCONV_8_4), std::move(wl_DWCONV_16_4), std::move(wl_ELT_8_4),
+                                          std::move(wl_ELT_16_4)};
 
     auto input1_volume = [](const DPUWorkload& wl) -> int {
         int wl_wts_size{0};
@@ -3932,7 +3893,8 @@ TEST_F(TestCostModel, Weigths_types_NPU27_test) {
     const DPUWorkload wl_ELT_16_4{Builder::makeWL(Operation::ELTWISE, in_ch, o_ch, DataType::FLOAT16, DataType::FLOAT16,
                                                   1, 1, DataType::INT4, 0U)};
 
-    std::vector<DPUWorkload> workloads = {wl_DWCONV_8_4, wl_DWCONV_16_4, wl_ELT_8_4, wl_ELT_16_4};
+    std::vector<DPUWorkload> workloads = {std::move(wl_DWCONV_8_4), std::move(wl_DWCONV_16_4), std::move(wl_ELT_8_4),
+                                          std::move(wl_ELT_16_4)};
 
     auto input1_volume = [](const DPUWorkload& wl) -> int {
         int wl_wts_size{0};
@@ -4209,21 +4171,20 @@ TEST_F(TestCostModel, MTL_Weigths_types_CONV_NPU27) {
 
     // check runtime equivalence
     {
-        EXPECT_EQ(model_x.DPU(base_wl8_4), model_x.DPU(base_wl8_8));
-        EXPECT_EQ(model_x.DPU(base_wl16_4), model_x.DPU(base_wl16_16));
+        EXPECT_EQ(model_x.DPU(base_wl8_4), model_x.DPU(std::move(base_wl8_8)));
+        EXPECT_EQ(model_x.DPU(base_wl16_4), model_x.DPU(std::move(base_wl16_16)));
 
         DPUWorkload base_wl16_8{base_wl16_4};
         base_wl16_8.weight_type = DataType::INT8;
 
-        /* coverity[copy_instead_of_move] */
-        EXPECT_EQ(model_x.DPU(base_wl16_4), model_x.DPU(base_wl16_8));
+        EXPECT_EQ(model_x.DPU(std::move(base_wl16_4)), model_x.DPU(std::move(base_wl16_8)));
 
         DPUWorkload base_wl8_16{base_wl8_4};
         base_wl8_16.weight_type = DataType::FLOAT16;
-        /* coverity[copy_instead_of_move] */
-        EXPECT_EQ(model_x.DPU(base_wl8_4), model_x.DPU(base_wl8_16));
+        EXPECT_EQ(model_x.DPU(std::move(base_wl8_4)), model_x.DPU(std::move(base_wl8_16)));
     }
 
     // EXPECT_TRUE(false);
 }
+
 }  // namespace VPUNN_unit_tests

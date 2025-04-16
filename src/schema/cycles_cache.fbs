@@ -1,0 +1,29 @@
+// Copyright © 2025 Intel Corporation
+// SPDX-License-Identifier: Apache 2.0
+// LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
+// is subject to the terms and conditions of the software license agreements for the Software Package,
+// which may also include notices, disclaimers, or license terms for third party or open source software
+// included in or with the Software Package, and your use indicates your acceptance of all such terms.
+// Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
+// Software Package for additional details.
+
+namespace VPUNN_SCHEMA;
+
+// The "magic" values at the start of the file, that identify a file as a cachebin file.
+file_identifier "cycl";
+// The file extension a generated file will take.
+file_extension "cachebin";
+
+// The entry in the cache map
+table Entry {
+	key: uint32; // 32bit hash
+	value: float; // The number of cycles
+}
+
+table CyclesCache {
+	// The cache map
+	cache_map: [Entry];
+}
+
+// This line just tells FlatBuffers to start with this object when parsing.
+root_type CyclesCache;

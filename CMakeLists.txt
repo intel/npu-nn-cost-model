@@ -21,10 +21,32 @@ option(VPUNN_ENABLE_VECTOR_INSTRUCTIONS "use vector instructions" ON)
 
 option(VPUNN_BUILD_SHARED_LIB "build shared library" ON)
 option(VPUNN_BUILD_EXAMPLES "build examples" ON)
+option(VPUNN_BUILD_APPS "build apps" OFF)
 option(VPUNN_BUILD_TESTS "build tests" ON)
 option(VPUNN_ENABLE_LOGGING "enable logging" OFF)
 option(ENABLE_PYTHON_BINDING "Build the python bindings" OFF)
 option(GENERATE_PYTHON_BINDING "Generate the python bindings code" OFF)
+
+option(VPUNN_OPT_LEGACY_ZTILING "Use legacy ZTiling mechanism" ON)
+if(VPUNN_OPT_LEGACY_ZTILING)
+ add_compile_definitions(VPUNN_OPT_LEGACY_ZTILING)
+ message(STATUS "-- Enable Legacy ZTiling (intratile) ")
+endif()
+
+#
+#option(VPUNN_OPT_LEGACY_DMA_TH_4 "Use legacy Theoretical DMA for Gen4" OFF)
+#if(VPUNN_OPT_LEGACY_DMA_TH_4)
+# add_compile_definitions(VPUNN_OPT_LEGACY_DMA_TH_4)
+# message(STATUS "-- Enable Legacy Gen4 DMA Theoretical")
+#endif()
+#
+#option(VPUNN_OPT_LEGACY_DMA_TH_5 "Use legacy Theoretical DMA for Gen5++" OFF)
+#if(VPUNN_OPT_LEGACY_DMA_TH_5)
+# add_compile_definitions(VPUNN_OPT_LEGACY_DMA_TH_5)
+# message(STATUS "-- Enable Legacy Gen5++ DMA Theoretical")
+#endif()
+
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(EXTERNAL_INSTALL_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/external)
 set(CMAKE_VPUNN_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -94,8 +116,10 @@ if(VPUNN_BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
 
-# not yet 
-# add_subdirectory(apps/data_augmenter)
+if(VPUNN_BUILD_APPS)
+    # add_subdirectory(apps/data_augmenter)
+    add_subdirectory(apps/cache_app)
+endif()
 
 if(VPUNN_BUILD_TESTS)
 	#enable_testing()

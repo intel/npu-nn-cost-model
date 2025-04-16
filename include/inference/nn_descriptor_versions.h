@@ -22,9 +22,11 @@ enum class NNVersions : int {
 
     VERSION_11_V89_COMPTBL = 89,  ///< v11 for NPU27 NNs where no swizzling or trainingspace limitations are active.
                                   ///< Compatibility mode for intial release (NOv 2024 vs Oct 2023)
-    VERSION_11_NPU40 = 4011,         ///< version 11 used for NPU40 trained NNs
-    VERSION_11_NPU41 = 4111,     ///< version 11 used for NPU40 trained NNs with swizz0,5 support.
-    VERSION_12_NPU_RESERVED = 5112,  ///< version 12 used for NPU_RESERVED trained NNs
+    VERSION_11_NPU40 = 4011,      ///< version 11 used for NPU40 trained NNs
+    VERSION_11_NPU41 = 4111,      ///< version 11 used for NPU40 trained NNs with swizz0,5 support.
+    VERSION_12_NPU_RESERVED = 5112,      ///< version 12 used for NPU_RESERVED trained NNs
+    VERSION_13_NPU_RESERVED = 5113,      ///< version 13 used for NPU_RESERVED trained NNs
+    VERSION_14_NPU_RESERVED = 5114,      ///< version 13 used for NPU_RESERVED trained NNs
 };
 
 }  // namespace VPUNN

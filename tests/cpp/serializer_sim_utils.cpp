@@ -183,7 +183,7 @@ public:
         {
             // const auto stdfields{createStandardFieldNames()};
             const std::vector<std::string> noFields{};
-            serializer_IN.initialize(inputCSV, FileMode::READONLY, noFields);  // open file, basic fields
+            serializer_IN.initialize(inputCSV, FileMode::READONLY, std::move(noFields));  // open file, basic fields
             EXPECT_TRUE(serializer_IN.is_initialized());
         }
 
@@ -195,8 +195,7 @@ public:
             }
             out_fields.emplace_back(output0_cycles_tag);  // output 0, normally a identity resim with input pred cycles
             out_fields.emplace_back(output2_cycles_tag);  // add new fields
-            /* coverity[copy_instead_of_move] */
-            serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, out_fields);
+            serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, std::move(out_fields));
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
@@ -230,8 +229,7 @@ public:
                 std::string info_mock, info_real;
                 const CyclesInterfaceType cycles_mock =
                         model_4_0_mock.DPU(dpu_wl, info_mock);  // SEH exception how to catch?
-                /* coverity[copy_instead_of_move] */
-                const CyclesInterfaceType cycles_LNLpost8 = model_4_0_Post8.DPU(dpu_wl, info_real);
+                const CyclesInterfaceType cycles_LNLpost8 = model_4_0_Post8.DPU(std::move(dpu_wl), info_real);
 
                 constexpr int lastIndex{std::tuple_size_v<decltype(readFields)> - 1};
                 const SerializableField<std::string>& info{std::get<lastIndex>(readFields)};
@@ -266,7 +264,7 @@ public:
         {
             const auto stdfields{createStandardFieldNames()};
             // const std::vector<std::string> noFields{};
-            serializer_IN.initialize(inputCSV, FileMode::READONLY, stdfields);  // open file, basic fields
+            serializer_IN.initialize(inputCSV, FileMode::READONLY, std::move(stdfields));  // open file, basic fields
             EXPECT_TRUE(serializer_IN.is_initialized());
         }
 
@@ -278,8 +276,7 @@ public:
             }
             out_fields.emplace_back(output0_cycles_tag);  // output 0, normally a identity resim with input pred cycles
             out_fields.emplace_back(output2_cycles_tag);  // add new fields
-            /* coverity[copy_instead_of_move] */
-            serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, out_fields);
+            serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, std::move(out_fields));
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
@@ -314,8 +311,7 @@ public:
                 std::string info_mock, info_real;
                 const CyclesInterfaceType cycles_mock =
                         model_4_0_mock.DPU(dpu_wl, info_mock);  // SEH exception how to catch?
-                /* coverity[copy_instead_of_move] */
-                const CyclesInterfaceType cycles_LNLpost8 = model_4_0_Post8.DPU(dpu_wl, info_real);
+                const CyclesInterfaceType cycles_LNLpost8 = model_4_0_Post8.DPU(std::move(dpu_wl), info_real);
 
                 // constexpr int lastIndex{std::tuple_size_v<decltype(readFields)> - 1};
                 // const SerializableField<std::string>& info{std::get<lastIndex>(readFields)};
@@ -352,12 +348,12 @@ public:
         {
             // const auto stdfields{createStandardFieldNames()};
             const std::vector<std::string> noFields{};
-            serializer_IN.initialize(inputCSV, FileMode::READONLY, noFields);  // open file, basic fields
+            serializer_IN.initialize(inputCSV, FileMode::READONLY, std::move(noFields));  // open file, basic fields
             EXPECT_TRUE(serializer_IN.is_initialized());
         }
 
         const std::vector<std::string> input_fields_names{serializer_IN.get_field_names()};
-        std::vector<std::string> output_fields_names{input_fields_names};
+        std::vector<std::string> output_fields_names{std::move(input_fields_names)};
         output_fields_names.emplace_back(
                 output0_cycles_tag);  // output 0, normally a identity resim with input pred cycles
         output_fields_names.emplace_back(post6_cycles_tag);  // add new fields
@@ -366,8 +362,7 @@ public:
 
         Serializer<FileFormat::CSV> serializer_out{true};
         {
-            /* coverity[copy_instead_of_move] */
-            serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, output_fields_names);
+            serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, std::move(output_fields_names));
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
@@ -404,8 +399,7 @@ public:
                 const CyclesInterfaceType cycles_mock =
                         model_4_0_mock.DPU(dpu_wl, info_mock);  // SEH exception how to catch?
 
-                /* coverity[copy_instead_of_move] */
-                const CyclesInterfaceType cycles_LNLpost6 = model_4_0_Post6.DPU(dpu_wl);
+                const CyclesInterfaceType cycles_LNLpost6 = model_4_0_Post6.DPU(std::move(dpu_wl));
 
                 gt_UT_buff.value = getGTfromInfo(info_buff.value) + "";
 
@@ -420,7 +414,7 @@ public:
         }
     }  // method
 
-    auto model_Resim_Generic_ModelsList(std::string inputCSV, std::string outputCSV,
+    auto model_Resim_Generic_ModelsList(const std::string& inputCSV, const std::string& outputCSV,
                                         const std::vector<VPUCostModel*>& models) {
         std::cout << "\n Processing : " << inputCSV;
 
@@ -450,12 +444,12 @@ public:
         {
             // const auto stdfields{createStandardFieldNames()};
             const std::vector<std::string> noFields{};
-            serializer_IN.initialize(inputCSV, FileMode::READONLY, noFields);  // open file, basic fields
+            serializer_IN.initialize(inputCSV, FileMode::READONLY, std::move(noFields));  // open file, basic fields
             EXPECT_TRUE(serializer_IN.is_initialized());
         }
 
         const std::vector<std::string> input_fields_names{serializer_IN.get_field_names()};
-        std::vector<std::string> output_fields_names{input_fields_names};
+        std::vector<std::string> output_fields_names{std::move(input_fields_names)};
         output_fields_names.emplace_back(gtUT_tag);  // what if duplicate?
         for (auto& tag : sim_tags) {
             output_fields_names.emplace_back(tag);  // newField
@@ -463,8 +457,7 @@ public:
 
         Serializer<FileFormat::CSV> serializer_out{true};
         {
-            /* coverity[copy_instead_of_move] */
-            serializer_out.initialize(outputCSV + "_Resim", FileMode::READ_WRITE, output_fields_names);
+            serializer_out.initialize(outputCSV + "_Resim", FileMode::READ_WRITE, std::move(output_fields_names));
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
@@ -525,7 +518,7 @@ public:
         }
 
         const std::vector<std::string> input_fields_names{serializer_IN.get_field_names()};
-        std::vector<std::string> output_fields_names{input_fields_names};
+        std::vector<std::string> output_fields_names{std::move(input_fields_names)};
         output_fields_names.emplace_back(
                 output0_cycles_tag);  // output 0, normally a identity resim with input pred cycles
         output_fields_names.emplace_back(post6_cycles_tag);    // add new fields
@@ -533,8 +526,7 @@ public:
 
         Serializer<FileFormat::CSV> serializer_out{true};
         {
-            /* coverity[copy_instead_of_move] */
-            serializer_out.initialize(inputCSV + "_Investigate", FileMode::READ_WRITE, output_fields_names);
+            serializer_out.initialize(inputCSV + "_Investigate", FileMode::READ_WRITE, std::move(output_fields_names));
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
@@ -609,12 +601,11 @@ public:
         return path.string();
     }
 
-    auto model_Resim_in_subfolder(std::string folder, std::string input_csv, std::string subfolderOutput,
+    auto model_Resim_in_subfolder(const std::string& folder, const std::string& input_csv, std::string subfolderOutput,
                                   const std::vector<VPUCostModel*>& models) {
         const std::string theFullName{folder + input_csv};
         const std::string theInputName{removeExtension(theFullName)};
-        /* coverity[copy_instead_of_move] */
-        const std::string theOutputName{addSubFolderInName(theInputName, subfolderOutput)};
+        const std::string theOutputName{addSubFolderInName(theInputName, std::move(subfolderOutput))};
 
         std::cout << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
         model_Resim_Generic_ModelsList(theInputName, theOutputName, models);
@@ -848,8 +839,7 @@ TEST_F(SerializerSimulator, DISABLED_Model_Merge_All_AGNOSTIC) {
             std::vector<std::string> output_fields_names{serializer_IN.get_field_names()};
             output_fields_names.emplace_back(model_file_tag);
 
-            /* coverity[copy_instead_of_move] */
-            serializer_out.initialize(outputCSV + "_", FileMode::READ_WRITE, output_fields_names);
+            serializer_out.initialize(outputCSV + "_", FileMode::READ_WRITE, std::move(output_fields_names));
             EXPECT_TRUE(serializer_out.is_initialized());
 
             mergeOneFile(serializer_IN, serializer_out);
@@ -881,10 +871,8 @@ protected:
     }
 
     void executeModels(std::string folderOfCSV, std::string csv_input) {
-        /* coverity[copy_instead_of_move] */
-        const std::string folder{folderOfCSV};
-        /* coverity[copy_instead_of_move] */
-        const std::string csv_param{csv_input};
+        const std::string folder{std::move(folderOfCSV)};
+        const std::string csv_param{std::move(csv_input)};
 
         std::vector<VPUCostModel*> models_ptr;
         for (auto& model : the_models) {

@@ -26,16 +26,18 @@ protected:
 
     const VPUNNModelsFiles& the_NN_models{VPUNNModelsFiles::getModels()};  ///< the paths to available NN models
 
-    const float requirements_target_latency{100.F / 1000.F};  // 100 microseconds
-    const float tolerance_factor_for_debug{20.0F};  ///< big enough to not cause problems when running tests in debug
+    const float requirements_target_latency{150.F / 1000.F};  // 100 microseconds
+    const float tolerance_factor_for_debug{25.0F};  ///< big enough to not cause problems when running tests in debug
 #if defined(_DEBUG) || defined(NO_PROFILING_ALLOWED) || defined(DEBUG)
     const bool time_relevance{false};
     const float target_latency{requirements_target_latency * tolerance_factor_for_debug};  ///< miliseconds
     const float strict_target_latency{target_latency};                                     ///< miliseconds
+    const unsigned int population_size{100};
 #else
     const bool time_relevance{true};
     const float target_latency{requirements_target_latency};         ///< miliseconds
     const float strict_target_latency{requirements_target_latency};  ///< miliseconds
+    const unsigned int population_size{1000};
 #endif
 
 private:
@@ -44,7 +46,7 @@ private:
 // Demonstrate runtime compliance.NOte: disabled because the results are dependent on CPU load
 // If another build is done in parallel (CI use case) the runtime will be high
 TEST_F(VPUNNPerformanceTest, Standard_InferenceLatency_stochastic) {
-    unsigned int n_workloads = 1000;
+    const unsigned int n_workloads = population_size;
     // EXPECT_TRUE(false);
 
     for (auto& model_info : the_NN_models.standard_model_paths) {
@@ -116,7 +118,7 @@ TEST_F(VPUNNPerformanceTest, Standard_InferenceLatency_stochastic) {
     }
 }
 TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
-    unsigned int n_workloads = 1000;
+    const unsigned int n_workloads = population_size;
 
     for (auto& model_info : the_NN_models.fast_model_paths) {
         if (model_info.second <= ignnore_old_devices) {

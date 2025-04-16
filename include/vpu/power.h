@@ -105,10 +105,9 @@ private:
                 {VPUDevice::VPU_2_0, vpu_2_0_values},
                 {VPUDevice::VPU_2_7, vpu_2_7_values},
                 {VPUDevice::VPU_4_0, vpu_4_0_values},
-                {VPUDevice::NPU_RESERVED, vpu_2_7_values},
         };
 
-        /* coverity[copy_instead_of_move] */
+         /* coverity[copy_instead_of_move] */
         return pf_lut_l;
     }
 

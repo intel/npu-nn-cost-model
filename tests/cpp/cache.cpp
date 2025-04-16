@@ -31,6 +31,8 @@ protected:
     }
     VPUNN::VPUCostModel small_cache_model{std::string(""), false, 10};
     VPUNN::VPUCostModel no_cache_model{std::string(""), false, 0};
+
+    using DPU_LRU_Cache = LRUCache<std::vector<float>, float>;  ///< DPU Cache, ex LRUCache of float
 };
 // Demonstrate some basic assertions.
 TEST_F(VPUNNCacheTest, BasicAssertions) {
@@ -56,7 +58,7 @@ TEST_F(VPUNNCacheTest, BasicAssertions) {
 }
 // Demonstrate some basic assertions.
 TEST_F(VPUNNCacheTest, CacheBasicTest) {
-    LRUCache<float> cache(1, 0, "");
+    DPU_LRU_Cache cache(1 /*, 0*/, "");
     std::srand(unsigned(std::time(nullptr)));
     std::vector<float> v1(100), v2(100);
     for (auto idx = 0; idx < 100; idx++) {
@@ -93,6 +95,10 @@ class VPUNNCachePreloadedTest : public testing::Test {
 public:
 protected:
     void SetUp() override {
+    }
+
+    static auto mkhsh(const std::vector<float>& desc) {
+        return NNDescriptor(desc).hash();
     }
 
     const DPUWorkload wl_conv1 = {
@@ -202,6 +208,24 @@ protected:
                                         "all_cache_misses_iter2_profiled.csv"};
     const std::string csv_cache_misses{csv_file_OneCache};
 
+    // const std::string csv_file_OneCache{"c:\\Users\\fistoc\\OneDrive - Intel Corporation"
+    //                                     "\\Models_logs\\logs\\abedekarvpunn-1.6.8-tag6-9Sept\\all_mexp_9_oct\\Cache\\"
+    //                                     "cache_luca.csv"};
+
+    // const std::string csv_file_OneCache{"c:\\Users\\fistoc\\OneDrive - Intel Corporation"
+    //                                     "\\Models_logs\\logs\\abedekarvpunn-1.6.8-tag6-9Sept\\all_mexp_29_oct\\Cache_1\\"
+    //                                     "l1_workloads_unique_all_mexp_29_oct_profiled.csv"};
+
+    // const std::string csv_cache_misses{"c:\\Users\\fistoc\\OneDrive - Intel Corporation"
+    //                                    "\\Models_logs\\logs\\abedekarvpunn-1.6.8-tag6-9Sept\\all_mexp_29_oct\\Cache_1\\"
+    //                                    "cache_misses37144.csv"};
+
+    // const std::string csv_file_OneCache{"c:\\Users\\fistoc\\OneDrive - Intel Corporation"
+    //                                     "\\Models_logs\\logs\\SJvpunn-1.6.8-post8-without-extra-swizzling\\Cache_3\\"
+    //                                     //"0_l1_workloads_unique_all_mexp_29_oct.csv"};
+    //                                     //"1_l1_unique_mexp_procyon_profiled.csv"};
+    //                                     "2_all_cache_misses_partly_profiled.csv"};
+
     const std::string mult_csv_folder_OneCache{
             //        "/home/abalanes/source/vpux-plugin/thirdparty/vpucostmodel/build/tests/cpp/"
             "/home/epele/mlir_serializer/cache_13/"
@@ -216,6 +240,39 @@ protected:
     };
 
     const std::vector<std::string> multiple_csv_files{
+
+            // cache 3
+            // "0_l1_workloads_unique_all_mexp_29_oct.csv",  //
+            // "1_l1_unique_mexp_procyon_profiled.csv",      //
+            // "2_all_cache_misses_partly_profiled.csv",
+
+            // cache 4
+            //"l1_workloads_unique_all_mexp_29_oct.csv",  // first
+            //"l1_unique_mexp_procyon.csv",
+            //"all_cache_misses.csv",
+            //"all_cache_misses_iter_1.csv",
+
+            // cache5
+            //"all_cache_misses_iter2_profiled.csv",
+
+            // cache7
+            // "all_cache_misses_iter_3_augmented_profiled.csv",
+
+            // cache8
+            //"all_cache_misses_iter_4_augmented_profiled.csv",
+
+            // cache9
+            //"all_cache_misses_iter5_augmented_profiled.csv",
+
+            // // cache10
+            // "all_cache_misses_iter6_augmented_profiled.csv",
+
+            // cache11
+            // "all_cache_misses_iter7_augmented_profiled.csv",
+
+            // cache12
+            //"all_cache_misses_iter8_augmented_profiled.csv",
+
             // cache13
             "all_cache_misses_iter9_mixed_swizz_profiling.csv",
     };
@@ -262,7 +319,7 @@ protected:
 };
 
 TEST_F(VPUNNCachePreloadedTest, EmptyBasicTest) {
-    FixedCache<float> empty_cache{size_of_descriptor_INterface11, ""};
+    FixedCache empty_cache{/*size_of_descriptor_INterface11,*/ ""};
     const auto& theMap{empty_cache.getMap()};
     EXPECT_EQ(pp_4011.output_size(), 93);
     EXPECT_EQ(theMap.size(), 0);
@@ -291,8 +348,8 @@ TEST_F(VPUNNCachePreloadedTest, FolderBasicTest) {
 }
 
 TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
-    auto& preprop_now = pp_4011;
-    FixedCache<float> the_cache{size_of_descriptor_INterface11, ""};
+    auto& preprop_now = pp_4011;  // irelevant since we create our own cache
+    FixedCache the_cache{/*size_of_descriptor_INterface11,*/ ""};
     auto pathC = std::filesystem::current_path();  // getting path
     std::cout << "Current path is : " << pathC << std::endl;
 
@@ -301,29 +358,29 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
     // DPUWorkload wl;  // a wl
 
     // generate a descriptor for the wl
-    const auto desc1{preprop_now.transform(wl_conv1)};
-    const auto desc2{preprop_now.transform(wl_conv2)};
-    const auto desc3{preprop_now.transform(wl_conv3)};
+    const std::vector<float> desc1{preprop_now.transform(wl_conv1)};
+    const std::vector<float> desc2{preprop_now.transform(wl_conv2)};
+    const std::vector<float> desc3{preprop_now.transform(wl_conv3)};
 
     ASSERT_EQ(desc1.size(), size_of_descriptor_INterface11);
     ASSERT_EQ(desc2.size(), size_of_descriptor_INterface11);
     ASSERT_EQ(desc3.size(), size_of_descriptor_INterface11);
 
     {
-        the_cache.set(desc1, 1.0f);
-        ASSERT_TRUE(the_cache.contains(desc1));
-        ASSERT_FALSE(the_cache.contains(desc2));
-        ASSERT_FALSE(the_cache.contains(desc3));
+        the_cache.insert(mkhsh(desc1), 1.0f);
+        ASSERT_TRUE(the_cache.contains(mkhsh(desc1)));
+        ASSERT_FALSE(the_cache.contains(mkhsh(desc2)));
+        ASSERT_FALSE(the_cache.contains(mkhsh(desc3)));
 
-        the_cache.set(desc2, 2.0f);
-        ASSERT_TRUE(the_cache.contains(desc1));
-        ASSERT_TRUE(the_cache.contains(desc2));
+        the_cache.insert(mkhsh(desc2), 2.0f);
+        ASSERT_TRUE(the_cache.contains(mkhsh(desc1)));
+        ASSERT_TRUE(the_cache.contains(mkhsh(desc2)));
 
-        EXPECT_TRUE(the_cache.get_pointer(desc1) != nullptr);
-        EXPECT_TRUE(the_cache.get(desc1).has_value());
+        EXPECT_TRUE(the_cache.get_pointer(mkhsh(desc1)) != nullptr);
+        EXPECT_TRUE(the_cache.get(mkhsh(desc1)).has_value());
 
-        EXPECT_EQ(*the_cache.get(desc1), 1.0f);
-        EXPECT_EQ(*the_cache.get(desc2), 2.0f);
+        EXPECT_EQ(*the_cache.get(mkhsh(desc1)), 1.0f);
+        EXPECT_EQ(*the_cache.get(mkhsh(desc2)), 2.0f);
 
         std::filesystem::path fileOne{pathC /= test_cache_file};
         std::cout << "Current test cache is : " << fileOne << std::endl;
@@ -334,18 +391,18 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
             std::filesystem::remove(fileOne);
         }
 
-        EXPECT_TRUE(the_cache.serializeCacheToFile(test_cache_file));
+        EXPECT_TRUE(the_cache.write_cache(test_cache_file));
     }
 
     {
-        const FixedCache<float> read_cache{size_of_descriptor_INterface11, test_cache_file};
+        const FixedCache read_cache{test_cache_file};
         // read_cache.deserializeCacheFromFile("test_cache.bin");
 
-        ASSERT_TRUE(read_cache.contains(desc1));
-        ASSERT_TRUE(read_cache.contains(desc2));
+        ASSERT_TRUE(read_cache.contains(mkhsh(desc1)));
+        ASSERT_TRUE(read_cache.contains(mkhsh(desc2)));
 
-        EXPECT_EQ(*read_cache.get(desc1), 1.0f);
-        EXPECT_EQ(*read_cache.get(desc2), 2.0f);
+        EXPECT_EQ(*read_cache.get(mkhsh(desc1)), 1.0f);
+        EXPECT_EQ(*read_cache.get(mkhsh(desc2)), 2.0f);
     }
 
     // check also  reading with the data pointer interface
@@ -356,7 +413,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
         ASSERT_TRUE(file.is_open()) << "Error opening file for binary read: " << test_cache_file << std::endl;
         std::vector<char> buffer(std::istreambuf_iterator<char>(file), {});
         file.close();
-        ASSERT_GE(buffer.size(), (93 + 1) * 2 * 4)
+        ASSERT_GE(buffer.size(), 68)  // just a value to check if the file is not empty and has 2 values
                 << "Empty file?: " << test_cache_file << ", Size: " << buffer.size() << std::endl;
 
         {
@@ -364,14 +421,14 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
             const char* data = buffer.data();
             const size_t size = buffer.size();
 
-            const FixedCache<float> read_cache{size_of_descriptor_INterface11, data, size};
+            const FixedCache read_cache{data, size};
 
-            ASSERT_TRUE(read_cache.contains(desc1));
-            ASSERT_TRUE(read_cache.contains(desc2));
-            ASSERT_FALSE(read_cache.contains(desc3));
+            ASSERT_TRUE(read_cache.contains(mkhsh(desc1)));
+            ASSERT_TRUE(read_cache.contains(mkhsh(desc2)));
+            ASSERT_FALSE(read_cache.contains(mkhsh(desc3)));
 
-            EXPECT_EQ(*read_cache.get(desc1), 1.0f);
-            EXPECT_EQ(*read_cache.get(desc2), 2.0f);
+            EXPECT_EQ(*read_cache.get(mkhsh(desc1)), 1.0f);
+            EXPECT_EQ(*read_cache.get(mkhsh(desc2)), 2.0f);
 
             const auto& cacheStats{read_cache.getCounter()};
             // print cache statistics
@@ -383,8 +440,9 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
     // EXPECT_TRUE(false);
 }
 
-TEST_F(VPUNNCachePreloadedTest, SmokeSparsityFloatBasicTest) {
-    auto& preprop_now = pp_4011;
+// Foirethis ro work we need a Good cache file for DPU in the models files
+TEST_F(VPUNNCachePreloadedTest, DISABLED_SmokeSparsityFloatBasicTest_40) {
+    auto& preprop_now = pp_4011;  // OLD, must associate with the cache you want to use now!
 
     std::filesystem::path pathNN = normalConfig.NN_CM_to_use;  // teh vpunn
     std::filesystem::path cache_file_now{pathNN.replace_extension("cache_bin")};
@@ -393,7 +451,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeSparsityFloatBasicTest) {
 
     const std::string test_cache_file{cache_file_now.string()};
 
-    const FixedCache<float> the_cache{size_of_descriptor_INterface11, test_cache_file};
+    const FixedCache the_cache{test_cache_file};
     EXPECT_TRUE(the_cache.getMap().size() > 0);
 
     // DPUWorkload wl;  // a wl
@@ -447,20 +505,20 @@ TEST_F(VPUNNCachePreloadedTest, SmokeSparsityFloatBasicTest) {
     ASSERT_NE(convSparse1.weight_sparsity, convSparse2.weight_sparsity);
 
     // generate a descriptor for the wl
-    const auto desc1{preprop_now.transform(convSparse1)};
-    const auto desc2{preprop_now.transform(convSparse2)};
+    const std::vector<float> desc1{preprop_now.transform(convSparse1)};
+    const std::vector<float> desc2{preprop_now.transform(convSparse2)};
 
     ASSERT_EQ(desc1.size(), size_of_descriptor_INterface11);
     ASSERT_EQ(desc2.size(), size_of_descriptor_INterface11);
 
     {
-        EXPECT_TRUE(the_cache.contains(desc1)) << "FLoat 1 does not hit";
-        EXPECT_TRUE(the_cache.contains(desc2)) << "FLoat 2 does not hit";
+        EXPECT_TRUE(the_cache.contains(mkhsh(desc1))) << "FLoat 1 does not hit";
+        EXPECT_TRUE(the_cache.contains(mkhsh(desc2))) << "FLoat 2 does not hit";
 
-        EXPECT_EQ(*the_cache.get(desc1), *the_cache.get(desc2));
+        EXPECT_EQ(*the_cache.get(mkhsh(desc1)), *the_cache.get(mkhsh(desc2)));
 
-        const float v1 = *the_cache.get(desc1);
-        const float v2 = *the_cache.get(desc2);
+        const float v1 = *the_cache.get(mkhsh(desc1));
+        const float v2 = *the_cache.get(mkhsh(desc2));
 
         std::cout << "Cache values: " << v1 << " , " << v2 << std::endl;
     }
@@ -472,7 +530,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeSparsityFloatBasicTest) {
 // can also append to existing cache
 TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
     OneCacheNormal& test_config{normalConfig};
-    FixedCache<float> the_cache{test_config.preprop_forWrite.output_size(), ""};
+    FixedCache the_cache{/*test_config.preprop_forWrite.output_size(),*/ ""};
 
     Serializer<FileFormat::CSV> serializer_IN{true};                                         // force enable
     serializer_IN.initialize(clean_csv_exension(test_config.csv_file), FileMode::READONLY);  // open file, basic fields
@@ -509,10 +567,10 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
                             std::remove_reference_t<decltype(test_config)>::pp_adapt_forWrite>(dpu_wl);  // maybe not?
                     // we shuld trandorm loosly, let it pass, even if is not the ione that will be searched in reality
                     // we should generate also teh one that is in reality in case runtime is teh same(int/float fro wts)
-                    const auto descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
-                    const auto cache_hit = the_cache.contains(descriptorNN);
+                    const std::vector<float> descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+                    const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (cache_hit) {
-                        const auto prevVal = the_cache.get(descriptorNN).value();
+                        const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                         const auto delta = abs(gt_value - prevVal);
                         std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
                                   << " , Prev  value: " << prevVal << ", Delta: " << delta
@@ -527,7 +585,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
                     }
                     if (isRelevant) {
                         if (!cache_hit) {
-                            the_cache.set(descriptorNN, gt_value);
+                            the_cache.insert(mkhsh(descriptorNN), gt_value);
                         } else {
                             std::cout << "   ------hit! value not set: " << gt_value << std::endl;
                         }
@@ -564,8 +622,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
     std::cout << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
 
     // ASSERT_FALSE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot overwrite: " << cache_file_now;
-    bool const appendIfExists{false};
-    EXPECT_TRUE(the_cache.serializeCacheToFile(cache_file_now.string(), appendIfExists));
+    // bool const appendIfExists{false};
+    EXPECT_TRUE(the_cache.write_cache(cache_file_now.string() /*appendIfExists*/));
 
     ASSERT_TRUE(allGood);
 }
@@ -581,8 +639,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
     ASSERT_TRUE(std::filesystem::exists(cache_file_input))
             << "ABORT: Cannot read NON existent cache: " << cache_file_input;
 
-    FixedCache<float> the_cache{normalConfig.preprop_forRead.output_size(), ""};
-    EXPECT_TRUE(the_cache.deserializeCacheFromFile(cache_file_input.string()));
+    FixedCache the_cache{""};
+    EXPECT_TRUE(the_cache.read_cache(cache_file_input.string()));
 
     Serializer<FileFormat::CSV> serializer_IN{true};                                          // force enable
     serializer_IN.initialize(clean_csv_exension(normalConfig.csv_file), FileMode::READONLY);  // open file, basic fields
@@ -619,10 +677,10 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
                             dpu_wl);  // maybe not?
                     // we shuld trandorm loosly, let it pass, even if is not the ione that will be searched in reality
                     // we should generate also teh one that is in reality in case runtime is teh same(int/float fro wts)
-                    const auto descriptorNN{normalConfig.preprop_forWrite.transform(dpu_wl)};  // a specific processor
-                    const auto cache_hit = the_cache.contains(descriptorNN);
+                    const std::vector<float> descriptorNN{normalConfig.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+                    const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (cache_hit) {
-                        const auto prevVal = the_cache.get(descriptorNN).value();
+                        const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                         const auto delta = abs(gt_value - prevVal);
                         std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
                                   << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
@@ -634,7 +692,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
                     }
                     if (isRelevant) {
                         if (!cache_hit) {
-                            the_cache.set(descriptorNN, gt_value);
+                            the_cache.insert(mkhsh(descriptorNN), gt_value);
                         } else {
                             std::cout << "   ------hit! value not set: " << gt_value << std::endl;
                         }
@@ -669,8 +727,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
     std::cout << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
 
     // ASSERT_FALSE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot overwrite: " << cache_file_now;
-    bool const appendIfExists{false};
-    EXPECT_TRUE(the_cache.serializeCacheToFile(cache_file_output.string(), appendIfExists));
+    // bool const appendIfExists{false};
+    EXPECT_TRUE(the_cache.write_cache(cache_file_output.string() /*, appendIfExists*/));
 
     ASSERT_TRUE(allGood);
 }
@@ -688,8 +746,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
     ASSERT_TRUE(std::filesystem::exists(cache_file_input))
             << "ABORT: Cannot read NON existent cache: " << cache_file_input;
 
-    FixedCache<float> the_cache{test_config.preprop_forRead.output_size(), ""};
-    EXPECT_TRUE(the_cache.deserializeCacheFromFile(cache_file_input.string()));
+    FixedCache the_cache{""};
+    EXPECT_TRUE(the_cache.read_cache(cache_file_input.string()));
 
     std::cout << " \n ***** Initial Cache contains  :" << the_cache.getMap().size() << std::endl;
 
@@ -727,8 +785,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
                     isCompatibleWithTrainedSpace<std::remove_reference_t<decltype(test_config)>::pp_adapt_forWrite>(
                             dpu_wl);  // maybe not
 
-            const auto descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
-            const auto cache_hit = the_cache.contains(descriptorNN);
+            const std::vector<float> descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+            const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
 
             if (gt.length() <= 0) {
                 std::cout << "NO GT at pos: " << i << ", gt: #" << gt << "#"
@@ -741,7 +799,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
                 if (gt_value > 0 && gt_value < four_bilion) {
                     if (sane) {
                         if (cache_hit) {
-                            const auto prevVal = the_cache.get(descriptorNN).value();
+                            const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(gt_value - prevVal);
                             std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
                                       << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
@@ -757,7 +815,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
                         }
                         if (isRelevant) {
                             if (!cache_hit) {
-                                the_cache.set(descriptorNN, gt_value);
+                                the_cache.insert(mkhsh(descriptorNN), gt_value);
                             } else {
                                 std::cout << "   ------hit! value not set: " << gt_value << std::endl;
                             }
@@ -798,16 +856,15 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
     std::cout << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     // std::filesystem::path csv_file_now{csv_file};
-    /* coverity[copy_instead_of_move] */
-    std::filesystem::path cache_file_output{cache_file_input};
+    std::filesystem::path cache_file_output{std::move(cache_file_input)};
     cache_file_output.replace_filename(cache_file_output.stem() += "_output");
     cache_file_output.replace_extension("cache_bin");
     std::cout << "Current test cache is : " << cache_file_output << std::endl;
     std::cout << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
 
     ASSERT_FALSE(std::filesystem::exists(cache_file_output)) << "ABORT: Cannot overwrite: " << cache_file_output;
-    bool const appendIfExists{false};
-    EXPECT_TRUE(the_cache.serializeCacheToFile(cache_file_output.string(), appendIfExists));
+    /*bool const appendIfExists{false};*/
+    EXPECT_TRUE(the_cache.write_cache(cache_file_output.string() /*, appendIfExists*/));
 
     // ASSERT_TRUE(false);
     EXPECT_TRUE(allGood) << "\n\nREAD the LOG!\n\n";
@@ -826,8 +883,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
     ASSERT_TRUE(std::filesystem::exists(cache_file_input))
             << "ABORT: Cannot read NON existent cache: " << cache_file_input;
 
-    FixedCache<float> the_cache{test_config.preprop_forRead.output_size(), ""};
-    EXPECT_TRUE(the_cache.deserializeCacheFromFile(cache_file_input.string()));
+    FixedCache the_cache{""};
+    EXPECT_TRUE(the_cache.read_cache(cache_file_input.string()));
 
     std::cout << " \n ***** Initial Cache contains  :" << the_cache.getMap().size() << std::endl;
 
@@ -866,8 +923,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
                     isCompatibleWithTrainedSpace<std::remove_reference_t<decltype(test_config)>::pp_adapt_forWrite>(
                             dpu_wl);  // maybe not
 
-            const auto descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
-            const auto cache_hit = the_cache.contains(descriptorNN);
+            const std::vector<float> descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+            const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
 
             if (gt.length() <= 0) {
                 std::cout << "NO GT at pos: " << i << ", gt: #" << gt << "#"
@@ -880,7 +937,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
                 if (gt_value > 0 && gt_value < four_bilion) {
                     if (sane) {
                         if (cache_hit) {
-                            const auto prevVal = the_cache.get(descriptorNN).value();
+                            const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(gt_value - prevVal);
                             std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
                                       << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
@@ -896,7 +953,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
                         }
                         if (isRelevant) {
                             if (!cache_hit) {
-                                the_cache.set(descriptorNN, gt_value);
+                                the_cache.insert(mkhsh(descriptorNN), gt_value);
                             } else {
                                 std::cout << "   ------hit! value not set: " << gt_value << std::endl;
                             }
@@ -937,16 +994,15 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
     std::cout << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     // std::filesystem::path csv_file_now{csv_file};
-    /* coverity[copy_instead_of_move] */
-    std::filesystem::path cache_file_output{cache_file_input};
+    std::filesystem::path cache_file_output{std::move(cache_file_input)};
     cache_file_output.replace_filename(cache_file_output.stem() += "_output");
     cache_file_output.replace_extension("cache_bin");
     std::cout << "Current test cache is : " << cache_file_output << std::endl;
     std::cout << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
 
     ASSERT_FALSE(std::filesystem::exists(cache_file_output)) << "ABORT: Cannot overwrite: " << cache_file_output;
-    bool const appendIfExists{false};
-    EXPECT_TRUE(the_cache.serializeCacheToFile(cache_file_output.string(), appendIfExists));
+    // bool const appendIfExists{false};
+    EXPECT_TRUE(the_cache.write_cache(cache_file_output.string() /*, appendIfExists*/));
 
     // ASSERT_TRUE(false);
     EXPECT_TRUE(allGood) << "\n\nREAD the LOG!\n\n";
@@ -961,8 +1017,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
-    FixedCache<float> the_cache{normalConfig.preprop_forRead.output_size(), ""};
-    EXPECT_TRUE(the_cache.deserializeCacheFromFile(cache_file_now.string()));
+    FixedCache the_cache{""};
+    EXPECT_TRUE(the_cache.read_cache(cache_file_now.string()));
 
     Serializer<FileFormat::CSV> serializer_IN{true};                                          // force enable
     serializer_IN.initialize(clean_csv_exension(normalConfig.csv_file), FileMode::READONLY);  // open file, basic fields
@@ -995,17 +1051,17 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
                 if (sane) {
                     const auto isRelevant = isCompatibleWithTrainedSpace<decltype(normalConfig)::pp_adapt_forRead>(
                             dpu_wl);                                                          // maybe not
-                    const auto descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
+                    const std::vector<float> descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
 
                     if (isRelevant) {
-                        const auto cache_hit = the_cache.contains(descriptorNN);
+                        const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                         EXPECT_TRUE(cache_hit) << "Cache miss at pos: " << i << std::endl;
                         if (!cache_hit) {
                             std::cout << "Cache miss at pos: " << i << std::endl;
                             allGood = false;
                         } else {
                             // check hit is the gt match
-                            const float cache_value = the_cache.get(descriptorNN).value();
+                            const float cache_value = the_cache.get(mkhsh(descriptorNN)).value();
                             EXPECT_NEAR(cache_value, gt_value, cache_delta_tolerance)  // maybe csv has multiple GTs
                                     << "Cache value mismatch at pos: " << i << ", GT :" << gt_value
                                     << " ,Cache: " << cache_value << std::endl;
@@ -1047,10 +1103,10 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
-    VPUCostModel model_active_cache{normalConfig.NN_CM_to_use, cache_file_now.string()};
+    VPUCostModel model_active_cache{cache_file_now.string()};
 
-    FixedCache<float> the_cache{normalConfig.preprop_forRead.output_size(), ""};
-    EXPECT_TRUE(the_cache.deserializeCacheFromFile(cache_file_now.string()));
+    FixedCache the_cache{""};
+    EXPECT_TRUE(the_cache.read_cache(cache_file_now.string()));
 
     Serializer<FileFormat::CSV> serializer_IN{true};                                          // force enable
     serializer_IN.initialize(clean_csv_exension(normalConfig.csv_file), FileMode::READONLY);  // open file, basic fields
@@ -1082,21 +1138,20 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
                 const auto sane = normalConfig.sanitizerModel.sanitize_workload(dpu_wl, sanityInfo);
 
                 std::string model_run_info{};
-                /* coverity[copy_instead_of_move] */
-                const auto cycleTime{model_active_cache.DPU(wl_model, model_run_info)};
+                const auto cycleTime{model_active_cache.DPU(std::move(wl_model), model_run_info)};
 
                 if (sane) {
                     const auto isRelevant =
                             isCompatibleWithTrainedSpace<decltype(normalConfig)::pp_adapt_forRead>(dpu_wl);
-                    const auto descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
-                    const auto cache_hit = the_cache.contains(descriptorNN);
+                    const std::vector<float> descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
+                    const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (isRelevant) {
                         EXPECT_TRUE(cache_hit) << "Reference Cache miss at pos: " << i << std::endl;
                         if (!cache_hit) {
                             std::cout << "Reference Cache miss at pos: " << i << std::endl;
                             allGood = false;
                         } else {  // check that cache hit is the same as the model
-                            const float cache_value = the_cache.get(descriptorNN).value();
+                            const float cache_value = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(cache_value - (float)cycleTime);
 
                             if (delta > cache_delta_tolerance) {
@@ -1144,10 +1199,10 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
-    VPUCostModel model_active_cache{normalConfig.NN_CM_to_use, cache_file_now.string()};
+    VPUCostModel model_active_cache{normalConfig.NN_CM_to_use, cache_file_now.string(), "" /*shavecache*/};
 
-    FixedCache<float> the_cache{normalConfig.preprop_forRead.output_size(), ""};
-    EXPECT_TRUE(the_cache.deserializeCacheFromFile(cache_file_now.string()));
+    FixedCache the_cache{""};
+    EXPECT_TRUE(the_cache.read_cache(cache_file_now.string()));
     EXPECT_TRUE(the_cache.getMap().size() > 0);
 
     Serializer<FileFormat::CSV> serializer_IN{true};
@@ -1184,14 +1239,13 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
                 const auto sane = normalConfig.sanitizerModel.sanitize_workload(dpu_wl, sanityInfo);
 
                 std::string model_run_info{};
-                /* coverity[copy_instead_of_move] */
-                const auto cycleTime{model_active_cache.DPU(wl_model, model_run_info)};
+                const auto cycleTime{model_active_cache.DPU(std::move(wl_model), model_run_info)};
 
                 if (sane) {
                     const auto isRelevant =
                             isCompatibleWithTrainedSpace<decltype(normalConfig)::pp_adapt_forRead>(dpu_wl);
-                    const auto descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
-                    const auto cache_hit = the_cache.contains(descriptorNN);
+                    const std::vector<float> descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
+                    const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (isRelevant) {
                         // EXPECT_TRUE(cache_hit) << "Reference Cache miss at pos: " << i << std::endl;
                         if (!cache_hit) {
@@ -1199,7 +1253,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
                                       << std::endl;
                             allGood = false;
                         } else {  // check that cache hit is the same as the model
-                            const float cache_value = the_cache.get(descriptorNN).value();
+                            const float cache_value = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(cache_value - (float)cycleTime);
 
                             if (delta > 2.0f /*cache_delta_tolerance*/) {

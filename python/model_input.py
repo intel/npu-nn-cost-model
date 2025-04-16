@@ -89,7 +89,15 @@ def generate_model_input(args, wl_type=VPUNN_lib.DPUWorkload):
         wl.activation_function = str2enum(wl_ns.activation_function)
         wl.isi_strategy = str2enum(wl_ns.isi_strategy)
 
+        if hasattr(wl_ns, 'in_place_input1'):
+            wl.set_inplace_input1(wl_ns.in_place_input1)
+        if hasattr(wl_ns, 'in_place_output'):
+            wl.set_inplace_output(wl_ns.in_place_output)
+        if hasattr(wl_ns, 'superdense_output'):
+            wl.set_superdense(wl_ns.superdense_output)
+
         return wl
+
     elif wl_type == VPUNN_lib.DMANNWorkload_NPU27:
         dma_wl = wl_type()
         dma_wl.device = str2enum(f"VPUDevice.VPU_2_7")

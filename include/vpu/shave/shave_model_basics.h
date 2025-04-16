@@ -154,9 +154,9 @@ public:
      * @return the number of cycles required based on CyclesInterfaceType
      */
     template <typename... Ts>
+    /* coverity[pass_by_value] */
     CyclesInterfaceType getDPUCyclesAnotherFreqDPU_SHV(const int present_dpu_frq, const int present_shv_frq,
-                                                       /* coverity[pass_by_value] */
-                                                       Ts... args) const {
+                                                      Ts... args) const {  //disabled coverity pass by value finding for Ts.. args because we don't want to force arguments to be const or/and references
         const int shaveCycles = static_cast<const Derived*>(this)->getShaveCycles(args...);
         return converter.toDPUCyclesFromShaveCycles(shaveCycles, present_dpu_frq, present_shv_frq);
     }

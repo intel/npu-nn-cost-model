@@ -25,6 +25,7 @@
 #include "inference/dma_preprop_factory.h"
 #include "inference/post_process.h"
 
+#include "vpu/dma_types.h"
 #include "vpu/dma_workload.h"
 #include "vpu/performance.h"
 #include "vpu/power.h"
@@ -40,6 +41,8 @@
 
 #include "vpu/shave/shave_collection.h"
 #include "vpu/shave/shave_devices.h"
+
+#include <core/serializer.h>
 
 #include <typeinfo>
 
@@ -101,14 +104,17 @@ protected:
 template <class DMADesc>
 class VPUNN_API(DMACostModel) {
 public:
-    using DescType = DMADesc;   ///< Useful for deducing the type of the descriptor
+    using DescType = DMADesc;  ///< Useful for deducing the type of the descriptor
 
 private:
     const DMARuntimeProcessingFactory<DMADesc> preprocessing_factory;  ///< provides Preprocessing objects
     Runtime vpunn_runtime;  ///< the loaded inference model is here, used for FW propagation
     IPreprocessingDMA<float, DMADesc>&
             preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
-    LRUCache<float> cache;  ///< cache for inferred values, used only for single workload, not for batches
+    LRUCache<std::vector<float>, float>
+            cache;             ///< cache for inferred values, used only for single workload, not for batches
+    CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
+    CSVSerializer cache_miss_serializer;  ///< serializer for missed cache DMADesc workloads
 
     /// @brief obtains the actual preprocessing instance from factory. The factory must live longer than the instance
     /// created. warning: Throws if not possible
@@ -136,6 +142,19 @@ private:
 
             throw std::runtime_error(details);
         }
+    }
+
+    static const std::vector<std::string> get_names_for_serializer() {
+        std::vector<std::string> names;
+
+        for (const auto& name : DescType::_get_member_names()) {
+            names.push_back(name);
+        }
+
+        names.push_back("cycles");
+        names.push_back("info");
+
+        return names;
     }
 
     /**
@@ -221,10 +240,13 @@ public:
             : vpunn_runtime(filename, batch_size, profile),
               preprocessing(
                       init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), filename, batch_size)),
-              cache(cache_size, preprocessing.output_size(), cache_filename) /*,
-               results_config(vpunn_runtime.model_version_info().get_output_interface_version())*/
+              cache(cache_size, /* preprocessing.output_size(),*/ cache_filename) /*,
+                results_config(vpunn_runtime.model_version_info().get_output_interface_version())*/
     {
         Logger::initialize();
+
+        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
+        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
         check_post_config(vpunn_runtime.model_version_info());
 
         if (!vpunn_runtime.initialized()) {
@@ -250,14 +272,18 @@ public:
      */
     explicit DMACostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
-                          const std::string& cache_filename = "")
+                          const char* cache_data = nullptr, size_t cache_data_length = 0)
             : vpunn_runtime(model_data, model_data_length, copy_model_data, batch_size, profile),
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), "ConstCharInit",
                                          batch_size)),
-              cache(cache_size, preprocessing.output_size(), cache_filename) /*,
-               results_config(vpunn_runtime.model_version_info().get_output_interface_version())*/
+              cache(cache_size, /* preprocessing.output_size(), */ cache_data, cache_data_length) /*,
+                results_config(vpunn_runtime.model_version_info().get_output_interface_version())*/
     {
         Logger::initialize();
+
+        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
+        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
+
         check_post_config(vpunn_runtime.model_version_info());
 
         if (!vpunn_runtime.initialized()) {
@@ -299,6 +325,19 @@ public:
             const auto infered_value = vpunn_runtime.predict<float>(vector)[0];
             // Add result to the cache
             cache.add(vector, infered_value);
+
+            if (cache_miss_serializer.is_serialization_enabled()) {  // has to be factored out
+                try {
+                    cache_miss_serializer.serialize(SerializableField<VPUDevice>{"device", workload.device});
+                    serialize_workload(workload, cache_miss_serializer);
+                    cache_miss_serializer.end();
+                } catch (const std::exception& e) {
+                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                    cache_miss_serializer.clean_buffers();
+                }
+                cache_miss_serializer.clean_buffers();
+            }
+
             return infered_value;
         }
         return *cached_value;
@@ -427,6 +466,18 @@ private:
         SanityReport problems{};
         info = problems.info;
 
+        if (interogation_serializer.is_serialization_enabled()) {  // has to be factored out
+            try {
+                interogation_serializer.serialize(SerializableField<VPUDevice>{"device", wl.device});
+
+                serialize_workload(wl, interogation_serializer);
+
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                interogation_serializer.clean_buffers();
+            }
+        }
+
         CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
         if (is_inference_posible) {
             const auto nn_size_div_cycle = run_NN(wl);
@@ -459,7 +510,70 @@ private:
             }
         }
 
+        if (interogation_serializer.is_serialization_enabled()) {  // has to be factored out
+            try {
+                if (!interogation_serializer.is_write_buffer_clean()) {
+                    interogation_serializer.serialize(SerializableField<decltype(cycles)>{"cycles", cycles});
+                    interogation_serializer.end();
+                }
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                interogation_serializer.clean_buffers();
+            }
+            interogation_serializer.clean_buffers();
+        }
+
         return cycles;
+    }
+
+    void serialize_workload(const DMANNWorkload_NPU27& wl, CSVSerializer& serializer) {
+        if (serializer.is_serialization_enabled()) {
+            try {
+                serializer.serialize(SerializableField{"num_planes", wl.num_planes});
+                serializer.serialize(SerializableField{"length", wl.length});
+                serializer.serialize(SerializableField{"src_width", wl.src_width});
+                serializer.serialize(SerializableField{"dst_width", wl.dst_width});
+                serializer.serialize(SerializableField{"src_stride", wl.src_stride});
+                serializer.serialize(SerializableField{"dst_stride", wl.dst_stride});
+                serializer.serialize(SerializableField{"src_plane_stride", wl.src_plane_stride});
+                serializer.serialize(SerializableField{"dst_plane_stride", wl.dst_plane_stride});
+                serializer.serialize(SerializableField{"transfer_direction", wl.transfer_direction});
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                serializer.clean_buffers();
+            }
+        }
+    }
+
+    void serialize_workload(const DMANNWorkload_NPU40_RESERVED& wl, CSVSerializer& serializer) {
+        if (serializer.is_serialization_enabled()) {
+            try {
+                serializer.serialize(SerializableField{"src_width", wl.src_width});
+                serializer.serialize(SerializableField{"dst_width", wl.dst_width});
+                serializer.serialize(SerializableField{"num_dim", wl.num_dim});
+
+                for (int i = 0; i < wl.num_dim; i++) {
+                    const auto& dim{wl.e_dim[i]};
+                    serializer.serialize(SerializableField{"src_stride_" + std::to_string(i + 1), dim.src_stride});
+                    serializer.serialize(SerializableField{"dst_stride_" + std::to_string(i + 1), dim.dst_stride});
+                    serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), dim.src_dim_size});
+                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), dim.dst_dim_size});
+                }
+                
+                for(int i = wl.num_dim; i < wl.MaxExtraDimensions; i++){
+                    serializer.serialize(SerializableField{"src_stride_" + std::to_string(i + 1), 0});
+                    serializer.serialize(SerializableField{"dst_stride_" + std::to_string(i + 1), 0});
+                    serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), 0});
+                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), 0});  
+                }
+
+                serializer.serialize(SerializableField{"num_engine", wl.num_engine});
+                serializer.serialize(SerializableField{"direction", wl.transfer_direction});
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                serializer.clean_buffers();
+            }
+        }
     }
 
     /// NN clamping from minimum bandwith to maximum one
@@ -469,6 +583,7 @@ private:
     CyclesInterfaceType convert_from_sizeDivCycle_to_DPUCyc(
             float nn_size_div_cycle,  // [0 to 1], 0% to 100% of  device's bytes per cycle
             const DMADesc& wl, std::string& info) const {
+
         const auto maxBytesPerCycle{get_DMA_DDR_interface_bytes(wl.device)};
         const auto raw_bandwith_BPC{nn_size_div_cycle *
                                     maxBytesPerCycle};  // range 0 to device bytes per cycle (full max speed) .

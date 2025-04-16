@@ -228,6 +228,25 @@ public:
     friend bool operator<(const VPUNN::VPUTensor& lhs, const VPUNN::VPUTensor& rhs);
 
 private:
+    /// overflowBits can take values in interval: [1, 8] and represents the number of bits occupied by a data type in
+    /// the last byte
+    ///
+    /// overflowBits can not be smaller that 1 (have value of 0) because that would mean the data type doesn't occupy
+    /// any bits in the next byte of memory
+    /// example: an INT8 occupies a whole byte, so we do not move to the next byte, but an INT9 occupies a whole byte
+    /// plus one bit from the next byte, meaning overflowBits will be 1
+    ///
+    /// overflowBits can not be greater than 8, as 8 bits equal one byte
+    /// example: an INT8 occupies a whole byte, since overflowBits checks how many bits are occupied in the last byte, x
+    /// will be 8, same if type is FLOAT16, it occupies 2 bytes in memory, meaning the last byte will also have all 8
+    /// bits occupied 
+    /// @return true if overflowBits is in interval [1, 8] , false if not 
+    bool isOverflowBitsValid(const int overflowBits) const noexcept {
+        if (overflowBits < 1 || overflowBits > 8)
+            return false;
+        return true;
+    }
+
     /**
      * @brief we compute the size in bytes and number of tensor's elements that we can place in memory one after the
      * other so that an element cannot span more bytes than the number indicated by its size in bytes
@@ -258,9 +277,11 @@ private:
         //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
         const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension_B - 1);
 
+         if (!isOverflowBitsValid(overflowBits))
+            return std::make_pair(-1, -1);
+
         // the number of elements that can be placed in memory one after the other without an element spanning more
         // bytes than type_dimension_B indicates
-        /* coverity[divide_by_zero] */
         const int contiguousSeq_elem = 8 / overflowBits;
 
         // the size in bytes for such a contiguous sequence
@@ -422,14 +443,23 @@ private:
         // INT12 occupies 12 bits out of 2 bytes, leaving 6 bits free, but another element of this type cannot fit
         // =>types larger than 8 bits will always occupy 2 bytes in memory
         const auto innermost_dimension{shape[order[0]]};
-        const int type_dimension{static_cast<int>(dtype_to_bytes(dtype))};
+        const int type_dimension{dtype_to_bytes(dtype)};
+
+        if (type_dimension < 1)
+            return false;
+
+        // number of bits occupied in the last byte of the type dimension
+        // example: if type_dim=1 and dtype=INT3 => there is 1 byte and only 3 bits occupied
+        //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
         const int overflowBits =
-                dtype_to_bits(dtype) - 8 * (type_dimension - 1);  // how many bits beyond a byte does the type have
+                dtype_to_bits(dtype) - 8 * (type_dimension - 1);
+
+         if (!isOverflowBitsValid(overflowBits))
+            return false;
 
         // number of elements of that type that you can place in memory one after one without exceeding the allowed
         // number of bytes an element can span example: INT4, INT2, INT1, INT3 cannot fit in 2 bytes, max 1 INT12,
         // INT13, INT16 cannot fit in 3 bytes, max 2
-        /* coverity[divide_by_zero] */
         const int contiguousCapacity = 8 / overflowBits;
 
         //  remaining elements that do not form a complete cycle
@@ -457,14 +487,22 @@ private:
     // throw an exception in the constructor if the condition is not met
     bool is_tensor_valid_packmode_1() const {
         const auto elements_count = multiply_vector(shape);
-        const int type_dimension = static_cast<unsigned int>(dtype_to_bytes(dtype));
-        const int overflowBits =
-                dtype_to_bits(dtype) - 8 * (type_dimension - 1);  // how many bits beyond a byte does the type have
+        const int type_dimension = dtype_to_bytes(dtype);
+
+        if (type_dimension == -1)
+            return false;
+
+        // number of bits occupied in the last byte of the type dimension
+        // example: if type_dim=1 and dtype=INT3 => there is 1 byte and only 3 bits occupied
+        //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
+        const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension - 1); 
+
+         if (!isOverflowBitsValid(overflowBits))
+            return false;
 
         // number of elements of that type that you can place in memory one after one without exceeding the allowed
         // number of bytes an element can span example: INT4, INT2, INT1, INT3 cannot fit in 2 bytes, max 1 INT12,
         // INT13, INT16 cannot fit in 3 bytes, max 2
-        /* coverity[divide_by_zero] */
         const int contiguousCapacity = 8 / overflowBits;
 
         //  remaining elements that do not form a complete cycle
@@ -500,7 +538,6 @@ private:
                 (occupied_bits == 0) ? 0 : (8 - occupied_bits);  // unoccupied bits from the last byte
 
         // we verify if there is still enough space in the last byte to put another element
-        /* coverity[divide_by_zero] */
         if ((unoccupied_bits / dtype_to_bits(dtype)) != 0) {
             return false;
         }
@@ -516,7 +553,6 @@ private:
                 (occupied_bits == 0) ? 0 : (8 - occupied_bits);  // unoccupied bits from the last byte
 
         // we verify if there is still enough space in the last byte to put another element
-        /* coverity[divide_by_zero] */
         if ((unoccupied_bits / dtype_to_bits(dtype)) != 0) {
             return false;
         }

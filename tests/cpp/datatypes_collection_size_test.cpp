@@ -301,4 +301,11 @@ TEST_F(DataTypes_Collection_Size_Test, Compute_elements_number_from_bytes_Test) 
     EXPECT_EQ(compute_elements_count_from_bytes(104, DataType::FLOAT32), 26);
 }
 
+TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bits_and_Dtype_to_bytes_DefaultCase) {
+
+
+    EXPECT_EQ(-1, dtype_to_bits(static_cast<DataType>(20)));
+    EXPECT_EQ(-1, dtype_to_bytes(static_cast<DataType>(20)));
+}
+
 }  // namespace VPUNN_unit_tests

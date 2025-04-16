@@ -22,6 +22,9 @@ namespace VPUNN {
 inline auto tick() {
     return std::chrono::high_resolution_clock::now();
 }
+inline auto no_tick() {
+    return std::chrono::time_point<std::chrono::high_resolution_clock>{};//default value
+}
 
 /**
  * @brief Get the current timestamp and return the elapsed time with the previous timestamp

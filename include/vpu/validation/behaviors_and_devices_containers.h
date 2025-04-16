@@ -22,7 +22,7 @@ namespace VPUNN {
 /// @brief basic implementation for IContainer_OperationsDynamicBehavior
 /// maps operations to behaviors (provided as classed that implement IOperationDynamicConstraints interface at least)
 /// the order  matters, the map is fixed to be in the following order:
-/// CONVOLUTION, DW_CONVOLUTION, CM_CONVOLUTION, ELTWISE, MAXPOOL
+/// CONVOLUTION, DW_CONVOLUTION, CM_CONVOLUTION, ELTWISE, MAXPOOL, LAYERNORM, ELTWISE_MUL, AVEPOOL
 ///
 /// @tparam TOperationsBehavior parameter pack providing the correctly ordered list of behaviors
 template <class... TOperationsBehavior>
@@ -84,6 +84,11 @@ public:
             return std::get<6>(op_list);
             break;
 
+        case Operation::AVEPOOL:
+            static_assert((std::tuple_size<OpList>::value) > 7, "check tuple");
+            return std::get<7>(op_list);
+            break;
+
         default: {
             // should throw!
             std::stringstream buffer;
@@ -118,8 +123,7 @@ protected:
             &(std::get<0>(specific_vv)),  //
             &(std::get<1>(specific_vv)),  //
 
-            &(std::get<2>(specific_vv)),  //
-           // &(std::get<3>(specific_vv))   //
+            &(std::get<2>(specific_vv))  //
     };
 
 public:
