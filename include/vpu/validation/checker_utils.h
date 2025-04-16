@@ -85,7 +85,7 @@ public:
             std::stringstream buffer;
             buffer << static_cast<int>(item);
             try {
-                const auto enum_text{mapToText<Enum>().at(static_cast<int>(item))};
+                const auto& enum_text{mapToText<Enum>().at(static_cast<int>(item))};
                 buffer << " {" << enum_text << "}";
             } catch (const std::exception&) {  // no extra info
             }

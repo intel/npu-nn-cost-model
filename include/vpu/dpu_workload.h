@@ -66,7 +66,8 @@ struct DPUWorkload {
     /// Individual output halo still have meaning independent of it(owt).
     unsigned int output_write_tiles{1};
 
-    std::array<unsigned int, 4> offsets = {0, 0, 0, 0};  ///< offsets relative to the parent DPULayer, L2 API
+    std::array<unsigned int, 4> offsets = {
+            0, 0, 0, 0};  ///< offsets relative to the parent DPULayer, L2 API. Used only in intratile splitting
 
     ///@brief inter slice interconnect strategy , from 2.7 onwards
     /// reflects if the workload is a part of a split larger workload/layer.
@@ -82,18 +83,19 @@ struct DPUWorkload {
     /// for pointers=> memory tensor is different than compute tensor.
     SEPModeInfo sep_activators{};
 
-    /// add type of weights, if different than input_0 type
+    /// add type of weights, if different than input_0 type (EISXW-103211)
     std::optional<DataType> weight_type{};
 
     /// textual information about the belonging of this workload. NOt mandatory, used only for logging
     std::string layer_info{""};
 
-    std::optional<bool> weightless_operation{};  ///< operation does not have weights
+    /// operation does not have weights, in_place_input1, element-wise only
+    std::optional<bool> weightless_operation{};
 
-    /// output tensor can be the same as the input tensor, for Elementwise ops only
+    /// output tensor can be the same as the input tensor, for element-wise ops only
     std::optional<bool> in_place_output_memory{};
 
-    /// Superdense memory. ODU specific?
+    /// Superdense memory. ODU specific, superdense_output
     std::optional<bool> superdense_memory{};
 
     std::string get_layer_info() const {
@@ -101,6 +103,14 @@ struct DPUWorkload {
     }
     void set_layer_info(const std::string& layer_info_name) {
         layer_info = layer_info_name;
+    }
+
+    void set_inplace_input1(bool in_place) {
+        weightless_operation = in_place;
+    }
+
+    void set_inplace_output(bool in_place) {
+        in_place_output_memory = in_place;
     }
 
     void set_inplace_output_memory(bool in_place) {
@@ -123,6 +133,10 @@ struct DPUWorkload {
         }
         return false;  // not elemntwise
     }
+    /// alias of is_inplace_output_memory
+    bool is_inplace_output() const {
+        return is_inplace_output_memory();
+    }
 
     bool is_weightless_operation() const {
         if (is_elementwise_like_operation()) {  // only for elementwise
@@ -133,6 +147,11 @@ struct DPUWorkload {
             }
         }
         return false;  // not elemntwise
+    }
+
+    /// alias for is_weightless_operation
+    bool is_inplace_input1() const {
+        return is_weightless_operation();
     }
 
     /// detect if operation is elementwise fammily
@@ -152,6 +171,12 @@ struct DPUWorkload {
         } else {  // optional not set. using older/initial mechanism
             return false;
         }
+    }
+
+    void set_all_swizzlings(Swizzling toSet) {
+        input_swizzling[0] = toSet;
+        input_swizzling[1] = toSet;
+        output_swizzling[0] = toSet;
     }
 
 protected:
@@ -286,13 +311,12 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& 
            << " ;\n"  //
            //<< "layer_info:" << d.layer_info << " ;\n" //  keep out since affects layer hash (until layer is more
            // decoupled)
-           << " weightless_operation: \t"
+           << " weightless_operation/in_place_input1: \t"
            << (d.weightless_operation.has_value() ? std::to_string(d.weightless_operation.value()) : "NA") << " ;\n"  //
            << " in_place_output_memory: \t"
-           << (d.in_place_output_memory.has_value() ? std::to_string(d.in_place_output_memory.value()) : "NA")
+           << (d.in_place_output_memory.has_value() ? std::to_string(d.in_place_output_memory.value()) : "NA") << " ;\n"
            << " superdense_memory: \t"
-           << (d.superdense_memory.has_value() ? std::to_string(d.superdense_memory.value()) : "NA")
-           << " ;\n"                           //
+           << (d.superdense_memory.has_value() ? std::to_string(d.superdense_memory.value()) : "NA") << " ;\n"  //
            << out_terminator() << "Workload "  // terminator
             ;
     return stream;

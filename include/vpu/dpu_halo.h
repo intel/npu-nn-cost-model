@@ -64,6 +64,11 @@ public:
             top = 0;
             bottom = 0;
         }
+        void setHorizontalNoHalo() noexcept {
+            // W halo must be forced to zero
+            left = 0;
+            right = 0;
+        }
     };
     friend inline std::ostream& operator<<(std::ostream& stream, const VPUNN::HaloWorkload::HaloInfoHW& d);
 
@@ -157,6 +162,16 @@ public:
         output_0_halo_broadcast_cnt.setVerticalNoHalo();
         output_0_inbound_halo.setVerticalNoHalo();
     }
+
+    void setHorizontalNoHalo() noexcept {
+        // W input halo must be forced to zero
+        input_0_halo.setHorizontalNoHalo();
+        // W output halo  must be zero
+        output_0_halo.setHorizontalNoHalo();
+        output_0_halo_broadcast_cnt.setHorizontalNoHalo();
+        output_0_inbound_halo.setHorizontalNoHalo();
+    }
+
     void setInboudHaloVerticalForBradcastAll(const unsigned int full_output_size,
                                              const unsigned int output_remaining_to_process,
                                              const unsigned output_tile_dim) {
@@ -172,6 +187,26 @@ public:
 
         output_0_inbound_halo.top = prev_tiles_output_processed;
         output_0_inbound_halo.bottom = next_tiles_output_to_process;
+        // memory output tensor:
+        // (output_size - remaining_output_to_split) +  (output_tile_dim)
+        // +(remaining_output_to_split -output_tile_dim) = output_size , constant for all tiles
+    }
+
+    void setInboudHaloHorizontalForBradcastAll(const unsigned int full_output_size,
+                                             const unsigned int output_remaining_to_process,
+                                             const unsigned output_tile_dim) {
+        // we assume here that we want broadcast for all tiles
+
+        // if OWT is >1 , it means that we want to broadcast the split to all other tiles
+        //   we need to populate output_inbound halo , so that the memory tensor is equal to all output
+        //   tensor of the full layer
+        //  the left/right value depend on the position of the tile in the list.
+
+        const auto prev_tiles_output_processed{full_output_size - output_remaining_to_process};  // sum of prev tiles
+        const auto next_tiles_output_to_process{output_remaining_to_process - output_tile_dim};  // sum of next tiles
+
+        output_0_inbound_halo.left = prev_tiles_output_processed;
+        output_0_inbound_halo.right = next_tiles_output_to_process;
         // memory output tensor:
         // (output_size - remaining_output_to_split) +  (output_tile_dim)
         // +(remaining_output_to_split -output_tile_dim) = output_size , constant for all tiles

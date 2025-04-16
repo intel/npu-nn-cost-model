@@ -35,27 +35,19 @@ protected:
     }
 };
 
-class DW_CONVOLUTION_Constraints_Layer : public DW_CONVOLUTION_Constraints {
-protected:
-};
+class DW_CONVOLUTION_Constraints_Layer : public DW_CONVOLUTION_Constraints {};
 
-class CM_CONVOLUTION_Constraints_Layer : public CM_CONVOLUTION_Constraints {
-protected:
-};
+class CM_CONVOLUTION_Constraints_Layer : public CM_CONVOLUTION_Constraints {};
 
-class ELTWISE_Constraints_Layer : public ELTWISE_Constraints {
-protected:
-};
+class ELTWISE_Constraints_Layer : public ELTWISE_Constraints {};
 
-class MAXPOOL_Constraints_Layer : public MAXPOOL_Constraints {
-protected:
-};
+class MAXPOOL_Constraints_Layer : public MAXPOOL_Constraints {};
 
-class LAYERNORM_Constraints_Layer : public LAYERNORM_Constraints {
-};
+class LAYERNORM_Constraints_Layer : public LAYERNORM_Constraints {};
 
-class ELTWISE_MUL_Constraints_Layer : public ELTWISE_MUL_Constraints {
-};
+class ELTWISE_MUL_Constraints_Layer : public ELTWISE_MUL_Constraints {};
+
+class AVGPOOL_Constraints_Layer : public AVGPOOL_Constraints {};
 
 }  // namespace VPUNN
 

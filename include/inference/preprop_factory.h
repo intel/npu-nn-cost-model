@@ -13,7 +13,9 @@
 // #include <math.h>
 #include <vpu/compatibility/types01.h>  // detailed implementations
 #include <vpu/compatibility/types11.h>  // detailed implementations  pp_v01
-#include <vpu/compatibility/types12.h>  // detailed implementations  pp_v01
+#include <vpu/compatibility/types12.h>  // detailed implementations
+#include <vpu/compatibility/types13.h>  // detailed implementations
+#include <vpu/compatibility/types14.h>  // detailed implementations
 #include <vpu/types.h>
 #include <sstream>  // for error formating
 #include <stdexcept>
@@ -42,7 +44,9 @@ private:
     Preprocessing_Interface4011<float> pp_v4011;
     Preprocessing_Interface4111<float> pp_v4111;
     Preprocessing_Interface12<float> pp_v12;
-    Preprocessing_Interface15911<float> pp_v89_11; //special v159
+    Preprocessing_Interface13<float> pp_v13;
+    Preprocessing_Interface14<float> pp_v14;
+    Preprocessing_Interface15911<float> pp_v89_11;  // special v159
 
     /// @brief the map of versions mapped to preprocessing concrete objects
     const PreprocessingMap pp_map{
@@ -51,9 +55,11 @@ private:
             {pp_v10.getInterfaceVersion(), pp_v10},            //
             {pp_v11.getInterfaceVersion(), pp_v11},            //
             {pp_v89_11.getInterfaceVersion(), pp_v89_11},      //
-            {pp_v4011.getInterfaceVersion(), pp_v4011},
-            {pp_v4111.getInterfaceVersion(), pp_v4111},
-            {pp_v12.getInterfaceVersion(), pp_v12}
+            {pp_v4011.getInterfaceVersion(), pp_v4011},        //
+            {pp_v4111.getInterfaceVersion(), pp_v4111},        //
+            {pp_v12.getInterfaceVersion(), pp_v12},            //
+            {pp_v13.getInterfaceVersion(), pp_v13},            //
+            {pp_v14.getInterfaceVersion(), pp_v14}             //
     };
 
 public:

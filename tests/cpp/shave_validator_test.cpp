@@ -6,8 +6,8 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#include "vpu/validation/shave_workloads_sanitizer.h"
 #include "vpu/shave/shave_devices.h"
+#include "vpu/validation/shave_workloads_sanitizer.h"
 
 #include <gtest/gtest.h>
 
@@ -28,88 +28,83 @@ protected:
     void SetUp() override {
     }
     VPUNN::SHAVE_Workloads_Sanitizer dut;  // no overhead by default
-
 };
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingNormalCase){
-    
+TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingNormalCase) {
     {
         VPUNN::SanityReport sane;
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)},
                           {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)});
-        
-        dut.check_and_sanitize_workloads(swl, sane);
 
-        ASSERT_EQ(sane.value(), VPUNN::Cycles::NO_ERROR)<<sane.value();      
+        dut.check_and_sanitize(swl, sane);
+
+        ASSERT_EQ(sane.value(), VPUNN::Cycles::NO_ERROR) << sane.value();
     }
 }
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingInvalidIODataType){
-    
+TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingInvalidIODataType) {
     {
         VPUNN::SanityReport sane;
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::INT8)},
                           {VPUTensor(1, 50, 50, 1, DataType::INT8)});
-        
-        dut.check_and_sanitize_workloads(swl, sane);
+
+        dut.check_and_sanitize(swl, sane);
 
         ASSERT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_SHAVE_INVALID_INPUT))
                 << sane.info << "\n error is : " << VPUNN::Cycles::Cycles::toErrorText(sane.value()) << "\n"
-                << swl;        
+                << swl;
     }
     {
         VPUNN::SanityReport sane;
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)},
                           {VPUTensor(1, 50, 50, 1, DataType::INT8)});
-        
-        dut.check_and_sanitize_workloads(swl, sane);
+
+        dut.check_and_sanitize(swl, sane);
 
         ASSERT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_SHAVE_INVALID_INPUT))
                 << sane.info << "\n error is : " << VPUNN::Cycles::Cycles::toErrorText(sane.value()) << "\n"
-                << swl;        
+                << swl;
     }
     {
         VPUNN::SanityReport sane;
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::INT8)},
                           {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)});
-        
-        dut.check_and_sanitize_workloads(swl, sane);
+
+        dut.check_and_sanitize(swl, sane);
 
         ASSERT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_SHAVE_INVALID_INPUT))
                 << sane.info << "\n error is : " << VPUNN::Cycles::Cycles::toErrorText(sane.value()) << "\n"
-                << swl;        
+                << swl;
     }
 }
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingInputTooBigError){
-    
+TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingInputTooBigError) {
     {
         VPUNN::SanityReport sane;
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 400000, 1, 1, DataType::FLOAT16)},
                           {VPUTensor(1, 400000, 1, 1, DataType::FLOAT16)});
-        
-        dut.check_and_sanitize_workloads(swl, sane);
+
+        dut.check_and_sanitize(swl, sane);
 
         ASSERT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_INPUT_TOO_BIG))
                 << sane.info << "\n error is : " << VPUNN::Cycles::Cycles::toErrorText(sane.value()) << "\n"
-                << swl;        
+                << swl;
     }
     {
         VPUNN::SanityReport sane;
         SHAVEWorkload swl("sigmoid", VPUDevice::VPU_2_7, {VPUTensor(1, 550000, 1, 1, DataType::FLOAT16)},
                           {VPUTensor(1, 550000, 1, 1, DataType::FLOAT16)});
-        
-        dut.check_and_sanitize_workloads(swl, sane);
+
+        dut.check_and_sanitize(swl, sane);
 
         ASSERT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_INPUT_TOO_BIG))
                 << sane.info << "\n error is : " << VPUNN::Cycles::Cycles::toErrorText(sane.value()) << "\n"
-                << swl;        
+                << swl;
     }
 }
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInvalidIODataType){
-    
-    const ShaveConfiguration shaves;
+TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInvalidIODataType) {
+    const ShaveConfiguration shaves{0, ""};
 
     {
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::INT8)},
@@ -134,8 +129,8 @@ TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInvalidIODataType)
     }
 }
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInputTooBigError){
-    const ShaveConfiguration shaves;
+TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInputTooBigError) {
+    const ShaveConfiguration shaves{0, ""};
 
     {
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 400000, 1, 1, DataType::FLOAT16)},

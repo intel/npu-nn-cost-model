@@ -23,9 +23,9 @@ namespace VPUNN {
 /** @brief Get the size of the dtype
  *
  * @param dtype a DataType object
- * @return size in bytes.
+ * @return size in bytes if valid dtypes, else return -1 for invalid types
  */
-inline constexpr unsigned int dtype_to_bytes(const DataType dtype) noexcept {
+inline constexpr int dtype_to_bytes(const DataType dtype) noexcept {
     // intermediate 1+ bytes are not handled, will be when present
     switch (dtype) {
     case DataType::INT32:
@@ -50,14 +50,14 @@ inline constexpr unsigned int dtype_to_bytes(const DataType dtype) noexcept {
         return 1;
 
     default:  // unknown types
-        return 0;
+        return -1;
     }
 }
 
 /** @brief Get the size of the dtype in bits
  *
  * @param dtype a DataType object
- * @return size in bits.
+ * @return size in bits if dtype valid, else return -1 for invalid types
  */
 inline constexpr int dtype_to_bits(const DataType dtype) noexcept {
     //@todo: handle all possible types from the enum
@@ -84,7 +84,7 @@ inline constexpr int dtype_to_bits(const DataType dtype) noexcept {
         return 1;
 
     default:  // unknown types
-        return 0;
+        return -1;
     }
 }
 
@@ -104,7 +104,6 @@ inline int types_per_byte(const DataType datatype) {
     const int datatype_size_in_bits{dtype_to_bits(datatype)};  // number of bits for datatype
 
     if (datatype_size_in_bits <= 8) {
-        /* coverity[divide_by_zero] */
         return 8 / datatype_size_in_bits;  // number of elements fitting into 8 bits
     } else {
         return 0;
@@ -160,7 +159,8 @@ constexpr std::array<unsigned int, 4> layout_to_order(Layout layout) noexcept {
 }
 
 /**
- * @brief Return grid in X, Y, Z, B format
+ * @brief Return grid in X, Y, Z, B format (alignments?)
+ * Note: potentially OBSOLETE, since it does not depend on Device
  *
  * @param mode a DPUWorkload ExecutionMode
  * @return std::vector<unsigned int>
@@ -178,6 +178,7 @@ inline std::vector<unsigned int> mpe_mode_to_grid(ExecutionMode mode) {
 
 /**
  * @brief Return the NTHW/NTK grid in X, Y, Z, B format
+ * Note: potentially OBSOLETE, since it does not depend on Device
  *
  * @param mode a DPUWorkload ExecutionMode
  * @return std::vector<unsigned int>

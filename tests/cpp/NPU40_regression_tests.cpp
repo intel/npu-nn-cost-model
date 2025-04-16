@@ -2828,11 +2828,11 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4634_4662_SOHO_extra_K6
     SOHO_K32_4x16.outputs[0] = VPUTensor(28, 7, 32, 1, DataType::UINT8);
 
     // K16
-    DPUWorkload SOHO_K16_8x16{SOHO_8x16};
+    DPUWorkload SOHO_K16_8x16{std::move(SOHO_8x16)};
     SOHO_K16_8x16.outputs[0] = VPUTensor(28, 7, 16, 1, DataType::UINT8);
-    DPUWorkload SOHO_K16_16x16{SOHO_16x16};
+    DPUWorkload SOHO_K16_16x16{std::move(SOHO_16x16)};
     SOHO_K16_16x16.outputs[0] = VPUTensor(28, 7, 16, 1, DataType::UINT8);
-    DPUWorkload SOHO_K16_4x16{SOHO_4x16};
+    DPUWorkload SOHO_K16_4x16{std::move(SOHO_4x16)};
     SOHO_K16_4x16.outputs[0] = VPUTensor(28, 7, 16, 1, DataType::UINT8);
 
     std::cout << "*************************************************** wl_4634 "

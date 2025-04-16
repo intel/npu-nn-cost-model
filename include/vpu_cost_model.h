@@ -69,23 +69,25 @@ private:
 
     Runtime vpunn_runtime;                ///< the loaded inference model is here, used for FW propagation
     Preprocessing<float>& preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
-    LRUCache<float> cache;                ///< cache for inferred values, used only for single workload, not for batches
+    LRUCache<std::vector<float>, float>
+            cache;  ///< cache for inferred values, used only for single workload, not for batches
     const PostProcessSupport results_config;  ///< in case we have a deprecated version with hw_overhead, the ouptut
                                               ///< support should false and the response should be unused
     const IPostProcess& postProcess;          ///< postprocessing transformer
+
+    CSVSerializer cache_miss_serializer;  ///< serializer for missed cache
+
+    const ShaveConfiguration shave_gen_2;  ///< second generation of shaves
 
     const size_t prealloc_results{1000};          ///< how much results buffer to pre-alloc
     std::vector<float> workloads_results_buffer;  ///< buffer dedicated for workloads. avoids reallocation.
     const float default_NN_output{-1.0F};      ///< this is the value used in no NN output is present (like not loaded).
     const VPUPowerFactorLUT power_factor_lut;  /// < this is the lookup table for power factors.
 
-    const ShaveConfiguration shave_gen_2;  ///< second generation of shaves
-
     const std::string dummyStr{
             "ConstCharInit"};  ///< dummy string for initialization (avoid possible dangling reference)
 
-    CSVSerializer serializer{};             ///< serializer for workloads, has its own file to save data
-    CSVSerializer cache_miss_serializer{};  ///< serializer for missed cache
+    CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
 
 protected:
     DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
@@ -206,13 +208,17 @@ private:
     }
 
 protected:
-    /// @brief simulates AVGPOOL with another equivalent operation (DW CONV)
+    /// @brief simulates AVGPOOL with another equivalent operation (DW CONV), depends also on Device
     ///
     /// @param workload [in, out] that will be changed in case the input is AVGPOOL
     void avgpool_replace_by(DPUWorkload& workload) const {
-        if (workload.op == Operation::AVEPOOL) {
-            Logger::warning() << "Workload with AVEPOOL changed to DW_CONVOLUTION";
-            workload.op = Operation::DW_CONVOLUTION;
+        if (Operation::AVEPOOL == workload.op) {
+            if (VPUDevice::NPU_RESERVED > workload.device) {
+                Logger::warning() << "Workload with AVEPOOL changed to DW_CONVOLUTION";
+                workload.op = Operation::DW_CONVOLUTION;
+            } else {
+                Logger::warning() << "Workload with AVEPOOL  NOT changed!, Device should support it!, ";
+            }
         }
     }
 
@@ -239,6 +245,18 @@ protected:
         fields.emplace_back("workload_uid");
 
         return fields;
+    }
+
+    /// @brief Turns OFF the swizzling
+    ///
+    /// @param workload [in, out] that will be changed in case the conditions are met
+    void swizzling_turn_OFF(DPUWorkload& workload) const {
+        if constexpr (false == PerformanceMode::allowLegacySwizzling_G5) {
+            // only for some devices
+            if (workload.device >= VPUDevice::NPU_RESERVED) {
+                workload.set_all_swizzlings(Swizzling::KEY_0);
+            }
+        }
     }
 
 private:
@@ -275,11 +293,13 @@ public:
      * @brief Construct a new VPUCostModel object
      *
      * @param filename the name of the .vpunn model
-     * @param cache_filename the name of the cache file
+     * @param dpu_cache_filename the name of the cache file
+     * @param shave_cache_filename the name of the shave cache file
+     *
      */
-    explicit VPUCostModel(const std::string& filename, const std::string& cache_filename,
-                          bool tryToLoadPairedCache = false)
-            : VPUCostModel(filename, false, 16384, 1, cache_filename, tryToLoadPairedCache) {
+    explicit VPUCostModel(const std::string& filename, const std::string& dpu_cache_filename,
+                          const std::string& shave_cache_filename, bool tryToLoadPairedCache = false)
+            : VPUCostModel(filename, false, 16384, 1, dpu_cache_filename, shave_cache_filename, tryToLoadPairedCache) {
         /* coverity[uninit_member] */
     }
 
@@ -290,19 +310,26 @@ public:
      * @param profile enable/disable profiling
      * @param cache_size the size of the LRUCache
      * @param batch_size model batch size
+     * @param dpu_cache_filename the name of the cache file
+     * @param shave_cache_filename the name of the shave cache file
+     * @param tryToLoadPairedCache , special condition: if main file empty, try to load the paired cache, generated name
+     * based on NN file. (fro DPU, for others?) DRAFT!
+     *
      */
     explicit VPUCostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
-                          const unsigned int batch_size = 1, const std::string& cache_filename = "",
-                          bool tryToLoadPairedCache = false)
+                          const unsigned int batch_size = 1, const std::string& dpu_cache_filename = "",
+                          const std::string& shave_cache_filename = "", bool tryToLoadPairedCache = false)
             : preprocessing_factory{},
               postprocessing_factory{},
               vpunn_runtime(filename, batch_size, profile),
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), filename)),
-              cache(cache_size, preprocessing.output_size(), cache_filename, (tryToLoadPairedCache ? filename : "")),
+              cache(cache_size /*, preprocessing.output_size()*/, dpu_cache_filename,
+                    (tryToLoadPairedCache ? filename : "")),
               results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
               postProcess(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), filename)),
               cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
-                                            .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE") {
+                                            .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE"),
+              shave_gen_2(cache_size, shave_cache_filename) {
         Logger::initialize();
         check_post_config(vpunn_runtime.model_version_info());
 
@@ -320,6 +347,7 @@ public:
     }
     VPUCostModel(const VPUCostModel&) = delete;
     // VPUCostModel(VPUCostModel&&) = default; //explicitly defaulted move constructor is implicitly deleted
+    virtual ~VPUCostModel() = default;
 
     /**
      * @brief Construct a new VPUCostModel object
@@ -333,16 +361,18 @@ public:
      */
     explicit VPUCostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
-                          const char* cache_data = nullptr, size_t cache_data_length = 0)
+                          const char* dpu_cache_data = nullptr, size_t dpu_cache_data_length = 0,
+                          const char* shave_cache_data = nullptr, size_t shave_cache_data_length = 0)
             : preprocessing_factory{},
               postprocessing_factory{},
               vpunn_runtime(model_data, model_data_length, copy_model_data, batch_size, profile),
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), dummyStr)),
-              cache(cache_size, preprocessing.output_size(), cache_data, cache_data_length),
+              cache(cache_size, /* preprocessing.output_size(),*/ dpu_cache_data, dpu_cache_data_length),
               results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
               postProcess(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), dummyStr)),
               cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
-                                            .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE") {
+                                            .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE"),
+              shave_gen_2(cache_size, shave_cache_data, shave_cache_data_length) {
         Logger::initialize();
         check_post_config(vpunn_runtime.model_version_info());
 
@@ -691,6 +721,8 @@ protected:
      *  Provides workload outside so we know on what(post sanitization) was done the inference
      */
     CyclesInterfaceType DPU_and_sanitize(DPUWorkload& wl, std::string& info) {
+        swizzling_turn_OFF(wl);  // swizz guard sanitization
+
         if (serializer.is_serialization_enabled()) {  // has to be factored out
             try {
                 auto wl_op = DPUOperation(wl, sanitizer.getDeviceConfiguration(wl.device));
@@ -770,6 +802,7 @@ public:
         for (unsigned int idx = 0; idx < number_of_workloads; ++idx) {
             auto& wl{workloads[idx]};
             auto& sanity{sanitization_results[idx]};
+            swizzling_turn_OFF(wl);                                               // swizz guard sanitization
             sanity.inference_relevance = sanitize_workload(wl, sanity.problems);  // workloads are changed
         }
 
@@ -804,6 +837,7 @@ public:
         if (serializer.is_serialization_enabled()) {  // has to be factored out
             for (unsigned int idx = 0; idx < serializer_orig_wls.size(); ++idx) {
                 try {
+                    swizzling_turn_OFF(serializer_orig_wls[idx]);  // swizz guard sanitization
                     auto wl_op = DPUOperation(serializer_orig_wls[idx],
                                               sanitizer.getDeviceConfiguration(serializer_orig_wls[idx].device));
                     const size_t wl_uid = wl_op.hash();
@@ -913,7 +947,7 @@ public:
     unsigned int DMA(VPUDevice device, const VPUTensor& input, const VPUTensor& output,
                      MemoryLocation input_location = MemoryLocation::DRAM,
                      MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
-        // Call the helper function
+        // Call the helper function. TO DO Adjust theoretical based on some measured data!
         return DMATheoreticalCycles({device, input, output, input_location, output_location, output_write_tiles});
     }
 
@@ -925,8 +959,7 @@ public:
      * @deprecated Will be removed in future releases
      */
     unsigned int DMA(const DMAWorkload& wl) const {
-        // Call the helper function
-        return DMATheoreticalCycles(wl);
+        return DMA(wl.device, wl.input, wl.output, wl.input_location, wl.output_location, wl.output_write_tiles);
     }
 
     /**
@@ -948,7 +981,7 @@ public:
      * @param infoOut  a string that will contain informative error information (in case of error)
      * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
      */
-    CyclesInterfaceType SHAVE_2(const SHAVEWorkload& shave_wl, std::string& infoOut) {
+    CyclesInterfaceType SHAVE_2(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
         return shave_gen_2.computeCycles(shave_wl, infoOut);
     }
 

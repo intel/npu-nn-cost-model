@@ -89,33 +89,40 @@ public:
         std::unordered_map<Operation, const Values<DataType>> weights_datatypes;
     };
 
+    /// @brief collection of possible execution modes for different operations
+    class ValidExecutionModes {
+    public:
+        // valid execution modes based on operations
+        std::unordered_map<Operation, const Values<ExecutionMode>> execution_modes;
+    };
+
 protected:
     const IContainer_OperationsDynamicBehavior& operations_dynamic_behavior;  ///< externally attached dynamic behavior
     /// @brief non public constructor for initializing the reference
-    IDeviceValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
-                       const Values<ExecutionMode>& valid_execution_order_,                 //
-                       const Values<Swizzling>& valid_swizzlings_,                          //
-                       const Values<Layout>& valid_layouts_,                                //
-                       const Values<VPUDevice>& devices_,                                   //
-                       const std::unordered_map<VPUDevice, int>& cmx_KB_sizes_,             //
-                       const Values<int>& output_write_tile_options_,                       //
-                       const Values<ISIStrategy>& isi_stategy_options_,                     //
-                       const int& weigths_alignment_,                                       //
-                       const int& input_heigth_start_factor_SOH_,                           //
-                       const IDeviceValidValues::ValidDatatypes& valid_datatypes,           //
-                       const Values<Operation>& valid_operations_,                          //
-                       const int& alignement_size_bytes_                                    // page size, NPU specific
+    IDeviceValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,     //
+                       const IDeviceValidValues::ValidExecutionModes& valid_execution_order_,  //
+                       const Values<Swizzling>& valid_swizzlings_,                             //
+                       const Values<Layout>& valid_layouts_,                                   //
+                       const Values<VPUDevice>& devices_,                                      //
+                       const std::unordered_map<VPUDevice, int>& cmx_KB_sizes_,                //
+                       const Values<int>& output_write_tile_options_,                          //
+                       const Values<ISIStrategy>& isi_stategy_options_,                        //
+                       const int& weigths_alignment_,                                          //
+                       const int& input_heigth_width_start_factor_SOHW_,                       //
+                       const IDeviceValidValues::ValidDatatypes& valid_datatypes,              //
+                       const Values<Operation>& valid_operations_,                             //
+                       const int& alignement_size_bytes_  // page size, NPU specific
                        )
-            : operations_dynamic_behavior{op_dynamic_constraints},            //
-              valid_execution_order{valid_execution_order_},                  //
-              valid_swizzlings{valid_swizzlings_},                            //
-              valid_layouts{valid_layouts_},                                  //
-              devices{devices_},                                              //
-              cmx_KB_sizes{cmx_KB_sizes_},                                    //
-              output_write_tile_options{output_write_tile_options_},          //
-              isi_stategy_options{isi_stategy_options_},                      //
-              weigths_alignment{weigths_alignment_},                          //
-              input_heigth_start_factor_SOH{input_heigth_start_factor_SOH_},  //
+            : operations_dynamic_behavior{op_dynamic_constraints},                          //
+              valid_execution_order_map{valid_execution_order_},                            //
+              valid_swizzlings{valid_swizzlings_},                                          //
+              valid_layouts{valid_layouts_},                                                //
+              devices{devices_},                                                            //
+              cmx_KB_sizes{cmx_KB_sizes_},                                                  //
+              output_write_tile_options{output_write_tile_options_},                        //
+              isi_stategy_options{isi_stategy_options_},                                    //
+              weigths_alignment{weigths_alignment_},                                        //
+              input_heigth_width_start_factor_SOHW{input_heigth_width_start_factor_SOHW_},  //
               valid_datatypes_map{valid_datatypes},
               valid_operations{valid_operations_},
               alignement_size_bytes{alignement_size_bytes_} {
@@ -130,6 +137,12 @@ public:
     // return a SmartRanges that verify if a value matches
     virtual SmartRanges get_input_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
     virtual SmartRanges get_output_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
+
+    /// false for places where checks regarding properties that are not connected to the abstract operation is not  to
+    /// be checked (they do not really exists in that context). e.g. stencil. true: low level checks to be executed
+    virtual bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept {
+        return true;  // check all by default
+    };
 
     const Values<DataType>& get_input_valid_datatypes(const DPUOperation& dpu) const {
         const auto& ch_map{valid_datatypes_map.input_datatypes};
@@ -152,10 +165,10 @@ public:
     /// @brief Changes tensor swizzling to match the device special restrictions or conventions. Useful for defaults
     virtual Swizzling adapt_device_comaptible_swizzling(Swizzling swizz) const = 0;
 
-    std::pair<int, int> get_input_height_interval(const DPUOperation& dpu) const {
-        const int extra_out_rows{dpu.isi_strategy == ISIStrategy::SPLIT_OVER_H
-                                         ? input_heigth_start_factor_SOH - 1  // will be >1 for layers checking
-                                         : 1 - 1};                            // no restriction
+    std::pair<int, int> get_input_height_interval(const DPUOperation& dpu, bool use_extra_start = false) const {
+        const int extra_out_rows{use_extra_start
+                                         ? get_spatial_range_start_factor_HW() - 1  // will be >1 for layers checking
+                                         : 1 - 1};                                  // no restriction
 
         const int minH_oneRow =
                 dpu.kernel.height - (dpu.kernel.pad_top + dpu.kernel.pad_bottom);  // for one row of output
@@ -169,9 +182,13 @@ public:
         return makeList(interval.first, interval.second);
     }
 
-    std::pair<int, int> get_input_width_interval(const DPUOperation& dpu) const {
-        const int minW_oneCol = dpu.kernel.width - (dpu.kernel.pad_left + dpu.kernel.pad_right);  // for one output
-        const int minW{(minW_oneCol < 1) ? 1 : minW_oneCol};                                      // at least one
+    std::pair<int, int> get_input_width_interval(const DPUOperation& dpu, bool use_extra_start = false) const {
+        const int extra_out_cols{use_extra_start
+                                         ? get_spatial_range_start_factor_HW() - 1  // will be >1 for layers checking
+                                         : 1 - 1};
+
+        const int minW_oneCol = dpu.kernel.width - (dpu.kernel.pad_left + dpu.kernel.pad_right);    // for one output
+        const int minW{((minW_oneCol + extra_out_cols) < 1) ? 1 : (minW_oneCol + extra_out_cols)};  // at least one
         const auto maxW{input_spatial_dim_max};
         return std::make_pair(minW, maxW);  // force by value for constexpr
     }
@@ -258,9 +275,11 @@ public:
         return valid_operations;
     };
 
-    const Values<ExecutionMode>& get_valid_execution_order() const {
-        return valid_execution_order;
+    const Values<ExecutionMode>& get_valid_execution_order(const DPUOperation& dpu) const {
+        const auto& ch_map{valid_execution_order_map.execution_modes};
+        return ch_map.at(dpu.operation);
     }
+
     const Values<Swizzling>& get_valid_swizzlings() const {
         return valid_swizzlings;
     }
@@ -296,7 +315,7 @@ protected:
 
     // restrictions described as data, set in derived classes
 protected:
-    const Values<ExecutionMode> valid_execution_order;  ///< what executions order are permitted
+    const ValidExecutionModes valid_execution_order_map;  ///< what executions order are permitted for each operation
     const Values<Swizzling> valid_swizzlings;  ///< what swizzlings are permitted, ordered from least to most swizzling
     const Values<Layout> valid_layouts;        ///< what layouts are permitted
     const Values<VPUDevice> devices;           ///< devices covered with this instance
@@ -306,8 +325,12 @@ protected:
     const Values<int> output_write_tile_options;  ///<
     const Values<ISIStrategy> isi_stategy_options;
 
-    const int weigths_alignment{16};             ///< default alignment for weights,
-    const int input_heigth_start_factor_SOH{1};  ///<  to be set in derived implementations
+    const int weigths_alignment{16};                    ///< default alignment for weights,
+    const int input_heigth_width_start_factor_SOHW{1};  ///<  to be set in derived implementations
+
+    int get_spatial_range_start_factor_HW() const {
+        return input_heigth_width_start_factor_SOHW;
+    }
 
     const ValidDatatypes valid_datatypes_map;  ///< valid data types for each operation
 
@@ -326,7 +349,7 @@ protected:
     static constexpr int input_spatial_dim_max{8192};  ///< 1-8K. MAX HW dim
     static constexpr int cm_conv_channels_max{16};     ///< CM convolution is limited to C<=16 ,
 
-    static constexpr int kernel_max{11};  ///< max nominal kernel size (hardware)
+    static constexpr int kernel_max{15};  ///< max nominal kernel size (hardware)
     static constexpr int stride_max{8};   ///< hardware limit to 8
 
     static constexpr float cmx_size_safety_factor{1.0};
@@ -408,6 +431,10 @@ public:
     long long compute_size_raw(const long long elements_count, const DataType& datatype) const noexcept {
         const auto size{compute_size_in_bytes(elements_count, datatype)};
         return size;
+    }
+
+    bool is_valid_operation(const Operation op) const {
+        return contains_value(valid_operations, op);
     }
 };
 

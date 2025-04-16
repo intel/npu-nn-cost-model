@@ -15,6 +15,8 @@
 #include <cstdlib>
 #include <limits>
 #include <numeric>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 #include "types.h"
 #include "utils.h"
@@ -62,6 +64,11 @@ inline const EnumMap& mapToText<MemoryLocation>() {
     return MemoryLocation_ToText;
 }
 
+template <>
+inline std::string enumName<MemoryLocation>() {
+    return "MemoryLocation";
+}
+
 /**
  * @brief Memory directions DDR <> CMX.
  * Applies to DMA transfers
@@ -79,6 +86,11 @@ inline const EnumMap& mapToText<MemoryDirection>() {
     return MemoryDirection_ToText;
 }
 
+template <>
+inline std::string enumName<MemoryDirection>() {
+    return "MemoryDirection";
+}
+
 /**
  *Number of DMA engine used
  */
@@ -91,6 +103,11 @@ static const EnumMap Num_DMA_Engine_ToText{
 template <>
 inline const EnumMap& mapToText<Num_DMA_Engine>() {
     return Num_DMA_Engine_ToText;
+}
+
+template <>
+inline std::string enumName<Num_DMA_Engine>() {
+    return "Num_DMA_Engine";
 }
 
 /**
@@ -139,9 +156,96 @@ struct DMANNWorkload_NPU27 {
 
     MemoryDirection transfer_direction;  ///< from where to where
 
+    std::string loc_name{};  ///< The location name
+
     int getAccessedBytes() const {
         return (num_planes + 1) * length;
     }
+
+    // -- Serialization --
+
+    static const std::string get_wl_name() {
+        return "dma_workload_npu27_";
+    }
+
+    using _ref_supported_type = std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<MemoryDirection>,
+                                             std::reference_wrapper<int>, std::reference_wrapper<std::string>>;
+
+    const std::unordered_map<std::string, _ref_supported_type> _member_map{
+            {"device", std::ref(device)},
+            {"num_planes", std::ref(num_planes)},
+            {"length", std::ref(length)},
+            {"src_width", std::ref(src_width)},
+            {"dst_width", std::ref(dst_width)},
+            {"src_stride", std::ref(src_stride)},
+            {"dst_stride", std::ref(dst_stride)},
+            {"src_plane_stride", std::ref(src_plane_stride)},
+            {"dst_plane_stride", std::ref(dst_plane_stride)},
+            {"transfer_direction", std::ref(transfer_direction)},
+            {"loc_name", std::ref(loc_name)}};
+
+    static const std::vector<std::string> _get_member_names() {
+        return {"device",
+                "num_planes",
+                "length",
+                "src_width",
+                "dst_width"
+                "src_stride",
+                "dst_stride",
+                "src_plane_stride",
+                "dst_plane_stride",
+                "transfer_direction",
+                "loc_name"};
+    }
+
+    DMANNWorkload_NPU27() = default;
+    DMANNWorkload_NPU27(VPUDevice _device, int _num_planes, int _length, int _src_width, int _dst_width,
+                        int _src_stride, int _dst_stride, int _src_plane_stride, int _dst_plane_stride,
+                        MemoryDirection _transfer_direction, std::string _loc_name = {}) /* noexcept(false)*/
+            : device{_device},
+              num_planes{_num_planes},
+              length{_length},
+              src_width{_src_width},
+              dst_width{_dst_width},
+              src_stride{_src_stride},
+              dst_stride{_dst_stride},
+              src_plane_stride{_src_plane_stride},
+              dst_plane_stride{_dst_plane_stride},
+              transfer_direction{_transfer_direction},
+              loc_name{std::move(_loc_name)} {
+    }
+
+    DMANNWorkload_NPU27(const DMANNWorkload_NPU27& w) /*noexcept(false)*/
+            : device{w.device},
+              num_planes{w.num_planes},
+              length{w.length},
+              src_width{w.src_width},
+              dst_width{w.dst_width},
+              src_stride{w.src_stride},
+              dst_stride{w.dst_stride},
+              src_plane_stride{w.src_plane_stride},
+              dst_plane_stride{w.dst_plane_stride},
+              transfer_direction{w.transfer_direction},
+              loc_name{w.loc_name} /*_member_map{}*/ {
+    }
+
+    // DMANNWorkload_NPU27(DMANNWorkload_NPU27&) noexcept(false) = delete;
+    DMANNWorkload_NPU27& operator=(const DMANNWorkload_NPU27&) = delete;
+    DMANNWorkload_NPU27(DMANNWorkload_NPU27&& w) /*noexcept(false)*/
+            : device{w.device},
+              num_planes{std::move(w.num_planes)},
+              length{std::move(w.length)},
+              src_width{std::move(w.src_width)},
+              dst_width{std::move(w.dst_width)},
+              src_stride{std::move(w.src_stride)},
+              dst_stride{std::move(w.dst_stride)},
+              src_plane_stride{std::move(w.src_plane_stride)},
+              dst_plane_stride{std::move(w.dst_plane_stride)},
+              transfer_direction{std::move(w.transfer_direction)},
+              loc_name{std::move(w.loc_name)} /*_member_map{}*/ {
+    }
+    DMANNWorkload_NPU27& operator=(DMANNWorkload_NPU27&&) = delete;
+    virtual ~DMANNWorkload_NPU27() = default;
 };
 
 /// placeholder/reserved name
@@ -176,6 +280,8 @@ struct DMANNWorkload_NPU40_RESERVED {
 
     MemoryDirection transfer_direction{MemoryDirection::CMX2CMX};  ///< from where to where
 
+    std::string loc_name{};  ///< The location name
+
     /// How many bytes are being transferred read and written
     int getAccessedBytes() const {
         const auto unitBlock{src_width};
@@ -185,21 +291,118 @@ struct DMANNWorkload_NPU40_RESERVED {
         }
         return bytes_accessed;
     }
+
+    // -- Serialization --
+
+    static const std::string get_wl_name() {
+        return "dma_workload_npu40_50_";
+    }
+
+    using _ref_supported_type = std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<MemoryDirection>,
+                                             std::reference_wrapper<Num_DMA_Engine>, std::reference_wrapper<int>,
+                                             std::reference_wrapper<std::string>>;
+
+    const std::unordered_map<std::string, _ref_supported_type> _member_map{
+            {"device", std::ref(device)},
+            {"src_width", std::ref(src_width)},
+            {"dst_width", std::ref(dst_width)},
+            {"num_dim", std::ref(num_dim)},
+            {"num_engine", std::ref(num_engine)},
+            {"direction", std::ref(transfer_direction)},
+            {"src_stride_1", std::ref(e_dim[0].src_stride)},
+            {"dst_stride_1", std::ref(e_dim[0].dst_stride)},
+            {"src_dim_size_1", std::ref(e_dim[0].src_dim_size)},
+            {"dst_dim_size_1", std::ref(e_dim[0].dst_dim_size)},
+            {"src_stride_2", std::ref(e_dim[1].src_stride)},
+            {"dst_stride_2", std::ref(e_dim[1].dst_stride)},
+            {"src_dim_size_2", std::ref(e_dim[1].src_dim_size)},
+            {"dst_dim_size_2", std::ref(e_dim[1].dst_dim_size)},
+            {"src_stride_3", std::ref(e_dim[2].src_stride)},
+            {"dst_stride_3", std::ref(e_dim[2].dst_stride)},
+            {"src_dim_size_3", std::ref(e_dim[2].src_dim_size)},
+            {"dst_dim_size_3", std::ref(e_dim[2].dst_dim_size)},
+            {"src_stride_4", std::ref(e_dim[3].src_stride)},
+            {"dst_stride_4", std::ref(e_dim[3].dst_stride)},
+            {"src_dim_size_4", std::ref(e_dim[3].src_dim_size)},
+            {"dst_dim_size_4", std::ref(e_dim[3].dst_dim_size)},
+            {"src_stride_5", std::ref(e_dim[4].src_stride)},
+            {"dst_stride_5", std::ref(e_dim[4].dst_stride)},
+            {"src_dim_size_5", std::ref(e_dim[4].src_dim_size)},
+            {"dst_dim_size_5", std::ref(e_dim[4].dst_dim_size)},
+            {"loc_name", std::ref(loc_name)}};
+
+    static const std::vector<std::string> _get_member_names() {
+        auto fields = std::vector<std::string>{"device",     "src_width", "dst_width", "num_dim",
+                                               "num_engine", "direction", "loc_name"};
+
+        for (int i = 0; i < MaxExtraDimensions; i++) {
+            fields.push_back("src_stride_" + std::to_string(i + 1));
+            fields.push_back("dst_stride_" + std::to_string(i + 1));
+            fields.push_back("src_dim_size_" + std::to_string(i + 1));
+            fields.push_back("dst_dim_size_" + std::to_string(i + 1));
+        }
+
+        return fields;
+    }
+
+    DMANNWorkload_NPU40_RESERVED(VPUDevice _device, int _src_width = 0, int _dst_width = 0, int _num_dim = 0,
+                           std::array<SizeStride, MaxExtraDimensions> _e_dim =
+                                   {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+                           Num_DMA_Engine _num_engine = Num_DMA_Engine::Num_Engine_1,
+                           MemoryDirection _transfer_direction = MemoryDirection::CMX2CMX, std::string _loc_name = {})
+            : device{_device},
+              src_width{_src_width},
+              dst_width{_dst_width},
+              num_dim{_num_dim},
+              e_dim{_e_dim},
+              num_engine{_num_engine},
+              transfer_direction{_transfer_direction},
+              loc_name{std::move(_loc_name)} {
+    }
+
+    DMANNWorkload_NPU40_RESERVED() = default;
+    DMANNWorkload_NPU40_RESERVED(const DMANNWorkload_NPU40_RESERVED& w) noexcept(false)
+            : device{w.device},
+              src_width{w.src_width},
+              dst_width{w.dst_width},
+              num_dim{w.num_dim},
+              e_dim{w.e_dim},
+              num_engine{w.num_engine},
+              transfer_direction{w.transfer_direction},
+              loc_name{w.loc_name} /*_member_map{}*/ {
+    }
+
+    // DMANNWorkload_NPU40_RESERVED(DMANNWorkload_NPU40_RESERVED&) noexcept(false) = delete;
+    DMANNWorkload_NPU40_RESERVED& operator=(const DMANNWorkload_NPU40_RESERVED&) = delete;
+
+    DMANNWorkload_NPU40_RESERVED(DMANNWorkload_NPU40_RESERVED&& w) noexcept(false)
+            : device{std::move(w.device)},
+              src_width{std::move(w.src_width)},
+              dst_width{std::move(w.dst_width)},
+              num_dim{std::move(w.num_dim)},
+              e_dim{std::move(w.e_dim)},
+              num_engine{std::move(w.num_engine)},
+              transfer_direction{std::move(w.transfer_direction)},
+              loc_name{std::move(w.loc_name)} /*_member_map{}*/ {
+    }
+    // DMANNWorkload_NPU40_RESERVED(const DMANNWorkload_NPU40_RESERVED&&) /*noexcept(false)*/ = delete;
+    DMANNWorkload_NPU40_RESERVED& operator=(DMANNWorkload_NPU40_RESERVED&&) = delete;
+    virtual ~DMANNWorkload_NPU40_RESERVED() = default;
 };
 
 /// DMA descriptor aliases
 using DMANNWorkload_NPU40 = DMANNWorkload_NPU40_RESERVED;
 using DMANNWorkload_NPU_RESERVED = DMANNWorkload_NPU40_RESERVED;
 
-inline constexpr DMANNWorkload_NPU40 create_DMANNWorkload_NPU40() {
+inline const DMANNWorkload_NPU40 create_DMANNWorkload_NPU40() {
     return DMANNWorkload_NPU40{VPUDevice::VPU_4_0};
 }
 
-inline constexpr DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED() {
+inline const DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED() {
     return DMANNWorkload_NPU_RESERVED{VPUDevice::NPU_RESERVED};
 }
 
-inline constexpr DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED_W() {
+inline const DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED_W() {
     return DMANNWorkload_NPU_RESERVED{VPUDevice::NPU_RESERVED_W};
 }
 

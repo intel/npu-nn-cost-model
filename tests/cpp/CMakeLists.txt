@@ -75,7 +75,7 @@ file(GLOB shv_test_src "${CMAKE_CURRENT_BINARY_DIR}/shave/*.cpp")
 add_executable(
   test_cost_model
   ${test_src}
-  ${shv_test_src})
+  ${shv_test_src} "dpu_saniter_tests.cpp")
  
 #DPU models
 

@@ -23,25 +23,30 @@ enum class VPUTilingStrategy {
     NONE,              // Clustering, replicate on each tile the input
     SOH_Overlapped,    // old SOH, this is SOH_overlapped for 2.7 inputs, Kept same enum value (1). 2.7, 4.0+
     SOK,               // 4.0+
-    SOW,               // 4.0+
+    SOW,               // 4.0+ equivalent of SOH_Overlappeed on W dimension
     SOHW,              // 4.0+ , 4 tiles
     SOHK,              // 4.0+ , 4 tiles,   this is not HKswitch (HKS is just a H with full broadcast)
     SOH_HaloRead,      // SOH with input Halo for 2.7 (only) . (4.0 has only Overlapped)
-    SOHO_K_SWITCH,     // HK switch with H = SOHO
+    SOHO_K_SWITCH,     // HK switch with H = SOHO, + broadcast
     SOH_K_SWITCH,      // HK switch with H = SOH (possible in 2.7 only)
     SOK_NO_BROADCAST,  // K split , bu no broadcast. Smaller output memory
+    UNKNOWN,           // not known, or not communicated (is not receiver decision to implement/apply)
     __size
 };
-static const EnumMap VPUTilingStrategy_ToText{link(VPUTilingStrategy::NONE, "NONE"),
-                                              link(VPUTilingStrategy::SOH_Overlapped, "SOHO"),
-                                              link(VPUTilingStrategy::SOK, "SOK"),
-                                              link(VPUTilingStrategy::SOW, "SOW"),
-                                              link(VPUTilingStrategy::SOHW, "SOHW"),
-                                              link(VPUTilingStrategy::SOHK, "SOHK"),
-                                              link(VPUTilingStrategy::SOH_HaloRead, "SOH_HaloRead"),
-                                              link(VPUTilingStrategy::SOHO_K_SWITCH, "SOHO_K_SWITCH"),
-                                              link(VPUTilingStrategy::SOH_K_SWITCH, "SOH_K_SWITCH"),
-                                              link(VPUTilingStrategy::SOK_NO_BROADCAST, "SOK_NO_BROADCAST")};
+static const EnumMap VPUTilingStrategy_ToText{
+        link(VPUTilingStrategy::NONE, "NONE"),
+        link(VPUTilingStrategy::SOH_Overlapped, "SOHO"),
+        link(VPUTilingStrategy::SOK, "SOK"),
+        link(VPUTilingStrategy::SOW, "SOW"),
+        link(VPUTilingStrategy::SOHW, "SOHW"),
+        link(VPUTilingStrategy::SOHK, "SOHK"),
+        link(VPUTilingStrategy::SOH_HaloRead, "SOH_HaloRead"),
+        link(VPUTilingStrategy::SOHO_K_SWITCH, "SOHO_K_SWITCH"),
+        link(VPUTilingStrategy::SOH_K_SWITCH, "SOH_K_SWITCH"),
+        link(VPUTilingStrategy::SOK_NO_BROADCAST, "SOK_NO_BROADCAST"),
+        link(VPUTilingStrategy::UNKNOWN, "UNKNOWN"),
+};
+
 template <>
 inline const EnumMap& mapToText<VPUTilingStrategy>() {
     return VPUTilingStrategy_ToText;
@@ -51,6 +56,53 @@ template <>
 inline std::string enumName<VPUTilingStrategy>() {
     return "VPUTilingStrategy";
 }
+
+class TilingStrategyInfo {
+public:
+    static bool isVerticalTiling(VPUTilingStrategy strategy) {
+        switch (strategy) {  // SOH like, cutting the vertical dimension
+        case VPUTilingStrategy::NONE:
+            return false;
+        case VPUTilingStrategy::SOHW:
+            return true;
+        case VPUTilingStrategy::SOHK:
+        case VPUTilingStrategy::SOH_HaloRead:
+        case VPUTilingStrategy::SOHO_K_SWITCH:
+        case VPUTilingStrategy::SOH_Overlapped:
+            return true;
+        case VPUTilingStrategy::SOW:
+            return false;
+        case VPUTilingStrategy::SOK:
+        case VPUTilingStrategy::SOH_K_SWITCH:
+        case VPUTilingStrategy::SOK_NO_BROADCAST:
+        default:
+            return false;
+        }
+    }
+    static bool isHorizontalTiling(VPUTilingStrategy strategy) {
+        switch (strategy) {  // SOW like, cutting the horizontal dimension
+        case VPUTilingStrategy::NONE:
+            return false;
+        case VPUTilingStrategy::SOHW:
+            return true;
+        case VPUTilingStrategy::SOHK:
+        case VPUTilingStrategy::SOH_HaloRead:
+        case VPUTilingStrategy::SOHO_K_SWITCH:
+        case VPUTilingStrategy::SOH_Overlapped:
+            return false;
+        case VPUTilingStrategy::SOW:
+            return true;
+        case VPUTilingStrategy::SOK:
+        case VPUTilingStrategy::SOH_K_SWITCH:
+        case VPUTilingStrategy::SOK_NO_BROADCAST:
+        default:
+            return false;
+        }
+    }
+
+private:
+    // TilingStategyInfo() = delete;
+};
 
 /// @brief DPULayer class. no data  only methods on top of DPUWorkload
 struct DPULayer : public DPUWorkload {
@@ -246,6 +298,163 @@ public:
                             const auto whole{input_size};     // layer Height
                             rescale_tensor_height(sep.storage_elements_pointers, part, whole);
                             rescale_tensor_height(sep.actual_activators_input, part, whole);
+                        }
+                    }
+                }
+
+                {  // increment context for next tile (like i++ stage) ; last operation in for
+                    const int consumed_input = static_cast<int>(output_tile_dim * s);
+                    available_in = available_in - consumed_input;  // consumed at input
+
+                    if (remnant_pad_begin > consumed_input) {  // consume also remnant padding
+                        remnant_pad_begin -= consumed_input;   // assures stays >=0
+                    } else {
+                        remnant_pad_begin = 0;
+                    }
+                    remaining_output_to_split -= output_tile_dim;  // no underflow possible
+                }
+            }  // for each tile
+        }      // variables used in for
+
+        // Remove tiles that are of zero size
+        remove_empty_tiles(tiles);
+
+        // in case the actual number of tiles <nTiles, limit the propagated value to number of
+        // actual tiles (only in case forced broadcast is ON)
+        if ((force_broadcast) && (tiles.size() < nTiles)) {
+            const unsigned int n_broadcast{static_cast<unsigned int>(tiles.size())};
+            std::for_each(tiles.begin(), tiles.end(), [n_broadcast](auto& t) {
+                t.output_write_tiles = n_broadcast;
+            });
+        }
+
+        return tiles;
+    }
+
+    /**
+     * @brief Implements the SplitOverWidth (SOW) tiling strategy
+     * @details In the SOW tiling strategy, activations are split across the tiles over the W dimension
+     * Algorithm or principle is: split the output in (almost)equal slices, for each output slice compute(chose the
+     * elements from original in tensor) the input tensor that you need in order to produce that output. The result will
+     * be a list of input tensors that overlap (except if kernel =1).
+     *
+     * Internal slices (tiles>2), have 2 borders and may produce more than outside slices.
+     * Populates also ISI strategy with CLUSTERING,
+     * output_write_tiles is propagated from inputLayer  to the tiles Layers
+     *
+     * if output tiles are less than nTiles , the ISI strategy or output_write_tiles are not adjusted
+     *
+     * Halo info are adjusted(set to zero) only for the horizontal dimension/direction. REst are just propagated.
+     * OWT>1 will influence output_inbound halo for horizontal direction: like saying broadcast this tile to all tiles,
+     * the output memory tensor will get big (= original full height)
+     *
+     *
+     *
+     * @param nTiles number of CMX tiles
+     * @return std::vector<DPULayer>  the list of split layers. can be smaller than nTiles
+     */
+    std::vector<DPULayer> SOW_overlapped_inputs(unsigned int nTiles, bool force_broadcast) const {
+        const unsigned int output_size = outputs[0].width();
+        const unsigned int input_size = inputs[0].width();
+        const auto dimKernel{Dim::Grid::W};
+        const auto dim_pad_begin{Dim::LEFT};
+        const auto dim_pad_end{Dim::RIGHT};
+
+        const auto k = kernels[dimKernel];
+        const auto s = strides[dimKernel];
+        const auto layer_pad_begin = padding[dim_pad_begin];
+        const auto layer_pad_end = padding[dim_pad_end];
+
+        const unsigned int desired_tile_dim = ceil_division(output_size, nTiles);  // non uniform
+
+        std::vector<DPULayer> tiles(nTiles, *this);  // initial split , just copy to nTiles
+
+        // first tile and last tile will keep the external padding from parent
+        // internal tiles (internal cuts) must have padding = 0, except when using entire input(till external edge) and
+        // need more=> will take some padding from Layer extremity
+
+        {  // this block is for variables used in for as pseudo counters
+            int available_in{static_cast<int>(
+                    input_size + layer_pad_begin)};  ///< positive or 0, includes padding left(but not right).
+                                                     ///< Represents how much input values are still available
+            int remnant_pad_begin = static_cast<int>(
+                    layer_pad_begin);  ///< Represents how much padding is contained in the available_in inputs.
+                                       ///< Initially all pad left is to be used (at least for first tile). It will
+                                       ///< remain positive also for second tile in the special case that first tile has
+                                       ///< not entirely used the padding
+
+            unsigned int remaining_output_to_split = output_size;
+            for (unsigned int i{0}; i < tiles.size(); ++i) {
+                const auto output_tile_dim{(remaining_output_to_split >= desired_tile_dim) ? desired_tile_dim
+                                                                                           : remaining_output_to_split};
+                const bool is_last_usefull_tile{
+                        (remaining_output_to_split == output_tile_dim) ? true : false};  // is last/bottom tile
+
+                const auto current_pad_begin{
+                        remnant_pad_begin};  // take it from the one that goes towards zero after every tile
+
+                int current_pad_end{is_last_usefull_tile ? (int)layer_pad_end : 0};
+
+                // how much input this output needs!
+                const int input_max_required_size = helper_input_dim(output_tile_dim, k, 0 /*pad=0*/, s);
+
+                const int need_more_size =
+                        input_max_required_size - available_in;  // if positive we need more space(reached end of
+                                                                 // layer), we have to take from right padding of Layer
+
+                auto input_tile = input_max_required_size -
+                                  current_pad_begin;  // padding start is always used (completely), first ;
+
+                if (need_more_size > 0) {  // will rely also on a part of right padding (but maybe not all)
+                    const auto use_from_right_padding =
+                            std::min(need_more_size /*take from padding*/, (int)layer_pad_end /*take all padding*/);
+                    input_tile = input_tile - use_from_right_padding;
+
+                    // right padding of tile must be adjusted to what we have taken, but only  in case is not the last
+                    // one
+                    if (!is_last_usefull_tile) {
+                        current_pad_end = use_from_right_padding;  // not inherited but computed
+                    }
+                }
+
+                if (input_tile < 0) {  // sanity
+                    input_tile = 0;    // invalid
+                }
+
+                {  // change/set tile attributes/dimensions
+                    auto& tile = tiles[i];
+                    const unsigned int input_tile_dim = input_tile;
+                    redimension_tile_W(tile, input_tile_dim, output_tile_dim);  // changes the tile
+                    tile.padding[dim_pad_begin] = current_pad_begin;
+                    tile.padding[dim_pad_end] = current_pad_end;
+
+                    tile.isi_strategy = ISIStrategy::CLUSTERING;  // in order to propagate to workloads
+
+                    if (!force_broadcast) {
+                        tile.output_write_tiles = this->output_write_tiles;  // propagate from parent, does not force to
+                                                                             // any particular value
+                    } else {
+                        tile.output_write_tiles =
+                                nTiles;  // in order to propagate to workloads. Might be less in practice
+                    }
+
+                    HaloWorkload& tHalo{tile.halo};
+                    // By default halo info propagates from upper layer, except  what we create here
+                    // out inbound =0, no other tile writes to us, except if OWT is >1
+                    tHalo.setHorizontalNoHalo();
+                    if (tile.output_write_tiles > 1)  // we assume here that we want broadcast for all tiles
+                    {
+                        tHalo.setInboudHaloHorizontalForBradcastAll(output_size, remaining_output_to_split,
+                                                                    output_tile_dim);
+                    }
+
+                    {  // set SEP for this tile, reduce according to tile dim vs layer dim
+                        auto& sep{tile.sep_activators};
+                        if (sep.isEnabled()) {
+                            const auto part{input_tile_dim};  // this tile Height
+                            const auto whole{input_size};     // layer Height
+                            rescale_tensor_width(sep.storage_elements_pointers, part, whole);
+                            rescale_tensor_width(sep.actual_activators_input, part, whole);
                         }
                     }
                 }
@@ -631,11 +840,28 @@ protected:
         tile.inputs[0].set_shape({input_shape[Dim::X], input_tile_dim, input_shape[Dim::Z], input_shape[Dim::B]});
     }
 
+    void redimension_tile_W(DPULayer& tile, const unsigned int input_tile_dim,
+                            const unsigned int output_tile_dim) const {
+        const auto& output_shape = outputs[0].get_shape();
+        const auto& input_shape = inputs[0].get_shape();
+        // Set input and output shape, specific for W
+        tile.outputs[0].set_shape({output_tile_dim, output_shape[Dim::Y], output_shape[Dim::Z], output_shape[Dim::B]});
+        tile.inputs[0].set_shape({input_tile_dim, input_shape[Dim::Y], input_shape[Dim::Z], input_shape[Dim::B]});
+    }
+
     void rescale_tensor_height(WHCBTensorShape& tensor, const DimType part, const DimType whole) const {
         const DimType newRawHeight{ceil_division(tensor.height() * part, whole)};  // h*part/whole
         const DimType newHeight{newRawHeight > 0 ? newRawHeight : 1};              // at least 1
 
         const WHCBTensorShape newSep{tensor.width(), newHeight, tensor.channels(), tensor.batches()};
+        tensor = newSep;
+    }
+
+    void rescale_tensor_width(WHCBTensorShape& tensor, const DimType part, const DimType whole) const {
+        const DimType newRawWidth{ceil_division(tensor.width() * part, whole)};  // w*part/whole
+        const DimType newWidth{newRawWidth > 0 ? newRawWidth : 1};               // at least 1
+
+        const WHCBTensorShape newSep{newWidth, tensor.height(), tensor.channels(), tensor.batches()};
         tensor = newSep;
     }
 
@@ -713,8 +939,8 @@ public:
         case VPUTilingStrategy::NONE: {  // clustering
             return clustering(nTiles);
         }
-        case VPUTilingStrategy::SOH_Overlapped: {         // old VPUTilingStrategy::SOH
-            return SOH_overlapped_inputs(nTiles, false);  // make it  SOH Overlapped (also for VPU 2.0?)
+        case VPUTilingStrategy::SOH_Overlapped: {  // old VPUTilingStrategy::SOH
+            return SOH_overlapped_inputs(nTiles, false);
         }
         case VPUTilingStrategy::SOHO_K_SWITCH: {         // known as HKSwitch = SOHO with broadcast
             return SOH_overlapped_inputs(nTiles, true);  //
@@ -728,7 +954,9 @@ public:
         case VPUTilingStrategy::SOH_HaloRead: {  // split by dividing by 2 , no other alignment
             return SOH_HALO_inputs(nTiles);
         }
-        case VPUTilingStrategy::SOW:
+        case VPUTilingStrategy::SOW: {  // same as SOH_Overlapped, but for W dimension
+            return SOW_overlapped_inputs(nTiles, false);
+        }
         case VPUTilingStrategy::SOHW:
         case VPUTilingStrategy::SOHK:
         // case VPUTilingStrategy::SOHO_K_SWITCH:  // not handled for now, SOH_Overlapped + Output full broadcast @TODO
@@ -744,23 +972,27 @@ public:
     }
 
     /*@brief Only for assuming Layer strategy for Sanity Checks. Do not use to actually populate created splits.
+     * Should become DEPRECATED soon
      */
     static ISIStrategy mapTilingStrategiesToWorkload(VPUTilingStrategy strategy) {
         switch (strategy) {
         case VPUTilingStrategy::NONE:
+        case VPUTilingStrategy::SOW:
             return ISIStrategy::CLUSTERING;
 
         case VPUTilingStrategy::SOH_Overlapped:  // Checks it has the H to be split
-        case VPUTilingStrategy::SOH_HaloRead:    // this is still a H split, check the rules
         case VPUTilingStrategy::SOHO_K_SWITCH:
-            return ISIStrategy::SPLIT_OVER_H;  // still does a split so layer checks make sense (no CLustering)
+            return ISIStrategy::CLUSTERING;
+
+        case VPUTilingStrategy::SOH_HaloRead:  // this is still a H split, check the rules
+            return ISIStrategy::SPLIT_OVER_H;  // still does a split so layer checks make sense (no CLustering) , halo
+                                               // in
 
         case VPUTilingStrategy::SOK:
         case VPUTilingStrategy::SOK_NO_BROADCAST:
             return ISIStrategy::SPLIT_OVER_K;
 
         case VPUTilingStrategy::SOHK:
-        case VPUTilingStrategy::SOW:
         case VPUTilingStrategy::SOHW:
         case VPUTilingStrategy::SOH_K_SWITCH:
         default:
@@ -975,6 +1207,27 @@ private:
         }
     }
 
+    /// @brief Get the valid ExecutionMode for NPU_RESERVED
+    ///
+    /// @param wl the DPULayer
+    /// @return std::vector<ExecutionMode> to_do
+    static std::vector<ExecutionMode> getValidExecutionMode_RESERVED(const DPULayer& wl) {
+        // The available mode choice is based on the OP type
+        switch (wl.op) {
+        case Operation::CM_CONVOLUTION:  // compressconv surogate
+        case Operation::DW_CONVOLUTION:
+        case Operation::AVEPOOL:
+        case Operation::MAXPOOL:
+            return {ExecutionMode::CUBOID_16x16};
+        case Operation::ELTWISE:
+        case Operation::ELTWISE_MUL:
+            return {ExecutionMode::CUBOID_8x16};
+        case Operation::LAYER_NORM:  // is this the case?
+        default:
+            return {ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_8x16, ExecutionMode::CUBOID_4x16};
+        }
+    }
+
     DPULayerModes() = default;  // no instance possible
 
 public:
@@ -991,6 +1244,10 @@ public:
         case VPUDevice::VPU_2_7:
         case VPUDevice::VPU_4_0: {
             return getValidExecutionMode_2_7(wl);
+        }
+        case VPUDevice::NPU_RESERVED:
+        case VPUDevice::NPU_RESERVED_W: {
+            return getValidExecutionMode_RESERVED(wl);
         }
         default:
             return {};

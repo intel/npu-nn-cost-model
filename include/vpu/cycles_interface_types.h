@@ -46,6 +46,7 @@ namespace VPUNN {
 /// parameters were not passed!
 /// ERROR_SHAVE_LAYOUT                  UINT_MAX - 14:0 - 15:Problems with SHAVE layout.
 /// ERROR_SHAVE_INVALID_INPUT           UINT_MAX - 15:0 - 16:Problems with SHAVE workload input.
+/// ERROR_L2_INVALID_PARAMETERS         UINT_MAX - 16:0 - 17:Invalid parameters at L2 API 
 ///
 ///     Zero value is not an error, and can represent NN cycles output. This might let the NN communicate something like
 ///     it cannot solve the request.
@@ -81,6 +82,8 @@ public:
     static constexpr CyclesInterfaceType ERROR_SHAVE_PARAMS{MaxV - 13};
     static constexpr CyclesInterfaceType ERROR_SHAVE_LAYOUT{MaxV - 14};
     static constexpr CyclesInterfaceType ERROR_SHAVE_INVALID_INPUT{MaxV - 15};
+
+    static constexpr CyclesInterfaceType ERROR_L2_INVALID_PARAMETERS{MaxV - 16}; // used for invalid parameters for L2 API
 
     static constexpr CyclesInterfaceType START_ERROR_RANGE{MaxV - 1000};  ///< 1000 position for errors
 
@@ -133,6 +136,8 @@ public:
             return "ERROR_SHAVE_LAYOUT";
         case ERROR_SHAVE_INVALID_INPUT:
             return "ERROR_SHAVE_INVALID_INPUT";
+        case ERROR_L2_INVALID_PARAMETERS:
+            return "ERROR_L2_INVALID_PARAMETERS";
         default:
             return "UNKNOWN";
         }

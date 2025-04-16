@@ -73,6 +73,7 @@ inline const EnumMap& mapToText<DataType>() {
 
 static const EnumTextLogicalMap dtype_logical_map{
         link_logical("UINT8", "UINT8"),       // same
+        link_logical("INT8", "UINT8"),        // mapped
         link_logical("FLOAT16", "FLOAT16"),   // same
         link_logical("BFLOAT16", "FLOAT16"),  // same
         link_logical("HF8", "HF8"),           // same
@@ -120,7 +121,7 @@ static const EnumTextLogicalMap op_logical_map{
         link_logical("DW_CONVOLUTION", "DW_CONVOLUTION"),  //
         link_logical("ELTWISE", "ELTWISE"),                //
         link_logical("MAXPOOL", "MAXPOOL"),                //
-        link_logical("AVEPOOL", "MAXPOOL"),                //
+        link_logical("AVEPOOL", "DW_CONVOLUTION"),         //
         link_logical("CM_CONVOLUTION", "CM_CONVOLUTION"),  //
         link_logical("LAYER_NORM", "LAYER_NORM"),          //
         link_logical("ELTWISE_MUL", "ELTWISE_MUL"),        //
@@ -246,14 +247,11 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 // interface class
 
 /**
- * @brief Preprocessing for HALO , VPU27/NPU40 and newer
- * Has 118  floats input
- * Mocks BF8 and HS8 to UINT8
- * Mocks RESERVED ops to something available in NPU4
+ * @brief
  * removed ISI
  * removed device
  * changed swizzle descriptor from one_hot enum to a enabled/disabled bool
- * Added HALO
+ *
  *
  * DATA CHANGES:
  * 1) mock BF8 and HF8 to uint8
@@ -302,7 +300,10 @@ protected:
 
         // for enums we must put here the equivalent version  from the target interface, not latest types
 
-        offset = this->insert<only_simulate>(intf_12::convert<intf_12::Operation>(workload.op), offset);
+        {
+            const auto operation{DeviceAdapter::mock_replace_operations(workload.op)};
+            offset = this->insert<only_simulate>(intf_12::convert<intf_12::Operation>(operation), offset);
+        }
 
         offset = this->insert<only_simulate>(workload.inputs[0], offset);
 

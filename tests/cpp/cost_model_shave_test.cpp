@@ -195,17 +195,33 @@ TEST_F(TestSHAVE, SHAVE_v2_Cache_Smoke) {
 
     };
 
+    const std::string temp_cache_file{"SHAVE_v2_Cache_Smoke.cache_bin"};
+    FixedCache shave_cacheToBe{temp_cache_file};
+
+    shave_cacheToBe.insert(wlp7.hash(), 1.0f);
+    shave_cacheToBe.insert(wlp10.hash(), 2.0f);
+
+    shave_cacheToBe.write_cache(temp_cache_file);
+
+    // need to load a cache that contains 1 & 2  values already cached
+    VPUCostModel model_shave_cache{"", "", temp_cache_file};
+
     {
         std::string info;
-        auto shave_cycles = empty_model.SHAVE_2(wlp7, info);
+        auto shave_cycles = model_shave_cache.SHAVE_2(wlp7, info);
         EXPECT_EQ(shave_cycles, V(1));
     }
     {
         std::string info;
-        auto shave_cycles = empty_model.SHAVE_2(wlp10, info);
+        auto shave_cycles = model_shave_cache.SHAVE_2(wlp10, info);
         EXPECT_EQ(shave_cycles, V(2));
     }
-    {
+    {  // not in oracolo cache
+        std::string info;
+        auto shave_cycles = model_shave_cache.SHAVE_2(wls, info);
+        EXPECT_GT(shave_cycles, V(100)) << wls << info;
+    }
+    {  // not in oracolo cache
         std::string info;
         auto shave_cycles = empty_model.SHAVE_2(wls, info);
         EXPECT_GT(shave_cycles, V(100)) << wls << info;
@@ -220,7 +236,6 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
 
         EXPECT_EQ(ops.size(), 71 + 3);
 
-
         std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
                   << "  has # SHAVE operators : " << ops.size() << " -----------------------------------";
         for (const auto& o : ops) {
@@ -233,7 +248,6 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
         auto ops = empty_model.getShaveSupportedOperations(d);
 
         EXPECT_EQ(ops.size(), 80);
-
 
         std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
                   << "  has # SHAVE operators : " << ops.size() << " -----------------------------------";

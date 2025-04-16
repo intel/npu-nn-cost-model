@@ -34,7 +34,6 @@ TEST_F(SmartRangesTest, Is_Value_In_Interval_Test) {
     EXPECT_TRUE(SmartRanges(16, 64, 16, 32).is_in(32, text));
     EXPECT_FALSE(SmartRanges(16, 64, 16, 32).is_in(48, text));
     EXPECT_TRUE(SmartRanges(16, 64, 16, 32).is_in(64, text));
-
 }
 
 TEST_F(SmartRangesTest, Multiply_UpperBound_Test) {
@@ -69,14 +68,90 @@ TEST_F(SmartRangesTest, Add_LowerBound_Test) {
     EXPECT_EQ(result.getLowerBound(), 30);
 }
 
-//TEST_F(SmartRangesTest, RangeSize_Test) {
-//    EXPECT_EQ(SmartRanges(16, 64, 16, 32).range_size(), 3);
-//    EXPECT_EQ(SmartRanges(16, 64, 16).range_size(), 4);
-//    EXPECT_EQ(SmartRanges(10, 64, 2, 10).range_size(), 6);
-//    EXPECT_EQ(SmartRanges(10, 64, 16, 3).range_size(), 4);
-//    EXPECT_EQ(SmartRanges(10, 64, 2, 32).range_size(), 13);
-//    EXPECT_EQ(SmartRanges(1, 20, 2, 5).range_size(), 4);
-//    EXPECT_EQ(SmartRanges(1, 20, 5).range_size(), 4);
-//}
+// TEST_F(SmartRangesTest, RangeSize_Test) {
+//     EXPECT_EQ(SmartRanges(16, 64, 16, 32).range_size(), 3);
+//     EXPECT_EQ(SmartRanges(16, 64, 16).range_size(), 4);
+//     EXPECT_EQ(SmartRanges(10, 64, 2, 10).range_size(), 6);
+//     EXPECT_EQ(SmartRanges(10, 64, 16, 3).range_size(), 4);
+//     EXPECT_EQ(SmartRanges(10, 64, 2, 32).range_size(), 13);
+//     EXPECT_EQ(SmartRanges(1, 20, 2, 5).range_size(), 4);
+//     EXPECT_EQ(SmartRanges(1, 20, 5).range_size(), 4);
+// }
+
+TEST_F(SmartRangesTest, IsInSimple_Test) {
+    EXPECT_TRUE(SmartRanges(20, 100).is_in(50));
+    EXPECT_FALSE(SmartRanges(20, 100, 16).is_in(50));
+    EXPECT_FALSE(SmartRanges(20, 100).is_in(10));
+    EXPECT_FALSE(SmartRanges(20, 100, 16).is_in(256));
+    EXPECT_TRUE(SmartRanges(20, 100, 12).is_in(24));
+    EXPECT_FALSE(SmartRanges(20, 100, 12).is_in(25));
+    EXPECT_TRUE(SmartRanges(20, 100).is_in(20));
+    EXPECT_TRUE(SmartRanges(20, 100).is_in(100));
+    EXPECT_TRUE(SmartRanges(20, 100).is_in(31));
+
+    EXPECT_TRUE(SmartRanges(20, 100, 13, 2).is_in(26));
+    EXPECT_FALSE(SmartRanges(20, 100, 13, 2).is_in(27));
+
+    EXPECT_TRUE(SmartRanges(16, 64, 16, 32).is_in(16));
+    EXPECT_TRUE(SmartRanges(16, 64, 16, 32).is_in(32));
+    EXPECT_FALSE(SmartRanges(16, 64, 16, 32).is_in(48));
+    EXPECT_TRUE(SmartRanges(16, 64, 16, 32).is_in(64));
+}
+
+TEST_F(SmartRangesTest, RoundToNext_Test) {
+    EXPECT_TRUE(SmartRanges(20, 100).roundToNextLarger(50));
+    EXPECT_EQ(SmartRanges(20, 100).roundToNextLarger(50), 50);
+    EXPECT_EQ(SmartRanges(20, 100).roundToNextLarger(51), 51);
+
+     EXPECT_FALSE(SmartRanges(20, 100).roundToNextLarger(19));
+    EXPECT_FALSE(SmartRanges(20, 100).roundToNextLarger(101));
+
+    EXPECT_EQ(SmartRanges(20, 100, 16).roundToNextLarger(50), 64);
+    EXPECT_EQ(SmartRanges(20, 100, 16).roundToNextLarger(51), 64);
+    EXPECT_EQ(SmartRanges(20, 100, 16).roundToNextLarger(64), 64);
+    EXPECT_EQ(SmartRanges(20, 100, 16).roundToNextLarger(20), 32);
+    EXPECT_EQ(SmartRanges(20, 100, 16).roundToNextLarger(21), 32);
+    EXPECT_EQ(SmartRanges(20, 100, 16).roundToNextLarger(96), 96);
+    EXPECT_FALSE(SmartRanges(20, 100, 16).roundToNextLarger(97));
+    EXPECT_FALSE(SmartRanges(20, 100, 16).roundToNextLarger(98));
+    EXPECT_FALSE(SmartRanges(20, 100, 16).roundToNextLarger(99));
+    EXPECT_FALSE(SmartRanges(20, 100, 16).roundToNextLarger(100));
+    EXPECT_FALSE(SmartRanges(20, 100, 16).roundToNextLarger(101));
+    EXPECT_FALSE(SmartRanges(20, 100, 16).roundToNextLarger(19));
+
+    // EXPECT_TRUE(SmartRanges(20, 100, 13, 2).is_in(26));
+    // EXPECT_FALSE(SmartRanges(20, 100, 13, 2).is_in(27));
+
+    EXPECT_FALSE(SmartRanges(16, 64, 16, 32).roundToNextLarger(0));
+
+    EXPECT_FALSE(SmartRanges(16, 64, 16, 32).roundToNextLarger(15));
+
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(16), 16);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(17), 32);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(31), 32);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(32), 32);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(33), 64);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(47), 64);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(48), 64);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(49), 64);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(63), 64);
+    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(64), 64);
+
+    EXPECT_FALSE(SmartRanges(16, 64, 16, 32).roundToNextLarger(65));
+}
+
+TEST_F(SmartRangesTest, RoundToNext_Pathological_Test) {
+
+    EXPECT_EQ(SmartRanges(1, 100, 16).roundToNextLarger(1), 16);
+    EXPECT_EQ(SmartRanges(1, 100, 16).roundToNextLarger(2), 16);
+   
+
+
+//    EXPECT_EQ(SmartRanges(16, 64, 16, 32).roundToNextLarger(16), 16);
+
+
+    EXPECT_FALSE(SmartRanges(1, 65, 16, 32).roundToNextLarger(65));
+    EXPECT_EQ(SmartRanges(1, 65, 16, 32).roundToNextLarger(1), 16);
+}
 
 }  // namespace VPUNN_unit_tests

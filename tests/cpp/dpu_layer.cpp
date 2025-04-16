@@ -49,6 +49,16 @@ protected:
                         {padtop, padbot, 0, 0}                                // padding TBLR
         );
     }
+    DPULayer layer_W(unsigned int w_input, unsigned int w_output, unsigned int kernel, unsigned int padleft,
+                     unsigned int padright, unsigned int stride) {
+        return DPULayer(VPUDevice::VPU_4_0, Operation::CONVOLUTION,
+                        {VPUTensor(w_input, 1, 128, 1, DataType::FLOAT16)},   // input dimensions WH
+                        {VPUTensor(w_output, 1, 128, 1, DataType::FLOAT16)},  // output dimensions
+                        {kernel, 1},                                          // kernels WH
+                        {stride, 1},                                          // stridesWH
+                        {0, 0, padleft, padright}                             // padding TBLR
+        );
+    }
 
 public:
     struct TestInput {
@@ -151,6 +161,19 @@ protected:
         executeT(SOH_inHALO_test, tests, "SOHinHALO:: ");
     }
 
+    std::function<std::vector<DPULayer>(const DPULayer* /*thisObject*/, unsigned int /*nTiles*/)> split_SOWO_heuristic =
+            std::bind(&DPULayer::SOW_overlapped_inputs, _1, _2,
+                      false);  //_1 is this of DPULayer, _2 is n tiles, false is forced_broadcast
+
+    std::function<void(const TestInput&, const TestExpectations&, const std::string&)> SOWO_test =
+            std::bind(&DPULayerTest::TestSow, this /*(DPULayerTest::TestSow)*/,  //
+                      split_SOWO_heuristic /*wSplit function*/,                  //
+                      _1 /*t_in*/, _2 /*t_exp*/, _3 /*test_case*/);              //
+
+    void executeT_SOWOVR(const TestsVector& tests) {
+        executeT(SOWO_test, tests, "SOWOin:: ");
+    }
+
 public:
     void TestSoh(std::function<std::vector<DPULayer>(const DPULayer*, unsigned int)>& hSplit, const TestInput& t_in,
                  const TestExpectations& t_exp, const std::string& test_case = "") const {
@@ -200,6 +223,65 @@ public:
             ASSERT_EQ(s.halo.input_0_halo.top, exp_inhalo1) << "top in halo"
                                                             << " i= " << i << s << t_exp;
             ASSERT_EQ(s.halo.input_0_halo.bottom, exp_inhalo2) << "bot in halo"
+                                                               << " i= " << i << s << t_exp;
+
+            // check also stride??
+
+            // can do checks that other fields are not changed!
+        }
+
+        std::cout << t_header << "------------------------------------------------------------------------"
+                  << std::endl;
+    }
+
+    void TestSow(std::function<std::vector<DPULayer>(const DPULayer*, unsigned int)>& wSplit, const TestInput& t_in,
+                 const TestExpectations& t_exp, const std::string& test_case = "") const {
+        const DPULayer& l1{t_in.l1};
+        const auto tiles{t_in.nTiles};
+
+        std::string details = test_case + ":";
+        {  // "5-5 k3 p11"},
+            std::stringstream buffer;
+            buffer << " [" << l1.inputs[0].width() << "-" << l1.outputs[0].width() << " k" << l1.kernels[Dim::W]
+                   << " p" << l1.padding[Dim::LEFT] << "-" << l1.padding[Dim::RIGHT] << " s" << l1.strides[Dim::W]
+                   << "]";
+
+            details += buffer.str();
+        }
+
+        std::string t_header{"** Test Case: " + details + "\n"};
+        std::cout << ">> " << t_header << std::endl;
+
+        EXPECT_TRUE(t_exp.has_consistent_size()) << "problem with expected values consistency";
+
+        auto split = wSplit(&l1, tiles);
+
+        // Basic expectations
+        ASSERT_EQ(split.size(), t_exp.in_size.size()) << "Expected size of split is different than real split";
+
+        for (size_t i = 0; i < split.size(); ++i) {
+            const auto& s = split[i];
+            ASSERT_EQ(s.outputs[0].width(), t_exp.out_size[i]) << " i= " << i << s << t_exp;
+
+            ASSERT_EQ(s.inputs[0].width(), t_exp.in_size[i]) << " i= " << i << s << t_exp;
+
+            ASSERT_EQ(s.kernels[Dim::W], t_exp.k[i]) << " i= " << i << s << t_exp;
+            ASSERT_EQ(s.padding[Dim::LEFT], t_exp.pad1[i]) << " i= " << i << s << t_exp;
+            ASSERT_EQ(s.padding[Dim::RIGHT], t_exp.pad2[i]) << " i= " << i << s << t_exp;
+
+            ISIStrategy expected_isi{(t_exp.isi.size() > i) ? t_exp.isi[i]
+                                                            : ISIStrategy::CLUSTERING};  // clustering by default
+
+            ASSERT_EQ(s.isi_strategy, expected_isi) << "ISI is marked BAD"
+                                                    << " i= " << i << s << t_exp;
+            ASSERT_EQ(s.output_write_tiles, l1.output_write_tiles) << "output_write_tiles not kept"
+                                                                   << " i= " << i << s << t_exp << l1;
+
+            int exp_inhalo1{(t_exp.haloIn1.size() > i) ? t_exp.haloIn1[i] : 0};  // zero halo by default
+            int exp_inhalo2{(t_exp.haloIn2.size() > i) ? t_exp.haloIn2[i] : 0};  // zero halo by default
+            ASSERT_EQ(s.halo.input_0_halo.left, exp_inhalo1) << "left in halo"
+                                                            << " i= " << i << s << t_exp;
+            ASSERT_EQ(s.halo.input_0_halo.right, exp_inhalo2) << "right in halo "
                                                                << " i= " << i << s << t_exp;
 
             // check also stride??
@@ -307,6 +389,28 @@ TEST_F(DPULayerTest, SplitAcrossTileSOHO) {
 
     EXPECT_EQ(SOH_four_tile[0].outputs[0].size(), wl.outputs[0].size() / 4);
     EXPECT_EQ(SOH_four_tile[0].outputs[0].get_shape()[1] * 4, wl.outputs[0].get_shape()[1]);
+}
+
+TEST_F(DPULayerTest, SplitAcrossTileSOW) {
+    auto wl = generate_helper_layer(16, 64);
+
+    auto SOH_single_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOW, 1);
+    auto SOH_two_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOW, 2);
+    auto SOH_four_tile = wl.splitAcrossTiles(VPUNN::VPUTilingStrategy::SOW, 4);
+
+    // Basic expectations
+    EXPECT_EQ(SOH_single_tile.size(), 1);
+    EXPECT_EQ(SOH_two_tile.size(), 2);
+    EXPECT_EQ(SOH_four_tile.size(), 4);
+
+    // The shape of the single split must be equal to the origial layer
+    EXPECT_EQ(SOH_single_tile[0].outputs[0].get_shape(), wl.outputs[0].get_shape());
+
+    EXPECT_EQ(SOH_two_tile[0].outputs[0].size(), wl.outputs[0].size() / 2);
+    EXPECT_EQ(SOH_two_tile[0].outputs[0].get_shape()[0] * 2, wl.outputs[0].get_shape()[0]);
+
+    EXPECT_EQ(SOH_four_tile[0].outputs[0].size(), wl.outputs[0].size() / 4);
+    EXPECT_EQ(SOH_four_tile[0].outputs[0].get_shape()[0] * 4, wl.outputs[0].get_shape()[0]);
 }
 
 TEST_F(DPULayerTest, SplitAcrossTileSOK) {
@@ -461,6 +565,99 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K3_2T) {
     executeT_SOHOVR(tests);
 }
 
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K3_2T) {
+    // IN ,O, K , PT, PB, S
+    const int k = 3;
+    const std::vector<TestCase> tests{
+            {{layer_W(5, 5, k, 1, 1, 1), 2},
+             {
+                     {4, 3},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                              //{isiC, isiC},  // ISI
+                              //{0, 0} /*in halo top*/,
+                              //{0, 0} /*in halo bottom*/
+                     HALO_ZERO2,
+             },
+             "5-5 k3 p11"},
+            {{layer_W(5, 3, 3, 0, 0, 1), 2},
+             {
+                     {4, 3},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "5-3 k3 p00"},
+            {{layer_W(5, 4, 3, 1, 0, 1), 2},
+             {
+                     {3, 4},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "5-4 k3 p10"},
+            {{layer_W(5, 4, 3, 0, 1, 1), 2},
+             {
+                     {4, 3},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "5-4 k3 p01"},
+            /// 6 inputs (even)
+            {{layer_W(6, 6, 3, 1, 1, 1), 2},
+             {
+                     {4, 4},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "6-6 k3 p11"},
+            {{layer_W(6, 4, 3, 0, 0, 1), 2},
+             {
+                     {4, 4},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "6-4 k3 p00"},
+            {{layer_W(6, 5, 3, 1, 0, 1), 2},
+             {
+                     {4, 4},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "6-5 k3 p10"},
+            {{layer_W(6, 5, 3, 0, 1, 1), 2},
+             {
+                     {5, 3},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "6-5 k3 p01"},
+    };
+
+    executeT_SOWOVR(tests);
+}
+
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K2_2T) {
     // IN ,O, K , PT, PB, S
     const int k = 2;
@@ -551,6 +748,96 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K2_2T) {
     executeT_SOHOVR(tests);
 }
 
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K2_2T) {
+    // IN ,O, K , PT, PB, S
+    const int k = 2;
+    const std::vector<TestCase> tests{
+            {{layer_W(5, 6, k, 1, 1, 1), 2},
+             {
+                     {3, 3},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 4, k, 0, 0, 1), 2},
+             {
+                     {3, 3},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 5, k, 1, 0, 1), 2},
+             {
+                     {3, 3},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 5, k, 0, 1, 1), 2},
+             {
+                     {4, 2},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            /// 6 inputs (even)
+            {{layer_W(6, 7, k, 1, 1, 1), 2},
+             {
+                     {4, 3},  // in
+                     {4, 3},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(6, 5, k, 0, 0, 1), 2},
+             {
+                     {4, 3},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(6, 6, k, 1, 0, 1), 2},
+             {
+                     {3, 4},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(6, 6, k, 0, 1, 1), 2},
+             {
+                     {4, 3},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+    };
+
+    executeT_SOWOVR(tests);
+}
+
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K1_2T) {
     // IN ,O, K , PT, PB, S
     const int k = 1;
@@ -639,6 +926,96 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K1_2T) {
     };
 
     executeT_SOHOVR(tests);
+}
+
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K1_2T) {
+    // IN ,O, K , PT, PB, S
+    const int k = 1;
+    const std::vector<TestCase> tests{
+            {{layer_W(5, 7, k, 1, 1, 1), 2},
+             {
+                     {3, 2},  // in
+                     {4, 3},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 5, k, 0, 0, 1), 2},
+             {
+                     {3, 2},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 6, k, 1, 0, 1), 2},
+             {
+                     {2, 3},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 6, k, 0, 1, 1), 2},
+             {
+                     {3, 2},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            /// 6 inputs (even)
+            {{layer_W(6, 8, k, 1, 1, 1), 2},
+             {
+                     {3, 3},  // in
+                     {4, 4},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(6, 6, k, 0, 0, 1), 2},
+             {
+                     {3, 3},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(6, 7, k, 1, 0, 1), 2},
+             {
+                     {3, 3},  // in
+                     {4, 3},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(6, 7, k, 0, 1, 1), 2},
+             {
+                     {4, 2},  // in
+                     {4, 3},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+    };
+
+    executeT_SOWOVR(tests);
 }
 
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K4_2T) {
@@ -741,6 +1118,106 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K4_2T) {
     executeT_SOHOVR(tests);
 }
 
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K4_2T) {
+    // IN ,O, K , PT, PB, S
+    int k = 4;
+    const std::vector<TestCase> tests{
+            {{layer_W(5, 4, k, 1, 1, 1), 2},
+             {
+                     {4, 4},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 2, k, 0, 0, 1), 2},
+             {
+                     {4, 4},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 3, k, 1, 0, 1), 2},
+             {
+                     {4, 4},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 3, k, 0, 1, 1), 2},
+             {
+                     {5, 3},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            /// 5 inputs  , p2 combinations
+            {{layer_W(5, 6, k, 2, 2, 1), 2},
+             {
+                     {4, 4},  // in
+                     {3, 3},  // out
+                     {k, k},  // k
+                     {2, 0},  // pad top
+                     {0, 2},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "P+"},
+            {{layer_W(5, 4, k, 2, 0, 1), 2},
+             {
+                     {3, 5},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {2, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 4, k, 0, 2, 1), 2},
+             {
+                     {5, 3},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 2},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 5, k, 2, 1, 1), 2},
+             {
+                     {4, 4},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {2, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 5, k, 1, 2, 1), 2},
+             {
+                     {5, 3},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 2},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+    };
+
+    executeT_SOWOVR(tests);
+}
+
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K5_2T) {
     // IN ,O, K , PT, PB, S
     int k = 5;
@@ -840,6 +1317,96 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K5_2T) {
     executeT_SOHOVR(tests);
 }
 
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K5_2T) {
+    // IN ,O, K , PT, PB, S
+    int k = 5;
+    const std::vector<TestCase> tests{
+            {{layer_W(5, 3, k, 1, 1, 1), 2},
+             {
+                     {5, 4},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 2, k, 1, 0, 1), 2},
+             {
+                     {4, 5},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 2, k, 0, 1, 1), 2},
+             {
+                     {5, 4},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            /// 5 inputs  , p2 combinations
+            {{layer_W(5, 5, k, 2, 2, 1), 2},
+             {
+                     {5, 4},  // in
+                     {3, 2},  // out
+                     {k, k},  // k
+                     {2, 0},  // pad top
+                     {0, 2},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "P+"},
+            {{layer_W(5, 3, k, 2, 0, 1), 2},
+             {
+                     {4, 5},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {2, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 3, k, 0, 2, 1), 2},
+             {
+                     {5, 3},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {1, 2},  // pad bottom
+                     HALO_ZERO2,
+             },
+             " GROWS MORE THAN INput!!"},
+            {{layer_W(5, 4, k, 2, 1, 1), 2},
+             {
+                     {4, 5},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {2, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 4, k, 1, 2, 1), 2},
+             {
+                     {5, 4},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 2},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+    };
+
+    executeT_SOWOVR(tests);
+}
+
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K7_2T_CornerC) {
     // IN ,O, K , PT, PB, S
     int k = 7;
@@ -858,6 +1425,26 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K7_2T_CornerC) {
     };
 
     executeT_SOHOVR(tests);
+}
+
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K7_2T_CornerC) {
+    // IN ,O, K , PT, PB, S
+    int k = 7;
+    const std::vector<TestCase> tests{
+            {{layer_W(2, 2, k, 3, 3, 1), 2},
+             {
+                     {2, 2},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {3, 2},  // pad top
+                     {2, 3},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "Both Tile takes all, except pad "},
+
+    };
+
+    executeT_SOWOVR(tests);
 }
 
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K3_3T) {
@@ -994,6 +1581,140 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K3_3T) {
     executeT_SOHOVR(tests);
 }
 
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K3_3T) {
+    // IN ,O, K , PT, PB, S
+    const int T = 3;
+    const int k = 3;
+    const std::vector<TestCase> tests{
+            // div by T
+            {{layer_W(15, 15, k, 1, 1, 1), T},
+             {
+                     {6, 7, 6},  // in
+                     {5, 5, 5},  // out
+                     {k, k, k},  // k
+                     {1, 0, 0},  // pad top
+                     {0, 0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            {{layer_W(15, 13, k, 0, 0, 1), T},
+             {
+                     {7, 7, 5},  // in
+                     {5, 5, 3},  // out
+                     {k, k, k},  // k
+                     {0, 0, 0},  // pad top
+                     {0, 0, 0},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            {{layer_W(15, 14, k, 1, 0, 1), T},
+             {
+                     {6, 7, 6},  // in
+                     {5, 5, 4},  // out
+                     {k, k, k},  // k
+                     {1, 0, 0},  // pad top
+                     {0, 0, 0},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            {{layer_W(15, 14, k, 0, 1, 1), T},
+             {
+                     {7, 7, 5},  // in
+                     {5, 5, 4},  // out
+                     {k, k, k},  // k
+                     {0, 0, 0},  // pad top
+                     {0, 0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            /// 16 inputs (mod+1)
+            {{layer_W(16, 16, k, 1, 1, 1), T},
+             {
+                     {7, 8, 5},  // in
+                     {6, 6, 4},  // out
+                     {k, k, k},  // k
+                     {1, 0, 0},  // pad top
+                     {0, 0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             "Goes beyond"},
+            {{layer_W(16, 14, k, 0, 0, 1), T},
+             {
+                     {7, 7, 6},  // in
+                     {5, 5, 4},  // out
+                     {k, k, k},  // k
+                     {0, 0, 0},  // pad top
+                     {0, 0, 0},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            {{layer_W(16, 15, k, 1, 0, 1), T},
+             {
+                     {6, 7, 7},  // in
+                     {5, 5, 5},  // out
+                     {k, k, k},  // k
+                     {1, 0, 0},  // pad top
+                     {0, 0, 0},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            {{layer_W(16, 15, k, 0, 1, 1), T},
+             {
+                     {7, 7, 6},  // in
+                     {5, 5, 5},  // out
+                     {k, k, k},  // k
+                     {0, 0, 0},  // pad top
+                     {0, 0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+
+            /// 17 inputs (mod+2)
+            {{layer_W(17, 17, k, 1, 1, 1), T},
+             {
+                     {7, 8, 6},  // in
+                     {6, 6, 5},  // out
+                     {k, k, k},  // k
+                     {1, 0, 0},  // pad top
+                     {0, 0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             "Goes beyond"},
+            {{layer_W(17, 15, k, 0, 0, 1), T},
+             {
+                     {7, 7, 7},  // in
+                     {5, 5, 5},  // out
+                     {k, k, k},  // k
+                     {0, 0, 0},  // pad top
+                     {0, 0, 0},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            {{layer_W(17, 16, k, 1, 0, 1), T},
+             {
+                     {7, 8, 6},  // in
+                     {6, 6, 4},  // out
+                     {k, k, k},  // k
+                     {1, 0, 0},  // pad top
+                     {0, 0, 0},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            {{layer_W(17, 16, k, 0, 1, 1), T},
+             {
+                     {8, 8, 5},  // in
+                     {6, 6, 4},  // out
+                     {k, k, k},  // k
+                     {0, 0, 0},  // pad top
+                     {0, 0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+    };
+
+    executeT_SOWOVR(tests);
+}
+
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K5_3T) {
     // IN ,O, K , PT, PB, S
     int k = 5;
@@ -1091,6 +1812,76 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K5_3T) {
     executeT_SOHOVR(tests);
 }
 
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_basic_K5_3T) {
+    // IN ,O, K , PT, PB, S
+    int k = 5;
+    const std::vector<TestCase> tests{
+            {{layer_W(5, 3, k, 1, 1, 1), 3},
+             {
+                     {4, 5, 4},  // in
+                     {1, 1, 1},  // out
+                     {k, k, k},  // k
+                     {1, 0, 0},  // pad top
+                     {0, 0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             ""},
+            /// 5 inputs  , p2 combinations
+            {{layer_W(5, 5, k, 2, 2, 1), 3},
+             {
+                     {4, 5, 3},  // in
+                     {2, 2, 1},  // out
+                     {k, k, k},  // k
+                     {2, 0, 0},  // pad top
+                     {0, 1, 2},  // pad bottom
+                     HALO_ZERO3,
+             },
+             "Second is at end already"},
+            {{layer_W(5, 3, k, 2, 0, 1), 3},
+             {
+                     {3, 4, 5},  // in
+                     {1, 1, 1},  // out
+                     {k, k, k},  // k
+                     {2, 1, 0},  // pad top
+                     {0, 0, 0},  // pad bottom
+                     HALO_ZERO3,
+             },
+             "second still uses pad begin layer"},
+            {{layer_W(5, 3, k, 0, 2, 1), 3},
+             {
+                     {5, 4, 3},  // in
+                     {1, 1, 1},  // out
+                     {k, k, k},  // k
+                     {0, 0, 0},  // pad top
+                     {0, 1, 2},  // pad bottom
+                     HALO_ZERO3,
+             },
+             " "},
+            {{layer_W(5, 4, k, 2, 1, 1), 3},
+             {
+                     {4, 5},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {2, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO3,
+             },
+             "ONly 2 splits a."},
+            {{layer_W(5, 4, k, 1, 2, 1), 3},
+             {
+                     {5, 4},  // in
+                     {2, 2},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 2},  // pad bottom
+                     HALO_ZERO3,
+             },
+             "only 2 splits b."},
+    };
+
+    executeT_SOWOVR(tests);
+}
+
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_S2_K3_2T) {
     // IN ,O, K , PT, PB, S
     const int k = 3;
@@ -1183,6 +1974,95 @@ TEST_F(DPULayerTest, SplitSOHOVERLAPPED_S2_K3_2T) {
     // auto split = tst_layer_ref.SOH(2);
 
     executeT_SOHOVR(tests);
+}
+
+TEST_F(DPULayerTest, SplitSOWOVERLAPPED_S2_K3_2T) {
+    // IN ,O, K , PT, PB, S
+    const int k = 3;
+    const std::vector<TestCase> tests{
+            {{layer_W(5, 3, k, 1, 1, 2), 2},
+             {
+                     {4, 2},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 2, 3, 0, 0, 2), 2},
+             {
+                     {3, 3},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 2, 3, 1, 0, 2), 2},
+             {
+                     {2, 3},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(5, 2, 3, 0, 1, 2), 2},
+             {
+                     {3, 3},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "extra padding is bad! "},
+            ///// 6 inputs (even)
+            {{layer_W(6, 3, 3, 1, 1, 2), 2},
+             {
+                     {4, 3},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "extra pad! "},
+            {{layer_W(6, 2, 3, 0, 0, 2), 2},
+             {
+                     {3, 3},  // in
+                     {1, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             "MOre needs"},
+            {{layer_W(6, 3, 3, 1, 0, 2), 2},
+             {
+                     {4, 3},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {1, 0},  // pad top
+                     {0, 0},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+            {{layer_W(6, 3, 3, 0, 1, 2), 2},
+             {
+                     {5, 2},  // in
+                     {2, 1},  // out
+                     {k, k},  // k
+                     {0, 0},  // pad top
+                     {0, 1},  // pad bottom
+                     HALO_ZERO2,
+             },
+             ""},
+    };
+    executeT_SOWOVR(tests);
 }
 
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_S1_K3_2T_EISXW_76882) {

@@ -21,6 +21,7 @@
 #include "dpu_types.h"
 #include "vpu_tensor.h"
 #include "dpu_defaults.h"
+#include "core/utils.h"
 
 namespace VPUNN {
 
@@ -29,14 +30,14 @@ namespace VPUNN {
  */
 class SHAVEWorkload {
 private:
-    std::string name;  ///<  the name of the SW operation. We have a very flexible range of them.
-    VPUDevice device;  ///< The VPU device. There will be different methods/calibrations/profiling depending on device
+    std::string name{};  ///<  the name of the SW operation. We have a very flexible range of them.
+    VPUDevice device{};  ///< The VPU device. There will be different methods/calibrations/profiling depending on device
 
     // input and output tensors number and content must be correlated with the operation and among themselves. Not all
     // combinations are possible
-    std::vector<VPUTensor> inputs;   ///< The input tensors. Mainly shape and datatype are used
-    std::vector<VPUTensor> outputs;  ///< The output tensors. Mainly shape and datatype are used
-    std::string            loc_name; ///< The location name
+    std::vector<VPUTensor> inputs{};  ///< The input tensors. Mainly shape and datatype are used
+    std::vector<VPUTensor> outputs{};  ///< The output tensors. Mainly shape and datatype are used
+    std::string loc_name{};            ///< The location name
 
 public:
     using Param = std::variant<int, float>;
@@ -54,6 +55,10 @@ public:
 
     SHAVEWorkload(const SHAVEWorkload&) = default;
     SHAVEWorkload& operator=(const SHAVEWorkload&) = default;
+
+    /// @brief Default constructor
+    SHAVEWorkload() = default;
+
 
     // accessors
 
@@ -76,6 +81,29 @@ public:
     const std::string& get_loc_name() const {
         return loc_name;
     };
+
+    uint32_t hash() const {
+        std::stringstream ss;
+        ss << static_cast<int>(get_device()) << ",";
+        ss << get_name() << ",";
+        for (const auto& input : get_inputs()) {
+            ss << input.batches() << "," << input.channels() << "," << input.height() << "," << input.width() << ",";
+        }
+        for (const auto& output : get_outputs()) {
+            ss << output.batches() << "," << output.channels() << "," << output.height() << "," << output.width()
+               << ",";
+        }
+
+        for (const auto& param : get_params()) {
+            std::visit(
+                    [&ss](auto&& arg) {
+                        ss << arg << ",";
+                    },
+                    param);
+        }
+
+        return fnv1a_hash(ss.str());
+    }
 
     std::string toString() const {
         std::stringstream stream;

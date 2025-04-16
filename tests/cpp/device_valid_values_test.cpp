@@ -34,17 +34,33 @@ protected:
         const VPUNN::OperationsBehaviour specific_behaviours{};  ///< known behaviors
 
         /// @brief non public constructor for initializing the reference
-        DeviceValidValuesMock(const int input_heigth_start_factor_SOH_ = input_heigth_start_factor_SOH_def)
+        DeviceValidValuesMock(const int input_heigth_start_factor_SOH_)
                 : VPUNN::IDeviceValidValues(specific_behaviours,
-                                            valid_execution_order_def,       //
-                                            valid_swizzlings_def,            //
-                                            valid_layouts_def,               //
-                                            devices_def,                     //
-                                            cmx_KB_sizes_def,                //
-                                            output_write_tile_options_def,   //
-                                            isi_stategy_options_def,         //
-                                            weigths_alignment_def,           //
-                                            input_heigth_start_factor_SOH_,  // special
+                                            valid_execution_order_map_default,  //
+                                            valid_swizzlings_def,               //
+                                            valid_layouts_def,                  //
+                                            devices_def,                        //
+                                            cmx_KB_sizes_def,                   //
+                                            output_write_tile_options_def,      //
+                                            isi_stategy_options_def,            //
+                                            weigths_alignment_def,              //
+                                            input_heigth_start_factor_SOH_,     // special
+
+                                            valid_datatypes_map_default,  //
+                                            valid_operations_default,     //
+                                            alignement_size_bytes_def) {
+        }
+        DeviceValidValuesMock()
+                : VPUNN::IDeviceValidValues(specific_behaviours,
+                                            valid_execution_order_map_default,  //
+                                            valid_swizzlings_def,               //
+                                            valid_layouts_def,                  //
+                                            devices_def,                        //
+                                            cmx_KB_sizes_def,                   //
+                                            output_write_tile_options_def,      //
+                                            isi_stategy_options_def,            //
+                                            weigths_alignment_def,              //
+                                            input_heigth_start_factor_SOH_def,  // special
 
                                             valid_datatypes_map_default,  //
                                             valid_operations_default,     //
@@ -90,11 +106,8 @@ protected:
         const SmartRanges channels_1_range{1, 1, 1};
 
         int get_input_heigth_start_factor_SOH() const {
-            return input_heigth_start_factor_SOH;
+            return get_spatial_range_start_factor_HW();
         }
-        // void set_input_heigth_start_factor_SOH(int val) {
-        //     input_heigth_start_factor_SOH = val;
-        // }
 
         // setup content
 
@@ -168,6 +181,16 @@ protected:
                 Operation::ELTWISE,         //
                 Operation::MAXPOOL,         //
         };
+
+        inline static const IDeviceValidValues::ValidExecutionModes valid_execution_order_map_default{
+                // valid execution modes based on operations
+                {
+                        {Operation::CONVOLUTION, valid_execution_order_def},         //
+                        {Operation::DW_CONVOLUTION, {ExecutionMode::CUBOID_16x16}},  //
+                        {Operation::CM_CONVOLUTION, {ExecutionMode::CUBOID_16x16}},  //
+                        {Operation::MAXPOOL, {ExecutionMode::CUBOID_16x16}},         //
+                        {Operation::ELTWISE, {ExecutionMode::CUBOID_8x16}},          //
+                }};
     };
 
 private:
@@ -272,7 +295,7 @@ TEST_F(IntfDeviceValidValuesTest, defaultSwizz) {
     // this lambda function check if swizzling is initialized correctly
     // for VPU2.0 swizzling=0 is the only one possible, but by default=5 (in constructor swizzling is set to 5)
     // swizzling=5 by default for VPU2.7 and newer
-    auto verify_swizz = [](TestsVector tests) {
+    auto verify_swizz = [](const TestsVector& tests) {
         int i = 1;  // test case index
         for (const auto& t : tests) {
             std::cout << "Test case: " << i << "\n";
@@ -283,11 +306,16 @@ TEST_F(IntfDeviceValidValuesTest, defaultSwizz) {
         }
     };
 
-    /* coverity[copy_instead_of_move] */
     const TestsVector tests = {
-            {{wl2_0}, allFive, "VPU2_0, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
-            {{wl2_7}, allFive, "VPU2_7, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
-            {{wl4_0}, allFive, "VPU4_0, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
+            {{std::move(wl2_0)},
+             allFive,
+             "VPU2_0, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
+            {{std::move(wl2_7)},
+             allFive,
+             "VPU2_7, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
+            {{std::move(wl4_0)},
+             allFive,
+             "VPU4_0, swizzling should be 5 by default (swizzling is set to 5 in constructor)"},
     };
 
     verify_swizz(tests);
@@ -400,8 +428,8 @@ using namespace VPUNN;
 
 // checks what is the minim input height that can be used with this kernel & padding, and STrategy if unsplit
 TEST_F(IntfDeviceValidValuesTest, get_input_height_range) {
-    DeviceValidValuesMock dut(1);
-    DeviceValidValuesMock dut2(2);
+    DeviceValidValuesMock dut(1);   // extension is 1 , like for split and below
+    DeviceValidValuesMock dut2(2);  // extension 2, like for top Layer
     const DPUWorkload tst_refH16P1K3x3{
             VPUDevice::VPU_2_7,
             Operation::CONVOLUTION,
@@ -441,8 +469,8 @@ TEST_F(IntfDeviceValidValuesTest, get_input_height_range) {
     auto check_it2 = [&dut2](DPUOperation& wl, std::array<int, 2> pad, int minExp, const std::string& h = "") {
         wl.kernel.pad_top = pad[0];
         wl.kernel.pad_bottom = pad[1];
-        auto r = dut2.get_input_height_range(wl);
-        EXPECT_EQ(r[0], minExp) << h << "paddings: " << pad[0] << " , " << pad[1] << "\n" << wl;
+        auto r = dut2.get_input_height_interval(wl, true);
+        EXPECT_EQ(r.first, minExp) << h << "paddings: " << pad[0] << " , " << pad[1] << "\n" << wl;
     };
 
     {  // 3x3
@@ -477,6 +505,7 @@ TEST_F(IntfDeviceValidValuesTest, get_input_height_range) {
         DPUOperation wl{tst_refH16P1K3x3};
         {
             std::string info{" x3SOH1x "};
+            EXPECT_EQ(dut.get_input_heigth_start_factor_SOH(), 1);
             wl.isi_strategy = ISIStrategy::SPLIT_OVER_H;
             EXPECT_EQ(dut.get_input_heigth_start_factor_SOH(), 1);
 
@@ -488,7 +517,9 @@ TEST_F(IntfDeviceValidValuesTest, get_input_height_range) {
         {
             // 3x3 and SOH special :
             std::string info{" x3SOH2x "};
-            // dut2.set_input_heigth_start_factor_SOH(2);  // now we need t least 2 rows in output to be guaranteed
+            // now we need t least 2 rows in output to be guaranteed
+            EXPECT_EQ(dut2.get_input_heigth_start_factor_SOH(), 2);
+            wl.isi_strategy = ISIStrategy::CLUSTERING;
             EXPECT_EQ(dut2.get_input_heigth_start_factor_SOH(), 2);
 
             check_it2(wl, {1, 1}, 2, info);
@@ -501,13 +532,13 @@ TEST_F(IntfDeviceValidValuesTest, get_input_height_range) {
 
 // checks what is the minim input height that can be used with this kernel & padding
 TEST_F(IntfDeviceValidValuesTest, get_input_width_range) {
-    DeviceValidValuesMock dut(1);
-    DeviceValidValuesMock dut2(2);
+    DeviceValidValuesMock dut(1);   // extension is 1 , like for split and below
+    DeviceValidValuesMock dut2(2);  // extension 2, like for top Layer
     const DPUWorkload tst_refH16P1K3x3{
             VPUDevice::VPU_2_7,
             Operation::CONVOLUTION,
-            {VPUTensor(60, 16, 128, 1, VPUNN::DataType::UINT8)},  // input dimensions
-            {VPUTensor(60, 16, 128, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {VPUTensor(16, 60, 128, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUTensor(16, 60, 128, 1, VPUNN::DataType::UINT8)},  // output dimensions
             {3, 1},                                               // kernels
             {1, 1},                                               // strides
             {1, 1, 1, 1},                                         // padding
@@ -516,8 +547,8 @@ TEST_F(IntfDeviceValidValuesTest, get_input_width_range) {
     const DPUWorkload tst_refH16P1K5x5{
             VPUDevice::VPU_2_7,
             Operation::CONVOLUTION,
-            {VPUTensor(60, 16, 128, 1, VPUNN::DataType::UINT8)},  // input dimensions
-            {VPUTensor(60, 16, 128, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {VPUTensor(16, 60, 128, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUTensor(16, 60, 128, 1, VPUNN::DataType::UINT8)},  // output dimensions
             {5, 1},                                               // kernels
             {1, 1},                                               // strides
             {1, 1, 1, 1},                                         // padding
@@ -526,8 +557,8 @@ TEST_F(IntfDeviceValidValuesTest, get_input_width_range) {
     const DPUWorkload tst_refH16P1K2x2{
             VPUDevice::VPU_2_7,
             Operation::CONVOLUTION,
-            {VPUTensor(60, 16, 128, 1, VPUNN::DataType::UINT8)},  // input dimensions
-            {VPUTensor(60, 16, 128, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {VPUTensor(16, 60, 128, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUTensor(16, 60, 128, 1, VPUNN::DataType::UINT8)},  // output dimensions
             {2, 1},                                               // kernels
             {1, 1},                                               // strides
             {1, 1, 1, 1},                                         // padding
@@ -542,8 +573,8 @@ TEST_F(IntfDeviceValidValuesTest, get_input_width_range) {
     auto check_it2 = [&dut2](DPUOperation& wl, std::array<int, 2> pad, int minExp, const std::string& h = "") {
         wl.kernel.pad_left = pad[0];
         wl.kernel.pad_right = pad[1];
-        auto r = dut2.get_input_width_range(wl);
-        EXPECT_EQ(r[0], minExp) << h << "paddings: " << pad[0] << " , " << pad[1] << "\n" << wl;
+        auto r = dut2.get_input_width_interval(wl, true);
+        EXPECT_EQ(r.first, minExp) << h << "paddings: " << pad[0] << " , " << pad[1] << "\n" << wl;
     };
 
     {  // 3x3
@@ -578,6 +609,7 @@ TEST_F(IntfDeviceValidValuesTest, get_input_width_range) {
         DPUOperation wl{tst_refH16P1K3x3};
         {
             std::string info{" x3SOH1x "};
+            EXPECT_EQ(dut.get_input_heigth_start_factor_SOH(), 1);
             wl.isi_strategy = ISIStrategy::SPLIT_OVER_H;
             EXPECT_EQ(dut.get_input_heigth_start_factor_SOH(), 1);
 
@@ -589,13 +621,15 @@ TEST_F(IntfDeviceValidValuesTest, get_input_width_range) {
         {
             // 3x3 and SOH special :
             std::string info{" x3SOH2x "};
-            // dut2.set_input_heigth_start_factor_SOH(2);  // NO change /influence
+            // NO change /influence
+            EXPECT_EQ(dut2.get_input_heigth_start_factor_SOH(), 2);
+            wl.isi_strategy = ISIStrategy::CLUSTERING;
             EXPECT_EQ(dut2.get_input_heigth_start_factor_SOH(), 2);
 
-            check_it2(wl, {1, 1}, 1, info);
-            check_it2(wl, {1, 0}, 2, info);
-            check_it2(wl, {0, 1}, 2, info);
-            check_it2(wl, {0, 0}, 3, info);
+            check_it2(wl, {1, 1}, 2, info);
+            check_it2(wl, {1, 0}, 3, info);
+            check_it2(wl, {0, 1}, 3, info);
+            check_it2(wl, {0, 0}, 4, info);
         }
     }
 }

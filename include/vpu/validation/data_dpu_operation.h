@@ -471,21 +471,21 @@ struct DPUOperation {
                  return sep_activators.actual_activators_input.batches();
              }},
             {"sep_no_sparse_map", std::ref(sep_activators.no_sparse_map)},
-            {"weightless_operation",
+            {"in_place_input1",  // weightless_operation
              [this](bool set_mode, std::string s) -> VPUNN::DimType {
                  if (set_mode) {
                      setWeightlessOperation(s);
                  }
                  return weightless_operation;
              }},
-            {"in_place_output_memory",
+            {"in_place_output",
              [this](bool set_mode, std::string s) -> VPUNN::DimType {
                  if (set_mode) {
                      setInPlaceOutputMemory(s);
                  }
                  return in_place_output_memory;
              }},
-            {"superdense", std::ref(superdense)},
+            {"superdense_output", std::ref(superdense)},
     };
 
     static const std::vector<std::string>& _get_member_names() {
@@ -564,9 +564,9 @@ struct DPUOperation {
                 "sep_act_c",
                 "sep_act_b",
                 "sep_no_sparse_map",
-                "weightless_operation",
-                "in_place_output_memory",
-                "superdense",
+                "in_place_input1",    // not the same name as the attribute weightless_operation
+                "in_place_output",    // not the same name as the attribute in_place_output_memory
+                "superdense_output",  // not the same name as the attribute superdense
         };
 
         return names;
@@ -581,9 +581,9 @@ struct DPUOperation {
                                                      VPUNN::SetGet_MemberMapValues>) {
                             // arg have two parameters first one is false and that means that arg is in get_mode
                             // (function will just return a value), second parameter could be any value, in get_mode
-                            // its value doesn't matter 
+                            // its value doesn't matter
                             combined_hash ^= std::hash<int>{}(arg(false, "")) + 0x9e3779b9 + (combined_hash << 6) +
-                                    (combined_hash >> 2);
+                                             (combined_hash >> 2);
                         } else {
                             using argtype = std::decay_t<std::remove_reference_t<decltype(arg.get())>>;
                             combined_hash ^= std::hash<argtype>{}(arg) + 0x9e3779b9 + (combined_hash << 6) +
@@ -593,7 +593,7 @@ struct DPUOperation {
                     value);
         }
         return combined_hash;
-    }  
+    }
 
     /// detect if operation is elementwise fammily
     bool is_elementwise_like_operation() const {
@@ -601,7 +601,7 @@ struct DPUOperation {
                 (operation == Operation::ELTWISE_MUL));
     }
 
-    protected:
+protected:
     // test if a number is an unsigned int, if true we assign to result the value
     // if number is not an unsigned int, we return false, else return true
     static bool is_unsigned_int(const std::string& s, VPUNN::DimType& result) {
@@ -659,7 +659,6 @@ struct DPUOperation {
         }
     }
 
-
     /// @brief checks if the memory for input and output have the preconditions to be 1-1 in order to support in place
     /// does not look at operation specific fields, like kernels, etc
     ///
@@ -668,7 +667,7 @@ struct DPUOperation {
     bool is_preconditions_for_inplace_output() const {
         const TensorInfo& in{input_0};
         const TensorInfo& out{output_0};
-        if ((in.layout== out.layout)                             // same layout
+        if ((in.layout == out.layout)                                   // same layout
             && (is_same_datatype_footprint(in.datatype, out.datatype))  // same type size
         ) {
             return true;
@@ -753,7 +752,7 @@ inline std::ostream& operator<<(std::ostream& stream, const DPUOperation& d) {
            << d.sep_activators                                                                     //
            << " weightless_operation: \t" << std::to_string(d.weightless_operation) << " ;\n"      //
            << " in_place_output_memory: \t" << std::to_string(d.in_place_output_memory) << " ;\n"  //
-           << " superdense: \t" << std::to_string(d.superdense) << " ;\n"            //
+           << " superdense: \t" << std::to_string(d.superdense) << " ;\n"                          //
             ;
     return stream;
 }

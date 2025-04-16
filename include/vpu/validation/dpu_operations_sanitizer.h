@@ -50,6 +50,13 @@ public:
         }
 
         const auto& config = get_config(wl.device);
+
+        // check ahead
+        if (!config.is_valid_operation(wl.op)) {
+            result.mark_unknown_operation();
+            return;
+        }
+
         // apply data restriction for input and output tensor types. device/config dependent
         {
             const auto intype_0{wl.inputs[0].get_dtype()};
@@ -102,6 +109,12 @@ public:
             return;
         }
         const auto& config = get_config(wl.device);  // previous if prevents throwing
+
+        // check ahead
+        if (!config.is_valid_operation(wl.op)) {
+            result.mark_unknown_operation();
+            return;
+        }
 
         try {
             const DPUOperation w(wl, config);                                  // workload internal representation

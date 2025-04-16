@@ -137,10 +137,10 @@ public:
     template <class T>
     const T* predict(const T* input_array, const unsigned int input_size) {
         model.set_inputs(input_array, input_size);  // might throw if input mismatch
-        auto t1 = tick();
+        const auto t1{profile ? tick() : no_tick()};
         model.predict();
         if (profile) {
-            auto delta = tock(t1);
+            const auto delta = tock(t1);
             Logger::info() << "Execution time: " << delta << " ms";
         }
         return model.get_outputs<T>();
@@ -157,10 +157,10 @@ public:
     const std::vector<T> predict(const std::vector<T>& input_tensor) {
         model.set_inputs(input_tensor.data(),
                          static_cast<unsigned int>(input_tensor.size()));  // might throw if input mismatch
-        auto t1 = tick();
+        const auto t1{profile ? tick() : no_tick()};
         model.predict();
         if (profile) {
-            auto delta = tock(t1);
+            const auto delta = tock(t1);
             Logger::info() << "Execution time: " << delta << " ms";
         }
         return model.get_outputs_vector<T>();

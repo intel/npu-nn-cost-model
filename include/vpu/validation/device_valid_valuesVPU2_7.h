@@ -33,6 +33,7 @@
 namespace VPUNN {
 
 /// @brief specific VPU 2.7 configuration possibilities for workload, not layer
+/* coverity[rule_of_five_violation:FALSE] */
 class VPU2_7_WorkloadValidValues : public IDeviceValidValues {
 public:
     VPU2_7_WorkloadValidValues(const VPU2_7_WorkloadValidValues&) noexcept(false) = default;
@@ -44,7 +45,7 @@ public:
     ~VPU2_7_WorkloadValidValues() = default;
 
 private:
-    inline static const Values<ExecutionMode> valid_execution_order_def{
+    inline static const Values<ExecutionMode> valid_execution_order_all{
             ExecutionMode::CUBOID_4x16,
             ExecutionMode::CUBOID_8x16,
             ExecutionMode::CUBOID_16x16,
@@ -122,11 +123,21 @@ private:
             Operation::MAXPOOL,         //
     };
 
+    inline static const IDeviceValidValues::ValidExecutionModes valid_execution_order_map_default{
+            // valid execution modes based on operations
+            {
+                    {Operation::CONVOLUTION, valid_execution_order_all},     //
+                    {Operation::DW_CONVOLUTION, valid_execution_order_all},  //
+                    {Operation::CM_CONVOLUTION, valid_execution_order_all},  //
+                    {Operation::ELTWISE, valid_execution_order_all},         //
+                    {Operation::MAXPOOL, valid_execution_order_all},         //
+            }};
+
 public:
     /// constructor with link to operations dynamic behavior
     VPU2_7_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
             : IDeviceValidValues(op_dynamic_constraints,
-                                 valid_execution_order_def,          //
+                                 valid_execution_order_map_default,  //
                                  valid_swizzlings_def,               //
                                  valid_layouts_def,                  //
                                  devices_def,                        //
@@ -143,7 +154,7 @@ public:
     VPU2_7_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
                                const std::unordered_map<Operation, SmartRanges>& input_channels_restrictions_)
             : IDeviceValidValues(op_dynamic_constraints,
-                                 valid_execution_order_def,          //
+                                 valid_execution_order_map_default,  //
                                  valid_swizzlings_def,               //
                                  valid_layouts_def,                  //
                                  devices_def,                        //
@@ -163,17 +174,17 @@ public:
                                const int& input_heigth_start_factor_SOH_,
                                const std::unordered_map<Operation, SmartRanges>& input_channels_restrictions_)
             : IDeviceValidValues(op_dynamic_constraints,
-                                 valid_execution_order_def,       //
-                                 valid_swizzlings_def,            //
-                                 valid_layouts_def,               //
-                                 devices_def,                     //
-                                 cmx_KB_sizes_def,                //
-                                 output_write_tile_options_def,   //
-                                 isi_stategy_options_def,         //
-                                 weigths_alignment_def,           //
-                                 input_heigth_start_factor_SOH_,  // special
-                                 valid_datatypes_map_default,     //
-                                 valid_operations_default,        //
+                                 valid_execution_order_map_default,  //
+                                 valid_swizzlings_def,               //
+                                 valid_layouts_def,                  //
+                                 devices_def,                        //
+                                 cmx_KB_sizes_def,                   //
+                                 output_write_tile_options_def,      //
+                                 isi_stategy_options_def,            //
+                                 weigths_alignment_def,              //
+                                 input_heigth_start_factor_SOH_,     // special
+                                 valid_datatypes_map_default,        //
+                                 valid_operations_default,           //
                                  alignement_size_bytes_def),
               input_channels_restrictions{input_channels_restrictions_} {};
 
@@ -242,6 +253,10 @@ public:
                        : output_channels_restrictions;
     }
 
+    bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept override {
+        return false;  // layer is above the workload, no need to check
+    };
+
     Values<ISIStrategy> get_ISI_Strategy_Range(const DPUOperation& dpu) const override {
         // at layer level this is the desired strategy, no limitation based on tiles/output write tiles desired
         Values<ISIStrategy> v{isi_stategy_options};
@@ -272,6 +287,9 @@ public:
             : VPU2_7_WorkloadValidValues(op_dynamic_cosntraints, input_channels_restrictions_layersplit) {
         // at layer level we are not limited like for workload level
     }
+    bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept override {
+        return false;  // layer is above the workload, no need to check
+    };
 
 protected:
 };
