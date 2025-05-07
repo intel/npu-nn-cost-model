@@ -1,3 +1,0 @@
-*.vpunn filter=lfs diff=lfs merge=lfs -text
-*.dmann filter=lfs diff=lfs merge=lfs -text
-models/vpu_4_0.vpunn filter=lfs diff=lfs merge=lfs -text
