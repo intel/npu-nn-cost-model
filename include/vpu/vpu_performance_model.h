@@ -473,7 +473,7 @@ protected:
     // CMX clock. COnsiders also limitation like compression...
     int cmx_agregated_bytes_per_cycle_bw(const VPUTensor& tensor, VPUDevice device, bool half_duplex, bool permute,
                                          bool compression, float decompression_ratio = 1.0F,
-                                         int compressed_BW_BytesPerCycle = 0) const {
+                                         int compressed_BW_BytesPerCycle = 1) const {
         // permute limits the bw to one element per cycle
         if (permute) {
             return dtype_to_bytes(tensor.get_dtype());  // size of one element (what about half duplex?). should not be
@@ -548,12 +548,12 @@ public:
         const float decompression_ratio{is_DDR2CMX_decompresion ? ((float)wl.output.size() / (float)wl.input.size())
                                                                 : 1.0f};
 
-        const unsigned int input_bw_bpc =
+        const int input_bw_bpc =
                 get_bytes_per_cycle_read_bw(wl.input, wl.device, wl.input_location, is_half_duplex_limitation);
         const auto CMX_cycles_read = (float)wl.input.size() / (float)input_bw_bpc;
         const auto input_cycles_DPU = Cycles::toCycleInterfaceType(CMX_cycles_read * dpuPerCmx_clock_ratio);
 
-        const unsigned int output_bw_bpc = get_bytes_per_cycle_write_bw(
+        const int output_bw_bpc = get_bytes_per_cycle_write_bw(
                 wl.output, wl.device, wl.output_location, is_half_duplex_limitation, is_cmx2cmx_permutation,
                 is_DDR2CMX_decompresion, decompression_ratio, input_bw_bpc);
         const auto CMX_cycles_write = (float)wl.output.size() / (float)output_bw_bpc;
