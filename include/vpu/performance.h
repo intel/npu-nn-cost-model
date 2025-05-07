@@ -139,7 +139,7 @@ inline constexpr int get_DMA_DDR_interface_bytes(VPUDevice device) {
     case VPUDevice::NPU_RESERVED_W:
         return 64;  // no change
     default:
-        return 0;
+        return -1;
     }
 }
 
