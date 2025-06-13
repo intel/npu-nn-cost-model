@@ -18,6 +18,9 @@
 #include <utility>
 #include <vector>
 
+#include <mutex>
+#include <thread>
+
 #include "core/cache.h"
 #include "core/logger.h"
 #include "core/serializer.h"
@@ -47,6 +50,8 @@
 #include "vpu/dpu_dcim_workload.h"
 #include "vpu_dcim_cost_model_interface.h"
 
+#include "vpu/vpu_mutex.h"
+
 namespace VPUNN {
 
 using DCiM_Workload_Interface = DCIMWorkload;  ///< alias for DCIMWorkload
@@ -61,7 +66,8 @@ using DCiM_Workload_Interface = DCIMWorkload;  ///< alias for DCIMWorkload
  */
 class VPUNN_API(VPUCostModel)
         : public VPUNNPerformanceModel,
-          protected DCiMCostModelInterface<DCiM_Workload_Interface>  // for DCiM CM interface, implementation TBD
+          protected DCiMCostModelInterface<DCiM_Workload_Interface>,  // for DCiM CM interface, implementation TBD
+          virtual protected VPU_MutexAcces                            // for mutex access
 {
 private:
     const RuntimeProcessingFactory preprocessing_factory;  ///< provides Preprocessing objects
@@ -75,7 +81,7 @@ private:
                                               ///< support should false and the response should be unused
     const IPostProcess& postProcess;          ///< postprocessing transformer
 
-    CSVSerializer cache_miss_serializer;  ///< serializer for missed cache
+    mutable CSVSerializer cache_miss_serializer;  ///< serializer for missed cache
 
     const ShaveConfiguration shave_gen_2;  ///< second generation of shaves
 
@@ -87,7 +93,7 @@ private:
     const std::string dummyStr{
             "ConstCharInit"};  ///< dummy string for initialization (avoid possible dangling reference)
 
-    CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
+    mutable CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
 
 protected:
     DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
@@ -265,7 +271,7 @@ private:
     /// The result may be impossibility to run (if smaller) or leaving empty zeros at the end (only partial fill)
     ///
     void correlate_preprocessor_with_model_inputs() {
-        const auto model_input_size = vpunn_runtime.input_tensors()[0]->shape()[1];
+        const auto model_input_size{(vpunn_runtime.input_shapes()[0])[1]};
         const auto preprocessing_output_size = preprocessing.output_size();
         if (model_input_size != preprocessing_output_size) {
             Logger::warning() << "Changing preprocessing output size (" << preprocessing_output_size
@@ -411,6 +417,7 @@ public:
 public:
     /**
      * @brief Compute the NN Output of a specific DPUWorkload
+     * NO Threadsafe protection planned here. DO NOT USE directly!
      * takes in consideration the cache
      * no sanitation is done
      * no check if network exists
@@ -589,6 +596,7 @@ protected:
 public:
     /**
      * @brief Compute the NN Output of multiple DPUWorkloads
+     * NO Threadsafe protection planned here. DO NOT USE directly!
      * NOT taking in consideration the cache
      * no sanitation is done
      * no check if network exists
@@ -605,7 +613,7 @@ public:
         }
 
         // Pre-process the workloads to generate descriptors
-        const auto model_batch_size{vpunn_runtime.input_tensors()[0]->shape()[0]};  // how many wlds in a batch
+        const auto model_batch_size{(vpunn_runtime.input_shapes()[0])[0]};  // how many wlds in a batch
         // transforms all at once, potential optimization is to do batch by batch
         const auto& vector = preprocessing.transform(workloads, model_batch_size);
 
@@ -615,7 +623,8 @@ public:
         for (unsigned int wl_idx = 0; wl_idx < workloads.size(); wl_idx += model_batch_size) {
             // Slice the workload descriptors and predict on a single batch
             const float* hw_overhead_arr =
-                    vpunn_runtime.predict(&(vector[wl_idx * descriptor_size]), inputs_to_process_in_batch);
+                    vpunn_runtime.predict(&(vector[static_cast<size_t>(wl_idx) * static_cast<size_t>(descriptor_size)]),
+                                          inputs_to_process_in_batch);
 
             const auto complete_batch_end_idx{wl_idx + model_batch_size};
             auto end_idx{(complete_batch_end_idx > workloads.size()) ? workloads.size() : complete_batch_end_idx};
@@ -690,6 +699,7 @@ public:
      */
     /* coverity[pass_by_value] */
     CyclesInterfaceType DPU(DPUWorkload wl) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         std::string dummy_info{};
         return DPU(std::move(wl), dummy_info);
     }
@@ -700,6 +710,7 @@ public:
     /// @param li will collect error info regarding wl checking.
     /* coverity[pass_by_value] */
     std::tuple<CyclesInterfaceType, std::string> DPUMsg(DPUWorkload wl) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         std::string dummy_info{};
         auto previous_print_mode{Checker::set_print_tags(false)};
         const auto r{DPU(wl, dummy_info)};
@@ -712,7 +723,8 @@ public:
     /// @param wl the workload to infer on
     /// @param info [out] will collect error info regarding wl checking.
     /* coverity[pass_by_value] */
-    CyclesInterfaceType DPU(DPUWorkload wl, std::string& info) {
+    virtual CyclesInterfaceType DPU(DPUWorkload wl, std::string& info) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         return DPU_and_sanitize(wl, info);
     }
 
@@ -721,6 +733,7 @@ protected:
      *  Provides workload outside so we know on what(post sanitization) was done the inference
      */
     CyclesInterfaceType DPU_and_sanitize(DPUWorkload& wl, std::string& info) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         swizzling_turn_OFF(wl);  // swizz guard sanitization
 
         if (serializer.is_serialization_enabled()) {  // has to be factored out
@@ -780,7 +793,9 @@ public:
      * @return std::vector<CyclesInterfaceType> the DPUWorklaods execution cycles, @sa DPU for single wl for more
      * explanations
      */
-    std::vector<CyclesInterfaceType> DPU(std::vector<DPUWorkload> workloads) {
+    virtual std::vector<CyclesInterfaceType> DPU(std::vector<DPUWorkload> workloads) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
+
         std::vector<DPUWorkload> serializer_orig_wls;  // should be const
         if (serializer.is_serialization_enabled()) {   // has to be factored out
             serializer_orig_wls = std::vector<DPUWorkload>(workloads.size());
@@ -886,7 +901,7 @@ public:
         return mac_hw_utilization(wl, &VPUCostModel::DPU_Power_IdealCycles);
     }
 
-    /** @bief utilization without sparsity, can be larger than one */
+    /** @bief utilization without sparsity, can be larger than one, uses CostModel */
     float efficiency_mac_hw_utilization(const DPUWorkload& wl) {
         return mac_hw_utilization(wl, &VPUCostModel::DPU_Efficency_IdealCycles);
     }
@@ -896,6 +911,7 @@ protected:
                                decltype(&VPUCostModel::DPU_Power_IdealCycles)>::value,
                   "must be same signature ");
 
+    /// uses CostModel
     float mac_hw_utilization(const DPUWorkload& wl,
                              decltype(&VPUCostModel::DPU_Efficency_IdealCycles) CalculateCycles) {
         std::string dummy_info{};
@@ -944,9 +960,10 @@ public:
      * @return unsigned int the number of cycles of the DMA transfer
      * @deprecated Will be removed in future releases
      */
-    unsigned int DMA(VPUDevice device, const VPUTensor& input, const VPUTensor& output,
-                     MemoryLocation input_location = MemoryLocation::DRAM,
-                     MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
+    virtual unsigned int DMA(VPUDevice device, const VPUTensor& input, const VPUTensor& output,
+                             MemoryLocation input_location = MemoryLocation::DRAM,
+                             MemoryLocation output_location = MemoryLocation::CMX,
+                             unsigned int output_write_tiles = 1) const {
         // Call the helper function. TO DO Adjust theoretical based on some measured data!
         return DMATheoreticalCycles({device, input, output, input_location, output_location, output_write_tiles});
     }
@@ -958,7 +975,7 @@ public:
      * @return unsigned int the number of cycles of the DMA transfer
      * @deprecated Will be removed in future releases
      */
-    unsigned int DMA(const DMAWorkload& wl) const {
+    virtual unsigned int DMA(const DMAWorkload& wl) const {
         return DMA(wl.device, wl.input, wl.output, wl.input_location, wl.output_location, wl.output_write_tiles);
     }
 
@@ -969,7 +986,7 @@ public:
      * @return unsigned int the number of cycles of the Shave kernel
      * \deprecated
      */
-    unsigned int SHAVE(const SWOperation& swl) {
+    unsigned int SHAVE(const SWOperation& swl) const {
         return SHAVETheoreticalCycles(swl);
     }
 
@@ -982,6 +999,8 @@ public:
      * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
      */
     CyclesInterfaceType SHAVE_2(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);  // due to shave cache access and serializer access
+
         return shave_gen_2.computeCycles(shave_wl, infoOut);
     }
 
@@ -993,7 +1012,7 @@ public:
         return shave_gen_2.getShaveSupportedOperations(device);
     };
 
-    /// provides a reference to teh operator executor specified by name
+    /// provides a reference to the operator executor specified by name
     /// The executor can be used to execute (run) the runtime prediction on different tensors/parameters
     /// Or can be asked to print information about its implementation parameters
     ///
@@ -1019,6 +1038,7 @@ public:
      * reference dynamic power is considered for INT8 operations
      * It can be more than 1 in case the PowerViruschosen for reference is not the fact the highest (like if reference
      * is power virus INT8,  the float operations can have the AF >1).
+     * Internally uses CostModel
      *
      * @param wl a DPUWorkload
      * @return float the DPUWorkload activity factor relative to reference PowerVirus  (now is INT8)
@@ -1040,6 +1060,7 @@ public:
         return restricted_powerVirus_relative_af;
     }
 
+    /// Internally uses CostModel
     float DPU_EfficiencyActivityFactor(const DPUWorkload& wl) {
         const float mac_utilization_rate = efficiency_mac_hw_utilization(wl);  // if zero will propagate error
 
@@ -1050,7 +1071,7 @@ public:
 
 protected:
     float DPU_AgnosticActivityFactor(const DPUWorkload& wl, const float reference_hw_util,
-                                     const float sparse_correction_factor_experimental = 1.0F) {
+                                     const float sparse_correction_factor_experimental = 1.0F) const {
         const float power_factor_value = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
 
         return DPU_AgnosticActivityFactor_formula(power_factor_value, reference_hw_util,
@@ -1058,7 +1079,7 @@ protected:
     }
 
     float DPU_AgnosticActivityFactor_formula(const float power_factor_value, const float reference_hw_util,
-                                             const float sparse_correction_factor_experimental = 1.0F) {
+                                             const float sparse_correction_factor_experimental = 1.0F) const {
         const float rough_powerVirus_relative_af{(reference_hw_util * power_factor_value) *
                                                  sparse_correction_factor_experimental};
 
@@ -1074,7 +1095,7 @@ public:
      * @param wl a DPUWorkload
      * @return float the DPUWorkload energy, measured  PowerVirus*cycle
      */
-    float DPUEnergy(const DPUWorkload& wl) {
+    float DPUEnergy(const DPUWorkload& wl) const {
         // const float activity_factor_powerVirus = DPU_PowerActivityFactor(wl);
         // const CyclesInterfaceType cycles{DPU(wl)};
         // return calculateEnergyFromAFandTime(activity_factor_powerVirus, cycles);
@@ -1086,13 +1107,14 @@ public:
 protected:
     /** @brief integrates activity factor over the cycles duration=> from power to energy
      */
-    float calculateEnergyFromAFandTime(const float activity_factor_powerVirus, const CyclesInterfaceType& cycles) {
+    float calculateEnergyFromAFandTime(const float activity_factor_powerVirus,
+                                       const CyclesInterfaceType& cycles) const {
         const float checked_cycles{Cycles::isErrorCode(cycles) ? 0.0F : (float)cycles};  // zero if error
         const float energy = activity_factor_powerVirus * checked_cycles;
         return energy;
     }
 
-    float calculateEnergyFromIdealCycles(const DPUWorkload& wl, const unsigned long int reference_ideal_cycles) {
+    float calculateEnergyFromIdealCycles(const DPUWorkload& wl, const unsigned long int reference_ideal_cycles) const {
         const float power_factor_value = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
 
         // should we scale with sparse ON but dense?
@@ -1113,7 +1135,7 @@ public:
      * @return float the SWOperation energy , in units relative to DPU PowerVirus16
      * \deprecated
      */
-    float SHAVEEnergy(const SWOperation& swl) {
+    float SHAVEEnergy(const SWOperation& swl) const {
         constexpr float activity_factor{0.5f};      //<assume a constant activity factor of 0.5
         const float max_power_ratio_to_DPU{0.05f};  //<assume a max power of 5% of the DPU max power.
         const float energy = (activity_factor * max_power_ratio_to_DPU) * (float)SHAVE(swl);
@@ -1129,7 +1151,7 @@ public:
      * @param swl a SHAVEWorkload
      * @return float the operation energy, in units relative to DPU PowerVirus. WIl return zero in case of error
      */
-    float SHAVEEnergy(const SHAVEWorkload& swl) {
+    float SHAVEEnergy(const SHAVEWorkload& swl) const {
         constexpr float activity_factor{0.5f};      //<assume a constant activity factor of 0.5
         const float max_power_ratio_to_DPU{0.05f};  //<assume a max power of 5% of the DPU max power.
 
@@ -1192,7 +1214,7 @@ public:
     /////// Section for dCIM interfaces
 public:
     // provides the interface that has methods for DCiM
-    DCiMCostModelInterface<DCiM_Workload_Interface>& getDCiM_interface() {
+    const DCiMCostModelInterface<DCiM_Workload_Interface>& getDCiM_interface() const {
         return *this;
     }
 

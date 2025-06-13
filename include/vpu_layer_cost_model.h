@@ -83,8 +83,9 @@ private:
     const DMACostModelVariant the_dma_cost_model{
             static_cast<DMACostModel<DMANNWorkload_NPU27>*>(nullptr)};  ///< Variant that holds a DMACostModel
 
-    CSVSerializer serializer{};  ///< Serializer for the VPULayerCostModel, has its own file as output
-    CSVSerializer presplit_serializer{};  ///< Serializer for the VPULayerCostModel (presplit api), has its own file as output
+    mutable CSVSerializer serializer{};  ///< Serializer for the VPULayerCostModel, has its own file as output
+    mutable CSVSerializer
+            presplit_serializer{};  ///< Serializer for the VPULayerCostModel (presplit api), has its own file as output
 
 public:
     /// @brief Get a reference to the serializer.
@@ -112,7 +113,8 @@ public:
                            tryToLoadPairedCache),
               the_dma_cost_model(dma_cost_model) {
         serializer.initialize("l2_dpu_workloads", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
-        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
+        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE,
+                                       get_names_for_serializer(model_name_tag));
     }
 
     /**
@@ -135,7 +137,8 @@ public:
                            dpu_cache_data, dpu_cache_data_length, shave_cache_data, shave_cache_data_length),
               the_dma_cost_model(dma_cost_model) {
         serializer.initialize("l2_dpu_workloads", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
-        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
+        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE,
+                                       get_names_for_serializer(model_name_tag));
     }
 
     /// Allow creation of VPULayerCostModel without DMA model (fallback to theoretical model in order to maintain older
@@ -155,7 +158,8 @@ public:
             : VPUCostModel(filename, profile, cache_size, batch_size, dpu_cache_filename, shave_cache_filename,
                            tryToLoadPairedCache) {
         serializer.initialize("l2_dpu_workloads", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
-        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
+        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE,
+                                       get_names_for_serializer(model_name_tag));
     }
 
     /**
@@ -176,7 +180,8 @@ public:
             : VPUCostModel(model_data, model_data_length, copy_model_data, profile, cache_size, batch_size,
                            dpu_cache_data, dpu_cache_data_length, shave_cache_data, shave_cache_data_length) {
         serializer.initialize("l2_dpu_workloads", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
-        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE, get_names_for_serializer(model_name_tag));
+        presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE,
+                                       get_names_for_serializer(model_name_tag));
     }
 
     /// @brief limits the split of a tile (intra-tile split) to this number of individual workloads
@@ -194,7 +199,7 @@ public:
      * @param strategy the layer strategy, shaves do not matter
      * @return  measured best cycles or error code . \see Cycles for error codes
      */
-    CyclesInterfaceType Layer(DPULayer& layer, VPULayerStrategy strategy) {
+    virtual CyclesInterfaceType Layer(DPULayer& layer, VPULayerStrategy strategy) {
         return layer_cycles(layer, strategy.tiling_strategy, strategy.nDPUs, strategy.nTiles, strategy.input_fetching,
                             strategy.output_spilling, strategy.prefetching);
     }
@@ -208,12 +213,14 @@ public:
     // inside of VPULayerStrategy
 
     CyclesInterfaceType Layer_dCiM(DPULayer& layer, VPULayerStrategy strategy) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         Logger::info() << "DCIM LAYER:" << layer.get_layer_info();
         Logger::info() << strategy;
         return Cycles::ERROR_TILE_SPLIT_EXCEPTION;
     }
 
     CyclesInterfaceType Layer_dCiM(DPULayer& layer, VPULayerStrategy strategy, LayerSplitInfo& detailed_split) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         Logger::info() << "DCIM LAYER:" << layer.get_layer_info();
         Logger::info() << strategy;
         detailed_split.clear();
@@ -296,20 +303,20 @@ public:
      *
      * @return measured best cycles for the overall vector of layers or error code . \see Cycles for error codes
      */
-    CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
-                                       bool input_in_ddr, bool output_in_ddr, bool prefetching,
-                                       LayerSplitInfo& detailed_split,
-                                       const size_t fullLayerHash = 0,  // hash on layer only, computed by VPUX
-                                       const std::optional<VPUTilingStrategy> strategyOfSplit =
-                                               (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
+    virtual CyclesInterfaceType LayersPreSplit(
+            const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU, bool input_in_ddr, bool output_in_ddr,
+            bool prefetching, LayerSplitInfo& detailed_split,
+            const size_t fullLayerHash = 0,  // hash on layer only, computed by VPUX
+            const std::optional<VPUTilingStrategy> strategyOfSplit =
+                    (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
     ) {
         return layer_pre_split_cycles(layers_pre_split, nDPU, input_in_ddr, output_in_ddr, prefetching, &detailed_split,
                                       fullLayerHash, strategyOfSplit);
     }
 
     /// version without detailed split output parameter and no hash or tiling strategy.
-    CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
-                                       bool input_in_ddr, bool output_in_ddr, bool prefetching) {
+    virtual CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
+                                               bool input_in_ddr, bool output_in_ddr, bool prefetching) {
         return layer_pre_split_cycles(layers_pre_split, nDPU, input_in_ddr, output_in_ddr, prefetching, nullptr);
     }
 
@@ -319,7 +326,7 @@ protected:
      *
      * @return true if a DMACostModel is initialized, false otherwise
      */
-    bool is_dma_model_variant() {
+    bool is_dma_model_variant() const {
         return std::visit(
                 [](const auto& dma_model) {
                     return dma_model && dma_model->nn_initialized();
@@ -336,7 +343,7 @@ protected:
      * @param dwl A simple DMA descriptor (considers a simplistic 1D array transfer)
      * @return measured best cycles or error code. \see Cycles for error codes
      */
-    CyclesInterfaceType compute_dma_cycles(const DMATransfer1D& dwl) {
+    CyclesInterfaceType compute_dma_cycles(const DMATransfer1D& dwl) const {
         CyclesInterfaceType cost = Cycles::NO_ERROR;
 
         if (!is_dma_model_variant()) {
@@ -425,6 +432,8 @@ protected:
     CyclesInterfaceType layer_cycles(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU = 1,
                                      unsigned int nTiles = 1, bool input_in_ddr = false, bool output_in_ddr = false,
                                      bool prefetching = true, LayerSplitInfo* detailed_split = nullptr) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
+
         auto isSerializationON = [this]() {
             return serializer.is_serialization_enabled();
         };
@@ -731,7 +740,10 @@ protected:
             const std::optional<VPUTilingStrategy> strategyOfSplit =
                     (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
     ) {
-        const bool is_serialization_inhibited{(!strategyOfSplit.has_value()) || (fullLayerHash == 0)};  // no value no serialization
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
+
+        const bool is_serialization_inhibited{(!strategyOfSplit.has_value()) ||
+                                              (fullLayerHash == 0)};  // no value no serialization
 
         auto isSerializationON = [this, &is_serialization_inhibited]() {
             // enabled and NOT inhibited!
@@ -824,9 +836,9 @@ protected:
                     tiles_cost.push_back(cycles);
 
                     if (detailed_split) {
-                        detailed_split->emplace_back(
-                                OneTileLayerInfo{one_tile_layer, std::move(cost_and_workloads), std::move(all_intra_tile_splits)});  // only
-                                                                                                               // best
+                        detailed_split->emplace_back(OneTileLayerInfo{one_tile_layer, std::move(cost_and_workloads),
+                                                                      std::move(all_intra_tile_splits)});  // only
+                                                                                                           // best
                     }
                 } catch (const std::exception& e) {
                     Logger::warning() << "\n Exception thrown while performing intra tile split "
@@ -857,7 +869,8 @@ protected:
                 presplit_serializer.serialize(SerializableField<CyclesInterfaceType>{model_name_tag, cost});
                 presplit_serializer.serialize(SerializableField{"n_computed_tiles", tiles_layer.size()});
                 presplit_serializer.serialize(SerializableField<std::string>{"level", "layer"});
-                presplit_serializer.serialize(SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)});
+                presplit_serializer.serialize(
+                        SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)});
                 presplit_serializer.end();
 
                 auto& cfg = the_layer_validator.getDeviceConfiguratorForTiles(device);
@@ -874,12 +887,12 @@ protected:
                             SerializableField<decltype(strategy)>{"tiling_strategy", strategy},
                             SerializableField<std::string>{"level", "layer_tile_split"},
                             SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)},
-                            SerializableField<std::string>{
-                                    "info", spliLayer.get_layer_name() + "/#_" + std::to_string(idx)},
+                            SerializableField<std::string>{"info",
+                                                           spliLayer.get_layer_name() + "/#_" + std::to_string(idx)},
                             SerializableField<std::string>{"name", spliLayer.get_compiler_pass()});
 
-                    presplit_serializer.serialize(SerializableField<CyclesInterfaceType>{model_name_tag,
-                                                                        split.best_intra_tile_split.first});
+                    presplit_serializer.serialize(
+                            SerializableField<CyclesInterfaceType>{model_name_tag, split.best_intra_tile_split.first});
                     presplit_serializer.end();
 
                     for (size_t split_idx = 0; split_idx < split.all_intra_tile_splits.size(); split_idx++) {
@@ -888,8 +901,7 @@ protected:
                         for (size_t wl_idx = 0; wl_idx < wls.workloads.size(); wl_idx++) {
                             const auto& wl = wls.workloads[wl_idx];
                             const auto& wl_cost = wls.cycles[wl_idx];
-                            auto wl_op =
-                                    DPUOperation(wl, VPUCostModel::sanitizer.getDeviceConfiguration(wl.device));
+                            auto wl_op = DPUOperation(wl, VPUCostModel::sanitizer.getDeviceConfiguration(wl.device));
                             auto ss = std::stringstream();
                             ss << wl_op;
                             std::hash<std::string> hasher;
@@ -901,15 +913,15 @@ protected:
                                     SerializableField<decltype(nDPU)>{"n_dpu", nDPU},
                                     SerializableField<decltype(strategy)>{"tiling_strategy", strategy},
                                     SerializableField<std::string>{"level", "intra_tile_split"},
-                                    SerializableField<std::string>{"layer_uid",
-                                                                    std::to_string(serializer_layer_uid)},
+                                    SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)},
                                     SerializableField<std::string>{
                                             "info", spliLayer.get_layer_name() + "/#_" + std::to_string(idx)},
                                     SerializableField<std::string>{"intra_tile_seq_id",
-                                                                    "its_" + std::to_string(split_idx)},
+                                                                   "its_" + std::to_string(split_idx)},
                                     SerializableField<std::string>{"name", spliLayer.get_compiler_pass()},
                                     SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)});
-                            presplit_serializer.serialize(SerializableField<CyclesInterfaceType>{model_name_tag, wl_cost});
+                            presplit_serializer.serialize(
+                                    SerializableField<CyclesInterfaceType>{model_name_tag, wl_cost});
                             presplit_serializer.end();
                         }
                     }
@@ -1058,7 +1070,7 @@ public:
      * @param strategy the layer strategy
      * @return CyclesInterfaceType
      */
-    CyclesInterfaceType Layer(const SWOperation& layer, const VPULayerStrategy& strategy) {
+    virtual CyclesInterfaceType Layer(const SWOperation& layer, const VPULayerStrategy& strategy) const {
         return Layer(layer, strategy.nSHVs, strategy.nTiles, strategy.input_fetching, strategy.output_spilling);
     }
 
@@ -1069,7 +1081,7 @@ public:
      * @param strategy the layer strategy
      * @return CyclesInterfaceType
      */
-    CyclesInterfaceType Layer(const SHAVEWorkload& layer, const VPULayerStrategy& strategy) {
+    CyclesInterfaceType Layer(const SHAVEWorkload& layer, const VPULayerStrategy& strategy) const {
         return Layer(layer, strategy.nSHVs, strategy.nTiles, strategy.input_fetching, strategy.output_spilling);
     }
 
@@ -1084,7 +1096,7 @@ public:
      * @return CyclesInterfaceType
      */
     CyclesInterfaceType Layer(const SWOperation& layer, const unsigned int nSHV = 1, const unsigned int nTiles = 1,
-                              const bool input_in_ddr = false, const bool output_in_ddr = false) {
+                              const bool input_in_ddr = false, const bool output_in_ddr = false) const {
         // For shave layer we use a simplistic model, as we assume the cost can be scale up to 4 tiles
         const CyclesInterfaceType single_shv_cost = SHAVE(layer);
         CyclesInterfaceType cost = static_cast<CyclesInterfaceType>((float)single_shv_cost / ((float)(nSHV * nTiles)));
@@ -1121,7 +1133,7 @@ public:
      * @return CyclesInterfaceType
      */
     CyclesInterfaceType Layer(const SHAVEWorkload& layer, const unsigned int nSHV = 1, const unsigned int nTiles = 1,
-                              const bool input_in_ddr = false, const bool output_in_ddr = false) {
+                              const bool input_in_ddr = false, const bool output_in_ddr = false) const {
         // For shave layer we use a simplistic model, as we assume the cost can be scale up to 4 tiles
         std::string infoOut;
         const CyclesInterfaceType single_shv_cost = SHAVE_2(layer, infoOut);
@@ -1168,7 +1180,7 @@ protected:
      * @param layer the DPULayer, expected to be a layer allocated to this tile
      * @return CyclesInterfaceType
      */
-    CyclesInterfaceType OneTileWeightsPrefetching(const DPULayer& layer) {
+    CyclesInterfaceType OneTileWeightsPrefetching(const DPULayer& layer) const {
         const auto& config = getDeviceConfiguratorForTiles(layer.device);
 
         const auto in_1_movable_size = layer.weight_footprint(config);

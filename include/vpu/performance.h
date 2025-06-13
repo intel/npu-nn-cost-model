@@ -314,6 +314,7 @@ inline constexpr CyclesInterfaceType get_DMA_latency_NPU40_Legacy(MemoryLocation
 }
 
 inline constexpr CyclesInterfaceType get_DMA_latency_NPU_RESERVED_Legacy(MemoryLocation location) {
+    //@todo: update for VPU_RESERVED actual latency (now a clone of 2.7)
     constexpr VPUDevice const_device{VPUDevice::NPU_RESERVED};
     constexpr int dramLatency_Nanoseconds{956};   // nanoseconds
     constexpr int cmxLatency_CMXClockCycles{16};  // 16 clock cycles at VPU frequency
@@ -343,7 +344,7 @@ inline constexpr CyclesInterfaceType get_DMA_latency_Legacy(VPUDevice device, Me
         return get_DMA_latency_NPU40_Legacy(location);
     } break;
     case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W: {
+    case VPUDevice::NPU_RESERVED_W: {  //@todo: update for VPU_RESERVED actual latency (now a clone of 2.7)
         return get_DMA_latency_NPU_RESERVED_Legacy(location);
     } break;
 
@@ -368,6 +369,7 @@ inline constexpr CyclesInterfaceType get_DMA_latency_NPU40(MemoryLocation locati
 }
 
 inline constexpr CyclesInterfaceType get_DMA_latency_NPU_RESERVED(MemoryLocation location) {
+    //@todo: update for VPU_RESERVED actual latency (now a clone of 2.7)
     constexpr VPUDevice const_device{VPUDevice::NPU_RESERVED};
     constexpr int dramLatency_Nanoseconds{300};   //  nanoseconds
     constexpr int cmxLatency_CMXClockCycles{32};  // 32 clock cycles at VPU frequency

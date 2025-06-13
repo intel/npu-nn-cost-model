@@ -27,7 +27,7 @@ void n_index(int n_index, float* data, unsigned int* index, unsigned int size) {
     }
 }
 
-void neighbours_idx(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* activations, int n_neighbours,
+void neighbours_idx(const VPUNN::Tensor<float>* weights, const VPUNN::Tensor<float>* activations, int n_neighbours,
                     VPUNN::Tensor<unsigned int>& indexes, VPUNN::Tensor<float>& distances) {
     // activations is of the shape [Batch, embedding]
     // weights is of the shape [items, embedding]
@@ -49,8 +49,8 @@ void neighbours_idx(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* activat
     }
 }
 
-void VPUNN::kNN(VPUNN::Tensor<float>* weights, VPUNN::Tensor<float>* targets, VPUNN::Tensor<float>* activations,
-                VPUNN::Tensor<float>* output, unsigned int n_neighbours) {
+void VPUNN::kNN(const VPUNN::Tensor<float>* weights, const VPUNN::Tensor<float>* targets,
+                const VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output, unsigned int n_neighbours) {
     if (n_neighbours < 1) {
         // precondition not met!
         return;

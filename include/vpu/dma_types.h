@@ -131,6 +131,7 @@ struct DMAWorkload {
  *
  * This is particular for NPU2.7.
  */
+/* coverity[rule_of_five_violation:FALSE] */
 struct DMANNWorkload_NPU27 {
     VPUDevice device;  ///< NPU device
 
@@ -251,6 +252,7 @@ struct DMANNWorkload_NPU27 {
 /// placeholder/reserved name
 /// DMA descriptor for NPU4.0++
 /// 6D addressing mode
+/* coverity[rule_of_five_violation:FALSE] */
 struct DMANNWorkload_NPU40_RESERVED {
     VPUDevice device;  ///< NPU device,  creation via create_DMANNWorkload_NPUXX functions ensures also proper init,
                        ///< otherwise please init explicitly

@@ -111,6 +111,7 @@ TEST_F(TestVPUNNPerformanceModel, LatencyTests) {
     // 4.0 not yet available
     EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_4_0, MemoryLocation::DRAM), 510);  // 1625 956ns @1700Mhz
     EXPECT_EQ(get_DMA_latency(VPUDevice::VPU_4_0, MemoryLocation::CMX), 56);    // 32 cyc @ 971MHZ => 56.x @1700
+
 }
 TEST_F(TestVPUNNPerformanceModel, LatencyTestsLegacy) {
     // tests to prove compiletime calculations of constants

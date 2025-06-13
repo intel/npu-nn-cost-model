@@ -33,6 +33,7 @@
 namespace VPUNN {
 
 /// @brief specific VPU2.0 configuration possibilities, for workload, not layer
+/* coverity[rule_of_five_violation:FALSE] */
 class VPU2_0_WorkloadValidValues : public IDeviceValidValues {
 public:
     VPU2_0_WorkloadValidValues(const VPU2_0_WorkloadValidValues&) noexcept(false) = default;

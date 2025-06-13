@@ -347,7 +347,10 @@ protected:
         // this rule is here only for Fathom compliance, must be clarified in the future what's actually required.
         // Especially device dependency is a design break
         const auto is_16_align = dtype_to_bytes(dpu.input_1.datatype) > 1 || dpu.device == VPUDevice::VPU_2_7;
-        dpu.input_1.channels = config.align_to(dpu.kernel.height * dpu.kernel.width, is_16_align ? 16 : 32);
+        dpu.input_1.channels = config.align_to(
+            static_cast<long long>(dpu.kernel.height) * static_cast<long long>(dpu.kernel.width),
+            is_16_align ? 16 : 32
+        );
 
         dpu.input_1.batch = dpu.output_0.channels;
     }
@@ -369,7 +372,10 @@ protected:
         {
             // this rule is here only for Fathom compliance, must be clarified in the future what's actually required
             const int multiple{dtype_to_bytes(w.datatype) > 1 ? 16 : config.get_specific_weigths_alignment()};
-            w.channels = config.align_to(kernel.height * kernel.width, multiple);
+            w.channels = config.align_to(
+                static_cast<long long>(kernel.height) * static_cast<long long>(kernel.width),
+                multiple
+            );
         }
         w.batch = out_0.channels;
     }

@@ -1151,4 +1151,5 @@ TEST_F(DPU_WorkloadValidatorTest, Memory_Output_32Bits_NPU40) {
                 << wl;
     }
 }
+
 }  // namespace VPUNN_unit_tests

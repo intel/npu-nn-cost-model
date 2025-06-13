@@ -256,6 +256,7 @@ Available Softmax Operation from VPUEM:
 Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
 
+
 ## VPUEM Operators NPU_RESERVED
 
 A Piecewise Operation is a simple operation based on a 3 slopes equation. Available Piecewise Operations from VPUEM:

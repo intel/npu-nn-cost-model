@@ -15,10 +15,10 @@ namespace VPUNN {
 class PerformanceMode {
 public:
     static constexpr bool forceLegacy_G4{true};
-    static constexpr bool forceLegacy_G5{true};
+    static constexpr bool forceLegacy_G5{false};
 
     /// if true allows legacy swizzling for G5, otherwise applies sanitization
-    static constexpr bool allowLegacySwizzling_G5{true};
+    static constexpr bool allowLegacySwizzling_G5{false};
 };
 
 }  // namespace VPUNN

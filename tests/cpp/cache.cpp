@@ -18,6 +18,7 @@
 #include <vector>
 #include "core/serializer.h"
 #include "vpu/compatibility/types11.h"
+#include "vpu/compatibility/types14.h"
 #include "vpu_cost_model.h"
 
 /// @brief namespace for Unit tests of the C++ library

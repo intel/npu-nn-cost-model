@@ -1631,7 +1631,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767) {
 
         const DMAWorkload wl{case1.t_in};
         auto dma_now = cm.DMA(wl);
-        auto dma_n = cm.DMATheoreticalCyclesRESERVED_ON(wl);
+        auto dma_n = cm.DMATheoreticalCycles_RESERVED_ON(wl);
         auto dma_o = cm.DMATheoreticalCyclesLegacyLNL(wl);
 
         EXPECT_EQ(dma_now, PerformanceMode::forceLegacy_G4 ? 1891 : 644);

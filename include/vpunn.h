@@ -24,7 +24,10 @@ namespace VPUNN {
  */
 class Runtime {
 private:
-    InferenceModel model;  ///< the NN loaded from a file/buffer (flatbuffer)
+    const InferenceModel model;                ///< the NN loaded from a file/buffer (flatbuffer)
+    InferenceExecutionData model_buffer_data;  ///< the memory/buffers used for executing a model (in/out and inter
+                                               ///< layer buffers). It is paired with the model at creation.
+
     const bool profile;
     ModelVersion model_version;  ///< holds the version info about the loaded model
 
@@ -37,9 +40,8 @@ public:
      * @param profile enable/disable profiling
      */
     explicit Runtime(const std::string& filename, const unsigned int batch = 1, bool profile = false)
-            : model(filename.c_str()), profile(profile), model_version() {
+            : model(filename.c_str()), model_buffer_data(batch, model.get_model()), profile(profile), model_version() {
         if (initialized()) {
-            model.allocate_tensors(batch);  // might throw
             model_version.parse_name(model.network_name());
         }
     }
@@ -65,9 +67,11 @@ public:
      */
     explicit Runtime(const char* model_data, size_t model_data_length, bool copy_model_data,
                      const unsigned int batch = 1, bool profile = false)
-            : model(model_data, model_data_length, copy_model_data), profile(profile), model_version() {
+            : model(model_data, model_data_length, copy_model_data),
+              model_buffer_data(batch, model.get_model()),
+              profile(profile),
+              model_version() {
         if (initialized()) {
-            model.allocate_tensors(batch);  // might throw
             model_version.parse_name(model.network_name());
         }
     }
@@ -82,13 +86,14 @@ public:
         return model.is_initialized();
     }
 
+private:
     /**
      * @brief Get the model input tensors
      *
      * @return std::vector<Tensor<float>*>
      */
-    std::vector<Tensor<float>*> input_tensors() {
-        return model.input_tensors();
+    std::vector<const Tensor<float>*> input_tensors() const {
+        return model_buffer_data.input_tensors();
     }
 
     /**
@@ -96,18 +101,19 @@ public:
      *
      * @return std::vector<Tensor<float>*>
      */
-    std::vector<Tensor<float>*> output_tensors() {
-        return model.output_tensors();
+    std::vector<const Tensor<float>*> output_tensors() const {
+        return model_buffer_data.output_tensors();
     }
 
+public:
     /**
      * @brief Get the model input tensors shapes
      *
      * @return std::vector<std::vector<unsigned int>>
      */
-    std::vector<std::vector<unsigned int>> input_shapes() {
+    std::vector<std::vector<unsigned int>> input_shapes() const {
         std::vector<std::vector<unsigned int>> shapes;
-        for (auto tensor : input_tensors()) {
+        for (const auto& tensor : input_tensors()) {
             shapes.push_back(tensor->shape());
         }
         return shapes;
@@ -118,9 +124,9 @@ public:
      *
      * @return std::vector<std::vector<unsigned int>>
      */
-    std::vector<std::vector<unsigned int>> output_shapes() {
+    std::vector<std::vector<unsigned int>> output_shapes() const {
         std::vector<std::vector<unsigned int>> shapes;
-        for (auto tensor : output_tensors()) {
+        for (const auto& tensor : output_tensors()) {
             shapes.push_back(tensor->shape());
         }
         return shapes;
@@ -136,14 +142,14 @@ public:
      */
     template <class T>
     const T* predict(const T* input_array, const unsigned int input_size) {
-        model.set_inputs(input_array, input_size);  // might throw if input mismatch
+        model_buffer_data.set_inputs(input_array, input_size);  // might throw if input mismatch
         const auto t1{profile ? tick() : no_tick()};
-        model.predict();
+        model.predict(model_buffer_data);
         if (profile) {
             const auto delta = tock(t1);
             Logger::info() << "Execution time: " << delta << " ms";
         }
-        return model.get_outputs<T>();
+        return model_buffer_data.get_outputs<T>();
     }
 
     /**
@@ -155,15 +161,15 @@ public:
      */
     template <class T>
     const std::vector<T> predict(const std::vector<T>& input_tensor) {
-        model.set_inputs(input_tensor.data(),
-                         static_cast<unsigned int>(input_tensor.size()));  // might throw if input mismatch
+        model_buffer_data.set_inputs(input_tensor.data(),
+                                     static_cast<unsigned int>(input_tensor.size()));  // might throw if input mismatch
         const auto t1{profile ? tick() : no_tick()};
-        model.predict();
+        model.predict(model_buffer_data);
         if (profile) {
             const auto delta = tock(t1);
             Logger::info() << "Execution time: " << delta << " ms";
         }
-        return model.get_outputs_vector<T>();
+        return model_buffer_data.get_outputs_copy_as_vector<T>();
     }
 };
 

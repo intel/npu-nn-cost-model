@@ -42,7 +42,8 @@
 #include "vpu/shave/shave_collection.h"
 #include "vpu/shave/shave_devices.h"
 
-#include <core/serializer.h>
+#include "core/serializer.h"
+#include "vpu/vpu_mutex.h"
 
 #include <typeinfo>
 
@@ -102,7 +103,10 @@ protected:
  *
  */
 template <class DMADesc>
-class VPUNN_API(DMACostModel) {
+class VPUNN_API(DMACostModel)
+        : virtual protected VPU_MutexAcces  // for mutex access
+{
+protected:
 public:
     using DescType = DMADesc;  ///< Useful for deducing the type of the descriptor
 
@@ -112,9 +116,9 @@ private:
     IPreprocessingDMA<float, DMADesc>&
             preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
     LRUCache<std::vector<float>, float>
-            cache;             ///< cache for inferred values, used only for single workload, not for batches
-    CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
-    CSVSerializer cache_miss_serializer;  ///< serializer for missed cache DMADesc workloads
+            cache;  ///< cache for inferred values, used only for single workload, not for batches
+    mutable CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
+    mutable CSVSerializer cache_miss_serializer;    ///< serializer for missed cache DMADesc workloads
 
     /// @brief obtains the actual preprocessing instance from factory. The factory must live longer than the instance
     /// created. warning: Throws if not possible
@@ -194,7 +198,7 @@ private:
     /// The result may be impossibility to run (if smaller) or leaving empty zeros at the end (only partial fill)
     ///
     void correlate_preprocessor_with_model_inputs() {
-        const auto model_input_size = vpunn_runtime.input_tensors()[0]->shape()[1];
+        const auto model_input_size{(vpunn_runtime.input_shapes()[0])[1]};
         const auto preprocessing_output_size = preprocessing.output_size();
         if (model_input_size != preprocessing_output_size) {
             Logger::warning() << "Changing preprocessing DMA output size (" << preprocessing_output_size
@@ -246,7 +250,8 @@ public:
         Logger::initialize();
 
         interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
-        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
+        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE,
+                                         get_names_for_serializer());
         check_post_config(vpunn_runtime.model_version_info());
 
         if (!vpunn_runtime.initialized()) {
@@ -282,7 +287,8 @@ public:
         Logger::initialize();
 
         interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
-        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
+        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE,
+                                         get_names_for_serializer());
 
         check_post_config(vpunn_runtime.model_version_info());
 
@@ -309,6 +315,7 @@ protected:
 public:
     /**
      * @brief Compute the NN Output of a specific workload
+     * NO Threadsafe protection planned here. DO NOT USE directly!
      * takes in consideration the cache
      * no sanitation is done
      * no check if network exists
@@ -343,6 +350,7 @@ public:
         return *cached_value;
     }
 
+public:
     /// @brief exposed only for debug purposes, populates the NN descriptor
     /// Does not run the model, or checks the validity of the workload.
     ///
@@ -407,6 +415,7 @@ public:
      *
      */
     CyclesInterfaceType computeCycles(const DMADesc& wl) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         std::string dummy_info{};
         return computeCycles(wl, dummy_info);
     }
@@ -417,6 +426,7 @@ public:
     /// @param li will collect error info regarding wl checking.
     /* coverity[pass_by_value] */
     std::tuple<CyclesInterfaceType, std::string> computeCyclesMsg(DMADesc wl) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         std::string dummy_info{};
         auto previous_print_mode{Checker::set_print_tags(false)};
         const auto r{computeCycles(wl, dummy_info)};
@@ -429,6 +439,7 @@ public:
     /// @param wl the workload to infer on
     /// @param info [out] will collect error info regarding wl checking.
     CyclesInterfaceType computeCycles(const DMADesc& wl, std::string& info) {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         return Execute_and_sanitize(wl, info);
     }
 
@@ -559,12 +570,12 @@ private:
                     serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), dim.src_dim_size});
                     serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), dim.dst_dim_size});
                 }
-                
-                for(int i = wl.num_dim; i < wl.MaxExtraDimensions; i++){
+
+                for (int i = wl.num_dim; i < wl.MaxExtraDimensions; i++) {
                     serializer.serialize(SerializableField{"src_stride_" + std::to_string(i + 1), 0});
                     serializer.serialize(SerializableField{"dst_stride_" + std::to_string(i + 1), 0});
                     serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), 0});
-                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), 0});  
+                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), 0});
                 }
 
                 serializer.serialize(SerializableField{"num_engine", wl.num_engine});
@@ -583,7 +594,6 @@ private:
     CyclesInterfaceType convert_from_sizeDivCycle_to_DPUCyc(
             float nn_size_div_cycle,  // [0 to 1], 0% to 100% of  device's bytes per cycle
             const DMADesc& wl, std::string& info) const {
-
         const auto maxBytesPerCycle{get_DMA_DDR_interface_bytes(wl.device)};
         const auto raw_bandwith_BPC{nn_size_div_cycle *
                                     maxBytesPerCycle};  // range 0 to device bytes per cycle (full max speed) .

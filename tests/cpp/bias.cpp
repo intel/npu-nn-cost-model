@@ -12,12 +12,13 @@
 #include <cmath>
 #include <iostream>
 #include <numeric>
+#include <random>
 #include <vector>
 #include "core/tensors.h"
-#include <random>
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 class TestBiasLayer : public testing::Test {
 public:
@@ -28,13 +29,15 @@ protected:
         auto bias = VPUNN::Tensor<float>({1, vector_size}, 0);
         auto output = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
         auto input = VPUNN::Tensor<float>({batch_size, vector_size}, 0);
-        std::random_device rd;  // create a random device to obtain a seed for the random number generator
-        std::mt19937 gen(rd()); // initialize the random number generator with the random seed
-        std::uniform_real_distribution<float> distrib(0.0, 1.0);  // uniform distribution, range{0.0, 1.0}, we chose this range because of the old code: rand()/RAND_MAX 
+        std::random_device rd;   // create a random device to obtain a seed for the random number generator
+        std::mt19937 gen(rd());  // initialize the random number generator with the random seed
+        std::uniform_real_distribution<float> distrib(0.0, 1.0);  // uniform distribution, range{0.0, 1.0}, we chose
+                                                                  // this range because of the old code: rand()/RAND_MAX
 
         for (unsigned int idx = 0; idx < batch_size * vector_size; idx++) {
-            auto random_number = distrib(gen); //old code: static_cast<float>(rand()) / (static_cast<float>(RAND_MAX));
-            input[idx] = random_number; 
+            auto random_number = distrib(gen);  // old code: static_cast<float>(rand()) /
+                                                // (static_cast<float>(RAND_MAX));
+            input[idx] = random_number;
             output[idx] = random_number;
         }
 
@@ -42,10 +45,11 @@ protected:
             bias[idx] = distrib(gen);  // old code: static_cast<float>(rand()) / (static_cast<float>(RAND_MAX));
         }
 
-        VPUNN::BiasOp biasOperator;
+        BiasOp biasOperator;
+        BiasOpBuffer biasBuffer;
 
-        biasOperator.reserve_bias_space(batch_size);
-        biasOperator.Bias(&bias, &output);
+        biasBuffer.reserve_bias_space(batch_size);
+        biasOperator.Bias(&bias, &output, biasBuffer);
 
         for (unsigned int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
             for (unsigned int vector_idx = 0; vector_idx < vector_size; vector_idx++) {
