@@ -64,11 +64,11 @@ TEST_F(TestRuntime, CreationBasicTest) {
         auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
         EXPECT_TRUE(runtime_model_bc.initialized());
 
-        EXPECT_EQ(runtime_model_f.input_tensors().size(), runtime_model_b.input_tensors().size());
-        EXPECT_EQ(runtime_model_f.output_tensors().size(), runtime_model_b.output_tensors().size());
+        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_b.input_shapes().size());
+        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_b.output_shapes().size());
 
-        EXPECT_EQ(runtime_model_f.input_tensors().size(), runtime_model_bc.input_tensors().size());
-        EXPECT_EQ(runtime_model_f.output_tensors().size(), runtime_model_bc.output_tensors().size());
+        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_bc.input_shapes().size());
+        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_bc.output_shapes().size());
 
         EXPECT_EQ(runtime_model_f.model_version_info().get_raw_name(),
                   runtime_model_bc.model_version_info().get_raw_name());
@@ -89,11 +89,11 @@ TEST_F(TestRuntime, CreationBasicTest) {
         auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
         EXPECT_TRUE(runtime_model_bc.initialized());
 
-        EXPECT_EQ(runtime_model_f.input_tensors().size(), runtime_model_b.input_tensors().size());
-        EXPECT_EQ(runtime_model_f.output_tensors().size(), runtime_model_b.output_tensors().size());
+        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_b.input_shapes().size());
+        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_b.output_shapes().size());
 
-        EXPECT_EQ(runtime_model_f.input_tensors().size(), runtime_model_bc.input_tensors().size());
-        EXPECT_EQ(runtime_model_f.output_tensors().size(), runtime_model_bc.output_tensors().size());
+        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_bc.input_shapes().size());
+        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_bc.output_shapes().size());
 
         EXPECT_EQ(runtime_model_f.model_version_info().get_raw_name(),
                   runtime_model_bc.model_version_info().get_raw_name());

@@ -38,7 +38,7 @@ static_assert(false, "VPU_4_1_MODEL_PATH is not defined, please define it in CMa
 
 // default path to DMA NN Models
 #ifndef VPU_DMA_2_7_MODEL_PATH
-#define VPU_DMA_2_7_MODEL_PATH "../../../models/dma_2_7.vpunn"
+#define VPUDevice::NPU_RESERVED "../../../models/dma_2_7.vpunn"
 #endif
 
 #ifndef VPU_DMA_2_7_G4_MODEL_PATH

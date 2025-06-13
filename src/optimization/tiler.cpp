@@ -236,7 +236,8 @@ public:
         if (layer_on_tile.device < VPUDevice::NPU_RESERVED  //
             || (force_LegacyZTiling)                   // Every device runs as before
         ) {                                            // Some layers have a max size in Z by specification
-            const auto validZTiles{requireMaxZTile(layer_on_tile) ? std::vector<unsigned int>({16, 32, 64})
+            const std::vector<unsigned int> validZTiles{requireMaxZTile(layer_on_tile)
+                                                                ? std::vector<unsigned int>({16, 32, 64})
                                                                   : std::vector<unsigned int>({})};
             splitOverZ(layer_on_tile, splitPool, mode, nWorkloads, validZTiles);
         } else {  // experimental for new devices
@@ -293,7 +294,7 @@ protected:
 
         ITilerAlgorithm::setWorkloadsModeAndInfereInputShape(workloads_split, mode,
                                                              layer);  // computes also input tensor
-        splitPool.push_back(workloads_split);
+        splitPool.push_back(std::move(workloads_split));
     }
 };
 

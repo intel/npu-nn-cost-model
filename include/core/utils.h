@@ -170,7 +170,8 @@ inline const std::string vec2int_str(const std::vector<float>& vec) {
 
     auto format_number = [&](auto value) -> std::string_view {
         thread_local char buffer[10];  // Thread local to avoid multithreading issues, max 10 characters numbers
-        int len = std::snprintf(buffer, sizeof(buffer), "%d:", static_cast<int>(std::floor(value)));
+        int len = std::snprintf(buffer, sizeof(buffer),
+                                "%d:", static_cast<int>(std::floor(value)));  // TODO, do not use floor (eg for sparsity)
         return std::string_view(buffer, len);
     };
 
@@ -196,14 +197,43 @@ inline const std::string vec2int_str(const std::vector<int>& vec) {
     }
     return result;  // RVO
 }
+constexpr uint32_t fnv_prime = 0x01000193;  // FNV-1a prime
+constexpr uint32_t fnv_offset_basis = 0x811c9dc5;  // FNV-1a offset basis
 
 // 32b Fowler-Noll-Vo hash function with string input
 inline uint32_t fnv1a_hash(const std::string& str) {
-    uint32_t h = 0x811c9dc5;  // FNV-1a base
+    uint32_t h = fnv_offset_basis;  // FNV-1a base
+
     for (char c : str) {
         h ^= c;
-        h *= static_cast<uint32_t>(0x01000193);  // FNV-1a prime
+        h *= fnv_prime;  // FNV-1a prime
     }
+    return h;
+}
+
+// Function to calculate the FNV-1a hash of a vector of floats, treating them as integers.
+// force_fractional_rescale: if true, rescale the fractional floats (0, +-1) to an integer value to avoid precision related hash issues
+// Needed for eg. sparsity values.
+inline uint32_t fnv1a_hash(const std::vector<float>& vec, const bool force_fractional_rescale = true) {
+    uint32_t h = fnv_offset_basis;
+
+    for (const float c : vec) {
+        uint32_t value;
+        if (force_fractional_rescale) {
+            float scaled_value = c * 100.0f;
+            value = (c < 1.0f && c > -1.0f && c != 0.0f) ? static_cast<uint32_t>(scaled_value)
+                                                         : static_cast<uint32_t>(c);
+        } else {
+            value = static_cast<uint32_t>(c);
+        }
+
+        // For each byte in the integer, apply the FNV-1a hash
+        h = (h ^ (value & 0xFF)) * fnv_prime;
+        h = (h ^ ((value >> 8) & 0xFF)) * fnv_prime;
+        h = (h ^ ((value >> 16) & 0xFF)) * fnv_prime;
+        h = (h ^ (value >> 24)) * fnv_prime;
+    }
+
     return h;
 }
 
@@ -226,7 +256,7 @@ struct NNDescriptor {
     }
 
     uint32_t hash() const {
-        return fnv1a_hash(vec2int_str(_desc));
+        return fnv1a_hash(_desc);
     }
 };
 

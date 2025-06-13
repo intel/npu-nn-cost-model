@@ -10,9 +10,10 @@
 #include <gtest/gtest.h>
 #include <sstream>  // for error formating
 #include "common_helpers.h"
-// #include "vpu_layer_cost_model.h"
 #include "core/logger.h"
 #include "vpu/optimization/dimension_tiler.h"
+
+#include "vpu/optimization/tiler.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -384,5 +385,195 @@ TEST_F(DPUTilerTest, Range16_32_64_BIGTest) {
         EXPECT_NO_THROW(dut_local.divideBalanced(1200, i, result));
     }
 }
+
+class ZTilingTest : public ::testing::Test {
+public:
+
+protected:
+    static constexpr bool legacy_ztiling_flag{
+        #ifdef VPUNN_OPT_LEGACY_ZTILING
+                true
+        #else
+                false
+        #endif
+    };
+    
+    // values for channels that should be splitted, correlated the names mentioned above
+    const std::vector<unsigned int> k_values {
+        128U,
+        512U,
+        333U
+    };
+
+    // Reusing same workload, and changing only the output channels on which the algorithm is tested
+    const std::vector < VPUNN::DPUWorkload> test_wl = [this]() {
+        std::vector<VPUNN::DPUWorkload> tmp;
+        for (size_t i = 0; i < k_values.size(); i++) {
+            tmp.push_back(VPUNN::DPUWorkload{VPUNN::VPUDevice::NPU_RESERVED,
+                                        VPUNN::Operation::CONVOLUTION,
+                                        {VPUNN::VPUTensor(64, 108, 256, 1, VPUNN::DataType::UINT8,
+                                                            Layout::ZXY)},   // input dimensions
+                                        {VPUNN::VPUTensor(21, 36, k_values[i], 1, VPUNN::DataType::UINT8,
+                                                            Layout::ZXY)},   // output dimensions
+                                        {3, 3},                              // kernels
+                                        {3, 3},                              // strides
+                                        {0, 0, 0, 0},                        // padding
+                                        VPUNN::ExecutionMode::CUBOID_16x16,  // execution mode
+                                        VPUNN::ActivationFunction::NONE,     // activation
+                                        0.0F,                                // act_sparsity
+                                        0.0F,                                // weight_sparsity
+                                        {swz_def, swz_def},                  // input_swizzling
+                                        {swz_def},                           // output_swizzling
+                                        1,                                   // output_write_tiles
+                                        {0, 0, 0, 0},                        // offsets
+                                        VPUNN::ISIStrategy::CLUSTERING,      // isi_strategy
+                                        false});
+        }
+        return tmp;
+    }(); // declaring lambda with immediate invokation for const array expressions
+};
+
+TEST_F(ZTilingTest, splitInNOverZOffset_Test) {
+
+    struct TestInput {
+        DPUWorkload wl;
+        unsigned int nWorkloads;
+    };
+
+    struct TestExpectations {
+        std::vector<unsigned int> channels_offset_gt;
+    };
+
+    struct TestCase {
+    public:
+        TestInput t_in;
+        TestExpectations t_exp;
+
+        std::string toString() const {
+            std::stringstream ss;
+            ss << "\nTest case for: \n"
+               << "\tInput:\n"
+               << "\t\tChannels: " << t_in.wl.outputs[0].z() << "\n"
+               << "\t\tWorkloads number: " << t_in.nWorkloads << "\n"
+               << "\tExpectations: \n"
+               << "\t\tOffset ground truth of length " << t_exp.channels_offset_gt.size() << ": {";
+            for (size_t i = 0; i < t_exp.channels_offset_gt.size(); i++) {
+                ss << t_exp.channels_offset_gt[i];
+                if (i != t_exp.channels_offset_gt.size() - 1)
+                    ss << ", ";
+            }
+            ss << "}\nLegacy_ZTiling_Flag is " << (legacy_ztiling_flag ? "True" : "False") << "\n";
+            return ss.str();
+        };
+    };
+
+    using TestVector = std::vector<TestCase>;
+
+    const ExecutionMode mode{ExecutionMode::CUBOID_8x16};
+    const SplitOptions options{128U,  ///< Maximum number of workloads available. Default is 128 because of FIFO size
+                               0,     ///< Number of DPU to optimize for. maxLatencyMs = 0 means full search
+                               0,  ///< Number of DPU to optimize for. Setting nDPU = 0 VPUNN auto-detects the number of
+                                   ///< DPUs based on the device
+                               0,  ///< Per workload runtime overhead in cycles
+                               VPUOptimizationTarget::LATENCY,
+                               {VPUSplitStrategy::Z_TILING}};
+
+    auto exec_tests = [&options, modeInternal = mode](TestVector& tests) {
+
+        for (auto& t : tests) {
+
+            DPULayer layer{t.t_in.wl};
+            TilingAlgorithmsContainer tiler_z = getTilingAlgorithms(layer, options);
+            ASSERT_TRUE(tiler_z.front() != nullptr) << "Could not retrieve the ZTiling algorithm from ITilerAlgorithm interface"
+                                            << t.toString();
+
+            // Use the method for splitting and extracting the splitPool with it's offset setted
+            std::list<DPUWorkloadsWithCyclesSplit> splitPool =
+                    tiler_z.front()->split_tile_in_workloads(modeInternal, t.t_in.nWorkloads);
+
+            // If it is a valid split case it means that the ground truth offset vector shouldn't be emtpy
+            if (splitPool.empty()) {
+                ASSERT_EQ(t.t_exp.channels_offset_gt.size(), 0) << "For a single ZTiling algorithm test case, there "
+                                                                   "should be only 1 split pool if success, and 0 "
+                                                                   "if the split is impossible"
+                                                                << t.toString();
+            } else {
+                const auto& workloads = splitPool.front().workloads;
+                std::stringstream ss;
+                ss << "{ ";
+                for (const auto& w : workloads) {
+                    ss << w.offsets[Dim::Act::Z] << " ";
+                }
+                ss << "}";
+
+                ASSERT_EQ(workloads.size(), t.t_exp.channels_offset_gt.size())
+                        << t.toString() << "\n\tWorkloads " << "of length " << workloads.size()
+                        << " values : " << ss.str();
+            }
+
+            if (t.t_exp.channels_offset_gt.size() != 0) {
+                // Extract the only available split
+                DPUWorkloadsWithCyclesSplit split = splitPool.front();
+
+                EXPECT_EQ(split.workloads.size(), t.t_in.nWorkloads);
+                for (unsigned int i = 0; i < t.t_in.nWorkloads; i++) {
+                    EXPECT_EQ(split.cycles[i], Cycles::NO_ERROR) << Cycles::toErrorText(split.cycles[i]);
+                    EXPECT_EQ(split.workloads[i].offsets[Dim::Act::Z], t.t_exp.channels_offset_gt[i])
+                            << t.toString()
+                            << "Failed for offset number: " << i << "\n";
+                }
+            }
+        }
+    };
+
+    // This test-set is used only when force_LegacyZTiling flag from tiler.cpp is ON
+    // For force_LegacyZTiling flag ON, for test to pass it should:
+    //  have Z dimension of input Tensor bigger than 16, and divisible by 16
+    //  then it will find nearest number divisible by 16 of channels/nWorkload expression
+    //  but if the result of division is < 16, then it will round up to 16
+    TestVector tests = {
+        { {test_wl[0], 4U}, {{0U, 32U, 64U, 96U}} }, // same expectation
+        { {test_wl[1], 3U}, {{0U, 176U, 352U}} },    // same expectation
+        {
+            {test_wl[1], 64U},
+            legacy_ztiling_flag
+                    ? TestExpectations{{0U,   16U,  32U,  48U,  64U,  80U,  96U,  112U, 128U, 144U, 160U,
+                                        176U, 192U, 208U, 224U, 240U, 256U, 272U, 288U, 304U, 320U, 336U,
+                                        352U, 368U, 384U, 400U, 416U, 432U, 448U, 464U, 480U, 496U, 512U,
+                                        528U, 544U, 560U, 576U, 592U, 608U, 624U, 640U, 656U, 672U, 688U,
+                                        704U, 720U, 736U, 752U, 768U, 784U, 800U, 816U, 832U, 848U, 864U,
+                                        880U, 896U, 912U, 928U, 944U, 960U, 976U, 992U, 1008U}}
+                    : TestExpectations{{}}
+        },
+        {
+            {test_wl[0], 64U},
+            legacy_ztiling_flag
+                     ? TestExpectations{{0U,   16U,  32U,  48U,  64U,  80U,  96U,  112U, 128U, 144U, 160U, 176U, 192U,
+                                         208U, 224U, 240U, 256U, 272U, 288U, 304U, 320U, 336U, 352U, 368U, 384U, 400U,
+                                         416U, 432U, 448U, 464U, 480U, 496U, 512U, 528U, 544U, 560U, 576U, 592U, 608U,
+                                         624U, 640U, 656U, 672U, 688U, 704U, 720U, 736U, 752U, 768U, 784U, 800U, 816U,
+                                         832U, 848U, 864U, 880U, 896U, 912U, 928U, 944U, 960U, 976U, 992U, 1008U}}
+                     : TestExpectations{{}}
+        },
+        {
+            {test_wl[0], 13U},
+            legacy_ztiling_flag
+                     ? TestExpectations{{0U,   16U,  32U,  48U,  64U,  80U,  96U,  112U, 128U, 144U, 160U, 176U, 192U}}
+                     : TestExpectations{{}}
+        },
+        {
+            {test_wl[1], 5U},       
+            legacy_ztiling_flag 
+                     // divides it in equal slices with 112 offset each, even though it takes more space, because the division is not even
+                     ? TestExpectations{{0U, 112U, 224U, 336U, 448U}} 
+                     // divides in slices with 112 and 96 offset, without additional offset space, and sums up to 512 channels
+                     : TestExpectations{{0U, 112U, 224U, 320U, 416U}}
+        },
+        { {test_wl[2], 4U}, {} },   // same expectations
+        { {test_wl[2], 55U}, {} }   // same expectations 
+    };
+
+    exec_tests(tests);
+    }
 
 }  // namespace VPUNN_unit_tests
