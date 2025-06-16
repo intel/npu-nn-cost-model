@@ -13,13 +13,16 @@
 #include <string>
 
 #include "vpu/dpu_dcim_workload.h"
+#include "vpu/vpu_mutex.h"
 
 namespace VPUNN {
 
 /// @brief The interfacefor DCim COst model operations at  workload level (L1/variant)
 /// DCiM_Workload_Alias can be a DCIMWorkload or a variant of it, or a DPUWorkload if reused the datastructure.
 template <class DCiM_Workload_Alias>
-class DCiMCostModelInterface {
+class DCiMCostModelInterface :
+        virtual protected VPU_MutexAcces  // for mutex access
+{
 public:
     // future potential functionalities
     // DCIMInfoPack DCiMInfo(const DCiM_Workload_Alias& workload)
@@ -27,7 +30,9 @@ public:
     // float DCiMActivityFactorXXXX(const DCiM_Workload_Alias& wl)   //more methods here
 
     // first interface
-    CyclesInterfaceType dCiM(const DCiM_Workload_Alias& wl, std::string& info) {
+    CyclesInterfaceType dCiM(const DCiM_Workload_Alias& wl, std::string& info) const {
+        std::lock_guard<std::recursive_mutex> lock(L1_mutex);  // for future
+
         info = "";
         if (wl.kernels[0])
             return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
@@ -36,7 +41,7 @@ public:
     }
 
     // for python binding
-    std::tuple<CyclesInterfaceType, std::string> dCiM_Msg(DCiM_Workload_Alias wl) {
+    std::tuple<CyclesInterfaceType, std::string> dCiM_Msg(DCiM_Workload_Alias wl) const{
         std::string info;
         CyclesInterfaceType cycles = dCiM(wl, info);
         return std::make_tuple(cycles, info);

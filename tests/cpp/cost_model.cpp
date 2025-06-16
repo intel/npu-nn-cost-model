@@ -34,7 +34,6 @@ using namespace VPUNN;
 //@todo Add all LNL profiling results for JIra tickets to a fixture of UNit tests for LNL
 //@todo Enhance DW-conv conversion factors to include the new ones from the LNL profiling results
 
-
 TEST_F(TestCostModel, MAXPOOL_172_VPU27_NoGT) {
     DPUWorkload tst_wl{
             VPUDevice::VPU_2_7,                         // dev
@@ -286,9 +285,13 @@ TEST_F(TestCostModel, BatchTestVPUNN_NN2_7) {
     ASSERT_EQ(model_batched.model_version_info().get_input_interface_version(), preprocessing.interface_version())
             << "Runtime expected input version and preprocessing version must be the same" << std::endl;
 
-    const auto& input_shape = runtime_model.input_tensors()[0]->shape();
-    const auto& output_shape = runtime_model.output_tensors()[0]->shape();
-    const auto& input_shape_batched = model_batched.input_tensors()[0]->shape();
+    // const auto& input_shape = runtime_model.input_tensors()[0]->shape();
+    // const auto& output_shape = runtime_model.output_tensors()[0]->shape();
+    // const auto& input_shape_batched = model_batched.input_tensors()[0]->shape();
+
+    const std::vector<unsigned int> input_shape{runtime_model.input_shapes()[0]};
+    const std::vector<unsigned int> output_shape{runtime_model.output_shapes()[0]};
+    const std::vector<unsigned int> input_shape_batched{model_batched.input_shapes()[0]};
 
     // Expect proper batch
     EXPECT_EQ(input_shape[0], 1u);
@@ -1245,9 +1248,9 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
         auto cycles_40_DtoC = model_4_0.DMA(wl_glob_40.device, wl_glob_40.inputs[0], wl_glob_40.outputs[0],
                                             MemoryLocation::DRAM, MemoryLocation::CMX);
 
-        EXPECT_GT(cycles_27_DtoC, (cycles_40_DtoC * ratio_27per40));                     // 2.7 is slower
-        EXPECT_EQ(cycles_27_DtoC, 3658);                                                 // theoretical DMA
-        EXPECT_EQ(cycles_40_DtoC, PerformanceMode::forceLegacy_G4 ? 4359 : 1883);        // theoretical DMA
+        EXPECT_GT(cycles_27_DtoC, (cycles_40_DtoC * ratio_27per40));               // 2.7 is slower
+        EXPECT_EQ(cycles_27_DtoC, 3658);                                           // theoretical DMA
+        EXPECT_EQ(cycles_40_DtoC, PerformanceMode::forceLegacy_G4 ? 4359 : 1883);  // theoretical DMA
 
         auto cycles_27_CtoD = model_2_7.DMA(wl_glob_27.device, wl_glob_27.inputs[0], wl_glob_27.outputs[0],
                                             MemoryLocation::CMX, MemoryLocation::DRAM);
@@ -1256,7 +1259,7 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
 
         EXPECT_GT(cycles_27_CtoD, (cycles_40_CtoD * ratio_27per40));  // 2.7 is slower
 
-        EXPECT_EQ(cycles_27_CtoD, 3658);                                                 // theoretical DMA
+        EXPECT_EQ(cycles_27_CtoD, 3658);                                           // theoretical DMA
         EXPECT_EQ(cycles_40_CtoD, PerformanceMode::forceLegacy_G4 ? 4359 : 1883);  // theoretical DMA
     }
 }
@@ -1771,7 +1774,7 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
     /// this lambda function verify that power ideal cyc is smaller than efficiency ideal cyc when input or/and weight
     /// sparsity is/are active when both sparsity are inactive then power ideal cyc should be equal with efficiency
     /// ideal cyc
-    auto verify_sparsity_influence = [](const TestCase& t, VPUCostModel& test_model) {
+    auto verify_sparsity_influence = [](const TestCase& t, const VPUCostModel& test_model) {
         DPUInfoPack sparse_mac_op_info;
 
         unsigned long int power_cyc = test_model.DPU_Power_IdealCycles(t.t_in.wl);

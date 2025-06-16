@@ -10,20 +10,23 @@
 #include "kernels/l2_normalization.h"
 #include "kernels/vpunn_blas.h"
 
-void VPUNN::L2Normalization(VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output) {
+void VPUNN::L2Normalization(const VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output) {
     // Use cblas_sgemm to compute C <- alpha A * B + beta C
 
     int channels = activations->shape()[1];
     int batch_size = activations->shape()[0];
 
+    // Assign to the output (copy the activations to a writable object))
+    output->assign(activations->c_ptr(), activations->size() * sizeof(float));
+
     for (auto batch = 0; batch < batch_size; batch++) {
         // Compute the norm of the vector
-        auto norm = cblas_snrm2(channels, activations->data() + channels * batch, 1);
+        auto norm = cblas_snrm2(channels, output->c_ptr() + channels * batch, 1);
         if (norm > 0)
             // Scale the tensor by the inverse of the norm
-            cblas_sscal(channels, 1.0f / norm, activations->data() + channels * batch, 1);
+            cblas_sscal(channels, 1.0f / norm, output->data() + channels * batch, 1);
     }
 
     // Assign to the output
-    output->assign(activations->data(), activations->size() * sizeof(float));
+    // output->assign(activations->c_ptr(), activations->size() * sizeof(float));
 }

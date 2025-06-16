@@ -163,7 +163,7 @@ public:
      *
      * @return std::vector<T> the output buffer
      */
-    std::vector<T> data_vector() {
+    std::vector<T> data_vector() const {
         return std::vector<T>{_data, _data + _size};
     }
 

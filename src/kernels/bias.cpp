@@ -12,7 +12,7 @@
 
 namespace VPUNN {
 
-void BiasOp::Bias(const VPUNN::Tensor<float>* bias, VPUNN::Tensor<float>* output) const {
+ void BiasOp::Bias(const VPUNN::Tensor<float>* bias, VPUNN::Tensor<float>* output, BiasOpBuffer& exec_buffer) {
     // Use cblas_sgemm to compute C <- alpha A * B + beta C
 
     const int batch_size = output->shape()[0];
@@ -21,7 +21,7 @@ void BiasOp::Bias(const VPUNN::Tensor<float>* bias, VPUNN::Tensor<float>* output
     constexpr int input_channels = 1;
 
     // use bias multiplier for batching,  should be preallocated and all 1.0
-    const float* bias_multiplier = batch_buffer.data();
+    const float* bias_multiplier = exec_buffer.batch_buffer.data();
 
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, batch_size, output_channels, input_channels, 1.0,
                 bias_multiplier, input_channels, bias->c_ptr(), output_channels, 1.0, output->data(), output_channels);

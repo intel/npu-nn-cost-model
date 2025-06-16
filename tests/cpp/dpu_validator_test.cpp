@@ -3704,4 +3704,6 @@ TEST_F(DPU_OperationValidator_Test, VPU40_presence_Test) {
         EXPECT_TRUE(dut.is_supported(wl.device));
     }
 }
+
+
 }  // namespace VPUNN_unit_tests
