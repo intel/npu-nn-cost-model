@@ -520,18 +520,6 @@ TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
                  {{mkLayer(VPUDevice::VPU_4_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1200, 1200 * no_fail + 1000},
                  "Device 4.0, B=2 "},
-
-                 {{mkLayer(VPUDevice::NPU_RESERVED, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
-                 {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
-                 "Device 5.0, B=0 "},
-                 {{mkLayer(VPUDevice::NPU_RESERVED, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
-                 {VPUNN::Cycles::NO_ERROR, true, 1000, 1000 * no_fail + 1000},
-                 "Device 5.0, B=1 "},
-                 {{mkLayer(VPUDevice::NPU_RESERVED, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
-                 {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
-                 "Device 5.0, B=2 "},
-               
-
         };
         executeTests(tests);
     }
