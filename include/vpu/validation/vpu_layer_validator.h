@@ -25,10 +25,14 @@
 #include "device_valid_valuesVPU2.h"
 #include "device_valid_valuesVPU2_7.h"
 #include "device_valid_valuesVPU4.h"
+
+
 #include "interface_operations_behavior.h"
 #include "interface_valid_values.h"
 #include "layer_operations_valid_behaviours.h"
 #include "sanity_report.h"
+#include "vpu/vpu_tiling_strategy.h"
+#include "vpu/vpu_tiling_strategy_info.h"
 
 namespace VPUNN {
 
@@ -41,7 +45,8 @@ using LayerOperationsBehaviour =
 /// @brief services for Layer validation
 class VPU_LayerValidator :
         public Behavior_Device_Mapping<LayerOperationsBehaviour,  // operations
-                                       VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU4_0_LayerValidValues> {
+                                       VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU4_0_LayerValidValues
+                                       > {
 protected:
 public:
     /// nTiles: number of tiles we split a layer
@@ -139,7 +144,10 @@ public:
 
                 const auto range = config.get_input_channels_restriction(w);
                 const auto input_range{range.multiply_upper(extended_border_coeff.channels())};
+
                 checker.check_is_in_requirements((int)in0.channels, input_range, "input_0.channels");
+
+                checker.check_is_in_requirements((int)in0.batch, config.get_batch_restrictions(), "input_0.batch");
 
                 checker.check_is_in_list(in0.datatype, config.get_input_valid_datatypes(w), "input_0.datatype");
                 checker.check_is_in_list(in0.layout, config.get_valid_layouts(), "input_0.layout");
@@ -175,7 +183,11 @@ public:
                 // TODO: consider also the Split  H aspect
                 auto range = config.get_output_channels_restriction(w);
                 const auto output_range{range.multiply_upper(extended_border_coeff.channels())};
+
                 checker.check_is_in_requirements((int)w.output_0.channels, output_range, "output_0.channels");
+
+                checker.check_is_in_requirements((int)w.output_0.batch, config.get_batch_restrictions(),
+                                                 "output_0.batch");
 
                 {  // special SOH situation ;  to do: should be captured in the generic approach
                     if (TilingStrategyInfo::isVerticalTiling(strategy)) {  // SOH

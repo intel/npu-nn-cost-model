@@ -13,6 +13,12 @@
 #include <vpu_cost_model.h>
 #include "vpu/vpu_tensor.h"
 
+#include <thread>
+#include <atomic>
+#include <filesystem>
+#include <chrono>
+#include <random>
+
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
@@ -136,7 +142,7 @@ TEST_F(VPUNNSerializerTest, Serialize_DpuOperation) {
     serializer->end();
 
     auto field_names = serializer->get_field_names();
-    auto expected_field_names = DPUOperation::_get_member_names();
+    std::vector<std::string> expected_field_names = DPUOperation::_get_member_names();
 
     // EXPECT_EQ(field_names, expected_field_names);
 }
@@ -270,6 +276,94 @@ TEST_F(VPUNNSerializerTest, CopyRow) {
     EXPECT_EQ(row.at("col1"), "hello");
     EXPECT_EQ(row.at("col2"), "1");
     EXPECT_EQ(row.at("new_col"), "new_data");
+}
+
+TEST_F(VPUNNSerializerTest, MultiThreaded_Serialization) {
+    const std::string filename = "test_multithreaded_serialize";
+    serializer->initialize(filename, FileMode::READ_WRITE, {"thread_id", "value", "2nd_value"});
+
+    ASSERT_TRUE(serializer->is_initialized());
+
+    constexpr int num_threads = 8;
+    constexpr int rows_per_thread = 100;
+    std::vector<std::thread> threads;
+    std::atomic<int> ready_count{0};
+    std::mutex start_mutex;
+    bool start_flag{false};
+    std::condition_variable start_cv;
+
+    // Each thread will write its own rows
+    for (int t = 0; t < num_threads; ++t) {
+        threads.emplace_back([&, t]() {
+            // Thread-local random number generator
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dist(1, 5);  // Random delay between 1 and 5 millise
+
+            // Notify that this thread is ready
+            {
+                std::lock_guard<std::mutex> lock(start_mutex);
+                ready_count.fetch_add(1);
+                if (ready_count.load() == num_threads) {
+                    start_cv.notify_all();  // Notify all threads when all are ready
+                }
+            }
+            
+            {
+                // Wait for the start signal
+                std::unique_lock<std::mutex> lock(start_mutex);
+                start_cv.wait(lock, [&]() {
+                    return start_flag;
+                });
+            }
+
+            for (int i = 0; i < rows_per_thread; ++i) {
+                serializer->serialize(SerializableField{"thread_id", t}, SerializableField{"value", i});
+                std::this_thread::sleep_for(std::chrono::milliseconds(dist(gen)));
+                serializer->serialize(SerializableField{"2nd_value", i + 10});
+                serializer->end();
+            }
+        });
+    }
+
+    // Wait until all threads are ready
+    {
+        std::unique_lock<std::mutex> lock(start_mutex);
+        start_cv.wait(lock, [&]() {
+            return ready_count.load() == num_threads;
+        });
+    }
+
+    // Signal all threads to start
+    {
+        std::lock_guard<std::mutex> lock(start_mutex);
+        start_flag = true;
+        start_cv.notify_all();
+    }
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    // Now, read back the file and check all expected rows are present
+    serializer->jump_to_beginning();
+
+    std::set<std::pair<int, int>> found;
+    auto thread_id_buf = SerializableField{"thread_id", 0};
+    auto value_buf = SerializableField{"value", 0};
+    auto second_value_buf = SerializableField{"2nd_value", 0};
+    while (serializer->deserialize(thread_id_buf, value_buf, second_value_buf)) {
+        found.emplace(thread_id_buf.value, value_buf.value);
+    }
+
+    // Check that all expected (thread_id, value) pairs are present
+    for (int t = 0; t < num_threads; ++t) {
+        for (int i = 0; i < rows_per_thread; ++i) {
+            EXPECT_TRUE(found.count({t, i})) << "Missing row for thread " << t << " value " << i;
+        }
+    }
+
+    EXPECT_EQ(found.size(), num_threads * rows_per_thread);
 }
 
 }  // namespace VPUNN_unit_tests

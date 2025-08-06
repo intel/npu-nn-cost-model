@@ -47,6 +47,7 @@ protected:
     //   VPUNN::DPUWorkload wl_glob_20;
     DMANNWorkload_NPU27 wl_glob_40M{wl_glob_27};
 
+
     DMACostModel<DMANNWorkload_NPU27> model{};
     // DMACostModel specialEmptyDMAModel;
 
@@ -253,6 +254,7 @@ TEST_F(TestDMANNCostModel, SmokeTestDMA_40) {
     }
 }
 
+
 // Demonstrate some basic assertions.
 TEST_F(TestDMANNCostModel, SmokeTestDMA_RAWNN) {
     DMANNWorkload_NPU27 wl = wl_glob_27;
@@ -276,7 +278,7 @@ TEST_F(TestDMANNCostModel, InitAspects) {
         DMACostModel<DMANNWorkload_NPU27> vpunn_model(model_path);
         EXPECT_TRUE(vpunn_model.nn_initialized());
 
-        const auto file_content{read_a_file(model_path)};
+        const auto file_content{read_a_file(std::move(model_path))};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
         EXPECT_NO_THROW(DMACostModel<DMANNWorkload_NPU27> x(file_content.data(), file_content.size(), true));
@@ -348,6 +350,28 @@ TEST_F(TestDMANNCostModel, Mock_40_vs_VPU27_DPU) {
         EXPECT_EQ(cycles_40, V(Cycles::ERROR_INFERENCE_NOT_POSSIBLE) /*3445*/)
                 << wl_glob_40M << Cycles::toErrorText(cycles_40);  // theoretical, but at 1700MHz
     }
+}
+// this test is for post process for DMA interface 02
+TEST_F(TestDMANNCostModel, DMA_PostProcessing_Test) {
+    DMANNWorkload_NPU40 wl{
+            VPUNN::VPUDevice::VPU_4_0,  // VPUDevice device;  ///< NPU device
+            65535,                      // int src_width;
+            65535,                      // int dst_width;
+            0,                          // int num_dim;
+            {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+            Num_DMA_Engine::Num_Engine_1,
+            MemoryDirection::CMX2CMX  // MemoryDirection transfer_direction;
+    };
+
+    ConvertFromDirectCycleToDPUCyc<DMANNWorkload_NPU40> pp_DirectCycToDPUCyc_converter;
+
+    std::string info{};
+    float nn_output = 222.9F;
+    CyclesInterfaceType cyc_direct = pp_DirectCycToDPUCyc_converter.process(nn_output, wl, info);
+
+    EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cyc_direct)) << "CASE ConvertFromDirectCycleToDPUCyc " << cyc_direct;
+    EXPECT_FALSE(pp_DirectCycToDPUCyc_converter.is_NN_value_invalid(nn_output))
+            << "CASE ConvertFromDirectCycleToDPUCyc ";
 }
 
 TEST_F(TestDMANNCostModel, DISABLED_SweepDMATime_27) {
@@ -462,6 +486,7 @@ TEST_F(TestDMANNCostModel, SweepGT_DMATime_27) {
                 1,                                             // owt
         };
         const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload(dmaOld_);
+        /* coverity[copy_instead_of_move] */
         return dmaNN;
     };
     const float ctoDPU{1300.0f / 975.0f};
@@ -622,6 +647,7 @@ TEST_F(TestDMANNCostModel, SweepGT_DMATime_27_GEAR4) {
                 1,                                             // owt
         };
         const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload(dmaOld_);
+        /* coverity[copy_instead_of_move] */
         return dmaNN;
     };
     const float ctoDPU{1300.0f / 975.0f};
@@ -771,6 +797,7 @@ TEST_F(TestDMANNCostModel, SweepGT_DMATime_40) {
                 1,                                             // owt
         };
         const DMANNWorkload_NPU40 dmaNN = DMAWorkloadTransformer::create_NPU40_workload(dmaOld_);
+        /* coverity[copy_instead_of_move] */
         return dmaNN;
     };
     const float ctoDPU{1700.0f / 975.0f};
@@ -1435,7 +1462,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_regresion_NPU27) {
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
 
-    for (auto t : tc) {
+    for (const auto& t : tc) {
         check(t);
     }
 }
@@ -1492,11 +1519,10 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_regresion_NPU40) {
         }
     };
 
-    for (auto t : tc) {
+    for (const auto& t : tc) {
         check(t);
     }
 }
-
 TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
     VPUCostModel cm("empty");
     ASSERT_TRUE(!cm.nn_initialized());
@@ -1521,6 +1547,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
         ;
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
+
 
     {
         std::cout << "\n\n NPU40 \n";
@@ -1551,7 +1578,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
 
         };
 
-        for (auto t : tc_40) {
+        for (const auto& t : tc_40) {
             if constexpr (!PerformanceMode::forceLegacy_G4) {
                 check(t);
             }
@@ -1619,6 +1646,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767) {
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
 
+
     {
         std::cout << "\n\n NPU40 \n";
         const VPUDevice device{VPUDevice::VPU_4_0};
@@ -1641,5 +1669,4 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767) {
 
     // EXPECT_TRUE(false);
 }
-
 }  // namespace VPUNN_unit_tests

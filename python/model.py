@@ -16,22 +16,24 @@ from vpunn import VPUNN_lib  # noqa
 
 class VPUNN:
     def __init__(self, filename, profile=False, batch=1):
-        self.model = VPUNN_lib.Runtime(filename, batch, profile)
+        self.model = VPUNN_lib.Runtime(filename, profile)
+        self.model_buff = self.model.createNewInferenceExecutionData(batch)
 
-        assert len(self.model.input_shapes()) == 1
-        assert len(self.model.output_shapes()) == 1
+        assert len(self.model_buff.input_shapes()) == 1
+        assert len(self.model_buff.output_shapes()) == 1
 
     def input_shapes(self):
-        return [tuple(shape) for shape in self.model.input_shapes()]
+        return [tuple(shape) for shape in self.model_buff.input_shapes()]
 
     def output_shapes(self):
-        return [tuple(shape) for shape in self.model.output_shapes()]
+        return [tuple(shape) for shape in self.model_buff.output_shapes()]
 
+    # features must have .tobytes and dtype, use numpy array!
     def run_inference(self, features):
         feature_array = array("f", features.tobytes())
 
         result_shape = self.output_shapes()[0]
-        arr = self.model.predict(feature_array)
+        arr = self.model.predict(feature_array,self.model_buff)
 
         data = np.array(
             arr,

@@ -118,5 +118,5 @@ protected:
 
 
 }  // namespace VPUNN_unit_tests
-#endif                                           
+#endif
    // VPUNN_UT_REGRESSIONL_H

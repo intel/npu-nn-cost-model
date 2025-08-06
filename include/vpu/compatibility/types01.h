@@ -18,12 +18,14 @@
 #include "../types.h"  // need to know the present day types for conversion
 #include "../utils.h"
 #include "inference/nn_descriptor_versions.h"
-#include "inference/preprocessing.h"
+#include "inference/preprocessing_inserter.h"
 
 #include <map>
 #include <sstream>
 #include <string>
 #include <type_traits>
+
+#include "inference/preprocessing_inserter_basics.h"
 
 namespace VPUNN {
 
@@ -220,17 +222,13 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 
 // interface class
 
-/**
- * @brief Preprocessing for original  input interface
- * Has 71 bytes input and populates 67
- * It is used by VPU 2.0, and VPU 2.7 from beginning 2022
- * Its NN model has only the name VPUNN and no other info
- */
+/// Inserts different datatypes into a descriptor buffer
 template <class T>
-class Preprocessing_Interface01 : public PreprocessingInserter<T, Preprocessing_Interface01<T>> {
-protected:
-    using PreprocessingInserter<T, Preprocessing_Interface01<T>>::insert;  ///< exposes the non virtual insert methods
-    friend class PreprocessingInserter<T, Preprocessing_Interface01<T>>;
+class Inserter_Interface01 : Inserter<T> {
+public:
+    using Inserter<T>::insert;  ///< exposes the non virtual insert methods
+    Inserter_Interface01(std::vector<T>& output): Inserter<T>(output) {
+    }
 
     /// @brief insert specialization for VPUTensor
     template <bool only_simulate>
@@ -243,6 +241,18 @@ protected:
         offset = this->insert<only_simulate>(intf_01::convert<intf_01::DataType>(data.get_dtype()), offset);
         return offset;
     }
+};
+
+/**
+ * @brief Preprocessing for original  input interface
+ * Has 71 bytes input and populates 67
+ * It is used by VPU 2.0, and VPU 2.7 from beginning 2022
+ * Its NN model has only the name VPUNN and no other info
+ */
+template <class T>
+class Preprocessing_Interface01 : public PreprocessingInserter<T, Preprocessing_Interface01<T>> {
+protected:
+    friend class PreprocessingInserter<T, Preprocessing_Interface01<T>>;
 
     /**
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
@@ -255,52 +265,53 @@ protected:
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    const std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
-        // Build the vector from the inputs
+    void transformOnly(const DPUWorkload& workload, size_t& debug_offset,
+                       std::vector<T>& destination_descriptor) const {
+        Inserter_Interface01<T> myIns(destination_descriptor);
+
         size_t offset = 0;
 
         // for enums we must put here the equivalent version  from the target interface, not latest types
 
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::VPUDevice>(workload.device), offset);
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::Operation>(workload.op), offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::VPUDevice>(workload.device), offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::Operation>(workload.op), offset);
 
-        offset = this->insert<only_simulate>(workload.inputs[0], offset);
-        offset = this->insert<only_simulate>(workload.outputs[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.inputs[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.outputs[0], offset);
 
-        offset = this->insert<only_simulate>(workload.kernels[0], offset);
-        offset = this->insert<only_simulate>(workload.kernels[1], offset);
+        offset = myIns.template insert<only_simulate>(workload.kernels[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.kernels[1], offset);
 
-        offset = this->insert<only_simulate>(workload.strides[0], offset);
-        offset = this->insert<only_simulate>(workload.strides[1], offset);
+        offset = myIns.template insert<only_simulate>(workload.strides[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.strides[1], offset);
 
-        offset = this->insert<only_simulate>(workload.padding[0], offset);
-        offset = this->insert<only_simulate>(workload.padding[1], offset);
-        offset = this->insert<only_simulate>(workload.padding[2], offset);
-        offset = this->insert<only_simulate>(workload.padding[3], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[1], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[2], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[3], offset);
 
-        offset =
-                this->insert<only_simulate>(intf_01::convert<intf_01::ExecutionMode>(workload.execution_order), offset);
-        offset = this->insert<only_simulate>(
+        offset = myIns.template insert<only_simulate>(
+                intf_01::convert<intf_01::ExecutionMode>(workload.execution_order), offset);
+        offset = myIns.template insert<only_simulate>(
                 intf_01::convert<intf_01::ActivationFunction>(workload.activation_function), offset);
-        offset = this->insert<only_simulate>(workload.act_sparsity, offset);
-        offset = this->insert<only_simulate>(workload.weight_sparsity, offset);
+        offset = myIns.template insert<only_simulate>(workload.act_sparsity, offset);
+        offset = myIns.template insert<only_simulate>(workload.weight_sparsity, offset);
 
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[0]), offset);
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[1]), offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[0]),
+                                                      offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[1]),
+                                                      offset);
 
-        offset =
-                this->insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.output_swizzling[0]), offset);
+        offset = myIns.template insert<only_simulate>(
+                intf_01::convert<intf_01::Swizzling>(workload.output_swizzling[0]), offset);
 
-        offset = this->insert<only_simulate>(workload.output_write_tiles, offset);
+        offset = myIns.template insert<only_simulate>(workload.output_write_tiles, offset);
 
         debug_offset = offset;
-
-        // Return the output as a pointer to the data
-        return this->processed_output;
     }
 
-    inline static const size_t size_of_descriptor{
-            71};  ///< how big the descriptor is, fixed at constructor. This interface has 71 but writes only 67
+    inline static constexpr size_t size_of_descriptor{
+            71};  ///< how big the descriptor is, fixed at type. This interface has 71 but writes only 67
 
 public:
     /// @brief the descriptor interface that this type was designed to fill/comply with
@@ -309,9 +320,7 @@ public:
     }
 
     /// @brief Ctor , inits the content with expected size
-    Preprocessing_Interface01() {
-        this->set_size(size_of_descriptor);
-    };
+    Preprocessing_Interface01(): PreprocessingInserter<T, Preprocessing_Interface01<T>>(size_of_descriptor) {};
 
     /// @brief default virtual destructor
     virtual ~Preprocessing_Interface01() = default;
@@ -327,24 +336,7 @@ public:
 template <class T>
 class Preprocessing_Interface10 : public PreprocessingInserter<T, Preprocessing_Interface10<T>> {
 protected:
-    using PreprocessingInserter<T, Preprocessing_Interface10<T>>::insert;  ///< exposes the non virtual insert methods
     friend class PreprocessingInserter<T, Preprocessing_Interface10<T>>;
-
-    /// @brief insert specialization for VPUTensor
-    template <bool only_simulate>
-    size_t insert(const VPUTensor& data, size_t offset) {
-        offset = this->insert<only_simulate>(data.get_shape()[0], offset);
-        offset = this->insert<only_simulate>(data.get_shape()[1], offset);
-        offset = this->insert<only_simulate>(data.get_shape()[2], offset);
-        offset = this->insert<only_simulate>(data.get_shape()[3], offset);
-
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::DataType>(data.get_dtype()), offset);
-
-        // offset = insert(intf_01::convert<intf_01::Layout>(data.get_layout()), offset);
-
-        // offset = insert(data.get_sparsity(), offset);
-        return offset;
-    }
 
     /**
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
@@ -356,53 +348,55 @@ protected:
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    const std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
+    void transformOnly(const DPUWorkload& workload, size_t& debug_offset,
+                       std::vector<T>& destination_descriptor) const {
+        Inserter_Interface01<T> myIns(destination_descriptor);
+
         // Build the vector from the inputs
         size_t offset = 0;
 
         // for enums we must put here the equivalent version  from the target interface, not latest types
 
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::VPUDevice>(workload.device), offset);
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::Operation>(workload.op), offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::VPUDevice>(workload.device), offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::Operation>(workload.op), offset);
 
-        offset = this->insert<only_simulate>(workload.inputs[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.inputs[0], offset);
         // offset = insert(workload.inputs_1[0], offset);
 
-        offset = this->insert<only_simulate>(workload.outputs[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.outputs[0], offset);
 
-        offset = this->insert<only_simulate>(workload.kernels[0], offset);
-        offset = this->insert<only_simulate>(workload.kernels[1], offset);
+        offset = myIns.template insert<only_simulate>(workload.kernels[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.kernels[1], offset);
 
-        offset = this->insert<only_simulate>(workload.strides[0], offset);
-        offset = this->insert<only_simulate>(workload.strides[1], offset);
+        offset = myIns.template insert<only_simulate>(workload.strides[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.strides[1], offset);
 
-        offset = this->insert<only_simulate>(workload.padding[0], offset);
-        offset = this->insert<only_simulate>(workload.padding[1], offset);
-        offset = this->insert<only_simulate>(workload.padding[2], offset);
-        offset = this->insert<only_simulate>(workload.padding[3], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[0], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[1], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[2], offset);
+        offset = myIns.template insert<only_simulate>(workload.padding[3], offset);
 
-        offset =
-                this->insert<only_simulate>(intf_01::convert<intf_01::ExecutionMode>(workload.execution_order), offset);
-        offset = this->insert<only_simulate>(
+        offset = myIns.template insert<only_simulate>(
+                intf_01::convert<intf_01::ExecutionMode>(workload.execution_order), offset);
+        offset = myIns.template insert<only_simulate>(
                 intf_01::convert<intf_01::ActivationFunction>(workload.activation_function), offset);
-        offset = this->insert<only_simulate>(workload.act_sparsity, offset);
-        offset = this->insert<only_simulate>(workload.weight_sparsity, offset);
+        offset = myIns.template insert<only_simulate>(workload.act_sparsity, offset);
+        offset = myIns.template insert<only_simulate>(workload.weight_sparsity, offset);
 
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[0]), offset);
-        offset = this->insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[1]), offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[0]),
+                                                      offset);
+        offset = myIns.template insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.input_swizzling[1]),
+                                                      offset);
 
-        offset =
-                this->insert<only_simulate>(intf_01::convert<intf_01::Swizzling>(workload.output_swizzling[0]), offset);
+        offset = myIns.template insert<only_simulate>(
+                intf_01::convert<intf_01::Swizzling>(workload.output_swizzling[0]), offset);
 
-        offset = this->insert<only_simulate>(workload.output_write_tiles, offset);
+        offset = myIns.template insert<only_simulate>(workload.output_write_tiles, offset);
 
         debug_offset = offset;
-
-        // Return the output as a pointer to the data
-        return this->processed_output;
     }
 
-    const size_t size_of_descriptor;  ///< how big the descriptor is, fixed at constructor
+    inline static constexpr size_t size_of_descriptor{67};  ///< how big the descriptor is, fixed at type
 
 public:
     /// @brief the descriptor interface that this type was designed to fill/comply with
@@ -410,9 +404,7 @@ public:
         return static_cast<std::underlying_type_t<NNVersions>>(NNVersions::VERSION_10_ENUMS_SAME);
     }
     /// @brief Ctor , inits the content with expected size
-    Preprocessing_Interface10(): size_of_descriptor(this->calculate_size()) {
-        this->set_size(size_of_descriptor);
-    };
+    Preprocessing_Interface10(): PreprocessingInserter<T, Preprocessing_Interface10<T>>(size_of_descriptor) {};
 
     /// @brief default virtual destructor
     virtual ~Preprocessing_Interface10() = default;

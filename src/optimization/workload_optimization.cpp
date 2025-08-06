@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "core/profiling.h"
+#include "vpu/dpu_layer_modes.h"
 #include "vpu/optimization/tiler.h"
 #include "vpu/optimization/workload_optimization.h"
 
@@ -26,7 +27,7 @@ inline bool operator<(const DPUWorkloadsWithCyclesSplit& lhs, const DPUWorkloads
  */
 class DPUTilerImplementation : public IDPUTiler {
 private:
-    VPUCostModel& model;
+    VPUCostModel& model;  /// < The DPU cost model used for performance estimation
 
     VPUDevice getWorkloadsDevice(const DPUWorkloadsWithCyclesSplit& workloads) const {
         if (workloads.workloads.size() == 0) {
@@ -43,7 +44,7 @@ private:
 
     std::list<DPUWorkloadsWithCycleCost> generateSplits(const TilingAlgorithmsContainer& algorithms,
                                                         const std::vector<ExecutionMode>& valid_execution_modes,
-                                                        const SplitOptions& options) {
+                                                        const SplitOptions& options) const {
         std::list<DPUWorkloadsWithCycleCost> splits_costs;
         // Loop algorithms, splits, modes and populate the DPUWorkloadsCost list
         auto timeout = SyncStopWatch<std::micro>();
@@ -121,7 +122,7 @@ public:
 
     DPUWorkloadsCost intraTileSplit(
             const DPULayer& layer, const SplitOptions& options,
-            std::vector<DPUWorkloadsWithCyclesSplit>* complete_output_splits = nullptr) override {
+            std::vector<DPUWorkloadsWithCyclesSplit>* complete_output_splits = nullptr) const override {
         // Get execution modes accepted  (e.g.: ExecutionMode::CUBOID_16x16,.....)
         auto valid_execution_modes = DPULayerModes::getValidExecutionMode(layer);  // based on operation
 
@@ -166,7 +167,8 @@ public:
     }
 
     PnPEstimates getLayerPerformance(DPUWorkloadsWithCyclesSplit& workloads_split,
-                                     const unsigned int runtimeOverhead = 0, const bool skip_power = true) override {
+                                     const unsigned int runtimeOverhead = 0,
+                                     const bool skip_power = true) const override {
         // For an empty list of workloads immediately return 0
         if (workloads_split.workloads.size() == 0)
             return {0, 0.0f};  // no runtime to execute nothing

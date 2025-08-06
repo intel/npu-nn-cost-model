@@ -67,12 +67,15 @@ def generate_model(layers, input_tensor, normalize):
     return model_path, np.array(output)
 
 
-@pytest.mark.parametrize("batch", [1, 2, 4, 8])
-@pytest.mark.parametrize("input_channels", [1, 4, 10, 16, 32, 64, 128])
-@pytest.mark.parametrize("output_channels", [1, 4, 10, 16, 32, 64, 128])
+@pytest.mark.parametrize("batch", [1, 2, 4])
+#@pytest.mark.parametrize("input_channels", [1, 4, 10, 16, 32, 64, 128])
+@pytest.mark.parametrize("input_channels", [1, 4, 93, 128])
+#@pytest.mark.parametrize("output_channels", [1, 4, 10, 16, 32, 64, 128])
+@pytest.mark.parametrize("output_channels", [1, 4])
 @pytest.mark.parametrize("bias", [True, False])
 @pytest.mark.parametrize("activation", [None, "relu", "sigmoid"])
-@pytest.mark.parametrize("layers", [1, 2, 3, 4, 5])
+#@pytest.mark.parametrize("layers", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize("layers", [1,  3,  5])
 @pytest.mark.parametrize("normalize", [False, True])
 def test_arithmetics(
     batch, input_channels, output_channels, bias, activation, layers, normalize

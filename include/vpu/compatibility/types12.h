@@ -19,7 +19,7 @@
 #include "../types.h"  // need to know the present day types for conversion
 #include "../utils.h"
 #include "inference/nn_descriptor_versions.h"
-#include "inference/preprocessing.h"
+#include "inference/preprocessing_inserter.h"
 
 #include "preprocessing_adapters.h"
 
@@ -27,6 +27,7 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include "inference/preprocessing_inserter_basics.h"
 #include "vpu/validation/dpu_operations_validator.h"
 
 namespace VPUNN {
@@ -246,6 +247,29 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 
 // interface class
 
+/// Inserts different datatypes into a descriptor buffer
+template <class T, typename DeviceAdapter>
+class Inserter_Interface12 : Inserter<T> {
+public:
+    using Inserter<T>::insert;  ///< exposes the non virtual insert methods
+    Inserter_Interface12(std::vector<T>& output): Inserter<T>(output) {
+    }
+
+    /// @brief insert specialization for VPUTensor
+    template <bool only_simulate>
+    size_t insert(const VPUTensor& data, size_t offset) {
+        offset = this->insert<only_simulate>(data.get_shape()[0], offset);
+        offset = this->insert<only_simulate>(data.get_shape()[1], offset);
+        offset = this->insert<only_simulate>(data.get_shape()[2], offset);
+        offset = this->insert<only_simulate>(data.get_shape()[3], offset);
+
+        offset = this->insert<only_simulate>(intf_12::convert<intf_12::DataType>(data.get_dtype()), offset);
+        // offset = this->insert<only_simulate>(intf_12::convert<intf_12::Layout>(data.get_layout()), offset);
+        // offset = this->insert<only_simulate>(data.get_sparsity(), offset);
+        return offset;
+    }
+};
+
 /**
  * @brief
  * removed ISI
@@ -264,25 +288,9 @@ template <class T, typename DeviceAdapter, NNVersions V>
 class Preprocessing_Interface12_Archetype :
         public PreprocessingInserter<T, Preprocessing_Interface12_Archetype<T, DeviceAdapter, V>> {
 private:
-    const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
+    inline static const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
-    using PreprocessingInserter<T, Preprocessing_Interface12_Archetype<T, DeviceAdapter, V>>::
-            insert;  ///< exposes the non virtual insert methods
     friend class PreprocessingInserter<T, Preprocessing_Interface12_Archetype<T, DeviceAdapter, V>>;
-
-    /// @brief insert specialization for VPUTensor
-    template <bool only_simulate>
-    size_t insert(const VPUTensor& data, size_t offset) {
-        offset = this->insert<only_simulate>(data.get_shape()[0], offset);
-        offset = this->insert<only_simulate>(data.get_shape()[1], offset);
-        offset = this->insert<only_simulate>(data.get_shape()[2], offset);
-        offset = this->insert<only_simulate>(data.get_shape()[3], offset);
-
-        offset = this->insert<only_simulate>(intf_12::convert<intf_12::DataType>(data.get_dtype()), offset);
-        // offset = this->insert<only_simulate>(intf_12::convert<intf_12::Layout>(data.get_layout()), offset);
-        // offset = this->insert<only_simulate>(data.get_sparsity(), offset);
-        return offset;
-    }
 
     /**
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
@@ -294,7 +302,10 @@ protected:
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    const std::vector<T>& transformOnly(const DPUWorkload& workload, size_t& debug_offset) {
+    void transformOnly(const DPUWorkload& workload, size_t& debug_offset,
+                       std::vector<T>& destination_descriptor) const {
+        Inserter_Interface12<T, DeviceAdapter> ins(destination_descriptor);
+
         // Build the vector from the inputs
         size_t offset = 0;
 
@@ -302,58 +313,55 @@ protected:
 
         {
             const auto operation{DeviceAdapter::mock_replace_operations(workload.op)};
-            offset = this->insert<only_simulate>(intf_12::convert<intf_12::Operation>(operation), offset);
+            offset = ins.template insert<only_simulate>(intf_12::convert<intf_12::Operation>(operation), offset);
         }
 
-        offset = this->insert<only_simulate>(workload.inputs[0], offset);
+        offset = ins.template insert<only_simulate>(workload.inputs[0], offset);
 
         // input 1 _type has special source
-        offset = this->insert<only_simulate>(
+        offset = ins.template insert<only_simulate>(
                 intf_12::convert<intf_12::DataType>(workload.weight_type.value_or(workload.inputs[0].get_dtype())),
                 offset);
 
-        offset = this->insert<only_simulate>(workload.outputs[0], offset);
+        offset = ins.template insert<only_simulate>(workload.outputs[0], offset);
 
-        offset = this->insert<only_simulate>(workload.kernels[0], offset);
-        offset = this->insert<only_simulate>(workload.kernels[1], offset);
+        offset = ins.template insert<only_simulate>(workload.kernels[0], offset);
+        offset = ins.template insert<only_simulate>(workload.kernels[1], offset);
 
-        offset = this->insert<only_simulate>(workload.strides[0], offset);
-        offset = this->insert<only_simulate>(workload.strides[1], offset);
+        offset = ins.template insert<only_simulate>(workload.strides[0], offset);
+        offset = ins.template insert<only_simulate>(workload.strides[1], offset);
 
-        offset = this->insert<only_simulate>(workload.padding[0], offset);
-        offset = this->insert<only_simulate>(workload.padding[1], offset);
-        offset = this->insert<only_simulate>(workload.padding[2], offset);
-        offset = this->insert<only_simulate>(workload.padding[3], offset);
+        offset = ins.template insert<only_simulate>(workload.padding[0], offset);
+        offset = ins.template insert<only_simulate>(workload.padding[1], offset);
+        offset = ins.template insert<only_simulate>(workload.padding[2], offset);
+        offset = ins.template insert<only_simulate>(workload.padding[3], offset);
 
-        offset =
-                this->insert<only_simulate>(intf_12::convert<intf_12::ExecutionMode>(workload.execution_order), offset);
+        offset = ins.template insert<only_simulate>(intf_12::convert<intf_12::ExecutionMode>(workload.execution_order),
+                                                    offset);
 
         {
             // normalize value as it have been read from a csv (limited precision) to match the generated cache
             const float act_sprs{std::stof(std::to_string(workload.act_sparsity))};
             const float wts_sprs{std::stof(std::to_string(workload.weight_sparsity))};
 
-            offset = this->insert<only_simulate>(act_sprs, offset);
-            offset = this->insert<only_simulate>(wts_sprs, offset);
+            offset = ins.template insert<only_simulate>(act_sprs, offset);
+            offset = ins.template insert<only_simulate>(wts_sprs, offset);
         }
 
         {
             const auto modified_fields{DeviceAdapter::avoid_untrained_space(workload)};
 
             const auto owt{modified_fields.owt};
-            offset = this->insert<only_simulate>(owt, offset);
+            offset = ins.template insert<only_simulate>(owt, offset);
         }
 
-        offset = this->insert<only_simulate>(intf_12::convert<intf_12::Layout>(workload.outputs[0].get_layout()),
-                                             offset);  // odu_permute
+        offset = ins.template insert<only_simulate>(intf_12::convert<intf_12::Layout>(workload.outputs[0].get_layout()),
+                                                    offset);  // odu_permute
 
         debug_offset = offset;
-
-        // Return the output as a pointer to the data
-        return this->processed_output;
     }
 
-    inline static const size_t size_of_descriptor{44};  ///< how big the descriptor is, fixed at constructor.
+    inline static constexpr size_t size_of_descriptor{44};  ///< how big the descriptor is, fixed at type.
 
 public:
     /// @brief the descriptor interface that this type was designed to fill/comply with
@@ -362,9 +370,8 @@ public:
     }
 
     /// @brief Ctor , inits the content with expected size
-    Preprocessing_Interface12_Archetype() {
-        this->set_size(size_of_descriptor);
-    };
+    Preprocessing_Interface12_Archetype()
+            : PreprocessingInserter<T, Preprocessing_Interface12_Archetype<T, DeviceAdapter, V>>(size_of_descriptor) {};
 
     /// @brief default virtual destructor
     virtual ~Preprocessing_Interface12_Archetype() = default;

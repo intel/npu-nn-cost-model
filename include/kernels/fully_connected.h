@@ -21,8 +21,8 @@ namespace VPUNN {
  * @param activations the input tensor
  * @param output the output tensor
  */
-VPUNN_API(void)
-Dense(const VPUNN::Tensor<float>* weights, const VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output);
+VPUNN_API void Dense(const VPUNN::Tensor<float>* weights, const VPUNN::Tensor<float>* activations,
+                     VPUNN::Tensor<float>* output);
 
 }  // namespace VPUNN
 

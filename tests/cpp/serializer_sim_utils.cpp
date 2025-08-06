@@ -43,6 +43,7 @@ protected:
         if (found != std::string::npos) {
             const auto start_pos{found + sep.length()};
             const auto gt_str{info.substr(start_pos)};  // till the end
+            /* coverity[copy_instead_of_move] */
             return gt_str;
         }
         return "";
@@ -420,7 +421,7 @@ public:
 
         for (const auto& m : models) {
             EXPECT_FALSE(m == nullptr);
-            EXPECT_TRUE((*m).nn_initialized()) << (*m).get_DPU_nickname();
+            EXPECT_TRUE((*m).nn_initialized()) << (*m).get_NN_cost_provider().get_DPU_nickname();
         }
 
         // new columns in CSV
@@ -428,7 +429,7 @@ public:
             std::vector<std::string> tags{};
             int colision{1};
             for (const auto& m : theModels) {
-                auto tag{m->get_DPU_nickname()};
+                auto tag{m->get_NN_cost_provider().get_DPU_nickname()};
 
                 if (std::find(tags.cbegin(), tags.cend(), tag) != tags.cend()) {
                     tag = tag + "_#" + std::to_string(colision++);  // colision protection

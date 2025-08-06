@@ -101,13 +101,13 @@ target_compile_definitions(test_cost_model PRIVATE NPU_5_0_MODEL_PATH="${MODEL50
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
-target_compile_definitions(test_cost_model PRIVATE VPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
 
 add_dependencies(test_cost_model cpp_schema)
 target_link_libraries(
   test_cost_model
   gtest_main
   inferenceStatic
+  ${VPUNN_HTTP_CLIENT_LIB}
 )
 
 include(GoogleTest)
@@ -133,7 +133,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
   set(COVERAGE_DIR ${CMAKE_BINARY_DIR}/coverage)
   set(COVERAGE_TITLE "VPUNN Code Coverage")
   set(COVERAGE_HTML_OPTIONS --html --html-title=${COVERAGE_TITLE})
-  set(GCOV_COMMAND gcovr --gcov-executable ${GCOV_BIN} -s -r .. . ${COVERAGE_HTML_OPTIONS} -e=_deps)
+  set(GCOV_COMMAND gcovr --gcov-executable ${GCOV_BIN} -s -r .. . ${COVERAGE_HTML_OPTIONS} -e=_deps --gcov-ignore-parse-errors=negative_hits.warn)
 
   # Generate coverage report for CI (no details)
   add_custom_target(coverage_ci

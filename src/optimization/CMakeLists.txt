@@ -12,7 +12,7 @@ include_directories(${FLATBUFFERS_SRC_DIR}/include)
 
 add_library(vpunn_optimization workload_optimization.cpp tiler.cpp splits.cpp)
 add_dependencies(vpunn_optimization cpp_schema)
-target_link_libraries(vpunn_optimization flatbuffers)
+target_link_libraries(vpunn_optimization flatbuffers  ${VPUNN_HTTP_CLIENT_LIB})
 
 if(VPUNN_BUILD_SHARED_LIB)
     add_library(vpunn_optimization_shared SHARED workload_optimization.cpp tiler.cpp splits.cpp)

@@ -15,6 +15,8 @@
 #include "vpu_cost_model.h"
 #include "workload_optimization_types.h"
 
+#include "vpu/layer_split_info.h"
+
 namespace VPUNN {
 
 /**
@@ -35,7 +37,7 @@ public:
      */
     virtual DPUWorkloadsCost intraTileSplit(
             const DPULayer& layer, const SplitOptions& options,
-            std::vector<DPUWorkloadsWithCyclesSplit>* complete_output_splits = nullptr) = 0;
+            std::vector<DPUWorkloadsWithCyclesSplit>* complete_output_splits = nullptr) const = 0;
 
     /**
      * @brief Get the cycles and power estimate for a list of workloads.
@@ -51,7 +53,8 @@ public:
      * @throws exceptions from inner dependencies. like DPU invocation
      */
     virtual PnPEstimates getLayerPerformance(DPUWorkloadsWithCyclesSplit& workloads_split,
-                                             const unsigned int runtimeOverhead = 0, const bool skip_power = true) = 0;
+                                             const unsigned int runtimeOverhead = 0,
+                                             const bool skip_power = true) const = 0;
 
     /**
      * @brief Destroy the DPUTiler object

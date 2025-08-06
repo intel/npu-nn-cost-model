@@ -24,6 +24,7 @@
 #include "vpu_layer_validator.h"
 
 #include "vpu/layer.h"
+#include "vpu/vpu_tiling_strategy.h"
 
 namespace VPUNN {
 
@@ -35,7 +36,8 @@ protected:
     /// configuration bundle for Workloads that are no finally split. Are just Layers on a Tile
     using SplitLayersContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations for workloads
                                                        VPU2_0_LayerOnTileValidValues, VPU2_7_LayerOnTileValidValues,
-                                                       VPU4_0_LayerOnTileValidValues>;
+                                                       VPU4_0_LayerOnTileValidValues
+                                                       >;
     using DPU_SplitLayersValidator = DPU_ConfigurableOperationValidator<SplitLayersContext>;
     DPU_SplitLayersValidator splitLayer_validator;
 

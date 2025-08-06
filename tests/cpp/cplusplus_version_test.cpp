@@ -29,7 +29,7 @@ TEST_F(TestCplusplusVersion, CompilerVersion_Test) {
     // https://learn.microsoft.com/en-us/cpp/overview/compiler-versions?view=msvc-170#service-releases-starting-with-visual-studio-2017
     // https://hackingcpp.com/cpp/std/macro_cplusplus.html
 
-#if defined(_MSC_VER)           
+#if defined(_MSC_VER)
     ASSERT_GE(_MSC_VER, 1930);  // we verify that the version is 17.0 or newer
 #elif defined(__GNUC__)         // gcc
     ASSERT_GE(__cplusplus, 201703L);

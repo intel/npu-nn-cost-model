@@ -130,6 +130,7 @@ TEST_F(TestVPUNNPerformanceModel, LatencyTestsLegacy) {
     // 4.0 not yet available
     EXPECT_EQ(get_DMA_latency_Legacy(VPUDevice::VPU_4_0, MemoryLocation::DRAM), 1625);  // 956ns @1700Mhz
     EXPECT_EQ(get_DMA_latency_Legacy(VPUDevice::VPU_4_0, MemoryLocation::CMX), 27);     // 16 cyc @ 975MHZ => 28.x @1700
+
 }
 
 TEST_F(TestVPUNNPerformanceModel, TestGetProfilingClkMHz) {

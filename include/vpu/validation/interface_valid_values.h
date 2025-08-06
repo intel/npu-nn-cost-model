@@ -125,7 +125,7 @@ protected:
               input_heigth_width_start_factor_SOHW{input_heigth_width_start_factor_SOHW_},  //
               valid_datatypes_map{valid_datatypes},
               valid_operations{valid_operations_},
-              alignement_size_bytes{alignement_size_bytes_} {
+              alignement_size_bytes{alignement_size_bytes_}{
     }
 
 protected:
@@ -135,8 +135,14 @@ protected:
     // virtual operations or dynamic ranges based on ops
 public:
     // return a SmartRanges that verify if a value matches
-    virtual SmartRanges get_input_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
-    virtual SmartRanges get_output_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
+    virtual MultiSmartRanges get_input_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
+    virtual MultiSmartRanges get_output_channels_restriction(const DPUOperation& /*dpu*/) const = 0;
+
+    // return a SmartRanges that verify if a value matches
+    // if lower and upper bound is 1 then batch could be only equal with 1
+    // but if lower bound is 1 and upper is a max value chosen by us then batch could be any value in this interval 
+    // same batch restrictions for input and output tensor batch dimension
+    virtual MultiSmartRanges get_batch_restrictions() const = 0; 
 
     /// false for places where checks regarding properties that are not connected to the abstract operation is not  to
     /// be checked (they do not really exists in that context). e.g. stencil. true: low level checks to be executed
@@ -364,6 +370,7 @@ protected:
             {DataType::INT1, DataType::UINT1},        //
             {DataType::BFLOAT16, DataType::FLOAT16},  //
             {DataType::BF8, DataType::HF8},           //
+            {DataType::INT16, DataType::UINT16}       //
     };
 
 public:

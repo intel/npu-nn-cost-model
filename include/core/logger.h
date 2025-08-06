@@ -16,6 +16,8 @@
 #include "vpu/types.h"
 #include "vpu/utils.h"
 
+#include <mutex>
+
 namespace VPUNN {
 
 /**
@@ -53,7 +55,9 @@ const std::string toString(LogLevel level);
 class LoggerStream {
     bool _enabled;
     LogLevel _logLevel;
+    std::ostringstream  _buffer;
     std::ostringstream* pout{nullptr};  ///< second output
+    static std::mutex cout_mutex;       ///< Mutex for protecting std::cout
 
 public:
     /**
@@ -64,12 +68,7 @@ public:
      */
     LoggerStream(LogLevel level, bool enabled, std::ostringstream* buff = nullptr)
             : _enabled(enabled), _logLevel(level), pout(buff) {
-        if (_enabled) {
-            std::cout << "[VPUNN " << toString(_logLevel) << "]: ";
-        }
-        if (pout) {
-            *pout << "[VPUNN " << toString(_logLevel) << "]: ";
-        }
+        _buffer << "[VPUNN " << toString(_logLevel) << "]: ";
     }
 
     /**
@@ -81,13 +80,7 @@ public:
      */
     template <typename T>
     LoggerStream& operator<<(const T& msg) {
-        if (_enabled) {
-            std::cout << msg;
-        }
-        if (pout) {
-            *pout << msg;
-        }
-
+        _buffer << msg;
         return *this;
     }
 
@@ -96,16 +89,16 @@ public:
      *
      */
     ~LoggerStream() {
-        if (_enabled) {
-            std::cout << std::endl;
-        }
-        if (pout) {
-            *pout << std::endl;
+        if (_enabled || pout) {
+            std::lock_guard<std::mutex> lock(cout_mutex);
+            if (_enabled) {
+                std::cout << _buffer.str() << std::endl;
+            }
+            if (pout) {
+                *pout << _buffer.str() << std::endl;
+            }
         }
     }
-
-    LoggerStream(const LoggerStream&) = default;
-    LoggerStream& operator=(const LoggerStream&) = default;
 };
 
 /**
@@ -118,18 +111,23 @@ private:
 
     static std::ostringstream buffer;
     static std::ostringstream* active_second_logger;  ///< logs into a string , deactivated by default
+    static std::mutex log_mutex;                      // Mutex to protect shared resources
 
 public:
     static void clear2ndlog() {
+        std::lock_guard<std::mutex> lock(log_mutex);
         buffer.str("");
     }
     static std::string get2ndlog() {
+        std::lock_guard<std::mutex> lock(log_mutex);
         return buffer.str();
     }
     static void activate2ndlog() {
+        std::lock_guard<std::mutex> lock(log_mutex);
         active_second_logger = &buffer;
     }
     static void deactivate2ndlog() {
+        std::lock_guard<std::mutex> lock(log_mutex);
         active_second_logger = nullptr;
     }
     /**
@@ -148,6 +146,7 @@ public:
      * @return auto
      */
     static auto level() {
+        std::lock_guard<std::mutex> lock(log_mutex);
         return _logLevel;
     }
 
@@ -157,6 +156,7 @@ public:
      * @param level
      */
     static void setLevel(LogLevel level) {
+        std::lock_guard<std::mutex> lock(log_mutex);
 #ifdef VPUNN_ENABLE_LOGGING
         _logLevel = level;
 #else
@@ -181,6 +181,7 @@ public:
 
 private:
     static auto log(LogLevel level) {
+        std::lock_guard<std::mutex> lock(log_mutex);
         bool enabled = level <= _logLevel;
         return LoggerStream(level, enabled, active_second_logger);
     }

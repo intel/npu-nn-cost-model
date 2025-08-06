@@ -15,7 +15,9 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
+#include<limits>
 
 #include "vpu/utils.h"
 
@@ -23,11 +25,11 @@ namespace VPUNN {
 // policy for defining a range based on divisibility by a number
 class SmartRanges {
 private:
-    const int lowerBound;                     /// < [
-    const int upperBound;                     /// < ]
-    const int divisor;                        ///< values have to be divisible with this number
-    const std::optional<int> second_divisor;  ///< if present values have to be divisible with this number too only if
-                                              ///< they are larger or equal than its value.
+    int lowerBound;                     /// < [
+    int upperBound;                     /// < ]
+    int divisor;                        ///< values have to be divisible with this number
+    std::optional<int> second_divisor;  ///< if present values have to be divisible with this number too only if
+                                        ///< they are larger or equal than its value.
 
 public:
     using value_type = int;
@@ -40,6 +42,47 @@ public:
     SmartRanges(int lowerBound_, int upperBound_, int divisor_, int second_div)
             : lowerBound(lowerBound_), upperBound(upperBound_), divisor(divisor_), second_divisor{second_div} {
     }
+
+    // Copy constructor
+    SmartRanges(const SmartRanges& other)
+            : lowerBound(other.lowerBound),
+              upperBound(other.upperBound),
+              divisor(other.divisor),
+              second_divisor(other.second_divisor) {
+    }
+
+    // Move constructor
+    SmartRanges(SmartRanges&& other) noexcept
+            : lowerBound(other.lowerBound),
+              upperBound(other.upperBound),
+              divisor(other.divisor),
+              second_divisor(std::move(other.second_divisor)) {
+    }
+
+    SmartRanges(): lowerBound(0), upperBound(0), divisor(1), second_divisor(std::nullopt) {
+    }
+
+    SmartRanges& operator=(const SmartRanges& other) {
+        if (this != &other) {
+            lowerBound = other.lowerBound;
+            upperBound = other.upperBound;
+            divisor = other.divisor;
+            second_divisor = other.second_divisor;
+        }
+        return *this;
+    }
+
+    SmartRanges& operator=(SmartRanges&& other) noexcept {
+        if (this != &other) {
+            lowerBound = other.lowerBound;
+            upperBound = other.upperBound;
+            divisor = other.divisor;
+            second_divisor = std::move(other.second_divisor);
+        }
+        return *this;
+    }
+
+    ~SmartRanges(){};
 
     /// @brief: here we verify if a value respect all the range requirements
     /// @param value: the value we want to verify
@@ -122,7 +165,7 @@ public:
 
             {
                 if (second_divisor.has_value()) {
-                    const int div2_value{round_up(value , *second_divisor)};
+                    const int div2_value{round_up(value, *second_divisor)};
                     if (betweenLimits(div2_value)) {
                         candidates.push_back(div2_value);  // candidate 2
                     }
@@ -196,6 +239,115 @@ public:
 
     int getLowerBound() const {
         return this->lowerBound;
+    }
+
+    static constexpr int max_limit{std::numeric_limits<int>::max()};  ///< max value accepted for a SmartRange bound
+};
+
+class MultiSmartRanges {
+private:
+    std::vector<SmartRanges> ranges;
+
+public:
+    using value_type = int;
+    MultiSmartRanges(const std::vector<SmartRanges>& ranges_): ranges(ranges_) {
+    }
+
+    // Copy constructor
+    MultiSmartRanges(const MultiSmartRanges& other): ranges(other.ranges) {
+    }
+
+    // Move constructor
+    MultiSmartRanges(MultiSmartRanges&& other) noexcept: ranges(std::move(other.ranges)) {
+    }
+
+    MultiSmartRanges(): ranges() {
+    }
+
+    MultiSmartRanges& operator=(const MultiSmartRanges& other) {
+        if (this != &other) {
+            ranges = other.ranges;
+        }
+        return *this;
+    }
+
+    MultiSmartRanges& operator=(MultiSmartRanges&& other) noexcept {
+        if (this != &other) {
+            ranges = std::move(other.ranges);
+        }
+        return *this;
+    }
+
+    ~MultiSmartRanges() {
+    }
+
+    /// @brief: here we verify if a value respect all the range requirements
+    /// @param value: the value we want to verify
+    /// @param text: a string with information when value does not respect all the requirements
+    /// @param mask: a vector of bools that indicates which ranges to check
+    ///             - If empty: all ranges are checked (mask is set to all true).
+    ///             - If smaller than the number of ranges: mask is extended with false for missing entries.
+    ///             - If larger than the number of ranges: extra mask entries are ignored.
+    /// @return true if value respect all the requirements, false if not
+    bool is_in(int value, std::string& text, std::vector<bool> mask = {}) const {
+        if (mask.empty()) {
+            mask.resize(ranges.size(), true);  // all ranges are checked
+        } else if (mask.size() < ranges.size()) {
+            mask.resize(ranges.size(), false);  // missing entries are not checked
+        }
+        for (size_t i = 0; i < ranges.size(); ++i) {
+            if (mask[i]) {
+                if (ranges[i].is_in(value, text)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool is_in(int value, std::vector<bool> mask = {}) const {
+        std::string text;
+        return is_in(value, text, std::move(mask));
+    }
+
+    /// @brief: get a specific range from the vector of ranges
+    /// @param index: the index of the range we want to get
+    /// @return the range at the given index
+    SmartRanges get_range(size_t index) const {
+        if (index >= ranges.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return ranges[index];
+    }
+
+    int getUpperBound() const {
+        return std::accumulate(ranges.begin(), ranges.end(), 0, [](int max, const SmartRanges& range) {
+            return std::max(max, range.getUpperBound());
+        });
+    }
+
+    int getLowerBound() const {
+        return std::accumulate(ranges.begin(), ranges.end(), 0, [](int min, const SmartRanges& range) {
+            return std::min(min, range.getLowerBound());
+        });
+    }
+
+    MultiSmartRanges multiply_lower(int multiplier) const {
+        std::vector<SmartRanges> new_ranges;
+        new_ranges.reserve(ranges.size());
+        for (const auto& range : ranges) {
+            new_ranges.push_back(range.multiply_lower(multiplier));
+        }
+        return MultiSmartRanges(new_ranges);
+    }
+
+    MultiSmartRanges multiply_upper(int multiplier) const {
+        std::vector<SmartRanges> new_ranges;
+        new_ranges.reserve(ranges.size());
+        for (const auto& range : ranges) {
+            new_ranges.push_back(range.multiply_upper(multiplier));
+        }
+        return MultiSmartRanges(new_ranges);
     }
 };
 

@@ -123,7 +123,7 @@ protected:
             &(std::get<0>(specific_vv)),  //
             &(std::get<1>(specific_vv)),  //
 
-            &(std::get<2>(specific_vv))  //
+            &(std::get<2>(specific_vv)),  //
     };
 
 public:

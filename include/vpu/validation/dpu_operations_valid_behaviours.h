@@ -38,6 +38,24 @@ inline SmartRanges::value_type Sampler::sample_list_decrease_prob<SmartRanges>(c
     return sample_list_decrease_prob(elem_list);
 }
 
+template <>
+inline MultiSmartRanges::value_type Sampler::sample_list_decrease_prob<MultiSmartRanges>(const MultiSmartRanges& elements) const {
+    // lambda function to generate a list of elements for a SmartRanges object
+    auto gen_SmartList = [](const MultiSmartRanges& elements) -> std::vector<MultiSmartRanges::value_type> {
+        std::string text{""};
+        std::vector<SmartRanges::value_type> result;
+
+        for (auto i = elements.getLowerBound(); i <= elements.getUpperBound(); i++) {
+            if (elements.is_in(i, text))
+                result.emplace_back(i);
+        }
+        return result;
+    };
+
+    auto elem_list{gen_SmartList(elements)};
+    return sample_list_decrease_prob(elem_list);
+}
+
 class IOperationDynamicGenerator {
 public:
     /// @brief  dynamic establishment of output_0 and input_1
@@ -266,6 +284,7 @@ protected:
         const auto out_channels_range{config.get_output_channels_restriction(dpu)};
 
         dpu.output_0.channels = sampler.sample_list_decrease_prob(out_channels_range);  //  non uniform
+
         // this rule is here only for Fathom compliance, must be clarified in the future what's actually required
         const auto is_16_align = dtype_to_bytes(dpu.input_1.datatype) > 1 || dpu.device == VPUDevice::VPU_2_7 ||
                                  dpu.input_1.sparsity_enabled;
@@ -357,7 +376,11 @@ protected:
     bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
-        checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels}, "output_0.channels");
+
+        if (!dpu.output_autopad) {
+            checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
+                                     "output_0.channels == input_0.channels");
+        }
 
         info = checker.findings();
         return checker.is_clean();
@@ -398,6 +421,7 @@ protected:
         const auto out_channels_range{config.get_output_channels_restriction(dpu)};
 
         dpu.output_0.channels = sampler.sample_list_decrease_prob(out_channels_range);  //  non uniform
+        
         const int multiple{wts_mask_alignement(dpu.input_1.datatype)};
         dpu.input_1.channels = config.align_to(dpu.input_0.channels * dpu.kernel.height * dpu.kernel.width, multiple);
 
@@ -462,8 +486,11 @@ protected:
     bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
-        checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
-                                 "output_0.channels == input_0.channels");
+        if (!dpu.output_autopad)
+        {
+            checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
+                                     "output_0.channels == input_0.channels");
+        }
 
         info = checker.findings();
         return checker.is_clean();
@@ -557,8 +584,12 @@ protected:
     bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
-        checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
-                                 "output_0.channels == input_0.channels");
+
+        if (!dpu.output_autopad)
+        {
+            checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
+                                     "output_0.channels == input_0.channels");
+        }
 
         info = checker.findings();
         return checker.is_clean();

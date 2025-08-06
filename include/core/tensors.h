@@ -28,7 +28,7 @@ namespace VPUNN {
  * @tparam T tensor datatype
  */
 template <typename T>
-class VPUNN_API(Tensor) {
+class VPUNN_API Tensor {
 private:
     std::vector<unsigned int> _dimensions;  ///< describes the data  represented as a multidimensional tensor
     int _size;                              ///< number of elements in the _data array

@@ -22,8 +22,12 @@
 
 constexpr float VPU27COSTCURVERATIO = 1.0;
 constexpr float VPU40COSTCURVERATIO = 2.5;
+
+
 constexpr int VPU27DSPARCH = 128;
 constexpr int VPU40DSPARCH = 512;
+
+
 constexpr int MAXBLKNUM = 32;
 
 constexpr char opPrefix[] = "vpuem.";
@@ -341,4 +345,5 @@ void ShaveInstanceHolder_NPU40::populate() {
 
     // clang-format on
 }
+
 }  // namespace VPUNN

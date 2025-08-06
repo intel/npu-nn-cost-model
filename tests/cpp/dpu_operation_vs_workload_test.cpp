@@ -34,6 +34,7 @@ class Wrapper_DPUOperation : public DPUOperation {
 public:
     using DPUOperation::is_preconditions_for_inplace_output;
     using DPUOperation::is_special_No_weights_situation;
+    Wrapper_DPUOperation(const DPUOperation& op): DPUOperation(op) { }
 };
 class Wrapper_DPUWorkload : public DPUWorkload {
 public:

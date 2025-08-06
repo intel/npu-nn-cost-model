@@ -34,6 +34,7 @@ using namespace VPUNN;
 //@todo Add all LNL profiling results for JIra tickets to a fixture of UNit tests for LNL
 //@todo Enhance DW-conv conversion factors to include the new ones from the LNL profiling results
 
+
 TEST_F(TestCostModel, MAXPOOL_172_VPU27_NoGT) {
     DPUWorkload tst_wl{
             VPUDevice::VPU_2_7,                         // dev
@@ -195,7 +196,7 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
     {  // empty models
 
         ASSERT_FALSE(model.nn_initialized());
-        auto minmax = model.get_NN_Valid_interval();
+        auto minmax = model.get_NN_cost_provider().get_NN_Valid_interval();
         ASSERT_FLOAT_EQ(down_exp, minmax.first);
         ASSERT_FLOAT_EQ(up_exp, minmax.second);
     }
@@ -206,7 +207,7 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
         VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
-        auto minmax = vpunn_model.get_NN_Valid_interval();
+        auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
         ASSERT_FLOAT_EQ(down_exp, minmax.first);
         ASSERT_FLOAT_EQ(up_exp, minmax.second);
     }
@@ -217,7 +218,7 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
         VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
-        auto minmax = vpunn_model.get_NN_Valid_interval();
+        auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
         ASSERT_FLOAT_EQ(down_exp, minmax.first);
         ASSERT_FLOAT_EQ(up_exp, minmax.second);
     }
@@ -228,7 +229,7 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
         VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
-        auto minmax = vpunn_model.get_NN_Valid_interval();
+        auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
         ASSERT_FLOAT_EQ(down_exp, minmax.first);
         ASSERT_FLOAT_EQ(up_exp, minmax.second);
     }
@@ -239,7 +240,7 @@ TEST_F(TestCostModel, LoadModels_NN_Valid_Interval) {
         VPUNN::VPUCostModel vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
-        auto minmax = vpunn_model.get_NN_Valid_interval();
+        auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
         ASSERT_FLOAT_EQ(down_exp, minmax.first);
         ASSERT_FLOAT_EQ(up_exp, minmax.second);
     }
@@ -277,8 +278,11 @@ TEST_F(TestCostModel, BatchTestVPUNN_NN2_7) {
     auto input_size = preprocessing.output_size();
     auto batch_size = (unsigned int)workloads.size();
 
-    auto runtime_model = VPUNN::Runtime(VPU_2_7_MODEL_PATH, 1);
-    auto model_batched = VPUNN::Runtime(VPU_2_7_MODEL_PATH, batch_size);
+    const auto runtime_model = VPUNN::Runtime(VPU_2_7_MODEL_PATH);
+    InferenceExecutionData runtime_buffer_data{runtime_model.createNewInferenceExecutionData(1)};
+
+    const auto model_batched = VPUNN::Runtime(VPU_2_7_MODEL_PATH);
+    InferenceExecutionData batched_buffer_data{model_batched.createNewInferenceExecutionData(batch_size)};
 
     ASSERT_EQ(runtime_model.model_version_info().get_input_interface_version(), preprocessing.interface_version())
             << "Runtime expected input version and preprocessing version must be the same" << std::endl;
@@ -289,9 +293,9 @@ TEST_F(TestCostModel, BatchTestVPUNN_NN2_7) {
     // const auto& output_shape = runtime_model.output_tensors()[0]->shape();
     // const auto& input_shape_batched = model_batched.input_tensors()[0]->shape();
 
-    const std::vector<unsigned int> input_shape{runtime_model.input_shapes()[0]};
-    const std::vector<unsigned int> output_shape{runtime_model.output_shapes()[0]};
-    const std::vector<unsigned int> input_shape_batched{model_batched.input_shapes()[0]};
+    const std::vector<unsigned int> input_shape{runtime_buffer_data.input_shapes()[0]};
+    const std::vector<unsigned int> output_shape{runtime_buffer_data.output_shapes()[0]};
+    const std::vector<unsigned int> input_shape_batched{batched_buffer_data.input_shapes()[0]};
 
     // Expect proper batch
     EXPECT_EQ(input_shape[0], 1u);
@@ -305,12 +309,13 @@ TEST_F(TestCostModel, BatchTestVPUNN_NN2_7) {
     std::vector<float*> inference = std::vector<float*>(batch_size);
     std::vector<std::vector<float>> inference_vector = std::vector<std::vector<float>>(batch_size);
     for (unsigned int idx = 0; idx < batch_size; idx++) {
-        auto& data = preprocessing.transform(workloads[idx]);
+        const std::vector<float> data = preprocessing.transformSingle(workloads[idx]);
         // Create a new pointer otherwise it will get overwritten every time
         inference[idx] = new float[output_shape[1]];
-        memcpy((void*)inference[idx], runtime_model.predict(&(data[0]), input_size), sizeof(float) * output_shape[1]);
+        memcpy((void*)inference[idx], runtime_model.predict(&(data[0]), input_size, runtime_buffer_data),
+               sizeof(float) * output_shape[1]);
         // Compute inference using the vector interface
-        inference_vector[idx] = runtime_model.predict<float>(data);
+        inference_vector[idx] = runtime_model.predict<float>(data, runtime_buffer_data);
     }
 
     // Expect output 0 and 2 and 1 and 3 to be the same
@@ -337,8 +342,9 @@ TEST_F(TestCostModel, BatchTestVPUNN_NN2_7) {
     }
 
     // Duplicate batched data
-    const auto& batched_data = preprocessing.transform(workloads);
-    float* inference_batched = (float*)model_batched.predict(batched_data.data(), input_size * batch_size);
+    const auto batched_data{preprocessing.transformBatch(workloads)};
+    float* inference_batched =
+            (float*)model_batched.predict(batched_data.data(), input_size * batch_size, batched_buffer_data);
 
     for (unsigned int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
         for (unsigned int data_idx = 0; data_idx < output_shape[1]; data_idx++) {
@@ -665,10 +671,11 @@ TEST_F(TestCostModel, SmokeTestDPUVPU_2_0Model) {
     };
     VPUNN::VPUCostModel model_2_0{VPU_2_0_MODEL_PATH};
 
-    float overhead = static_cast<float>(model_2_0.run_NN(wl));
+    auto overhead = model_2_0.DPU(std::move(wl));
 
     // Expect hw overhead to be valid
     EXPECT_TRUE(overhead > 1);
+    EXPECT_FALSE(Cycles::isErrorCode(overhead));
 }
 
 TEST_F(TestCostModel, SmokeTestDPUVPU_2_0Model_Eltwise) {
@@ -715,17 +722,19 @@ TEST_F(TestCostModel, SmokeTestDPUVPU27Model) {
             VPUNN::Operation::CONVOLUTION,
             {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
             {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {1, 1},                                                     // kernels
+            {3, 3},                                                     // kernels
             {1, 1},                                                     // strides
             {1, 1, 1, 1},                                               // padding
             VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
     };
     VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+    EXPECT_TRUE(model_2_7.nn_initialized());
 
-    float overhead = static_cast<float>(model_2_7.run_NN(wl));
+    auto overhead = model_2_7.DPU(std::move(wl));
 
     // Expect hw overhead to be valid
     EXPECT_TRUE(overhead > 1);
+    EXPECT_FALSE(Cycles::isErrorCode(overhead)) << overhead;
 }
 
 TEST_F(TestCostModel, SmokeTestDMA) {
@@ -830,6 +839,85 @@ TEST_F(TestCostModel, Special_Tests_DPU_MAXPOOL_VPU_2_0_1_96_96_9_9_1_2_VALID_FL
     }
 }
 
+/// Test batch values for devices
+TEST_F(TestCostModel, BatchValues_DPU_Test) {
+    auto mkWl = [](VPUDevice dev, unsigned int b, ExecutionMode exec = ExecutionMode::CUBOID_16x16) -> DPUWorkload {
+        VPUNN::DPUWorkload wl{
+                dev,
+                Operation::CONVOLUTION,
+                {VPUNN::VPUTensor(15, 50, 64, b, VPUNN::DataType::UINT8)},  // input dimensions
+                {VPUNN::VPUTensor(15, 50, 64, b, VPUNN::DataType::UINT8)},  // output dimensions
+                {1, 1},                                                     // kernels
+                {1, 1},                                                     // strides
+                {0, 0, 0, 0},                                               // padding
+                exec                                                        // execution mode
+        };
+
+        return wl;
+    };
+
+    struct TestInput {
+        VPUNN::DPUWorkload wl;
+        std::string model_path;
+    };
+
+    struct TestExpectation {
+        CyclesInterfaceType cyc_err;
+    };
+
+    struct TestCase {
+        TestInput t_in;
+        TestExpectation t_exp;
+        std::string text = "";
+    };
+
+    using TestsVector = std::vector<TestCase>;
+
+    auto verify_cyc = [](const TestsVector& tests) {
+        int i = 1;  // test case index
+        for (const auto& t : tests) {
+            std::cout << "Test case: " << i << "\n";
+            VPUNN::VPUCostModel model{t.t_in.model_path};
+            auto cyc = model.DPU(t.t_in.wl);
+
+            if (t.t_exp.cyc_err == Cycles::NO_ERROR) {
+                EXPECT_TRUE(!Cycles::isErrorCode(cyc));
+            } else {
+                EXPECT_EQ(cyc, t.t_exp.cyc_err) << "Actual: " << Cycles::toErrorText(cyc)
+                                                << " Expected: " << Cycles::toErrorText(t.t_exp.cyc_err);
+            }
+
+            i++;
+        }
+    };
+
+    /// for VPUDevice::VPU2_0, VPUDevice::VPU2_7, VPUDevice::VPU4_0 we accept any value for batch (ex: 1, 2, 3, ...)
+    /// but for VPUDevice::NPU_RESERVED batch is restricted to 1
+    const TestsVector tests = {{{mkWl(VPUDevice::VPU_2_0, 0U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+                                "VPU2_0, B=0"},
+                               {{mkWl(VPUDevice::VPU_2_0, 1U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+                                {Cycles::NO_ERROR},
+                                "VPU2_0, B=1"},
+                               {{mkWl(VPUDevice::VPU_2_0, 2U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+                                {Cycles::NO_ERROR},
+                                "VPU2_0, B=2"},
+
+                               {{mkWl(VPUDevice::VPU_2_7, 0U), VPU_2_7_MODEL_PATH},
+                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+                                "VPU2_7, B=0"},
+                               {{mkWl(VPUDevice::VPU_2_7, 1U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=1"},
+                               {{mkWl(VPUDevice::VPU_2_7, 2U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=2"},
+
+                               {{mkWl(VPUDevice::VPU_4_0, 0U), VPU_4_0_MODEL_PATH},
+                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+                                "VPU4_0, B=0"},
+                               {{mkWl(VPUDevice::VPU_4_0, 1U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=1"},
+                               {{mkWl(VPUDevice::VPU_4_0, 2U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=2"},
+    };
+
+    verify_cyc(tests);
+}
 TEST_F(TestCostModel, AVEPOOL_equivalence_test_27) {
     const VPUNN::DPUWorkload wl_avgpool_ref = {
             VPUNN::VPUDevice::VPU_2_7,
@@ -1264,6 +1352,7 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
     }
 }
 
+
 TEST_F(TestCostModel, Establish_unique_swizz_Test) {
     struct TestInput {
         Swizzling in0;
@@ -1330,11 +1419,12 @@ TEST_F(TestCostModel, ComaparativeRuns) {
 
     auto modelRun = [](const std::string& model_path, VPUNN::DPUWorkload& wld) {
         VPUNN::VPUCostModel vpunn_model(model_path);
+        const IEnergy& my_energy = vpunn_model.getEnergyInterface();
         std::cout << model_path << " : initialized: " << vpunn_model.nn_initialized() << std::endl;
 
-        std::cout << "run_NN(wl)   : " << vpunn_model.run_NN(wld) << std::endl;
+        // std::cout << "run_NN(wl)   : " << vpunn_model.run_NN(wld) << std::endl;
         std::cout << "DPU(wl)   : " << vpunn_model.DPU(wld) << std::endl;
-        std::cout << "hw_utilization(wl)   : " << vpunn_model.hw_utilization(wld) << std::endl;
+        std::cout << "hw_utilization(wl)   : " << my_energy.hw_utilization(wld) << std::endl;
     };
 
     std::cout << "----------------------------------------------------------\n";
@@ -1489,6 +1579,7 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
         EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
     }
+
 }
 TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 20
@@ -2221,6 +2312,7 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
                 VPUNN::ISIStrategy::CLUSTERING,                                 // isi_strategy
                 false,                                                          // weight_sparsity_enabled
         };
+        /* coverity[copy_instead_of_move] */
         return wl;
     };
 
@@ -2244,6 +2336,7 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
                 VPUNN::ISIStrategy::CLUSTERING,                               // isi_strategy
                 false,                                                        // weight_sparsity_enabled
         };
+        /* coverity[copy_instead_of_move] */
         return wl;
     };
 
@@ -2308,8 +2401,8 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
                 buffer.str("");
                 buffer << "CompressConv original , IC=" << i << ", OC= " << oc;
                 const std::string testName = buffer.str();
-                TestCase t{{costructCompressConv321x46(i, oc), testName}};
-                tests.push_back(t);
+                TestCase t{{costructCompressConv321x46(i, oc), std::move(testName)}};
+                tests.push_back(std::move(t));
             }
             {  // conv
                 int i = 16;
@@ -2319,7 +2412,7 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
                 auto w{costructCompressConv321x46(i, oc)};
                 w.op = Operation::CONVOLUTION;
                 TestCase t{{std::move(w), std::move(testName)}};
-                tests.push_back(t);
+                tests.push_back(std::move(t));
             }
         }
 
@@ -2424,7 +2517,7 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_EquivPostprocessing_test_VPU40) {
 
     {
         VPUCostModel model_{VPU_4_0_MODEL_PATH};
-        const auto [v_in, v_out] = model_.getNNVersion();
+        const auto [v_in, v_out] = model_.get_NN_cost_provider().getNNVersion();
 
         /* coverity[pass_by_value] */
         auto test_exec = [&](DPUWorkload wl /*, DPUWorkload wl_equiv*/, float factor, std::string info) {
@@ -3731,7 +3824,7 @@ TEST_F(TestCostModel, Weigths_types_CONV_NPU40_test) {
     // check runtime equivalence
     {
         EXPECT_EQ(model_x.DPU(base_wl8_4), model_x.DPU(std::move(base_wl8_8)));
-        EXPECT_EQ(model_x.DPU(base_wl16_4), model_x.DPU(base_wl16_16));
+        EXPECT_EQ(model_x.DPU(base_wl16_4), model_x.DPU(std::move(base_wl16_16)));
 
         DPUWorkload base_wl16_8{base_wl16_4};
         base_wl16_8.weight_type = DataType::INT8;

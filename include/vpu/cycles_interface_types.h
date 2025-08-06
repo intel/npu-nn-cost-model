@@ -85,6 +85,10 @@ public:
 
     static constexpr CyclesInterfaceType ERROR_L2_INVALID_PARAMETERS{MaxV - 16}; // used for invalid parameters for L2 API
 
+    static constexpr CyclesInterfaceType ERROR_PROFILING_SERVICE{MaxV - 17};  // used for invalid output from profiling service
+
+    static constexpr CyclesInterfaceType ERROR_CACHE_MISS{MaxV - 18};  // used for cache miss
+
     static constexpr CyclesInterfaceType START_ERROR_RANGE{MaxV - 1000};  ///< 1000 position for errors
 
     /// @brief true if v has a value that can be an error code
@@ -138,6 +142,10 @@ public:
             return "ERROR_SHAVE_INVALID_INPUT";
         case ERROR_L2_INVALID_PARAMETERS:
             return "ERROR_L2_INVALID_PARAMETERS";
+        case ERROR_PROFILING_SERVICE:
+            return "ERROR_PROFILING_SERVICE";
+        case ERROR_CACHE_MISS:
+            return "ERROR_CACHE_MISS";
         default:
             return "UNKNOWN";
         }

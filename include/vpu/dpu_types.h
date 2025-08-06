@@ -137,15 +137,17 @@ enum class DataType {
     INT1,
     INT32,    ///< 32bit integer
     FLOAT32,  ///< 32bit float
-    __size    ///< last element, its value  equals number of useful enum values
+    UINT16,
+    INT16,
+    __size  ///< last element, its value  equals number of useful enum values
 };
 static const EnumMap DataType_ToText{
         link(DataType::UINT8, "UINT8"),       link(DataType::INT8, "INT8"),       link(DataType::FLOAT16, "FLOAT16"),
         link(DataType::BFLOAT16, "BFLOAT16"), link(DataType::BF8, "BF8"),         link(DataType::HF8, "HF8"),
         link(DataType::UINT4, "UINT4"),       link(DataType::INT4, "INT4"),       link(DataType::UINT2, "UINT2"),
         link(DataType::INT2, "INT2"),         link(DataType::UINT1, "UINT1"),     link(DataType::INT1, "INT1"),
-        link(DataType::INT32, "INT32"),       link(DataType::FLOAT32, "FLOAT32"),
-};
+        link(DataType::INT32, "INT32"),       link(DataType::FLOAT32, "FLOAT32"), link(DataType::UINT16, "UINT16"),
+        link(DataType::INT16, "INT16")};
 template <>
 inline const EnumMap& mapToText<DataType>() {
     return DataType_ToText;

@@ -6,7 +6,7 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#include "vpunn.h"
+#include "inference/vpunn_runtime.h"
 
 #include <gtest/gtest.h>
 
@@ -19,6 +19,7 @@
 #include "common_helpers.h"
 
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 class TestRuntime : public ::testing::Test {
 public:
@@ -52,23 +53,26 @@ private:
 TEST_F(TestRuntime, CreationBasicTest) {
     {  // good data
         const std::string vpunn_file = VPU_2_0_MODEL_PATH;
-        auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
+        const auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
         EXPECT_TRUE(runtime_model_f.initialized());
+        InferenceExecutionData runtime_F_buffer_data{runtime_model_f.createNewInferenceExecutionData(1)};
 
         const auto file_content{read_a_file(vpunn_file)};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        auto runtime_model_b{VPUNN::Runtime(file_content.data(), file_content.size(), false)};
+        const auto runtime_model_b{VPUNN::Runtime(file_content.data(), file_content.size(), false)};
         EXPECT_TRUE(runtime_model_b.initialized());
+        InferenceExecutionData runtime_B_buffer_data{runtime_model_b.createNewInferenceExecutionData(1)};
 
-        auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
+        const auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
         EXPECT_TRUE(runtime_model_bc.initialized());
+        InferenceExecutionData runtime_BC_buffer_data{runtime_model_bc.createNewInferenceExecutionData(1)};
 
-        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_b.input_shapes().size());
-        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_b.output_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.input_shapes().size(), runtime_B_buffer_data.input_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.output_shapes().size(), runtime_B_buffer_data.output_shapes().size());
 
-        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_bc.input_shapes().size());
-        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_bc.output_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.input_shapes().size(), runtime_BC_buffer_data.input_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.output_shapes().size(), runtime_BC_buffer_data.output_shapes().size());
 
         EXPECT_EQ(runtime_model_f.model_version_info().get_raw_name(),
                   runtime_model_bc.model_version_info().get_raw_name());
@@ -77,23 +81,26 @@ TEST_F(TestRuntime, CreationBasicTest) {
     }
     {  // good data
         const std::string vpunn_file = VPU_2_7_MODEL_PATH;
-        auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
+        const auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
         EXPECT_TRUE(runtime_model_f.initialized());
+        InferenceExecutionData runtime_F_buffer_data{runtime_model_f.createNewInferenceExecutionData(1)};
 
         const auto file_content{read_a_file(vpunn_file)};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        auto runtime_model_b{VPUNN::Runtime(file_content.data(), file_content.size(), false)};
+        const auto runtime_model_b{VPUNN::Runtime(file_content.data(), file_content.size(), false)};
         EXPECT_TRUE(runtime_model_b.initialized());
+        InferenceExecutionData runtime_B_buffer_data{runtime_model_b.createNewInferenceExecutionData(1)};
 
-        auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
+        const auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
         EXPECT_TRUE(runtime_model_bc.initialized());
+        InferenceExecutionData runtime_BC_buffer_data{runtime_model_bc.createNewInferenceExecutionData(1)};
 
-        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_b.input_shapes().size());
-        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_b.output_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.input_shapes().size(), runtime_B_buffer_data.input_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.output_shapes().size(), runtime_B_buffer_data.output_shapes().size());
 
-        EXPECT_EQ(runtime_model_f.input_shapes().size(), runtime_model_bc.input_shapes().size());
-        EXPECT_EQ(runtime_model_f.output_shapes().size(), runtime_model_bc.output_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.input_shapes().size(), runtime_BC_buffer_data.input_shapes().size());
+        EXPECT_EQ(runtime_F_buffer_data.output_shapes().size(), runtime_BC_buffer_data.output_shapes().size());
 
         EXPECT_EQ(runtime_model_f.model_version_info().get_raw_name(),
                   runtime_model_bc.model_version_info().get_raw_name());
@@ -103,16 +110,16 @@ TEST_F(TestRuntime, CreationBasicTest) {
 
     {  // garbage data/no file
         const std::string vpunn_file = "NoFileHere.vpunn";
-        auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
+        const auto runtime_model_f{VPUNN::Runtime(vpunn_file)};
         EXPECT_FALSE(runtime_model_f.initialized());
 
         const decltype(read_a_file("")) file_content{'M', 'u', 's', 't', 'h', 'a', 'v', 'e', ' ', '0', '1'};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        auto runtime_model_b{VPUNN::Runtime(file_content.data(), file_content.size(), false)};
+        const auto runtime_model_b{VPUNN::Runtime(file_content.data(), file_content.size(), false)};
         EXPECT_FALSE(runtime_model_b.initialized());
 
-        auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
+        const auto runtime_model_bc{VPUNN::Runtime(file_content.data(), file_content.size(), true)};
         EXPECT_FALSE(runtime_model_bc.initialized());
     }
 }

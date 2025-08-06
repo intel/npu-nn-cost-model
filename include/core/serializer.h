@@ -21,6 +21,11 @@
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
+#include <mutex>
+#include <functional>
+#include <optional>
+#include <vector>
+
 #include "core/logger.h"
 #include "core/utils.h"
 #include "vpu/dpu_types.h"
@@ -466,6 +471,8 @@ public:
         if (!serialization_enabled) {
             return;
         } else {
+            std::lock_guard<std::recursive_mutex> lock(file_mutex); // protect initialization since several writes to file could happen here
+
             // Reset the serializer - close file stream, empty all buffers
             reset();
 
@@ -478,7 +485,7 @@ public:
             bool existing_readonly_file = false;
             // If file does not already exist, create a new file with a unique name (unique to current process run)
             if (!file_exists) {
-                file_path = std::filesystem::path(file_name + generate_uid() + get_extension(fmt));
+                file_path = std::filesystem::path(file_name + generate_file_name() + get_extension(fmt));
             } else {
                 // file exists
                 if (FileMode::READONLY == mode) {
@@ -530,8 +537,10 @@ public:
 
     /// @brief Reset the serializer - close file stream, empty all buffers
     void reset() {
+        std::lock_guard<std::recursive_mutex> lock(file_mutex);
+
         file.close();
-        write_tokens.clear();
+        write_tokens_map.clear();
         index_map.clear();
     }
 
@@ -543,9 +552,15 @@ public:
     /// @brief Check if the write buffer is clean
     /// @return true if the write buffer is clean, false otherwise
     bool is_write_buffer_clean() const {
+        const auto& write_tokens = get_write_tokens();
+        
+        if (!write_tokens.has_value()) {
+            return true;  // No write tokens for this thread, buffer is clean
+        }
+
         // Since write tokens might be populated with empty strings, check if any token is not empty
         bool isTokensEmpty = true;
-        for (const auto& token : write_tokens) {
+        for (const auto& token : write_tokens.value().get()) {
             if (!token.empty()) {
                 isTokensEmpty = false;
                 break;
@@ -554,10 +569,49 @@ public:
         return isTokensEmpty;
     }
 
+    /// @brief Get write tokens for the current thread
+    /// @return A vector of write tokens for the current thread, or std::nullopt if no tokens are available
+    std::optional<std::reference_wrapper<std::vector<std::string>>> get_write_tokens(const bool create_if_empty = false) {
+        std::lock_guard<std::mutex> lock(write_tokens_map_mutex);
+
+        const auto thread_id = std::this_thread::get_id();
+        const bool has_tokens = write_tokens_map.count(thread_id) > 0;
+
+        if (!has_tokens && !create_if_empty) {
+            return std::nullopt;  // No write tokens for this thread and not requested to create them
+        } else if (!has_tokens) {
+            // If write tokens for this thread do not exist, create them
+            write_tokens_map[thread_id].resize(index_map.size(), "");
+        }
+
+        auto& write_tokens = write_tokens_map.at(thread_id);
+        if (write_tokens.empty()) {
+            return std::nullopt;  // No tokens to return
+        }
+
+        return std::ref(write_tokens);
+    }
+
+    /// @brief Get write tokens for the current thread (const overload)
+    /// @return A vector of write tokens for the current thread, or std::nullopt if no tokens are available
+    std::optional<std::reference_wrapper<const std::vector<std::string>>> get_write_tokens() const {
+        std::lock_guard<std::mutex> lock(write_tokens_map_mutex);
+        const auto thread_id = std::this_thread::get_id();
+        if (write_tokens_map.count(thread_id) == 0) {
+            return std::nullopt;  // No write tokens for this thread
+        }
+        return std::cref(write_tokens_map.at(thread_id));
+    }
+
     /// @brief Clean the write buffer
     void clean_buffers() {
-        write_tokens.clear();
-        write_tokens.resize(index_map.size(), "");
+        const auto& write_tokens = get_write_tokens();
+        if (!write_tokens.has_value()) {
+            return;  // No write tokens for this thread, nothing to clean
+        }
+
+        write_tokens.value().get().clear();
+        write_tokens.value().get().resize(index_map.size(), "");
     }
 
     /// @brief Get the field names - eg. columns in a CSV file
@@ -613,6 +667,12 @@ public:
     void serialize(Args&&... args) {
         if (!is_initialized())
             return;
+        
+        auto write_tokens_opt = get_write_tokens(true);  // Get write tokens for the current thread, create if empty
+        if (!write_tokens_opt.has_value())
+            return;
+
+        auto& write_tokens = write_tokens_opt.value().get();
 
         // Define operation that will be mapped to each input argument
         auto operation = [&](auto& arg) {
@@ -804,6 +864,8 @@ public:
                         arg[key] = "";  // not found in tokens, forget old value
                     }
                 }
+            } else {
+                return false;
             }
         };
 
@@ -815,8 +877,15 @@ public:
 
     /// @brief End serialization of a block of data - write the write buffer to the file and clean buffers
     void end() {
-        if (!write_tokens.empty())
-            file.write(write_tokens);
+        std::lock_guard<std::recursive_mutex> lock(file_mutex);
+        const auto& write_tokens = get_write_tokens();
+        if (!write_tokens.has_value()) {
+            return;  // No write tokens for this thread, nothing to write
+        }
+
+        if (!write_tokens.value().get().empty()) {
+            file.write(write_tokens.value().get(), true);
+        }
 
         clean_buffers();
     }
@@ -857,9 +926,12 @@ private:
     const FileFormat format{fmt};                      ///> Serialization format
     FileHandler<fmt> file{};                           ///> File handler
     std::unordered_map<std::string, int> index_map{};  ///> First stores key name (eg column name), then a position
-    std::vector<std::string> write_tokens{};           ///> Buffer to store tokens to be written - needs to live between
-                                                       /// serialization calls until end()
+    std::unordered_map<std::thread::id, std::vector<std::string>> write_tokens_map{}; ///> Buffer to store tokens to be written - needs to be alive between
+                                                                                  /// serialization calls until end()
     int line_index{-1};                                ///> Index of the current line in the file
+
+    std::recursive_mutex file_mutex{};                ///> Mutex to protect file operations from concurrent access
+    mutable std::mutex   write_tokens_map_mutex{};    ///> Mutex to protect write_tokens_map from concurrent access
 
     /// @brief Create an index map to store positions of each unique identifier of a field.
     /// Eg. Positions of each column in a CSV file
@@ -881,7 +953,23 @@ private:
             index_map[header_keys[idx]] = static_cast<int>(idx);
         }
 
+        auto write_tokens_opt = get_write_tokens(true);  // Get write tokens for the current thread, create if empty
+        if (!write_tokens_opt.has_value()) {
+            return;  // No write tokens for this thread, nothing to do
+        }
+        auto& write_tokens = write_tokens_opt.value().get();
         write_tokens.resize(index_map.size(), "");
+    }
+
+    /// @brief Generate a unique file name based on the current time and an environment variable
+    /// @return A unique file name
+    std::string generate_file_name() {
+        // Generate a unique identifier for the file name
+        const std::string file_name_postfix = get_env_vars({"VPUNN_FILE_NAME_POSTFIX"}).at("VPUNN_FILE_NAME_POSTFIX");
+        std::ostringstream ss;
+        ss << std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) << "_" << file_name_postfix;
+
+        return ss.str();
     }
 };
 

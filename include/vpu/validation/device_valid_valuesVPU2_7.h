@@ -148,11 +148,11 @@ public:
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
-                                 alignement_size_bytes_def){};
+                                 alignement_size_bytes_def) {};
 
     /// constructor with link to operations dynamic behavior, input channels rules and restrictions
     VPU2_7_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
-                               const std::unordered_map<Operation, SmartRanges>& input_channels_restrictions_)
+                               const std::unordered_map<Operation, MultiSmartRanges>& input_channels_restrictions_)
             : IDeviceValidValues(op_dynamic_constraints,
                                  valid_execution_order_map_default,  //
                                  valid_swizzlings_def,               //
@@ -166,13 +166,13 @@ public:
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
                                  alignement_size_bytes_def),
-              input_channels_restrictions{input_channels_restrictions_} {};
+              input_channels_restrictions{input_channels_restrictions_}{};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden (and input channels
     /// rules)
     VPU2_7_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
                                const int& input_heigth_start_factor_SOH_,
-                               const std::unordered_map<Operation, SmartRanges>& input_channels_restrictions_)
+                               const std::unordered_map<Operation, MultiSmartRanges>& input_channels_restrictions_)
             : IDeviceValidValues(op_dynamic_constraints,
                                  valid_execution_order_map_default,  //
                                  valid_swizzlings_def,               //
@@ -186,15 +186,22 @@ public:
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
                                  alignement_size_bytes_def),
-              input_channels_restrictions{input_channels_restrictions_} {};
+              input_channels_restrictions{input_channels_restrictions_}{};
 
-    SmartRanges get_output_channels_restriction(const DPUOperation&) const override {
+    MultiSmartRanges get_output_channels_restriction(const DPUOperation&) const override {
         return output_channels_restrictions;
     }
 
-    SmartRanges get_input_channels_restriction(const DPUOperation& dpu) const override {
+    MultiSmartRanges get_input_channels_restriction(const DPUOperation& dpu) const override {
         return input_channels_restrictions.at(dpu.operation);
     }
+
+    MultiSmartRanges get_batch_restrictions() const override {
+        return batch_restrictions;
+    }
+
+    inline static const SmartRanges allValues_range{1, SmartRanges::max_limit};  /// a SmartRange that contains all possible values,
+                                                                                 /// from 1 to maxim number accepted => [1, max_limit] 
 
     Layout adapt_device_comaptible_tensor_layout(Layout layout) const override {
         if (layout == Layout::ZMAJOR) {
@@ -214,14 +221,18 @@ protected:  // only const attributes can be visible in derived
     // can be changed in derived constructor
 
     /// workload input channels restrictions
-    const std::unordered_map<Operation, SmartRanges> input_channels_restrictions{
-            {Operation::CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::DW_CONVOLUTION, SmartRanges(16, 64, 16, 32)},           // special case {16, 32, 64}
-            {Operation::CM_CONVOLUTION, SmartRanges(1, cm_conv_channels_max)},  // CM_Conv is ConvCompressed for VPU2
-            {Operation::ELTWISE, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::MAXPOOL, SmartRanges(16, 64, 16, 32)},  // special case {16, 32, 64}
+    const std::unordered_map<Operation, MultiSmartRanges> input_channels_restrictions{
+            {Operation::CONVOLUTION, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::DW_CONVOLUTION, MultiSmartRanges{{SmartRanges(16, 64, 16, 32)}}},  // special case {16, 32, 64}
+            {Operation::CM_CONVOLUTION,
+             MultiSmartRanges{{SmartRanges(1, cm_conv_channels_max)}}},  // CM_Conv is ConvCompressed for VPU2
+            {Operation::ELTWISE, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::MAXPOOL, MultiSmartRanges{{SmartRanges(16, 64, 16, 32)}}},  // special case {16, 32, 64}
     };
-    const SmartRanges output_channels_restrictions{SmartRanges(16, input_spatial_dim_max, 16)};
+
+    const MultiSmartRanges output_channels_restrictions{{SmartRanges(16, input_spatial_dim_max, 16)}};
+
+    const MultiSmartRanges batch_restrictions{{allValues_range}};  // valid batch values, we accept any value
 };
 
 //////// LAYER UNSPLIT situation
@@ -231,12 +242,12 @@ class VPU2_7_LayerValidValues : public VPU2_7_WorkloadValidValues {
 private:
     inline static const int input_heigth_start_factor_SOH_def{2};
 
-    inline static const std::unordered_map<Operation, SmartRanges> input_channels_restrictions_layer{
-            {Operation::CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::DW_CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::CM_CONVOLUTION, SmartRanges(1, cm_conv_channels_max - 1)},  // why not 2
-            {Operation::ELTWISE, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::MAXPOOL, SmartRanges(16, input_spatial_dim_max, 16)},
+    inline static const std::unordered_map<Operation, MultiSmartRanges> input_channels_restrictions_layer{
+            {Operation::CONVOLUTION, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::DW_CONVOLUTION, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::CM_CONVOLUTION, MultiSmartRanges{{SmartRanges(1, cm_conv_channels_max - 1)}}},  // why not 2
+            {Operation::ELTWISE, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::MAXPOOL, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
     };
 
 public:
@@ -247,7 +258,7 @@ public:
         // at layer level we are not limited like for workload level
     }
 
-    SmartRanges get_output_channels_restriction(const DPUOperation& dpu) const override {
+    MultiSmartRanges get_output_channels_restriction(const DPUOperation& dpu) const override {
         return (dpu.isi_strategy == ISIStrategy::SPLIT_OVER_K)
                        ? output_channels_restrictions.multiply_lower(2)  // 1 bcoms 2 or 16 becomes 32
                        : output_channels_restrictions;
@@ -273,12 +284,12 @@ protected:
 /// channels restrictions are less strict vs workload, since a further split is expected
 class VPU2_7_LayerOnTileValidValues : public VPU2_7_WorkloadValidValues {
 private:
-    inline static const std::unordered_map<Operation, SmartRanges> input_channels_restrictions_layersplit{
-            {Operation::CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::DW_CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::CM_CONVOLUTION, SmartRanges(1, cm_conv_channels_max - 1)},
-            {Operation::ELTWISE, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::MAXPOOL, SmartRanges(16, input_spatial_dim_max, 16)},
+    inline static const std::unordered_map<Operation, MultiSmartRanges> input_channels_restrictions_layersplit{
+            {Operation::CONVOLUTION, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::DW_CONVOLUTION, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::CM_CONVOLUTION, MultiSmartRanges{{SmartRanges(1, cm_conv_channels_max - 1)}}},
+            {Operation::ELTWISE, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::MAXPOOL, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
     };
 
 public:

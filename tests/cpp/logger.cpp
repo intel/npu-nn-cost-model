@@ -10,6 +10,8 @@
 #include "core/logger.h"
 #include <gtest/gtest.h>
 
+#include <thread>
+
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
@@ -142,6 +144,39 @@ TEST_F(VPUNNLoggerTest, Alternative2ndOutput_Reset) {
         Logger::trace() << "error3";
         std::string i2 = Logger::get2ndlog();
         EXPECT_EQ(i2, "[VPUNN TRACE]: error3\n");
+    }
+}
+
+TEST_F(VPUNNLoggerTest, MultiThreaded_Test) {
+    Logger::initialize();
+    Logger::activate2ndlog();
+
+    const auto num_threads = 8;
+    std::vector<std::thread> threads;
+
+    for (int i = 0; i < num_threads; ++i) {
+        threads.emplace_back([i]() {
+            Logger::error() << "error from thread " << i;
+            Logger::warning() << "warning from thread " << i;
+        });
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    // Collect the 2nd log output
+    std::string log_output = Logger::get2ndlog();
+
+    // Check that each thread's error and warning messages are present
+    for (int i = 0; i < num_threads; ++i) {
+        std::string error_msg = "[VPUNN ERROR]: error from thread " + std::to_string(i) + "\n";
+        std::string warning_msg = "[VPUNN WARNING]: warning from thread " + std::to_string(i) + "\n";
+        EXPECT_NE(log_output.find(error_msg), std::string::npos) << "Missing: " << error_msg;
+        EXPECT_NE(log_output.find(warning_msg), std::string::npos) << "Missing: " << warning_msg;
+        // Optionally, check info is not present
+        std::string info_msg = "[VPUNN INFO]: info from thread " + std::to_string(i) + "\n";
+        EXPECT_EQ(log_output.find(info_msg), std::string::npos) << "Unexpected: " << info_msg;
     }
 }
 

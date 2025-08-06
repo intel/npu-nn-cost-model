@@ -12,9 +12,8 @@
 #include <sstream>  // for error formating
 #include "common_helpers.h"
 
-
-#include "vpu/shave/layers.h"
 #include "layer_test.h"
+#include "vpu/shave/layers.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -114,10 +113,10 @@ TEST_F(VPULayerCostModelTest, DISABLED_ERROR_TILE_OUTPUT_LayerInvestigation_SOK_
 }
 
 TEST_F(VPULayerCostModelTest, LayerLoadModels) {
-    EXPECT_EQ(model_2_0.nn_initialized(), true);
-    EXPECT_EQ(model_2_7.nn_initialized(), true);
-    EXPECT_EQ(model_2_7_no_dma.nn_initialized(), true);
-    EXPECT_EQ(model_4_0.nn_initialized(), true);
+    EXPECT_EQ(model_2_0.get_cost_model().nn_initialized(), true);
+    EXPECT_EQ(model_2_7.get_cost_model().nn_initialized(), true);
+    EXPECT_EQ(model_2_7_no_dma.get_cost_model().nn_initialized(), true);
+    EXPECT_EQ(model_4_0.get_cost_model().nn_initialized(), true);
 }
 
 TEST_F(VPULayerCostModelTest, LayerCostModelVPU_2_0) {
@@ -459,6 +458,68 @@ TEST_F(VPULayerCostModelTest, DISABLED_Maxpool_layer_split_NPU40) {
                  {VPUNN::Cycles::NO_ERROR, true, 7500U, 7500U * no_fail + 1000U},  // 8228 v17:
                  "SOK , no memmove, "},
 
+        };
+        executeTests(tests);
+    }
+}
+
+/// Test batch values for devices
+TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
+    auto mkLayer = [](VPUDevice dev, unsigned int b, Layout layout = Layout::ZXY) -> DPULayer {
+        VPUNN::DPUWorkload wl{
+                dev,
+                Operation::CONVOLUTION,
+                {VPUNN::VPUTensor(15, 50, 64, b, VPUNN::DataType::UINT8, layout)},  // input dimensions
+                {VPUNN::VPUTensor(15, 50, 64, b, VPUNN::DataType::UINT8, layout)},  // output dimensions
+                {1, 1},                                                             // kernels
+                {1, 1},                                                             // strides
+                {0, 0, 0, 0},                                                       // padding
+                ExecutionMode::CUBOID_16x16,                                        // execution mode
+                ActivationFunction::NONE,                                           // activation
+                0.0F,                                                               // act_sparsity
+                0.0F,                                                               // weight_sparsity
+                {Swizzling::KEY_0, Swizzling::KEY_0},                               // input_swizzling
+                {Swizzling::KEY_0},                                                 // output_swizzling
+        };
+
+        DPULayer layer(wl);
+        return layer;
+    };
+
+    bool prefetch{true};
+    show_split = true;
+    unsigned int no_fail = 1;
+    {
+        const std::vector<TestCase> tests{
+                 {{mkLayer(VPUDevice::VPU_2_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
+                 "Device 2.0, B=0 "},
+                 {{mkLayer(VPUDevice::VPU_2_0, 1, Layout::ZMAJOR), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 12500, 12500 * no_fail + 1000},
+                 "Device 2.0, B=1 "},
+                 {{mkLayer(VPUDevice::VPU_2_0, 2, Layout::ZMAJOR), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 6500, 6500 * no_fail + 1000},
+                 "Device 2.0, B=2 "},
+
+                 {{mkLayer(VPUDevice::VPU_2_7, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
+                 "Device 2_7, B=0 "},
+                 {{mkLayer(VPUDevice::VPU_2_7, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 1500, 1500 * no_fail + 1000},
+                 "Device 2.7, B=1 "},
+                 {{mkLayer(VPUDevice::VPU_2_7, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 1300, 1300 * no_fail + 1000},
+                 "Device 2.7, B=2 "},
+
+                 {{mkLayer(VPUDevice::VPU_4_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
+                 "Device 4.0, B=0 "},
+                 {{mkLayer(VPUDevice::VPU_4_0, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 2000, 2000 * no_fail + 1000},
+                 "Device 4.0, B=1 "},
+                 {{mkLayer(VPUDevice::VPU_4_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                 {VPUNN::Cycles::NO_ERROR, true, 1200, 1200 * no_fail + 1000},
+                 "Device 4.0, B=2 "},
         };
         executeTests(tests);
     }
@@ -1001,7 +1062,7 @@ TEST_F(VPULayerCostModelTest, AVEPOOL_Concrete_GlobalAveragePool_172_MaxWorkload
 
 TEST_F(VPULayerCostModelTest, Default_MaxWorkloadSPlitAndDetails_Test) {
     std::vector<const VPULayerCostModel*> all_models{
-            &model_2_0, &model_2_7, &model_2_7_no_dma, &model_4_0,
+            &model_2_0, &model_2_7, &model_2_7_no_dma, &model_4_0, 
     };
 
     for (const auto m : all_models) {
@@ -1531,7 +1592,7 @@ TEST_F(VPULayerCostModelTest, ELTWISE_diff_swizz_NPU40) {
         std::cout << std::move(nline) << " " << text;
         std::string err_info;
         DPUWorkload tst_wl{wl};
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_wl, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_wl, err_info);
 
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << tst_wl << err_info;
@@ -2525,7 +2586,7 @@ TEST_F(VPULayerCostModelTest, Unet_perf_SOH_SOK_after_SOHO) {
         // EXPECT_EQ(cost_cyc, 3) << tst_layer << toStringLayerSplitInfo(detailed_split) << Logger::get2ndlog();
 
         std::string err_info;
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         // EXPECT_EQ(dpu_cost, 4) << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << tst_layer << err_info
         //                        << "END ERR";
 
@@ -2609,7 +2670,7 @@ TEST_F(VPULayerCostModelTest, DISABLED_Z_InvestigationTest) {
         }
         Logger::clear2ndlog();
         std::string err_info;
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_wl, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_wl, err_info);
         EXPECT_EQ(dpu_cost, 2) << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << tst_wl << err_info
                                << "\n 2ndLOG:\n"
                                << Logger::get2ndlog();
@@ -2769,8 +2830,10 @@ TEST_F(VPULayerCostModelTest, Layer_DMA_DDRvsCMX_Smoke) {
                 << cost_cyc_LayerNoMem << "\n"
                 << tst_layer << Logger::get2ndlog() << "END ERR";
         const auto& outT{tst_layer.outputs[0]};
-        auto cmxddr_dma = theModel->DMA(tst_layer.device, outT, outT, MemoryLocation::CMX, MemoryLocation::DRAM);
-        auto ddrcmx_dma = theModel->DMA(tst_layer.device, outT, outT, MemoryLocation::DRAM, MemoryLocation::CMX);
+        auto cmxddr_dma =
+                theModel->get_cost_model().DMA(tst_layer.device, outT, outT, MemoryLocation::CMX, MemoryLocation::DRAM);
+        auto ddrcmx_dma =
+                theModel->get_cost_model().DMA(tst_layer.device, outT, outT, MemoryLocation::DRAM, MemoryLocation::CMX);
         EXPECT_EQ(ddrcmx_dma, cmxddr_dma) << ddrcmx_dma << "\n"
                                           << cmxddr_dma << "\n"
                                           << cost_cyc_LayerFromDDR << "\n"
@@ -2913,7 +2976,7 @@ TEST_F(VPULayerCostModelTest, Layer_PRE_split_L1) {
     {  // call L1 x3
         std::string info{};
         for (const auto& w : wls) {
-            const auto res = theModel.DPU(w, info);
+            const auto res = theModel.get_cost_model().DPU(w, info);
             costsL1.push_back(res);
             ASSERT_TRUE(!Cycles::isErrorCode(res)) << res << " " << info;
         }
@@ -3030,5 +3093,26 @@ TEST_F(VPULayerCostModelTest, AVEPOOL_Layer_PRE_split_L2) {
     EXPECT_EQ(pre_split_cost1, cost_cyc_Layer)
             << toStringLayerSplitInfo(detailed_split_layer) << toStringLayerSplitInfo(detailed_split_pre_layer)
             << Logger::get2ndlog() << "END ERR";
+}
+
+TEST_F(VPULayerCostModelTest, L2_instantiated_with_external_DPU) {
+    {
+        const std::string model_path = VPU_2_7_MODEL_PATH;
+        EXPECT_NO_THROW(VPUCostModel x{model_path});
+        // VPUCostModel costmodel{model_path};
+        auto costmodel{std::make_shared<VPUCostModel>(model_path)};
+
+        const VPULayerCostModel layer_costmodel{costmodel};
+        EXPECT_EQ(costmodel.get(), (&layer_costmodel.get_cost_model()));
+    }
+    {
+        const std::string model_path = VPU_4_0_MODEL_PATH;
+        EXPECT_NO_THROW(VPUCostModel x{model_path});
+        // VPUCostModel costmodel{model_path};
+        auto costmodel{std::make_shared<VPUCostModel>(model_path)};
+
+        const VPULayerCostModel layer_costmodel{costmodel};
+        EXPECT_EQ(costmodel.get(), (&layer_costmodel.get_cost_model()));
+    }
 }
 }  // namespace VPUNN_unit_tests

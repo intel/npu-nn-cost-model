@@ -31,7 +31,9 @@ inline constexpr int dtype_to_bytes(const DataType dtype) noexcept {
     case DataType::INT32:
     case DataType::FLOAT32:
         return 4;
-
+    
+    case DataType::UINT16:
+    case DataType::INT16:
     case DataType::FLOAT16:
     case DataType::BFLOAT16:
         return 2;
@@ -65,6 +67,8 @@ inline constexpr int dtype_to_bits(const DataType dtype) noexcept {
     case DataType::INT32:
     case DataType::FLOAT32:
         return 32;
+    case DataType::UINT16:
+    case DataType::INT16:
     case DataType::FLOAT16:
     case DataType::BFLOAT16:
         return 16;

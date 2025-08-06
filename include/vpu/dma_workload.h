@@ -178,10 +178,6 @@ public:
         return create_NPU40_RESERVED_workload(dma);
     }
 
-    static inline DMANNWorkload_NPU_RESERVED create_NPU_RESERVED_workload(const DMAWorkload& dma) {
-        return create_NPU40_RESERVED_workload(dma);
-    }
-
 public:
     using LocationKey = std::pair<MemoryLocation, MemoryLocation>;  // DRAM, CMX, CSRAM, UPA
     using DirectionMap = std::map<LocationKey, MemoryDirection>;

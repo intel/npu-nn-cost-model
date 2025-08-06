@@ -12,33 +12,70 @@
 
 #include <list>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <vector>
+#include <thread>
+#include <filesystem>
+#include <shared_mutex>
 
-#include "core/utils.h"
+#include <cassert>
+
 #include "core/persistent_cache.h"
+#include "core/utils.h"
 
 namespace VPUNN {
 
-/**
- * @brief a workload cache using LRU (least recent used) replacement policy
- * @tparam K is the Key type
- * @tparam V is the Value type
- */
 template <typename K, typename V>
-class LRUCache {
+class FixedCacheAddON {
+protected:
+    // FixedCacheAddON(): FixedCacheAddON("", "") {
+    // }
+    FixedCacheAddON(const std::string& filename, const std::string& prio2_loadIfPairedCacheExists)
+            : deserialized_table{[&]() {
+                  auto env_override = check_if_env_path_override();
+                  if (!env_override.empty()) {
+                      return FixedCache(env_override);
+                  }
+                  return FixedCache(decideCacheFilename(filename, prio2_loadIfPairedCacheExists));
+              }()} {
+    }
+
+    FixedCacheAddON(const char* file_data, size_t file_data_length)
+            : deserialized_table{[&]() {
+                  auto env_override = check_if_env_path_override();
+                  if (!env_override.empty()) {
+                      return FixedCache(env_override);
+                  }
+                  return FixedCache(file_data, file_data_length);
+              }()} {
+    }
+
+protected:
+    bool contains(const K& wl) const {
+        if constexpr (has_hash_v<K>) {
+            if (deserialized_table.contains(wl.hash()))
+                return true;
+        } else {
+            if (deserialized_table.contains(NNDescriptor<float>(wl).hash()))
+                return true;
+        }
+        return false;
+    }
+
+    std::optional<V> get(const K& wl) const {
+        // Check if the workload is in the deserialized table
+        uint32_t wlhash{0};
+        if constexpr (has_hash_v<K>) {
+            wlhash = wl.hash();
+        } else {
+            wlhash = NNDescriptor<float>(wl).hash();
+        }
+
+        return deserialized_table.get(wlhash);
+    }
+
 private:
-    typedef std::list<std::pair<K, V>> List;
-    typedef typename List::const_iterator List_Iter_cnst;
-
-    typedef std::map<K, List_Iter_cnst> Map;
-    typedef typename Map::const_iterator Map_Iter_cnst;
-
-    List workloads;  ///< list with first being the most recently used key
-    Map m_table;     ///< table for fast searching of keys  (contains pointers to list objects)
-    const size_t max_size;
-    size_t size{0};
-
     /// loaded from file, must be loaded from a file with the same descriptor signature
     /// @note this is a draft implementation
     /// This datatype knows it is a float Value and uint32 key. this beats the K, V template
@@ -62,6 +99,41 @@ private:
         return selected_filename;
     }
 
+    static std::string check_if_env_path_override() {
+        auto env_cache_path = get_env_vars({"VPUNN_CACHE_PATH"}).at("VPUNN_CACHE_PATH");
+        if (!env_cache_path.empty() && std::filesystem::exists(env_cache_path)) {
+            return env_cache_path;
+        }
+        return {};
+    }
+
+public:
+    const AccessCounter& getPreloadedCacheCounter() const {
+        return deserialized_table.getCounter();
+    }
+};
+
+/**
+ * @brief a workload cache using LRU (least recent used) replacement policy
+ * @tparam K is the Key type
+ * @tparam V is the Value type
+ */
+template <typename K, typename V>
+class LRUCache : public FixedCacheAddON<K, V> {
+private:
+    typedef std::list<std::pair<K, V>> List;
+    typedef typename List::const_iterator List_Iter_cnst;
+
+    typedef std::map<K, List_Iter_cnst> Map;
+    typedef typename Map::const_iterator Map_Iter_cnst;
+
+    mutable List workloads;  ///< list with first being the most recently used key.
+    Map m_table;             ///< table for fast searching of keys  (contains pointers to list objects, as iterators)
+
+    const size_t max_size;
+
+    mutable std::shared_mutex mtx;  ///< Mutex to protect shared resources.
+
 public:
     /**
      * @brief Construct a new LRUCache object
@@ -70,16 +142,17 @@ public:
      */
     explicit LRUCache(size_t max_size, const std::string& filename = "",
                       const std::string& prio2_loadIfPairedCacheExists = "")
-            : max_size(max_size), deserialized_table{decideCacheFilename(filename, prio2_loadIfPairedCacheExists)} {
+            : FixedCacheAddON<K, V>(filename, prio2_loadIfPairedCacheExists), max_size(max_size) {
     }
 
     // const char* model_data, size_t model_data_length, bool copy_model_data
-    explicit LRUCache(size_t max_size, const char* file_data = nullptr, size_t file_data_length = 0)
-            : max_size(max_size), deserialized_table{file_data, file_data_length} {
+    explicit LRUCache(size_t max_size, const char* file_data, size_t file_data_length)
+            : FixedCacheAddON<K, V>(file_data, file_data_length), max_size(max_size) {
     }
 
     /**
-     * @brief Add a new workload descriptor to the cache
+     * @brief Add a new workload descriptor to the cache. If the key exists is does NOT replace the old value with the
+     * new one
      *
      * @param wl the workload descriptor (key)
      * @param value the workload value
@@ -89,26 +162,62 @@ public:
         if (max_size == 0)
             return;
 
+        std::unique_lock<std::shared_mutex> lock(mtx);  // Exclusive lock for write
+
         // Check if the workload is already in the deserialized table
+        if (FixedCacheAddON<K, V>::contains(wl))
+            return;
+
+        const Map_Iter_cnst& map_it{m_table.find(wl)};
+        if (map_it == m_table.cend()) {
+            // Insert items in the list and map
+            workloads.push_front({wl, value});         // adds a new element
+            m_table.insert({wl, workloads.cbegin()});  // would not add a new element if wl is already inside
+
+            clean_up_excess_elements();  // if size is exceeded
+        } else {
+            // wl already in table, keep old value, move to first position
+            mark_as_most_recently_used(map_it);
+        }
+
+        if (!check_consistency()) {
+            throw std::runtime_error("Cache consistency check failed after adding workload");
+        }
+    }
+
+public:
+    /**
+     * @brief Get a value from the cache.
+     *
+     * @param wl the workload(key) descriptor
+     * @return std::optional<V> the value stored in the cache, or nothing if not available
+     */
+    std::optional<V> get(const K& wl) const {
+        // Check if the workload is in the deserialized table
         {
-            if constexpr (has_hash_v<K>) {
-                if (deserialized_table.contains(wl.hash()))
-                    return;
-            } else {
-                if (deserialized_table.contains(NNDescriptor<float>(wl).hash()))
-                    return;
+            const std::optional<V> found{FixedCacheAddON<K, V>::get(wl)};
+            if (found) {
+                return found;
             }
         }
 
-        // Insert items in the list and map
-        workloads.push_front({wl, value});
-        m_table.insert({wl, workloads.cbegin()});
-        size++;
+        // First, try to find the key with a shared lock
+        {
+            std::shared_lock<std::shared_mutex> lock(mtx);
+            auto map_it = m_table.find(wl);
+            if (map_it == m_table.cend()) {
+                return std::nullopt;
+            }
+        }
 
-        // delete the oldest ones that occupy more space than allowed
-        while (size > max_size) {
-            const auto& last_item{workloads.back()};
-            remove(last_item.first);  // key is first in pair
+        // If found, acquire a unique lock and do the mutation
+        std::unique_lock<std::shared_mutex> lock(mtx);
+        auto map_it = m_table.find(wl);
+        if (map_it != m_table.cend()) {
+            mark_as_most_recently_used(map_it);
+            return (map_it->second->second);
+        } else {
+            return std::nullopt;
         }
     }
 
@@ -119,54 +228,46 @@ private:
      * @param wl the workload descriptor
      */
     void remove(const K& wl) {
-        Map_Iter_cnst it = m_table.find(wl);
+        const Map_Iter_cnst& it{m_table.find(wl)};
 
         if (it != m_table.cend()) {
             m_table.erase(it->first);  // key is first
         } else {
-            throw std::out_of_range("VPUNN Cache out of range");
+            throw std::out_of_range("VPUNN Cache out of range, an element was not in table");
         }
 
         workloads.pop_back();  // Remove the last element from the list
-        size--;                // Update the size
-    }
 
-public:
-    /**
-     * @brief Get a workload from the cache.
-     *
-     * @param wl the workload descriptor
-     * @return T* a pointer to the workload value stored in the cache, or nullptr if not available
-     */
-    const V* get(const K& wl) {
-        // Check if the workload is in the deserialized table
-        {
-            uint32_t wlhash{0};
-            if constexpr (has_hash_v<K>) {
-                wlhash = wl.hash();
-            } else {
-                wlhash = NNDescriptor<float>(wl).hash();
-            }
-
-            const V* elementInPreloadedCache{deserialized_table.get_pointer(wlhash)};
-            if (elementInPreloadedCache) {
-                return elementInPreloadedCache;  // ret the pointer to the element in the preloaded cache
-            }
-        }
-
-        // Check if the workload is in the main table
-        Map_Iter_cnst it = m_table.find(wl);
-        if (it != m_table.cend()) {
-            // Move the workload to the beginning of the list
-            workloads.splice(workloads.cbegin(), workloads, it->second);
-            return &(it->second->second);  // second is the list iterator
-        } else {
-            return nullptr;
+        if (!check_consistency()) {
+            throw std::runtime_error("Cache consistency check failed after removing workload");
         }
     }
 
-    const AccessCounter& getPreloadedCacheCounter() const {
-        return deserialized_table.getCounter();
+    /// deletes what exceeds the size
+    void clean_up_excess_elements() {
+        // delete the oldest ones that occupy more space than allowed
+        while (m_table.size() > max_size) {
+            const auto& oldest_item{workloads.back()};  // last
+            remove(oldest_item.first);                  // key is first in pair
+        }
+    }
+    
+    void mark_as_most_recently_used(const Map_Iter_cnst& map_it) const {
+        if (map_it != m_table.cend()) {                      // Move the workload to the beginning of the list
+            const List_Iter_cnst& list_it = map_it->second;  // second is the list iterator
+            workloads.splice(workloads.cbegin(), workloads, list_it);
+        }
+    }
+
+protected:
+
+    /// @brief Check if the cache is consistent, i.e., the number of workloads matches the size of the table
+    bool check_consistency() const {
+        if (workloads.size() != m_table.size()) {
+            return false;
+        }
+
+        return true;
     }
 };
 

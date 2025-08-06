@@ -263,7 +263,7 @@ TEST_F(TestPreprocessing_Interface10, SingleWLTestPreprocessing) {
     // Instantiate the preprocessing class
     auto pp = Preprocessing_Interface10<float>();
     // Transform a single workload
-    std::vector<float> result = pp.transform(wl);
+    std::vector<float> result = pp.transformSingle(wl);
 }
 
 // Demonstrate basic creation and size
@@ -331,7 +331,7 @@ TEST_F(TestPreprocessing_Interface11, SingleWLTestPreprocessing) {
     // Instantiate the preprocessing class
     auto pp = Preprocessing_Interface11<float>();
     // Transform a single workload
-    std::vector<float> result = pp.transform(wl);
+    std::vector<float> result = pp.transformSingle(wl);
     EXPECT_EQ(result.size(), 93);
 }
 // Demonstrate basic creation and size
@@ -996,7 +996,7 @@ TEST_F(TestPreprocessing_Interface12, SingleWLTestPreprocessing) {
     // Instantiate the preprocessing class
     auto pp = Preprocessing_Interface12<float>();
     // Transform a single workload
-    std::vector<float> result = pp.transform(wl);
+    std::vector<float> result = pp.transformSingle(wl);
     EXPECT_EQ(result.size(), descriptor_expected_size);
 }
 // Demonstrate basic creation and size
@@ -1293,7 +1293,7 @@ TEST_F(TestPreprocessing_Interface13, SingleWLTestPreprocessing) {
     // Instantiate the preprocessing class
     auto pp = Preprocessing_Interface13<float>();
     // Transform a single workload
-    std::vector<float> result = pp.transform(wl);
+    std::vector<float> result = pp.transformSingle(wl);
     EXPECT_EQ(result.size(), descriptor_expected_size);
 }
 // Demonstrate basic creation and size
@@ -1701,7 +1701,7 @@ TEST_F(TestPreprocessing_Interface14, SingleWLTestPreprocessing) {
     // Instantiate the preprocessing class
     auto pp = Preprocessing_Interface14<float>();
     // Transform a single workload
-    std::vector<float> result = pp.transform(wl);
+    std::vector<float> result = pp.transformSingle(wl);
     EXPECT_EQ(result.size(), descriptor_expected_size);
 }
 // Demonstrate basic creation and size
@@ -2043,6 +2043,70 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest_FLOAT_INT) {
         }
     }
 }
+
+TEST_F(TestPreprocessing_Interface14, wI2_MappingTo_wI4) {
+    using datatypeContent = std::array<int, (int)intf_14::DataType::__size>;
+    const datatypeContent uint4_content{0, 0, 0, 0, 1};
+
+    auto pp = Preprocessing_Interface14<float>();
+    size_t data_written = 0;
+
+    auto wl_int2 = DPUWorkload(wl);
+    auto wl_uint2 = DPUWorkload(wl);
+    wl_int2.weight_type = DataType::INT2;
+    wl_uint2.weight_type = DataType::UINT2;
+
+    auto desc_int2 = pp.generate_descriptor(wl_int2, data_written);
+    auto desc_uint2 = pp.generate_descriptor(wl_uint2, data_written);
+
+    for (int i = 0; i < (int)intf_14::DataType::__size; ++i) {
+        EXPECT_EQ(std::lround(desc_int2[in_1_dtype_idx + i]), uint4_content[i]) << i;
+        EXPECT_EQ(std::lround(desc_uint2[in_1_dtype_idx + i]), uint4_content[i]) << i;
+    }
+}
+
+TEST_F(TestPreprocessing_Interface14, EISXW164800_Tensor_CH_padding) {
+    auto pp = Preprocessing_Interface14<float>();
+    size_t data_written = 0;
+    DPUWorkload wl_ref{
+            VPUDevice::NPU_RESERVED,
+            Operation::ELTWISE,
+            {VPUTensor(28, 9, 16, 1, DataType::FLOAT16)},  // input dimensions
+            {VPUTensor(28, 9, 1, 1, DataType::UINT8)},     // output dimensions
+            {1, 1},                                        // kernels
+            {1, 1},                                        // strides
+            {0, 0, 0, 0},                                  // padding
+            ExecutionMode::CUBOID_8x16,                    // execution mode
+            ActivationFunction::NONE,                      // activation
+            0.0F,                                          // act_sparsity
+            0.0F,                                          // weight_sparsity
+            {swz_def, swz_def},                            // input_swizzling
+            {swz_def},                                     // output_swizzling
+            1,                                             // output_write_tiles
+            {0, 0, 0, 0},                                  // offsets
+            ISIStrategy::CLUSTERING,                       // isi_strategy
+            false,                                         // weight_sparsity_enabled
+    };
+    wl_ref.superdense_memory = true;
+
+    DPUWorkload wl_output_autopad{wl_ref};
+    wl_output_autopad.output_autopad = true;
+
+    auto desc_autopad = pp.generate_descriptor(wl_output_autopad, data_written);
+    EXPECT_EQ(desc_autopad[out_0_idx + 2], 16);  // output z dimension must be padded to 16
+
+    DPUWorkload wl_input_autopad{wl_ref};
+    wl_input_autopad.input_autopad = true;
+    wl_input_autopad.inputs[0] = VPUTensor(
+            {wl_ref.inputs[0].width(), wl_ref.inputs[0].height(), 5, wl_ref.inputs[0].batches()}, wl_ref.inputs[0]);
+    wl_input_autopad.outputs[0] =
+            VPUTensor({wl_ref.outputs[0].width(), wl_ref.outputs[0].height(), 16, wl_ref.outputs[0].batches()},
+                      wl_ref.outputs[0]);
+
+    auto desc_input_autopad = pp.generate_descriptor(wl_input_autopad, data_written);
+    EXPECT_EQ(desc_input_autopad[in_0_idx + 2], 16);  // input z dimension must be padded to 16
+}
+
 // end ITF14
 
 }  // namespace VPUNN_unit_tests

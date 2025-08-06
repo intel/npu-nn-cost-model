@@ -85,6 +85,9 @@ public:
 template <>
 SmartRanges::value_type Sampler::sample_list_decrease_prob<SmartRanges>(const SmartRanges& elements) const;
 
+template <>
+MultiSmartRanges::value_type Sampler::sample_list_decrease_prob<MultiSmartRanges>(const MultiSmartRanges& elements) const;
+
 }  // namespace VPUNN
 
 #endif  //

@@ -20,7 +20,7 @@ namespace VPUNN {
  * @param activations the input tensor
  * @param output the output tensor
  */
-VPUNN_API(void) L2Normalization(const VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output);
+VPUNN_API void L2Normalization(const VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output);
 
 }  // namespace VPUNN
 

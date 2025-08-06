@@ -146,11 +146,7 @@ template <typename T>
 class Preprocessing_Interface01_DMA :
         public PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>, DMANNWorkload_NPU27> {
 private:
-    // const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
-   // using PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>,
-   //                                DMANNWorkload_NPU27>::insert;  ///< exposes the non virtual insert
-                                                                  ///< methods
     friend class PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>, DMANNWorkload_NPU27>;
 
     /**
@@ -168,7 +164,7 @@ protected:
         // Build the vector from the inputs
         size_t offset = 0;
         // offset = this->insert<only_simulate>(workload.device, offset);
-        offset = this-> template insert<only_simulate>(workload.num_planes, offset);
+        offset = this->template insert<only_simulate>(workload.num_planes, offset);
         offset = this->template insert<only_simulate>(workload.length, offset);
 
         offset = this->template insert<only_simulate>(workload.src_width, offset);
@@ -188,7 +184,7 @@ protected:
         return this->processed_output;
     }
 
-    const size_t size_of_descriptor{12};  ///< how big the descriptor is, fixed at constructor
+    static inline constexpr size_t size_of_descriptor{12};  ///< how big the descriptor is, fixed at constructor
 
 public:
     /// @brief the descriptor interface that this type was designed to fill/comply with
@@ -212,11 +208,7 @@ template <typename T>
 class Preprocessing_Interface02_DMA :
         public PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40_RESERVED> {
 private:
-    // const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
-   // using PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>,
-   //                                DMANNWorkload_NPU40>::insert;  ///< exposes the non virtual insert
-                                                                  ///< methods
     friend class PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40_RESERVED>;
 
     /**
@@ -248,8 +240,9 @@ protected:
             offset = this->template insert<only_simulate>(d.src_dim_size, offset);
         }
 
-        offset = this->template insert<only_simulate>(intf_dma_01x::convert<intf_dma_01x::Num_DMA_Engine>(workload.num_engine),
-                                             offset);  // enum 2
+        offset = this->template insert<only_simulate>(
+                intf_dma_01x::convert<intf_dma_01x::Num_DMA_Engine>(workload.num_engine),
+                offset);  // enum 2
         offset = this->template insert<only_simulate>(
                 intf_dma_01x::convert<intf_dma_01x::MemoryDirection>(workload.transfer_direction), offset);  // enum 4
 
@@ -259,7 +252,7 @@ protected:
         return this->processed_output;
     }
 
-    const size_t size_of_descriptor{29};  ///< how big the descriptor is, fixed at constructor
+    static inline constexpr size_t size_of_descriptor{29};  ///< how big the descriptor is, fixed at constructor
 
 public:
     /// @brief the descriptor interface that this type was designed to fill/comply with
@@ -274,6 +267,107 @@ public:
 
     ///@brief default virtual destructor
     virtual ~Preprocessing_Interface02_DMA() = default;
+};
+
+/**
+ * @brief For interface of NPU4.0+ . Descriptor and interface datatype are dedicated
+ */
+template <typename T>
+class Preprocessing_Interface03_DMA :
+        public PreprocessingInserterDMA<T, Preprocessing_Interface03_DMA<T>, DMANNWorkload_NPU40_RESERVED> {
+private:
+protected:
+    friend class PreprocessingInserterDMA<T, Preprocessing_Interface03_DMA<T>, DMANNWorkload_NPU40_RESERVED>;
+
+    /**
+     * @brief Transform a DPUWorkload into a DPUWorkload descriptor
+     * Here the concrete descriptor is created/populated according to established convention/interface
+     * "config_num_dim",
+     * "width_cfg_dst",
+     * "width_cfg_src",
+     * "dim_size_1_dst",
+     * "dim_size_2_dst",
+     * "dim_size_dst_3",
+     * "dim_size_dst_4",
+     * "dim_size_dst_5",
+     * "dim_size_1_src",
+     * "dim_size_2_src",
+     * "dim_size_src_3",
+     * "dim_size_src_4",
+     * "dim_size_src_5",
+     * "stride_dst_1",
+     * "stride_dst_2",
+     * "stride_dst_3",
+     * "stride_dst_4",
+     * "stride_dst_5",
+     * "stride_src_1",
+     * "stride_src_2",
+     * "stride_src_3",
+     * "stride_src_4",
+     * "stride_src_5",
+     * "direction_Direction.DDR2CMX",
+     * "direction_Direction.CMX2CMX",
+     * "direction_Direction.CMX2DDR",
+     * "direction_Direction.DDR2DDR"
+     *
+     * @param workload a DPUWorkload
+     * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
+     * written
+     * @tparam only_simulate, if true then no data is actually written, only the offset is computed
+     * @return std::vector<T>& a DPUWorkload descriptor
+     */
+    template <bool only_simulate>
+    const std::vector<T>& transformOnly(const DMANNWorkload_NPU40_RESERVED& workload, size_t& debug_offset) {
+        // Build the vector from the inputs
+        size_t offset = 0;
+
+        offset = this->template insert<only_simulate>(workload.num_dim, offset);
+
+        offset = this->template insert<only_simulate>(workload.dst_width, offset);
+        offset = this->template insert<only_simulate>(workload.src_width, offset);
+
+        // sizes dst for dims 1,2,3,4,5
+        for (const auto& d : workload.e_dim) {
+            offset = this->template insert<only_simulate>(d.dst_dim_size, offset);
+        }
+        // sizes src for dims 1,2,3,4,5
+        for (const auto& d : workload.e_dim) {
+            offset = this->template insert<only_simulate>(d.src_dim_size, offset);
+        }
+
+        // strides dst for dims 1,2,3,4,5
+        for (const auto& d : workload.e_dim) {
+            offset = this->template insert<only_simulate>(d.dst_stride, offset);
+        }
+        // strides src for dims 1,2,3,4,5
+        for (const auto& d : workload.e_dim) {
+            offset = this->template insert<only_simulate>(d.src_stride, offset);
+        }
+
+        offset = this->template insert<only_simulate>(
+                intf_dma_01x::convert<intf_dma_01x::MemoryDirection>(workload.transfer_direction), offset);  // enum 4
+
+        debug_offset = offset;
+
+        // Return the output as a pointer to the data
+        return this->processed_output;
+    }
+
+    static inline constexpr size_t size_of_descriptor{27};  ///< how big the descriptor is, fixed at constructor
+
+public:
+    /// @brief the descriptor interface that this type was designed to fill/comply with
+    static int getInterfaceVersion() {
+        return static_cast<std::underlying_type_t<NNVersionsDMA>>(NNVersionsDMA::VERSION_03_50_v1);
+    }
+
+    ///@brief Ctor , inits the content with expected size
+    Preprocessing_Interface03_DMA() {
+        this->set_size(size_of_descriptor);
+    };
+
+    ///@brief default virtual destructor
+    virtual ~Preprocessing_Interface03_DMA() = default;
 };
 
 }  // namespace VPUNN

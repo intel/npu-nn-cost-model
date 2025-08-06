@@ -20,6 +20,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
 
 namespace VPUNN {
 
@@ -60,15 +61,6 @@ static inline std::unordered_map<std::string, std::string> get_env_vars(const st
     return envMap;
 }
 
-static inline std::string generate_uid() {
-    const std::string file_name_postfix = get_env_vars({"VPUNN_FILE_NAME_POSTFIX"}).at("VPUNN_FILE_NAME_POSTFIX");
-    std::ostringstream ss;
-    ss << std::this_thread::get_id() << "_" << file_name_postfix;
-    // std::string uid = ss.str();  // std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
-
-    return ss.str();
-}
-
 template <typename KeyType, typename ValueType>
 class ThreadSafeMap {
 protected:
@@ -95,10 +87,6 @@ public:
     }
     virtual ~ThreadSafeMap() = default;
 
-    void insert(const KeyType& key, const ValueType& value) {
-        std::unique_lock lock(_mutex);
-        _map[key] = value;
-    }
     bool contains(const KeyType& key) const {
         std::shared_lock lock(_mutex);
         return _map.find(key) != _map.end();
@@ -112,27 +100,7 @@ public:
         }
         return false;
     }
-    const ValueType* find(const KeyType& key) const {
-        std::shared_lock lock(_mutex);
-        auto it = _map.find(key);
-        if (it != _map.end()) {
-             return &it->second;
-        }
-        return nullptr;
-    }
-    bool remove(const KeyType& key) {
-        std::unique_lock lock(_mutex);
-        auto it = _map.find(key);
-        if (it != _map.end()) {
-            _map.erase(it);
-            return true;
-        }
-        return false;
-    }
-    void clear() {
-        std::unique_lock lock(_mutex);
-        _map.clear();
-    }
+
     size_t size() const {
         std::shared_lock lock(_mutex);
         return _map.size();
@@ -157,6 +125,26 @@ public:
         }
         return values;
     }
+
+    void insert(const KeyType& key, const ValueType& value) {
+        std::unique_lock lock(_mutex);
+        _map[key] = value;
+    }
+
+    bool remove(const KeyType& key) {
+        std::unique_lock lock(_mutex);
+        auto it = _map.find(key);
+        if (it != _map.end()) {
+            _map.erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    void clear() {
+        std::unique_lock lock(_mutex);
+        _map.clear();
+    }
 };
 
 template <typename T>
@@ -170,8 +158,9 @@ inline const std::string vec2int_str(const std::vector<float>& vec) {
 
     auto format_number = [&](auto value) -> std::string_view {
         thread_local char buffer[10];  // Thread local to avoid multithreading issues, max 10 characters numbers
-        int len = std::snprintf(buffer, sizeof(buffer),
-                                "%d:", static_cast<int>(std::floor(value)));  // TODO, do not use floor (eg for sparsity)
+        int len =
+                std::snprintf(buffer, sizeof(buffer),
+                              "%d:", static_cast<int>(std::floor(value)));  // TODO, do not use floor (eg for sparsity)
         return std::string_view(buffer, len);
     };
 
@@ -197,7 +186,7 @@ inline const std::string vec2int_str(const std::vector<int>& vec) {
     }
     return result;  // RVO
 }
-constexpr uint32_t fnv_prime = 0x01000193;  // FNV-1a prime
+constexpr uint32_t fnv_prime = 0x01000193;         // FNV-1a prime
 constexpr uint32_t fnv_offset_basis = 0x811c9dc5;  // FNV-1a offset basis
 
 // 32b Fowler-Noll-Vo hash function with string input
@@ -212,8 +201,8 @@ inline uint32_t fnv1a_hash(const std::string& str) {
 }
 
 // Function to calculate the FNV-1a hash of a vector of floats, treating them as integers.
-// force_fractional_rescale: if true, rescale the fractional floats (0, +-1) to an integer value to avoid precision related hash issues
-// Needed for eg. sparsity values.
+// force_fractional_rescale: if true, rescale the fractional floats (0, +-1) to an integer value to avoid precision
+// related hash issues Needed for eg. sparsity values.
 inline uint32_t fnv1a_hash(const std::vector<float>& vec, const bool force_fractional_rescale = true) {
     uint32_t h = fnv_offset_basis;
 
@@ -259,6 +248,13 @@ struct NNDescriptor {
         return fnv1a_hash(_desc);
     }
 };
+
+inline std::string trim_csv_str(const std::string& str) {
+    std::string trimmed = str;
+    std::replace(trimmed.begin(), trimmed.end(), '\n', ' ');
+    std::replace(trimmed.begin(), trimmed.end(), ',', ';');
+    return trimmed;
+}
 
 }  // namespace VPUNN
 

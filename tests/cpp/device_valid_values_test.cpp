@@ -75,11 +75,15 @@ protected:
         //     return channels_1;
         // };
 
-        SmartRanges get_output_channels_restriction(const DPUOperation&) const override {
+        MultiSmartRanges get_output_channels_restriction(const DPUOperation&) const override {
             return channels_1_range;  // nothing
         }
-        SmartRanges get_input_channels_restriction(const DPUOperation&) const override {
+        MultiSmartRanges get_input_channels_restriction(const DPUOperation&) const override {
             return channels_1_range;  // nothing
+        }
+
+        MultiSmartRanges get_batch_restrictions() const override {
+            return batch_restrictions;
         }
 
         // const Values<DataType>& get_input_valid_datatypes(const DPUOperation&) const override {
@@ -103,7 +107,9 @@ protected:
         };
 
         const VPUNN::Channels channels_1{1};
-        const SmartRanges channels_1_range{1, 1, 1};
+        const MultiSmartRanges channels_1_range{{SmartRanges{1, 1, 1}}};
+
+        const MultiSmartRanges batch_restrictions{{SmartRanges(1, SmartRanges::max_limit)}};
 
         int get_input_heigth_start_factor_SOH() const {
             return get_spatial_range_start_factor_HW();
@@ -320,6 +326,7 @@ TEST_F(IntfDeviceValidValuesTest, defaultSwizz) {
 
     verify_swizz(tests);
 }
+
 /// Test get_padMax method
 TEST_F(IntfDeviceValidValuesTest, padMaxTest) {
     DeviceValidValuesMock dut;
@@ -787,6 +794,8 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
         w.weightless_operation = wl_ref2.weightless_operation;
         w.in_place_output_memory = wl_ref2.in_place_output_memory;
         w.superdense_memory = wl_ref2.superdense_memory;
+        w.input_autopad = wl_ref2.input_autopad;
+        w.output_autopad = wl_ref2.output_autopad;
         EXPECT_EQ(w, wl_ref2);
 
         EXPECT_FALSE(w == wl_ref1);
@@ -800,6 +809,8 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
         w.weightless_operation = wl_ref1.weightless_operation;
         w.in_place_output_memory = wl_ref1.in_place_output_memory;
         w.superdense_memory = wl_ref1.superdense_memory;
+        w.input_autopad = wl_ref1.input_autopad;
+        w.output_autopad = wl_ref1.output_autopad;
         EXPECT_EQ(w, wl_ref1);
 
         EXPECT_FALSE(w == wl_ref2);
@@ -815,6 +826,8 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
         w.weightless_operation = wref3.weightless_operation;
         w.in_place_output_memory = wref3.in_place_output_memory;
         w.superdense_memory = wref3.superdense_memory;
+        w.input_autopad = wref3.input_autopad;
+        w.output_autopad = wref3.output_autopad;
         EXPECT_EQ(w, wref3);
 
         EXPECT_FALSE(w == wl_ref2);
@@ -836,7 +849,8 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
             w.weight_type = wref3.weight_type;
             w.weightless_operation = wref3.weightless_operation;
             w.in_place_output_memory = wref3.in_place_output_memory;
-
+            w.input_autopad = wref3.input_autopad;
+            w.output_autopad = wref3.output_autopad;
             EXPECT_EQ(w, wref3);
 
             EXPECT_FALSE(w == wl_ref2);
@@ -853,7 +867,8 @@ TEST_F(DPUOperationTest, toDPUWorkload) {
             w.weight_type = wref3.weight_type;
             w.weightless_operation = wref3.weightless_operation;
             w.in_place_output_memory = wref3.in_place_output_memory;
-
+            w.input_autopad = wref3.input_autopad;
+            w.output_autopad = wref3.output_autopad;
             EXPECT_EQ(w, wref3);
 
             EXPECT_FALSE(w == wl_ref2);

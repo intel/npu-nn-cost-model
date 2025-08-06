@@ -14,38 +14,11 @@
 #include "kernels/kNN.h"
 #include "kernels/l2_normalization.h"
 #include "kernels/sigmoid.h"
+#include "inference/inference_execution_data.h"
 
 namespace VPUNN {
 
-void InferenceExecutionData::allocate_tensorsMapAndBias(const unsigned int batch, const VPUNN_SCHEMA::Model* theModel) {
-    const auto tensors = theModel->tensors();
-    const auto buffers = theModel->buffers();
 
-    for (auto flatbuffer_tensor = tensors->cbegin(); flatbuffer_tensor != tensors->cend(); ++flatbuffer_tensor) {
-        const uint32_t buffer_ID = flatbuffer_tensor->buffer();
-        constexpr uint32_t NOT_EXISTING{0};
-        const bool buffer_is_present{buffer_ID != NOT_EXISTING};
-        // Batch only activations
-        // we use the batch only for buffers that are not stored in model (dynamic tensors)
-        const uint32_t forced_batch{(buffer_is_present) ? 1 : batch};
-
-        const auto tensor_shape{parse_vector(flatbuffer_tensor->shape(), forced_batch)};
-
-        {                                        // Create/Fill the new tensor structure
-            Tensor<float> tensor{tensor_shape};  // allocates on heap!
-            if (buffer_is_present) {  // in this case, copy the existing data(the buffer) into tensor's memory
-                const auto array = buffers->Get(buffer_ID)->data();
-                tensor.assign((const float*)(array->data()),
-                              array->size());  // will throw if buffer mismatch with tensor shape
-            } else {
-                tensor.fill(0);  // Fill with zeros the tensor's memory
-            }
-            tensor_map.emplace_back(std::move(tensor));  // store the created memory!
-        }
-    }
-
-    bias.reserve_bias_space(this->max_batch_in_tensors(tensor_map));
-}
 
 InferenceModel::InferenceModel(const char* filename): initialized(false) {
     std::ifstream myFile;
