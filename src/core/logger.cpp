@@ -14,6 +14,9 @@ namespace VPUNN {
 
 LogLevel Logger::_logLevel = LogLevel::None;
 
+std::mutex Logger::log_mutex;
+std::mutex LoggerStream::cout_mutex;
+
 std::ostringstream Logger::buffer{};
 std::ostringstream* Logger::active_second_logger{nullptr};
 

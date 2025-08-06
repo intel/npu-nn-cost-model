@@ -36,6 +36,7 @@ static_assert(false, "VPU_4_0_MODEL_PATH is not defined, please define it in CMa
 static_assert(false, "VPU_4_1_MODEL_PATH is not defined, please define it in CMakeLists.txt");
 #endif
 
+
 // default path to DMA NN Models
 #ifndef VPU_DMA_2_7_MODEL_PATH
 #define VPU_DMA_2_7_MODEL_PATH "../../../models/dma_2_7.vpunn"
@@ -48,6 +49,7 @@ static_assert(false, "VPU_4_1_MODEL_PATH is not defined, please define it in CMa
 #ifndef VPU_DMA_4_0_MODEL_PATH  // need to add also in cmakelist
 #define VPU_DMA_4_0_MODEL_PATH "../../../../models/dma_4_0.vpunn"
 #endif
+
 
 namespace VPUNN_unit_tests {
 

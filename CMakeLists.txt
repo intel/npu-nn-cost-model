@@ -14,6 +14,13 @@ set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 # set the project name
 project(VPUNN)
 
+# Enable /bigobj for debug build type with MSVC - remove after vpunn headers are cleaned up
+#if (MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
+endif()
+
 # impacts the blas/blasStatic library , if ON and linux will enable vector instructions by -msse[N]
 # on win(MSVC) will define USE_SIMD
 # if target architecture does not support it, deactivate it and enable manually the required optimizations (for vector instructions if runtime is important) at least for blas
@@ -26,6 +33,14 @@ option(VPUNN_BUILD_TESTS "build tests" ON)
 option(VPUNN_ENABLE_LOGGING "enable logging" OFF)
 option(ENABLE_PYTHON_BINDING "Build the python bindings" OFF)
 option(GENERATE_PYTHON_BINDING "Generate the python bindings code" OFF)
+option(VPUNN_BUILD_HTTP_CLIENT "Build support for cost provider http service" OFF)
+if (VPUNN_BUILD_HTTP_CLIENT)
+    add_compile_definitions(VPUNN_BUILD_HTTP_CLIENT)
+    message(STATUS "-- Enable HTTP service cost provider ")
+    set (VPUNN_HTTP_CLIENT_LIB vpunn_http_client)
+else()
+    set (VPUNN_HTTP_CLIENT_LIB "")
+endif()
 
 option(VPUNN_OPT_LEGACY_ZTILING "Use legacy ZTiling mechanism" ON)
 if(VPUNN_OPT_LEGACY_ZTILING)
@@ -55,6 +70,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 find_package(Threads REQUIRED)
 
 include_directories(${EXTERNAL_INSTALL_LOCATION}/include ${CMAKE_VPUNN_BINARY_DIR}/include)
+
+add_compile_definitions(INTEL_EMBARGO_NPU5) # INTEL_EMBARGO_NPU5_Content
+add_compile_definitions(INTEL_EMBARGO_NPU6) # INTEL_EMBARGO_NPU6_Content
+add_compile_definitions(INTEL_EMBARGO_COMMON) # INTEL_EMBARGO_COMMON_Content
 
 if(NOT CMAKE_BUILD_TYPE)
     message(AUTHOR_WARNING "-- Defaulting build type to Release because CMAKE_BUILD_TYPE is not set")

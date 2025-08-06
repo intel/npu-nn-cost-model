@@ -15,7 +15,7 @@
 namespace VPUNN {
 
 /// @brief Floating point bias layer (float). The instance has a helper memory for the constant buffer
-class VPUNN_API(BiasOpBuffer) {
+class VPUNN_API BiasOpBuffer {
 private:
     std::vector<float> batch_buffer{1.0F};
     friend class BiasOp;
@@ -30,7 +30,7 @@ public:
 };
 
 /// @brief Floating point bias layer (float). The instance has a helper memory for the constant buffer
-class VPUNN_API(BiasOp) {
+class VPUNN_API BiasOp {
 private:
 public:
     /**

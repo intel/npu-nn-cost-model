@@ -76,18 +76,49 @@ TEST_F(VPUNNCacheTest, CacheBasicTest) {
         auto val2 = random_float();
 
         // Testing that there is no vector
-        EXPECT_EQ(cache.get(v1), nullptr);
-        EXPECT_EQ(cache.get(v2), nullptr);
+        EXPECT_FALSE(cache.get(v1));
+        EXPECT_FALSE(cache.get(v2));
 
         cache.add(v1, val1);
 
         EXPECT_EQ(*cache.get(v1), val1);
-        EXPECT_EQ(cache.get(v2), nullptr);
+        EXPECT_FALSE(cache.get(v2));
 
         cache.add(v2, val2);
-        EXPECT_EQ(cache.get(v1), nullptr);
+        EXPECT_FALSE(cache.get(v1));
         EXPECT_EQ(*cache.get(v2), val2);
     }
+}
+
+TEST_F(VPUNNCacheTest, CacheBasicTest_ext) {
+    DPU_LRU_Cache cache(1 /*, 0*/, "");  // one position
+    std::srand(unsigned(std::time(nullptr)));
+    std::vector<float> v1(100), v2(100);
+    // for (auto idx = 0; idx < 100; idx++) {
+    // Generate a random vector and val
+    {
+        std::fill(v1.begin(), v1.end(), 1.0f);
+        std::fill(v2.begin(), v2.end(), 2.0f);
+    }
+    auto val1 = 101.0f;
+    auto val2 = 102.0f;
+
+    // Testing that there is no vector
+    EXPECT_FALSE(cache.get(v1));
+    EXPECT_FALSE(cache.get(v2));
+
+    EXPECT_NO_THROW(cache.add(v1, val1));
+    EXPECT_NO_THROW(cache.add(v1, val1));//second add 
+
+    EXPECT_NO_THROW(cache.get(v1));
+
+    EXPECT_EQ(*cache.get(v1), val1);
+    EXPECT_FALSE(cache.get(v2));
+
+    EXPECT_NO_THROW(cache.add(v2, val2));
+    EXPECT_FALSE(cache.get(v1));
+    EXPECT_EQ(*cache.get(v2), val2);
+    //}
 }
 
 //------
@@ -203,6 +234,7 @@ protected:
     Preprocessing_Interface4111<float> pp_4111;       // used interface where we have cache
 
     const size_t size_of_descriptor_INterface11{pp_4011.output_size()};  // same for all 11
+
 
     //////
     const std::string csv_file_OneCache{"c:\\gitwrk\\CM_Profilings\\UTests\\Cache_UT\\"
@@ -359,9 +391,9 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
     // DPUWorkload wl;  // a wl
 
     // generate a descriptor for the wl
-    const std::vector<float> desc1{preprop_now.transform(wl_conv1)};
-    const std::vector<float> desc2{preprop_now.transform(wl_conv2)};
-    const std::vector<float> desc3{preprop_now.transform(wl_conv3)};
+    const std::vector<float> desc1{preprop_now.transformSingle(wl_conv1)};
+    const std::vector<float> desc2{preprop_now.transformSingle(wl_conv2)};
+    const std::vector<float> desc3{preprop_now.transformSingle(wl_conv3)};
 
     ASSERT_EQ(desc1.size(), size_of_descriptor_INterface11);
     ASSERT_EQ(desc2.size(), size_of_descriptor_INterface11);
@@ -377,7 +409,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
         ASSERT_TRUE(the_cache.contains(mkhsh(desc1)));
         ASSERT_TRUE(the_cache.contains(mkhsh(desc2)));
 
-        EXPECT_TRUE(the_cache.get_pointer(mkhsh(desc1)) != nullptr);
+        // EXPECT_TRUE(the_cache.get_pointer(mkhsh(desc1)) != nullptr);
         EXPECT_TRUE(the_cache.get(mkhsh(desc1)).has_value());
 
         EXPECT_EQ(*the_cache.get(mkhsh(desc1)), 1.0f);
@@ -440,6 +472,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
     }
     // EXPECT_TRUE(false);
 }
+
 
 // Foirethis ro work we need a Good cache file for DPU in the models files
 TEST_F(VPUNNCachePreloadedTest, DISABLED_SmokeSparsityFloatBasicTest_40) {
@@ -506,8 +539,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SmokeSparsityFloatBasicTest_40) {
     ASSERT_NE(convSparse1.weight_sparsity, convSparse2.weight_sparsity);
 
     // generate a descriptor for the wl
-    const std::vector<float> desc1{preprop_now.transform(convSparse1)};
-    const std::vector<float> desc2{preprop_now.transform(convSparse2)};
+    const std::vector<float> desc1{preprop_now.transformSingle(convSparse1)};
+    const std::vector<float> desc2{preprop_now.transformSingle(convSparse2)};
 
     ASSERT_EQ(desc1.size(), size_of_descriptor_INterface11);
     ASSERT_EQ(desc2.size(), size_of_descriptor_INterface11);
@@ -568,7 +601,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
                             std::remove_reference_t<decltype(test_config)>::pp_adapt_forWrite>(dpu_wl);  // maybe not?
                     // we shuld trandorm loosly, let it pass, even if is not the ione that will be searched in reality
                     // we should generate also teh one that is in reality in case runtime is teh same(int/float fro wts)
-                    const std::vector<float> descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+                    const std::vector<float> descriptorNN{
+                            test_config.preprop_forWrite.transformSingle(dpu_wl)};  // a specific processor
                     const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (cache_hit) {
                         const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
@@ -678,7 +712,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
                             dpu_wl);  // maybe not?
                     // we shuld trandorm loosly, let it pass, even if is not the ione that will be searched in reality
                     // we should generate also teh one that is in reality in case runtime is teh same(int/float fro wts)
-                    const std::vector<float> descriptorNN{normalConfig.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+                    const std::vector<float> descriptorNN{
+                            normalConfig.preprop_forWrite.transformSingle(dpu_wl)};  // a specific processor
                     const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (cache_hit) {
                         const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
@@ -786,7 +821,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
                     isCompatibleWithTrainedSpace<std::remove_reference_t<decltype(test_config)>::pp_adapt_forWrite>(
                             dpu_wl);  // maybe not
 
-            const std::vector<float> descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+            const std::vector<float> descriptorNN{
+                    test_config.preprop_forWrite.transformSingle(dpu_wl)};  // a specific processor
             const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
 
             if (gt.length() <= 0) {
@@ -924,7 +960,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
                     isCompatibleWithTrainedSpace<std::remove_reference_t<decltype(test_config)>::pp_adapt_forWrite>(
                             dpu_wl);  // maybe not
 
-            const std::vector<float> descriptorNN{test_config.preprop_forWrite.transform(dpu_wl)};  // a specific processor
+            const std::vector<float> descriptorNN{
+                    test_config.preprop_forWrite.transformSingle(dpu_wl)};  // a specific processor
             const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
 
             if (gt.length() <= 0) {
@@ -1051,8 +1088,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
 
                 if (sane) {
                     const auto isRelevant = isCompatibleWithTrainedSpace<decltype(normalConfig)::pp_adapt_forRead>(
-                            dpu_wl);                                                          // maybe not
-                    const std::vector<float> descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
+                            dpu_wl);  // maybe not
+                    const std::vector<float> descriptorNN{
+                            normalConfig.preprop_forRead.transformSingle(dpu_wl)};  // a specific processor
 
                     if (isRelevant) {
                         const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
@@ -1144,7 +1182,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
                 if (sane) {
                     const auto isRelevant =
                             isCompatibleWithTrainedSpace<decltype(normalConfig)::pp_adapt_forRead>(dpu_wl);
-                    const std::vector<float> descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
+                    const std::vector<float> descriptorNN{
+                            normalConfig.preprop_forRead.transformSingle(dpu_wl)};  // a specific processor
                     const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (isRelevant) {
                         EXPECT_TRUE(cache_hit) << "Reference Cache miss at pos: " << i << std::endl;
@@ -1245,7 +1284,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
                 if (sane) {
                     const auto isRelevant =
                             isCompatibleWithTrainedSpace<decltype(normalConfig)::pp_adapt_forRead>(dpu_wl);
-                    const std::vector<float> descriptorNN{normalConfig.preprop_forRead.transform(dpu_wl)};  // a specific processor
+                    const std::vector<float> descriptorNN{
+                            normalConfig.preprop_forRead.transformSingle(dpu_wl)};  // a specific processor
                     const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                     if (isRelevant) {
                         // EXPECT_TRUE(cache_hit) << "Reference Cache miss at pos: " << i << std::endl;

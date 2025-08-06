@@ -257,4 +257,18 @@ For most updated list of operators and their details see also the unit tests: Te
 
 For information about the profiled operators and extraparameters you can consult this [document](src/shave/Readme.md#shave-current-operators)
 
+## Cost providers
 
+The cost model is designed to be extensible. The cost providers are the classes that implement the cost model for a specific device. The cost providers are selected at runtime based on the device type. The following cost providers are available:
+- NN based cost provider - is a learned performance model.
+- Theoretical cost provider - is a simple mathematical model.
+- "Oracle" cost provider - a LUT of measured performance for specific workloads.
+- Profiled cost provider - it's an http service that can be queried to get the measured performance of a specific workload.
+    - Currently it supports only DPU costs and it can be configured using the following env. variables
+        - `ENABLE_VPUNN_PROFILING_SERVICE` -- `TRUE` to enable the profiling service
+        - `VPUNN_PROFILING_SERVICE_BACKEND` -- `silicon` to use the RVP for profiling, `vpuem` to use VPUEM as a cost provider.
+        - `VPUNN_PROFILING_SERVICE_HOST` -- address of the profiling service host, default is `irlccggpu04.ir.intel.com`
+        - `VPUNN_PROFILING_SERVICE_PORT` -- port of the profiling service, default is `5000`
+
+To see a list of all queried workloads and which cost provider was used for each, set the environment variable `ENABLE_VPUNN_DATA_SERIALIZATION` to `TRUE`.
+This will generate a couple of `csv` files in the directory where vpunn is used.

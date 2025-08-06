@@ -1152,4 +1152,108 @@ TEST_F(DPU_WorkloadValidatorTest, Memory_Output_32Bits_NPU40) {
     }
 }
 
+
+TEST_F(DPU_WorkloadValidatorTest, AutoPadding_support) {
+    DPU_OperationSanitizer dut;
+    VPUNN::SanityReport sane;
+
+    DPUWorkload wl_ref{
+            VPUDevice::NPU_RESERVED,
+            Operation::ELTWISE,
+            {VPUTensor(28, 9, 16, 1, DataType::FLOAT16)},         // input dimensions
+            {VPUTensor(28, 9, 1, 1, DataType::UINT8)},            // output dimensions
+            {1, 1},                                               // kernels
+            {1, 1},                                               // strides
+            {0, 0, 0, 0},                                         // padding
+            ExecutionMode::CUBOID_8x16,                           // execution mode
+            ActivationFunction::NONE,                             // activation
+            0.0F,                                                 // act_sparsity
+            0.0F,                                                 // weight_sparsity
+            {swz_def, swz_def},                                   // input_swizzling
+            {swz_def},                                            // output_swizzling
+            1,                                                    // output_write_tiles
+            {0, 0, 0, 0},                                         // offsets
+            ISIStrategy::CLUSTERING,                              // isi_strategy
+            false,                                                // weight_sparsity_enabled
+    };
+    wl_ref.superdense_memory = true;
+
+    DPUWorkload wl_ref2{
+        VPUDevice::NPU_RESERVED,
+        Operation::AVEPOOL,
+        {VPUTensor(32, 80, 16, 1, DataType::UINT8, Layout::ZXY)},   // input dimensions
+        {VPUTensor(32, 80, 2, 1, DataType::UINT8, Layout::XYZ)},    // output dimensions
+        {1, 1},                                        // kernels
+        {1, 1},                                        // strides
+        {0, 0, 0, 0},                                  // padding
+        ExecutionMode::CUBOID_16x16,                   // execution mode
+        ActivationFunction::NONE,                      // activation
+        0.0F,                                          // act_sparsity
+        0.0F,                                          // weight_sparsity
+        {swz_def, swz_def},                            // input_swizzling
+        {swz_def},                                     // output_swizzling
+        1,                                             // output_write_tiles
+        {0, 0, 0, 0},                                  // offsets
+        ISIStrategy::CLUSTERING,                       // isi_strategy
+        false,                                         // weight_sparsity_enabled
+    };
+
+    DPUWorkload wl_ref3{
+        VPUDevice::NPU_RESERVED,
+        Operation::ELTWISE,
+        {VPUTensor(224, 43, 16, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
+        {VPUTensor(224, 43, 1, 1, DataType::FLOAT16, Layout::ZXY)},  // output dimensions
+        {1, 1},                                                    // kernels
+        {1, 1},                                                    // strides
+        {0, 0, 0, 0},                                              // padding
+        ExecutionMode::CUBOID_8x16,                                // execution mode
+        ActivationFunction::NONE,                                  // activation
+        0.0F,                                                      // act_sparsity
+        0.0F,                                                      // weight_sparsity
+        {swz_def, swz_def},                                        // input_swizzling
+        {swz_def},                                                 // output_swizzling
+        1,                                                         // output_write_tiles
+        {0, 0, 0, 0},                                              // offsets
+        ISIStrategy::CLUSTERING,                                   // isi_strategy
+        false,                                                     // weight_sparsity_enabled
+    };
+    wl_ref3.superdense_memory = true;
+
+    DPUWorkload wl_output_autopad{wl_ref};
+    wl_output_autopad.output_autopad = true;
+
+    dut.check_and_sanitize(wl_output_autopad, sane);
+    EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
+            << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
+            << wl_output_autopad;
+
+    DPUWorkload wl_input_autopad{wl_ref};
+    wl_input_autopad.input_autopad = true;
+    wl_input_autopad.inputs[0] = VPUTensor(
+            {wl_ref.inputs[0].width(), wl_ref.inputs[0].height(), 5, wl_ref.inputs[0].batches()}, wl_ref.inputs[0]);
+    wl_input_autopad.outputs[0] = VPUTensor(
+            {wl_ref.outputs[0].width(), wl_ref.outputs[0].height(), 16, wl_ref.outputs[0].batches()}, wl_ref.outputs[0]);
+
+    dut.check_and_sanitize(wl_input_autopad, sane);
+    EXPECT_EQ(sane.value(), V(VPUNN::Cycles::ERROR_INVALID_INPUT_CONFIGURATION))
+            << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
+            << wl_input_autopad;
+
+    DPUWorkload wl2_output_autopad{wl_ref2};
+    wl2_output_autopad.output_autopad = true;
+
+    dut.check_and_sanitize(wl2_output_autopad, sane);
+    EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
+            << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
+            << wl2_output_autopad;
+
+    DPUWorkload wl3_output_autopad{wl_ref3};
+    wl3_output_autopad.output_autopad = true;
+
+    dut.check_and_sanitize(wl3_output_autopad, sane);
+    EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
+            << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
+            << wl3_output_autopad;
+}
+
 }  // namespace VPUNN_unit_tests

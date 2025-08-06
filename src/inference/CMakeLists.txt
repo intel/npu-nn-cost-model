@@ -25,14 +25,14 @@ if(VPUNN_BUILD_SHARED_LIB)
         COMMENT "Generating python files")
 endif()
 
-add_library(inferenceStatic STATIC model.cpp preprop_factory.cpp)
+add_library(inferenceStatic STATIC model.cpp preprop_factory.cpp inference_execution_data.cpp)
 add_dependencies(inferenceStatic cpp_schema)
 
 if(CBLAS_LIB STREQUAL "internal")
-    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization blasStatic vpunn_vpu vpunn_shave)
+    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization blasStatic vpunn_vpu vpunn_shave ${VPUNN_HTTP_CLIENT_LIB})
 else()
     set(BLAS_STATIC ON)
-    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization vpunn_vpu vpunn_shave ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
+    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization vpunn_vpu vpunn_shave ${VPUNN_HTTP_CLIENT_LIB} ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
 endif()
 
 set_target_properties(inferenceStatic PROPERTIES OUTPUT_NAME inference)

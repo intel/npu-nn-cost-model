@@ -26,6 +26,7 @@ protected:
     }
 
     VPUNN::VPUCostModel model{VPU_2_7_MODEL_PATH};
+    const IEnergy& my_energy = model.getEnergyInterface();
     // VPU_2_7_MODEL_PATH
     // VPUNNModelsFiles::getModels().fast_model_paths[1].first
 
@@ -58,7 +59,8 @@ protected:
         const float FPOverInt_power_ratio_27{1.3f};
         return c / FPOverInt_power_ratio_27;
     }
-    const float convToReferenceVirus{VPUPowerFactorLUT().getFP_overI8_maxPower_ratio(VPUDevice::VPU_2_7)};
+    const float convToReferenceVirus{
+            1.3f /*VPUPowerFactorLUT().getFP_overI8_maxPower_ratio(VPUDevice::VPU_2_7)*/};  // put by hand
 
     // the code below might be part of a base class (helper) (refactoring)
     const bool dictON{false};  ///< if true will print the Dict representation of WL
@@ -96,7 +98,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorU8Conv) {
         for (auto i = ic.begin(); i != ic.end(); ++i, ++j) {
             auto wl = generate_helper_layer(16, *i, 256, VPUNN::Operation::CONVOLUTION, VPUNN::VPUDevice::VPU_2_7,
                                             VPUNN::DataType::UINT8);
-            EXPECT_NEAR(model.DPUActivityFactor(wl), expected[j] /** convToReferenceVirus*/, tolerance[j] * scale)
+            EXPECT_NEAR(my_energy.DPUActivityFactor(wl), expected[j] /** convToReferenceVirus*/, tolerance[j] * scale)
                     << "ic=" << *i << " NN cyc:" << model.DPU(wl) << " , ThCyc: " << model.DPUTheoreticalCycles(wl)
                     << " , GTcyc:" << exp_GrndTCyc[j] << " , Power Ideal Cyc: " << model.DPU_Power_IdealCycles(wl)
                     << " , Efficiency Ideal Cyc: " << model.DPU_Efficency_IdealCycles(wl) << " , ExpAF:" << expected[j]
@@ -130,7 +132,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorFPConv) {
     for (auto i = ic.begin(); i != ic.end(); ++i, ++j) {
         auto wl = generate_helper_layer(16, *i, 256, VPUNN::Operation::CONVOLUTION, VPUNN::VPUDevice::VPU_2_7,
                                         VPUNN::DataType::FLOAT16);
-        EXPECT_NEAR(model.DPUActivityFactor(wl), expected[j], tolerance[j] * scale)
+        EXPECT_NEAR(my_energy.DPUActivityFactor(wl), expected[j], tolerance[j] * scale)
                 << "ic=" << *i << " NN cyc:" << model.DPU(wl) << ", ThCyc: " << model.DPUTheoreticalCycles(wl)
                 << " , GTcyc:" << exp_GrndTCyc[j] << ", Power Ideal Cyc: " << model.DPU_Power_IdealCycles(wl)
                 << ", Efficiency Ideal Cyc: " << model.DPU_Efficency_IdealCycles(wl) << " , ExpAF:" << expected[j]
@@ -156,7 +158,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorConv576) {
     auto j{0};
     for (auto i = dtypes.begin(); i != dtypes.end(); ++i, ++j) {
         auto wl = generate_helper_layer(16, 576, 576, VPUNN::Operation::CONVOLUTION, VPUNN::VPUDevice::VPU_2_7, *i);
-        EXPECT_NEAR(model.DPUActivityFactor(wl), expected[j], weak_tol * scale)  //@todo make not so weak
+        EXPECT_NEAR(my_energy.DPUActivityFactor(wl), expected[j], weak_tol * scale)  //@todo make not so weak
                 << "dtype=" << (int)*i << " NN cyc:" << model.DPU(wl) << " , ThCyc: " << model.DPUTheoreticalCycles(wl)
                 << " , GTcyc:" << exp_GrndTCyc[j] << " , Power Ideal Cyc: " << model.DPU_Power_IdealCycles(wl)
                 << " , Efficiency Ideal Cyc: " << model.DPU_Efficency_IdealCycles(wl) << " , ExpAF:" << expected[j]
@@ -182,7 +184,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorConvMisc) {
             for (; k != dtype.end(); ++k) {
                 auto wl = generate_helper_layer(*i, *j, 256, VPUNN::Operation::CONVOLUTION, VPUNN::VPUDevice::VPU_2_7,
                                                 *k);
-                float af = model.DPUActivityFactor(wl);
+                float af = my_energy.DPUActivityFactor(wl);
                 // Just range check
                 EXPECT_GT(af, 0.2f);
                 EXPECT_LT(af, 0.9f);
@@ -200,7 +202,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorDwConv) {
                                    VPUNN::DataType::UINT8);
         wl.kernels = {3, 3};
         wl.padding = {1, 1, 1, 1};
-        EXPECT_NEAR(model.DPUActivityFactor(wl), convertToFP16_powerVirus_27(0.451f) * convToReferenceVirus,
+        EXPECT_NEAR(my_energy.DPUActivityFactor(wl), convertToFP16_powerVirus_27(0.451f) * convToReferenceVirus,
                     weak_tol * scale)
                 << " NN cyc:" << model.DPU(wl) << " ThCyc: " << model.DPUTheoreticalCycles(wl)
                 << " Power Ideal Cyc: " << model.DPU_Power_IdealCycles(wl) << toDict(wl) << wl;
@@ -213,7 +215,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorDwConv) {
         // Override specific fields to correctly configure AVEPOOL workload
         wl.kernels = {7, 7};
         wl.outputs = {VPUNN::VPUTensor(1, 1, 64, 1, VPUNN::DataType::UINT8)};
-        EXPECT_NEAR(model.DPUActivityFactor(wl), convertToFP16_powerVirus_27(0.025f) * convToReferenceVirus,
+        EXPECT_NEAR(my_energy.DPUActivityFactor(wl), convertToFP16_powerVirus_27(0.025f) * convToReferenceVirus,
                     strict_tol * scale)
                 << " NN cyc:" << model.DPU(wl) << " ThCyc: " << model.DPUTheoreticalCycles(wl)
                 << " Power Cyc: " << model.DPU_Power_IdealCycles(wl) << toDict(wl) << wl;
@@ -229,7 +231,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorEltWise) {
     wl = generate_helper_layer(56, 256, 256, VPUNN::Operation::ELTWISE, VPUNN::VPUDevice::VPU_2_7,
                                VPUNN::DataType::UINT8);
 
-    EXPECT_NEAR(model.DPUActivityFactor(wl), convertToFP16_powerVirus_27(0.084f) * convToReferenceVirus,
+    EXPECT_NEAR(my_energy.DPUActivityFactor(wl), convertToFP16_powerVirus_27(0.084f) * convToReferenceVirus,
                 strict_tol * scale)
             << " NN cyc:" << model.DPU(wl) << " ThCyc: " << model.DPUTheoreticalCycles(wl)
             << " Power Ideal Cyc: " << model.DPU_Power_IdealCycles(wl) << toDict(wl);
@@ -249,7 +251,7 @@ TEST_F(ActivityFactor, TestPowerActivityFactorMaxPool) {
     wl.padding = {1, 1, 1, 1};
     wl.strides = {2, 2};
     wl.outputs = {VPUNN::VPUTensor(14, 14, 64, 1, VPUNN::DataType::UINT8)};
-    EXPECT_NEAR(model.DPUActivityFactor(wl), 0.20f, norm_tol * scale)
+    EXPECT_NEAR(my_energy.DPUActivityFactor(wl), 0.20f, norm_tol * scale)
             << " NN cyc:" << model.DPU(wl) << " , ThCyc: "
             << model.DPUTheoreticalCycles(wl)
             /* << " , GTcyc:" << exp_GrndTCyc[j]*/

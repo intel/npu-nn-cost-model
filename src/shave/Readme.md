@@ -192,10 +192,6 @@ These operators below are not taking any extra parameters, The represent the Act
 -  tanh
 -  equal the time is the same despite the size (2952 DPU cycles). The only thing that gives equal a slope was the complementary convert operations before and after the equal operation. Since it is a special case it will be treated as a constant and it will give a constant time. The operations of convert appear in case that we use the ReferenceSW pipeline but in the real case will Convert run on SW or on DMA?
 -  default :special dummy implementation (like in the old shave ) for not profiled operators. It is the first bisector line, return value in DPU cycles is equal to the number of elements in the output tensor.
-
-## NPU_RESERVED operators (mock)
-Mocked from NPU4.0, speed up factor of 1 for the moment . Will be updated based on measurements.
-
 ## VPUEM Operators Usage
   
 All these operation are available for VPU2.7, VPU4.0 and NPU_RESERVED, it is only necessary to change the values of the parameters corresponding to the generation of the device. 
@@ -251,28 +247,6 @@ A Piecewise Operation is a simple operation based on a 3 slopes equation. Availa
 * vpuem.tanh
 
 Available Softmax Operation from VPUEM:
-* vpuem.softmax_x (draft) - it is restricted for C innermost ( XYZ layout).
-
-Available Spatial Operations from VPUEM:
-* vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
-
-
-## VPUEM Operators NPU_RESERVED
-
-A Piecewise Operation is a simple operation based on a 3 slopes equation. Available Piecewise Operations from VPUEM:
-* vpuem.add
-* vpuem.gelu
-* vpuem.hswish
-* vpuem.log
-* vpuem.mul
-* vpuem.mvn
-* vpuem.sigmoid
-* vpuem.softmax - no need for extra param 
-* vpuem.softmax_x
-* vpuem.swish
-* vpuem.tanh
-
-Available Softmax Operations from VPUEM:
 * vpuem.softmax_x (draft) - it is restricted for C innermost ( XYZ layout).
 
 Available Spatial Operations from VPUEM:

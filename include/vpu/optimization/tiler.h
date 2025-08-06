@@ -20,6 +20,8 @@
 #include "vpu/types.h"
 #include "vpu/utils.h"
 
+#include "vpu/layer_split_info.h"
+
 namespace VPUNN {
 
 /**

@@ -82,6 +82,9 @@ pybind11_add_module(vpunn_python_bindings MODULE
 
 add_dependencies(vpunn_python_bindings python_schema)
 
+#following have no effect
+
+
 # The python bindings depend on some internal libraries
 target_link_libraries(vpunn_python_bindings PRIVATE inferenceStatic vpunn_optimization)
 

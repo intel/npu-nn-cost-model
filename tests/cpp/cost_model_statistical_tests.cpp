@@ -17,6 +17,7 @@
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
+using namespace VPUNN;
 
 class CostModelStochastic : public ::testing::Test {
 public:
@@ -81,7 +82,7 @@ protected:
     int CheckNoCase_InferenceOutput(const ModelDescriptor& model_info, const float not_valid_value,
                                     unsigned int n_workloads = 1000) {
         const auto& model_path = model_info.first;
-        const float checked_result = not_valid_value;
+        const auto checked_result{Cycles::toCycleInterfaceType(not_valid_value)};
         // const float delta_error = 0.01F;
 
         VPUNN::VPUCostModel current_model{model_path, false, 0U};  // with cache, batch =1
@@ -93,7 +94,7 @@ protected:
 
         int i{0};
         for (auto& wl : workloads) {
-            float infered_value = current_model.run_NN(wl);
+            CyclesInterfaceType infered_value = current_model.DPU(wl);
             EXPECT_GT(infered_value, checked_result)
                     << "result: " << infered_value << " i:" << ++i << " Model: " << model_path << "\n"
                     << wl << std::endl;
@@ -102,8 +103,8 @@ protected:
         return i;
     }
 
-    std::tuple<int, int> CheckInValidInterval_RawInference(const ModelDescriptor& model_info, const float low_threshold,
-                                                           const float high_threshold,
+    std::tuple<int, int> CheckInValidInterval_RawInference(const ModelDescriptor& model_info,
+                                                           const float low_threshold_, const float high_threshold_,
                                                            const std::vector<VPUNN::DPUWorkload>& workloads) {
         const auto& model_path = model_info.first;
         VPUNN::VPUCostModel current_model{model_path, false};  // with cache, batch =1
@@ -112,8 +113,11 @@ protected:
         int ihigh{0};  // increments at every error
         int i{0};      // index
         const auto n{workloads.size()};
+
+        const auto low_threshold{Cycles::toCycleInterfaceType(low_threshold_)};
+        const auto high_threshold{Cycles::toCycleInterfaceType(high_threshold_)};
         for (const auto& wl : workloads) {
-            float inference = current_model.run_NN(wl);
+            auto inference = current_model.DPU(wl);
 
             // EXPECT_GT(inference, low_threshold)
             if (inference < low_threshold) {
@@ -215,13 +219,12 @@ protected:
                 << "\t expected_deviation_ratio: " << expected_deviation_ratio << std::endl;
 
         std::cout << "\n Total relevant Errors: " << i_errs << "\n DIstributed on operations:";
-        
+
         for (const auto& op : ops_errors) {
             const int err_percent{(i_errs != 0) ? (int)(((float)op.second / i_errs) * 100) : 0};
             std::cout << "\n op_id: " << (int)op.first
                       << " OP: " << VPUNN::Operation_ToText.at(static_cast<int>(op.first))
-                      << "\t,  Count #:" << op.second << " , Count %: " << err_percent
-                      << " %";
+                      << "\t,  Count #:" << op.second << " , Count %: " << err_percent << " %";
         }
         std::cout << "\n\n Total operations:";
         for (const auto& op : all_ops) {
@@ -672,9 +675,9 @@ TEST_F(CostModelStochastic, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) {
         };
 
         ResultMap res;
-       /* for (unsigned int i = 0; i < nns.size(); ++i)
-            for (unsigned int j = i + 1; j < nns.size(); ++j)
-                comp_lambda(nns[i], nns[j], 2, res);*/
+        /* for (unsigned int i = 0; i < nns.size(); ++i)
+             for (unsigned int j = i + 1; j < nns.size(); ++j)
+                 comp_lambda(nns[i], nns[j], 2, res);*/
 
         results_table_show_lambda(nns, res);
     }

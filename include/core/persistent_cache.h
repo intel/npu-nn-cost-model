@@ -19,6 +19,7 @@
 #include <optional>
 #include <stdexcept>
 #include <vector>
+#include <mutex>
 
 #include "core/logger.h"
 #include "core/utils.h"
@@ -37,8 +38,16 @@ private:
     mutable std::atomic<size_t> hits{0};
     mutable std::atomic<size_t> misses{0};
 
+    std::string name{"unnamed"};
+    mutable std::mutex mtx;
+
 public:
-    AccessCounter() {
+    AccessCounter() = default;
+    AccessCounter(std::string desiredName): name{std::move(desiredName)} {
+    }
+
+    std::string getName() const {
+        return name;
     }
 
     // destructor with status printing
@@ -57,9 +66,13 @@ public:
     // copy assignment operator
     AccessCounter& operator=(const AccessCounter&) = delete;
 
-    void access(bool hit = true) {
-        ++accesses;
-        ++(hit ? hits : misses);
+    void access(bool hit = true) {  // not really thread safe
+        accesses.fetch_add(1, std::memory_order_relaxed);
+        if (hit) {
+            hits.fetch_add(1, std::memory_order_relaxed);
+        } else {
+            misses.fetch_add(1, std::memory_order_relaxed);
+        }
     }
 
     void hit() {
@@ -71,9 +84,10 @@ public:
     }
 
     void reset() const {
-        accesses = 0;
-        hits = 0;
-        misses = 0;
+        std::lock_guard<std::mutex> lock(mtx);
+        accesses.store(0, std::memory_order_relaxed);
+        hits.store(0, std::memory_order_relaxed);
+        misses.store(0, std::memory_order_relaxed);
     }
 
     void printToLog(const std::string prefix = "") const {
@@ -86,12 +100,16 @@ public:
 
     // print to a string all the details, including the hit and miss ratios in percentage
     std::string printString() const {
+        std::lock_guard<std::mutex> lock(mtx);
+        size_t a = accesses.load(std::memory_order_relaxed);
+        size_t h = hits.load(std::memory_order_relaxed);
+        size_t m = misses.load(std::memory_order_relaxed);
         std::string result;
         result += "Cache Object: " + std::to_string((unsigned long long int)this) +
-                  " stats: Accesses: " + std::to_string(accesses) + ", Hits: " + std::to_string(hits) +
-                  ", Misses: " + std::to_string(misses);
-        result += "\t, Hit ratio: " + std::to_string(getHitRatio() * 100) +
-                  "%, Miss ratio: " + std::to_string(getMissRatio() * 100) + "%";
+                  " stats: Accesses: " + std::to_string(a) + ", Hits: " + std::to_string(h) +
+                  ", Misses: " + std::to_string(m);
+        result += "\t, Hit ratio: " + std::to_string(getHitRatioUnlocked() * 100) +
+                  "%, Miss ratio: " + std::to_string(getMissRatioUnlocked() * 100) + "%";
         return result;
     }
 
@@ -109,16 +127,38 @@ public:
 
     // calc hit ratio
     double getHitRatio() const {
-        return (accesses == 0) ? 0.0 : (static_cast<double>(hits) / accesses);
+        std::lock_guard<std::mutex> lock(mtx);
+        size_t a = accesses.load(std::memory_order_relaxed);
+        size_t h = hits.load(std::memory_order_relaxed);
+        return (a == 0) ? 0.0 : (static_cast<double>(h) / a);
     }
     // calc miss ratio
     double getMissRatio() const {
-        return (accesses == 0) ? 0.0 : (static_cast<double>(misses) / accesses);
+        std::lock_guard<std::mutex> lock(mtx);
+        size_t a = accesses.load(std::memory_order_relaxed);
+        size_t m = misses.load(std::memory_order_relaxed);
+        return (a == 0) ? 0.0 : (static_cast<double>(m) / a);
+    }
+
+private:
+
+    // these are unlocked versions, to be used only when the mutex is already locked
+    double getHitRatioUnlocked() const {
+        size_t a = accesses.load(std::memory_order_relaxed);
+        size_t h = hits.load(std::memory_order_relaxed);
+        return (a == 0) ? 0.0 : (static_cast<double>(h) / a);
+    }
+
+    // these are unlocked versions, to be used only when the mutex is already locked
+    double getMissRatioUnlocked() const {
+        size_t a = accesses.load(std::memory_order_relaxed);
+        size_t m = misses.load(std::memory_order_relaxed);
+        return (a == 0) ? 0.0 : (static_cast<double>(m) / a);
     }
 };
 
 // for the moment is caching a key of type uint32_t and a value of type float
-class FixedCache : public ThreadSafeMap<uint32_t, float> {
+class FixedCache : protected ThreadSafeMap<uint32_t, float> {
 private:
     mutable AccessCounter counter{};
 
@@ -151,20 +191,17 @@ public:
         }
     }
 
-    const float* get_pointer(const uint32_t& wl) const {
-        auto* value = ThreadSafeMap::find(wl);
-        if (value != nullptr) {
-            counter.hit();
-        } else {
-            counter.miss();
-        }
-        return value;
-    }
-
+protected:
+public:
     // for debug mainly
     const MapType& getMap() const {
         return _map;
     }
+
+public:
+    // expose public from base the following
+    using ThreadSafeMap::contains;  // read only
+    using ThreadSafeMap::insert;    // writes
 
     bool read_cache(const std::string& filename) {
         std::ifstream file;

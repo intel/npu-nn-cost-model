@@ -18,6 +18,7 @@
 
 #include "data_dpu_operation.h"
 #include "vpu/ranges.h"
+#include "vpu/validation/interface_valid_values.h"
 
 namespace VPUNN {
 
@@ -129,9 +130,9 @@ public:
     }
 
     /// checks if the item respects all the rules of a smart range. If not it will record an error/finding
-    bool check_is_in_requirements(const int item, const SmartRanges& range, const std::string& what) {
+    bool check_is_in_requirements(const int item, const MultiSmartRanges& range, const std::string& what) {
         std::string message{""};
-        bool result{range.is_in(item, message)};
+        bool result{range.is_in(item)};
 
         if (!result) {
             std::stringstream buffer;

@@ -85,6 +85,8 @@ protected:
             return model_2_7;
         case VPUDevice::VPU_4_0:
             return model_4_0;
+
+
         default:
             return model_invalid;
             break;

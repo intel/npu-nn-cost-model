@@ -88,14 +88,11 @@ EMSCRIPTEN_BINDINGS(vpunn) {
 
     class_<VPUCostModel>("VPUCostModel")
             .constructor<std::string>()
-            .function("DPU", select_overload<unsigned int(DPUWorkload)>(&VPUCostModel::DPU))
+            .function("DPU", select_overload<unsigned int(DPUWorkload) const>(&VPUCostModel::DPU))
             .function("DMA", select_overload<unsigned int(VPUDevice, const VPUTensor&, const VPUTensor&, MemoryLocation, MemoryLocation, unsigned int) const>(
                                      &VPUCostModel::DMA))
             .function("SHAVE", select_overload<unsigned int(const SWOperation&) const>(&VPUCostModel::SHAVE))
-            .function("hw_utilization", &VPUCostModel::hw_utilization)
-            .function("initialized", &VPUCostModel::nn_initialized)
-            // POWER API
-            .function("DPUActivityFactor", &VPUCostModel::DPUActivityFactor);
+            .function("initialized", &VPUCostModel::nn_initialized);
 
     // Helper functions
     function("createTensor", &createTensor);

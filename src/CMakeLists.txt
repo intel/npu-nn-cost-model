@@ -42,6 +42,10 @@ add_subdirectory(shave)
 add_subdirectory(schema)
 add_subdirectory(vpu)
 
+if (VPUNN_BUILD_HTTP_CLIENT)
+    add_subdirectory(http_client)
+endif()
+
 # Python bindings
 if(ENABLE_PYTHON_BINDING OR SKBUILD)
     add_subdirectory(python)

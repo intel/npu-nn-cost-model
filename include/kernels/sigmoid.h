@@ -19,7 +19,7 @@ namespace VPUNN {
  *
  * @param output the input/output tensor
  */
-VPUNN_API(void) Sigmoid(VPUNN::Tensor<float>* output);
+VPUNN_API void Sigmoid(VPUNN::Tensor<float>* output);
 
 }  // namespace VPUNN
 

@@ -16,93 +16,9 @@
 #include "vpu/utils.h"
 #include "vpu/validation/interface_valid_values.h"
 
+#include "vpu/vpu_tiling_strategy.h"
+
 namespace VPUNN {
-
-/// @brief VPU tiling strategy. How to split a Layer on multiple tiles
-enum class VPUTilingStrategy {
-    NONE,              // Clustering, replicate on each tile the input
-    SOH_Overlapped,    // old SOH, this is SOH_overlapped for 2.7 inputs, Kept same enum value (1). 2.7, 4.0+
-    SOK,               // 4.0+
-    SOW,               // 4.0+ equivalent of SOH_Overlappeed on W dimension
-    SOHW,              // 4.0+ , 4 tiles
-    SOHK,              // 4.0+ , 4 tiles,   this is not HKswitch (HKS is just a H with full broadcast)
-    SOH_HaloRead,      // SOH with input Halo for 2.7 (only) . (4.0 has only Overlapped)
-    SOHO_K_SWITCH,     // HK switch with H = SOHO, + broadcast
-    SOH_K_SWITCH,      // HK switch with H = SOH (possible in 2.7 only)
-    SOK_NO_BROADCAST,  // K split , bu no broadcast. Smaller output memory
-    UNKNOWN,           // not known, or not communicated (is not receiver decision to implement/apply)
-    __size
-};
-static const EnumMap VPUTilingStrategy_ToText{
-        link(VPUTilingStrategy::NONE, "NONE"),
-        link(VPUTilingStrategy::SOH_Overlapped, "SOHO"),
-        link(VPUTilingStrategy::SOK, "SOK"),
-        link(VPUTilingStrategy::SOW, "SOW"),
-        link(VPUTilingStrategy::SOHW, "SOHW"),
-        link(VPUTilingStrategy::SOHK, "SOHK"),
-        link(VPUTilingStrategy::SOH_HaloRead, "SOH_HaloRead"),
-        link(VPUTilingStrategy::SOHO_K_SWITCH, "SOHO_K_SWITCH"),
-        link(VPUTilingStrategy::SOH_K_SWITCH, "SOH_K_SWITCH"),
-        link(VPUTilingStrategy::SOK_NO_BROADCAST, "SOK_NO_BROADCAST"),
-        link(VPUTilingStrategy::UNKNOWN, "UNKNOWN"),
-};
-
-template <>
-inline const EnumMap& mapToText<VPUTilingStrategy>() {
-    return VPUTilingStrategy_ToText;
-}
-
-template <>
-inline std::string enumName<VPUTilingStrategy>() {
-    return "VPUTilingStrategy";
-}
-
-class TilingStrategyInfo {
-public:
-    static bool isVerticalTiling(VPUTilingStrategy strategy) {
-        switch (strategy) {  // SOH like, cutting the vertical dimension
-        case VPUTilingStrategy::NONE:
-            return false;
-        case VPUTilingStrategy::SOHW:
-            return true;
-        case VPUTilingStrategy::SOHK:
-        case VPUTilingStrategy::SOH_HaloRead:
-        case VPUTilingStrategy::SOHO_K_SWITCH:
-        case VPUTilingStrategy::SOH_Overlapped:
-            return true;
-        case VPUTilingStrategy::SOW:
-            return false;
-        case VPUTilingStrategy::SOK:
-        case VPUTilingStrategy::SOH_K_SWITCH:
-        case VPUTilingStrategy::SOK_NO_BROADCAST:
-        default:
-            return false;
-        }
-    }
-    static bool isHorizontalTiling(VPUTilingStrategy strategy) {
-        switch (strategy) {  // SOW like, cutting the horizontal dimension
-        case VPUTilingStrategy::NONE:
-            return false;
-        case VPUTilingStrategy::SOHW:
-            return true;
-        case VPUTilingStrategy::SOHK:
-        case VPUTilingStrategy::SOH_HaloRead:
-        case VPUTilingStrategy::SOHO_K_SWITCH:
-        case VPUTilingStrategy::SOH_Overlapped:
-            return false;
-        case VPUTilingStrategy::SOW:
-            return true;
-        case VPUTilingStrategy::SOK:
-        case VPUTilingStrategy::SOH_K_SWITCH:
-        case VPUTilingStrategy::SOK_NO_BROADCAST:
-        default:
-            return false;
-        }
-    }
-
-private:
-    // TilingStategyInfo() = delete;
-};
 
 /// @brief DPULayer class. no data  only methods on top of DPUWorkload
 struct DPULayer : public DPUWorkload {
@@ -314,7 +230,7 @@ public:
                     remaining_output_to_split -= output_tile_dim;  // no underflow possible
                 }
             }  // for each tile
-        }      // variables used in for
+        }  // variables used in for
 
         // Remove tiles that are of zero size
         remove_empty_tiles(tiles);
@@ -471,7 +387,7 @@ public:
                     remaining_output_to_split -= output_tile_dim;  // no underflow possible
                 }
             }  // for each tile
-        }      // variables used in for
+        }  // variables used in for
 
         // Remove tiles that are of zero size
         remove_empty_tiles(tiles);
@@ -508,64 +424,6 @@ public:
     std::vector<DPULayer> SOK(unsigned int nTiles, unsigned int rounding = 16) const {
         return SOK_Variants(nTiles, true, rounding);
     }
-    // std::vector<DPULayer> SOK(unsigned int nTiles, unsigned int rounding = 16) const {
-    //     const unsigned int output_size = outputs[0].channels();
-
-    //    // Round up to a multiple of 16 channels
-    //    const unsigned int max_tile_channels{round_up(ceil_division(output_size, nTiles), rounding)};
-
-    //    const auto& shape = outputs[0].get_shape();
-
-    //    std::vector<DPULayer> tiles(nTiles, *this);             // initial split , just copy to nTiles
-    //    unsigned int channels_remaining_to_split{output_size};  // counter like
-    //    for (auto& tile : tiles) {
-    //        const auto tile_channels{channels_remaining_to_split >= max_tile_channels ? max_tile_channels
-    //                                                                                  : channels_remaining_to_split};
-    //        tile.outputs[0].set_shape({shape[Dim::X], shape[Dim::Y], tile_channels, shape[Dim::B]});
-
-    //        // what is input shape based on the new output?
-    //        tile.recomputeInputTensorShape();
-
-    //        tile.isi_strategy = ISIStrategy::SPLIT_OVER_K;  // in order to propagate to workloads
-    //        tile.output_write_tiles = nTiles;  // in order to propagate to workloads. Might be less in practice
-
-    //        HaloWorkload& tHalo{tile.halo};
-    //        // By default halo info propagates from upper layer,
-    //        // out inbound =0, no other tile writes to us, except if OWT is >1
-    //        if (tile.output_write_tiles > 1)  // we assume here that we want broadcast for all tiles
-    //        {
-    //            // if OWT is >1 , it means that we want to broadcast the split to all other tiles
-    //            //   we need to populate output_inbound halo , so that the memory tensor is equal to all output
-    //            //   tensor of the full layer
-    //            //  the front/back value depend on the position of the tile in the list.
-
-    //            const auto prev_tiles_output_processed{output_size - channels_remaining_to_split};  // sum of prev
-    //            tiles const auto next_tiles_output_to_process{channels_remaining_to_split -
-    //                                                    tile_channels};  // sum of next tiles
-
-    //            tHalo.output_0_inbound_halo.front = prev_tiles_output_processed;
-    //            tHalo.output_0_inbound_halo.back = next_tiles_output_to_process;
-    //            // memory output tensor = output_size , constant for all tiles
-    //        } else {
-    //            tHalo.output_0_inbound_halo.front = 0;
-    //            tHalo.output_0_inbound_halo.back = 0;
-    //        }
-
-    //        // decrement/increment
-    //        channels_remaining_to_split -= tile_channels;  // no underflow possible
-    //    }                                                  // for
-    //    // Remove tiles that are of zero size
-    //    remove_empty_tiles(tiles);
-    //    // in case the actual number of tiles <nTiles, limit the propagated value to number of
-    //    // actual tiles
-    //    if (tiles.size() < nTiles) {
-    //        const unsigned int n_broadcast{static_cast<unsigned int>(tiles.size())};
-    //        std::for_each(tiles.begin(), tiles.end(), [n_broadcast](auto& t) {
-    //            t.output_write_tiles = n_broadcast;
-    //        });
-    //    }
-    //    return tiles;
-    //}
 
     std::vector<DPULayer> SOK_no_broadcast(unsigned int nTiles, unsigned int rounding = 16) const {
         return SOK_Variants(nTiles, false, rounding);  // not forcing classic SOK with broadcast
@@ -642,7 +500,7 @@ public:
 
             // decrement/increment
             channels_remaining_to_split -= tile_channels;  // no underflow possible
-        }                                                  // for
+        }  // for
         // Remove tiles that are of zero size
         remove_empty_tiles(tiles);
         // in case the actual number of tiles <nTiles, limit the propagated value to number of
@@ -814,7 +672,7 @@ public:
                     prevTile_memoryEnd = thisTile_memoryEnd;
                 }
             }  // for each tile
-        }      // variables used in for
+        }  // variables used in for
 
         // Remove tiles that are of zero size
         remove_empty_tiles(tiles);
@@ -891,7 +749,7 @@ public:
         switch (device) {
         case VPUDevice::VPU_2_0:
         case VPUDevice::VPU_2_1:
-            this->execution_order = inputs[0].is_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
+            this->execution_order = inputs[0].is_any_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
             break;
         case VPUDevice::VPU_2_7:
         case VPUDevice::VPU_4_0:
@@ -911,7 +769,7 @@ public:
         switch (device) {
         case VPUDevice::VPU_2_0:
         case VPUDevice::VPU_2_1:
-            this->execution_order = inputs[0].is_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
+            this->execution_order = inputs[0].is_any_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
             break;
         case VPUDevice::VPU_2_7:
         case VPUDevice::VPU_4_0:
@@ -1117,143 +975,6 @@ public:
     std::string compiler_pass{""};  ///< The name of the compiler pass that generated this layer
 
 };  // DPULAyer end
-
-struct DMA_CyclesInfo {
-    CyclesInterfaceType cycles{Cycles::NO_ERROR};  ///< cycles
-    // pipelined? y/n or 0,1,2,3
-};
-struct DMALayerInfo {
-    DMA_CyclesInfo w_tensor{};
-    DMA_CyclesInfo input_tensor{};
-    DMA_CyclesInfo output_tensor{};
-};
-
-/// container of workloads
-using DPUWorkloads = std::vector<DPUWorkload>;
-
-///  describes a pair of cost and the associated DPUWorkloads.
-/// the cost normally represents the runtime of the workloads sequence on a tile, considering also pipelining on nDPUs
-/// (not mentioned here)
-using DPUWorkloadsCost = std::pair<CyclesInterfaceType, DPUWorkloads>;  ///> interface VPUX
-
-/// container of DPUWorkload (order is relevant). Normally it stores the DPUworkloads associated to a tile plus their
-/// predicted  runtime
-struct DPUWorkloadsWithCyclesSplit {
-    std::vector<CyclesInterfaceType> cycles{};
-    std::vector<DPUWorkload> workloads{};
-};
-
-using DPUWorkloadsWithCycleCost = std::pair<CyclesInterfaceType, DPUWorkloadsWithCyclesSplit>;  ///>internal
-
-/// details about a tile split strategy
-struct OneTileLayerInfo {
-    DPULayer inter_tile_split_layer{};  ///<  layer resulted by splitting the orginalLayer to one tile using requested
-                                        ///<  strategy
-    DPUWorkloadsCost best_intra_tile_split{Cycles::NO_ERROR, {}};  ///< the cost and list of workloads that were
-                                                                   ///< inferred to be the best after
-    ///< performing the intra-tile split algorithm
-    std::vector<DPUWorkloadsWithCyclesSplit>
-            all_intra_tile_splits{};  ///< all intra tile splits generated. one pair() is a split
-
-    DMALayerInfo DMA_info{};  //< layers detailed DMA info (zero if not requested)
-};
-
-/// info on how are the splits on each tile
-/// For each tile a OneTileLayerInfo is allocated.
-using LayerSplitInfo = std::vector<OneTileLayerInfo>;
-
-/// provides differentiated information for a layer based on its content
-class DPULayerModes {
-private:
-    /// @brief Get the valid ExecutionMode for VPU_2_0
-    ///
-    /// @param wl the DPULayer
-    /// @return std::vector<ExecutionMode>
-    static std::vector<ExecutionMode> getValidExecutionMode_2_0(const DPULayer& wl) {
-        // Float input or output -> ExecutionMode::VECTOR_FP16
-        if (wl.inputs[0].is_float() || wl.outputs[0].is_float())
-            return {ExecutionMode::VECTOR_FP16};
-        // Find the optimal Execution Mode given output tensor layout
-        auto shape = wl.outputs[0].get_shape();
-        const double W = static_cast<double>(shape[Dim::Act::X]);
-        const double H = static_cast<double>(shape[Dim::Act::Y]);
-        // ExecutionMode::MATRIX process tensor using a W=4 H=4 grid, calculate grid cells count for it
-        const double matrixPartsCount = std::ceil(W / 4.0) * std::ceil(H / 4.0);
-        // ExecutionMode::VECTOR process tensor using a W=16 H=1 grid, calculate grid cells count for it
-        const double vectorPartsCount = std::ceil(W / 16.0) * H;
-        // Cells count is in direct ratio with work size, so choose smaller one
-        if (vectorPartsCount <= matrixPartsCount) {
-            return {ExecutionMode::VECTOR};
-        }
-        return {ExecutionMode::MATRIX};
-    }
-
-    /// @brief Get the valid ExecutionMode for VPU_2_7
-    ///
-    /// @param wl the DPULayer
-    /// @return std::vector<ExecutionMode>
-    static std::vector<ExecutionMode> getValidExecutionMode_2_7(const DPULayer& wl) {
-        // The available mode choice is based on the OP type
-        switch (wl.op) {
-        case Operation::CM_CONVOLUTION:  // compressconv surogate
-        case Operation::DW_CONVOLUTION:
-        case Operation::AVEPOOL:
-        case Operation::MAXPOOL:
-            return {ExecutionMode::CUBOID_16x16};
-        case Operation::ELTWISE:
-            return {ExecutionMode::CUBOID_8x16};
-        default:
-            return {ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_8x16, ExecutionMode::CUBOID_4x16};
-        }
-    }
-
-    /// @brief Get the valid ExecutionMode for NPU_RESERVED
-    ///
-    /// @param wl the DPULayer
-    /// @return std::vector<ExecutionMode> to_do
-    static std::vector<ExecutionMode> getValidExecutionMode_RESERVED(const DPULayer& wl) {
-        // The available mode choice is based on the OP type
-        switch (wl.op) {
-        case Operation::CM_CONVOLUTION:  // compressconv surogate
-        case Operation::DW_CONVOLUTION:
-        case Operation::AVEPOOL:
-        case Operation::MAXPOOL:
-            return {ExecutionMode::CUBOID_16x16};
-        case Operation::ELTWISE:
-        case Operation::ELTWISE_MUL:
-            return {ExecutionMode::CUBOID_8x16};
-        case Operation::LAYER_NORM:  // is this the case?
-        default:
-            return {ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_8x16, ExecutionMode::CUBOID_4x16};
-        }
-    }
-
-    DPULayerModes() = default;  // no instance possible
-
-public:
-    /// @brief Get the valid ExecutionMode for the DPULayer
-    ///
-    /// @param wl the DPULayer
-    /// @return std::vector<ExecutionMode>
-    static std::vector<ExecutionMode> getValidExecutionMode(const DPULayer& wl) {
-        switch (wl.device) {
-        case VPUDevice::VPU_2_0:
-        case VPUDevice::VPU_2_1: {
-            return getValidExecutionMode_2_0(wl);
-        }
-        case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_4_0: {
-            return getValidExecutionMode_2_7(wl);
-        }
-        case VPUDevice::NPU_RESERVED:
-        case VPUDevice::NPU_RESERVED_W: {
-            return getValidExecutionMode_RESERVED(wl);
-        }
-        default:
-            return {};
-        }
-    }
-};
 
 }  // namespace VPUNN
 

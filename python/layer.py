@@ -18,7 +18,7 @@ class VPULayerCostModel:
         if not os.path.isfile(filename):
             print(f"WARNING: file {filename} does not exists")
         self.model = VPUNN_lib.VPULayerCostModel(filename, profile, 16384, 1)
-        if not self.model.nn_initialized():
+        if not self.model.get_cost_model().nn_initialized():
             print("WARNING: VPUNN model not initialized... using simplistic model")
         self.verbose = verbose
 

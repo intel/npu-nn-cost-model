@@ -144,7 +144,7 @@ public:
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
-                                 alignement_size_bytes_def){};
+                                 alignement_size_bytes_def) {};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden
     VPU2_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
@@ -161,16 +161,23 @@ public:
                                  input_heigth_start_factor_SOH_,     // special
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
-                                 alignement_size_bytes_def){};
+                                 alignement_size_bytes_def) {};
 
 protected:
-    SmartRanges get_output_channels_restriction(const DPUOperation&) const override {
+    MultiSmartRanges get_output_channels_restriction(const DPUOperation&) const override {
         return output_channels_restrictions;
     }
 
-    SmartRanges get_input_channels_restriction(const DPUOperation& dpu) const override {
+    MultiSmartRanges get_input_channels_restriction(const DPUOperation& dpu) const override {
         return input_channels_restrictions.at(dpu.operation);
     }
+
+    MultiSmartRanges get_batch_restrictions() const override {
+        return batch_restrictions;
+    }
+
+    inline static const SmartRanges allValues_range{1, SmartRanges::max_limit};  /// a SmartRange that contains all possible values,
+                                                                                 /// from 1 to maxim number accepted => [1, max_limit] 
 
     Layout adapt_device_comaptible_tensor_layout(Layout layout) const override {
         if (layout == Layout::ZXY)  // default
@@ -189,14 +196,18 @@ protected:
 
 protected:  // only const attributes can be visible in derived
     /// layer input channels restrictions
-    const std::unordered_map<Operation, SmartRanges> input_channels_restrictions{
-            {Operation::CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::DW_CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::CM_CONVOLUTION, SmartRanges(1, cm_conv_channels_max)},  // why 2?
-            {Operation::ELTWISE, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::MAXPOOL, SmartRanges(16, input_spatial_dim_max, 16)},
+    const std::unordered_map<Operation, MultiSmartRanges> input_channels_restrictions{
+            {Operation::CONVOLUTION, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::DW_CONVOLUTION, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::CM_CONVOLUTION, MultiSmartRanges{{SmartRanges(1, cm_conv_channels_max)}}},  // why 2?
+            {Operation::ELTWISE, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
+            {Operation::MAXPOOL, MultiSmartRanges{{SmartRanges(16, input_spatial_dim_max, 16)}}},
     };
-    const SmartRanges output_channels_restrictions{SmartRanges(16, input_spatial_dim_max, 16)};
+
+    const MultiSmartRanges output_channels_restrictions{{SmartRanges(16, input_spatial_dim_max, 16)}};
+
+    const MultiSmartRanges batch_restrictions{{allValues_range}};  // valid batch values, we accept any value
+
 };
 
 //////// LAYER UNSPLIT situation
@@ -209,9 +220,9 @@ private:
 public:
     /// constructor with link to operations dynamic behavior
     VPU2_0_LayerValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
-            : VPU2_0_WorkloadValidValues(op_dynamic_constraints, input_heigth_start_factor_SOH_def){};
+            : VPU2_0_WorkloadValidValues(op_dynamic_constraints, input_heigth_start_factor_SOH_def) {};
 
-    SmartRanges get_output_channels_restriction(const DPUOperation& dpu) const override {
+    MultiSmartRanges get_output_channels_restriction(const DPUOperation& dpu) const override {
         return (dpu.isi_strategy == ISIStrategy::SPLIT_OVER_K) ? output_channels_restrictions.multiply_lower(2)
                                                                : output_channels_restrictions;
     }
@@ -228,10 +239,11 @@ protected:
 /// @brief specific VPU2.0 configuration possibilities, for  layer already split on tile.
 /// channels restrictions are less strict vs workload, since a further split is expected
 class VPU2_0_LayerOnTileValidValues : public VPU2_0_WorkloadValidValues {
+private:
 public:
     /// constructor with link to operations dynamic behavior
     VPU2_0_LayerOnTileValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_cosntraints)
-            : VPU2_0_WorkloadValidValues(op_dynamic_cosntraints){};
+            : VPU2_0_WorkloadValidValues(op_dynamic_cosntraints) {};
 
     bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept override {
         return false;  // layer is above the workload, no need to check

@@ -49,7 +49,7 @@ static void inferInputTensorShape(DPUWorkload& wl, const DPULayer& originalLayer
     // For the operation that are not having a kernel with depth (e.g. ELEMENTWISE)
     // - the input's Z should be equal to output's Z  (as a more general rule)
     const auto input_channel =
-            ((wl.op == Operation::CONVOLUTION) || (wl.op == Operation::CM_CONVOLUTION))  // kernels need all input Z
+            ((wl.op == Operation::CONVOLUTION) || (wl.op == Operation::CM_CONVOLUTION) || wl.output_autopad)  // kernels need all input Z
                     ? wl.inputs[0].z()  // use what the split left here by default (maybe original z, maybe a Z split of
                                         // inputs(future?))
                     : wl.outputs[0].z();  // for elementwise operations the in-out channels should match

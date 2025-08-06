@@ -32,6 +32,7 @@ protected:
        }*/
 };
 
+
 TEST_F(VPULayerCM_InvestigationTest, DISABLED_UnimplementedStrategies_ResultsTest) {
     const bool force_fail{false};        // controls force failing assertion
     const int fail{force_fail ? 0 : 1};  // 1 neutral, 0 fail
@@ -61,7 +62,7 @@ TEST_F(VPULayerCM_InvestigationTest, DISABLED_UnimplementedStrategies_ResultsTes
 
     const DPULayer tst_layer(wl_ref);
     const std::vector<TestCase> tests{
-            {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+            {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
              {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 1000, fail * 1000 + 1000},
              "SOW "},
 
@@ -99,7 +100,7 @@ TEST_F(VPULayerCM_InvestigationTest, SOW_SmokeTest) {
     const DPULayer tst_layer(wl_ref);
     // TODO: test should be SOHO wins,
     const std::vector<TestCase> tests{
-            {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+            {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
              {VPUNN::Cycles::NO_ERROR, true, 3700, fail * 3700 + 1000},
              "SOW "},
 
@@ -156,7 +157,7 @@ TEST_F(VPULayerCM_InvestigationTest, MEXP_C2_ELTWISE_1662_EISXW_126389_NPU40) {
         executeTests(tests);
     }
 
-    VPULayerCostModel& theModel = this->model_4_0;
+    VPUCostModel& theModel = this->model_4_0.get_cost_model();
 
     auto case_run = [=, &theModel](const DPUWorkload& workload, const std::string& whatTest) {
         DPUWorkload tst_layer(workload);
@@ -309,7 +310,7 @@ TEST_F(VPULayerCM_InvestigationTest, MEXP_C2_CONV_4634_4662_EISXW_126389_NPU40) 
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -539,7 +540,7 @@ TEST_F(VPULayerCM_InvestigationTest, MEXP_C2_CONV_4648_4676_EISXW_126389_NPU40) 
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -946,7 +947,7 @@ TEST_F(VPULayerCM_InvestigationTest, DWConv_SOK_SOH_Comparison_EISXW_92399) {
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (on) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -1282,6 +1283,7 @@ TEST_F(VPULayerCM_InvestigationTest, RuntimeELT_CONV_SOH_SOK_EISXW_98656) {
                 isi,                                          // isi_strategy
                 false,                                        // weight_sparsity_enabled
         };
+        /* coverity[copy_instead_of_move] */
         return wl_elm_layer;
     };
 
@@ -1306,6 +1308,7 @@ TEST_F(VPULayerCM_InvestigationTest, RuntimeELT_CONV_SOH_SOK_EISXW_98656) {
                 isi,                                          // ISIStrategy::CLUSTERING,      // isi_strategy
                 true,                                         // weight_sparsity_enabled
         };
+        /* coverity[copy_instead_of_move] */
         return wl_elm_layer;
     };
 
@@ -1381,10 +1384,10 @@ TEST_F(VPULayerCM_InvestigationTest, RuntimeELT_CONV_SOH_SOK_EISXW_98656) {
     std::cout << "\n-------------- WORKLOADS TESTS------------";
 
     auto run_dpu_wl = [=, &theModel](const DPUWorkload& wl, std::string text) {
-        std::cout << nline << " " << text;
+        std::cout << std::move(nline) << " " << text;
         std::string err_info;
         DPUWorkload tst_wl{wl};
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_wl, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_wl, err_info);
 
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << tst_wl << err_info;
@@ -1442,7 +1445,7 @@ TEST_F(VPULayerCM_InvestigationTest, MoreTiles_MAXP_EISXW_99246_NPU40) {
                 // {VPUNN::Cycles::NO_ERROR, true, 11000, 11000 + 1000},  // v17 11164    v159NN:11612
                 // "SOHO /2, no memmove, "},
 
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 4000 /*6000*/, 4500 + 500},  // v17 6132    v159NN:6234/ GTL:4500
                  "SOHO /4 , no memmove, "},
 
@@ -1457,7 +1460,7 @@ TEST_F(VPULayerCM_InvestigationTest, MoreTiles_MAXP_EISXW_99246_NPU40) {
         executeTests(tests);
     }
     const std::string nline{"\n ------------- NEW TEST------------------------------------ ------------------"};
-    auto verify_cost_cyc = [nline, &wl_MXP_layer, prefetch, &theModel](unsigned int nTiles,
+    auto verify_cost_cyc = [&nline, &wl_MXP_layer, prefetch, &theModel](unsigned int nTiles,
                                                                        CyclesInterfaceType& cost_cyc) {
         std::cout << nline;
         std::cout << "\n TILES: " << nTiles << "\n";
@@ -1666,7 +1669,7 @@ TEST_F(VPULayerCM_InvestigationTest, CONV_Act_sparsity_EISXW_117195_INT_NPU40) {
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -1929,7 +1932,7 @@ TEST_F(VPULayerCM_InvestigationTest, DWConv_SOK_SOH_decision_EISXW_117314_2d_3_N
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -2203,10 +2206,10 @@ TEST_F(VPULayerCM_InvestigationTest, SOHO_ELTWISE_EISXW_127594_MIneeva10June_NPU
         const DPULayer tst_layer_28(wl_28);
         const DPULayer tst_layer_27(wl_27);
         const std::vector<TestCase> tests{
-                {{tst_layer_28, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer_28), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 2655 - 260, fail * (3200 + 384)},  //  4T , 4x8: 3484 GTLNL:
                  "SOHO 28 , no memmove, "},
-                {{tst_layer_27, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer_27), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 2655 - 260, fail * (3498 + 349)},  //  4T , 3x7+1x6:3498  GTLNL:
                  "SOHO 27 , no memmove, "},
 
@@ -2221,7 +2224,7 @@ TEST_F(VPULayerCM_InvestigationTest, SOHO_ELTWISE_EISXW_127594_MIneeva10June_NPU
         DPUWorkload tst_layer{workload};
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -2370,7 +2373,7 @@ TEST_F(VPULayerCM_InvestigationTest, Model_N_v1_CONV_EISXW_127644_NPU40) {
         std::cout << "\n ------- CONV_34 half  K =80 outputs ------- \n";
         const DPULayer tst_layer(wl_halfK);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 3500,
                   fail * 3501 + 1000},  // V17: 3889 *2 = 7778    v159NN: 4234 *2=8468 GTVPUX:8400ns (2x 4200ns)
                                         // GTL:3811 *2 = 7622
@@ -2388,7 +2391,7 @@ TEST_F(VPULayerCM_InvestigationTest, Model_N_v1_CONV_EISXW_127644_NPU40) {
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail_case_run) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -2704,7 +2707,7 @@ TEST_F(VPULayerCM_InvestigationTest, Model_E_v9_CONV_EISXW_127649_NPU40) {
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail_case_run) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -2773,7 +2776,7 @@ TEST_F(VPULayerCM_InvestigationTest, Model_E_v9_CONV_EISXW_127649_NPU40) {
         const DPUWorkload conv8_SOHO_B_em4x16{mod_execution(conv8_SOHO_B, ExecutionMode::CUBOID_4x16)};
 
         // SOK part  only for conv8
-        DPUWorkload conv8_SOK_K16{conv8};
+        DPUWorkload conv8_SOK_K16{std::move(conv8)};
         conv8_SOK_K16.outputs[0] = VPUTensor(28, 16, 16, 1, DataType::UINT8);
         conv8_SOK_K16.output_write_tiles = 6;
 
@@ -2904,7 +2907,7 @@ TEST_F(VPULayerCM_InvestigationTest, EISXW_140892_err_investigation_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::ERROR_INPUT_TOO_BIG, true, 4000, fail * (4686) + 800},
                  "SOK , no memmove, "},
         };
@@ -3088,7 +3091,7 @@ TEST_F(VPULayerCM_InvestigationTest, WhisperFP16_BIG_CONV_EISXW_131119_NPU40) {
     {  // note: Real LNL NN has big delta vs GTL
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK_NO_BROADCAST, false, false, prefetch}},
+                {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK_NO_BROADCAST, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 335000, fail * 370000 + 30000},  // 2// V17:384288   v159NN: ?   GTL: ?? todo
                  "SOK no broadcast , no memmove, "},
 
@@ -3103,7 +3106,7 @@ TEST_F(VPULayerCM_InvestigationTest, WhisperFP16_BIG_CONV_EISXW_131119_NPU40) {
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -3206,7 +3209,7 @@ TEST_F(VPULayerCM_InvestigationTest, WhisperFP16_BIG_CONV_EISXW_131119_NPU40) {
             }
             {
                 std::cout << "\n   ---- FULL LAYER  no halo  ------- ";
-                DPUWorkload wl = wl_;
+                DPUWorkload wl = std::move(wl_);
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
                 EXPECT_GE(mem.cmx, (1024 * 1024 + 1024 * 512)) << "\nMemory size: " << mem << wl << std::endl;
                 std::cout << mem << std::endl;
@@ -3217,7 +3220,7 @@ TEST_F(VPULayerCM_InvestigationTest, WhisperFP16_BIG_CONV_EISXW_131119_NPU40) {
             {                                              // note: Real LNL NN has big delta vs GTL
                 const DPULayer tst_layer(wl_SOK_TOP_16x);  // has owt so it will force a broadcast
                 const std::vector<TestCase> tests{
-                        {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                        {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                          {Cycles::NO_ERROR, true, 340000, fail * 370000 + 30000},
                          "Tile split + CLU+ broadcast , no memmove, "},
 
@@ -3378,7 +3381,7 @@ TEST_F(VPULayerCM_InvestigationTest, Layer_EISXW_132141_SEP_split_Qualitative_NP
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -3691,7 +3694,7 @@ TEST_F(VPULayerCM_InvestigationTest, Layer_MAXP_EISXW_na_MINGQI_NPU27) {
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -3792,7 +3795,7 @@ TEST_F(VPULayerCM_InvestigationTest, zTemplate_Layer_EISXW_xxxxxxx_NPUXX) {
     {  // note: Real LNL NN has big delta vs GTL
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1000, fail * 5001 + 1500},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "SOHO , no memmove, "},
 
@@ -3807,7 +3810,7 @@ TEST_F(VPULayerCM_InvestigationTest, zTemplate_Layer_EISXW_xxxxxxx_NPUXX) {
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -3882,7 +3885,7 @@ protected:
         DPUWorkload tst_layer(workload);
         std::string err_info;
 
-        CyclesInterfaceType dpu_cost = theModel.DPU(tst_layer, err_info);
+        CyclesInterfaceType dpu_cost = theModel.get_cost_model().DPU(tst_layer, err_info);
         if (force_fail) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
@@ -5010,5 +5013,6 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOHO_possible_inte
     // EXPECT_TRUE(false);  // something has to fail to  see couts
     EXPECT_FALSE(simple_fail_all);  // centrally
 }
+
 
 }  // namespace VPUNN_unit_tests

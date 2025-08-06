@@ -10,9 +10,9 @@
 #ifndef VPUNN_API_H
 #define VPUNN_API_H
 #if defined(_WIN32)
-#define VPUNN_API(...) __VA_ARGS__
+#define VPUNN_API 
 #else
-#define VPUNN_API(...) __attribute__((visibility("default"))) __VA_ARGS__
+#define VPUNN_API __attribute__((visibility("default"))) 
 #endif
 
 #endif

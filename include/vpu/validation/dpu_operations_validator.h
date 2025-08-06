@@ -153,13 +153,14 @@ public:
             }
             {  // input/activation dimensions and tensor properties
                 const auto& in0{w.input_0};
-                // what to do with batch??
 
                 checker.check_is_in_interval((int)in0.height, config.get_input_height_interval(w), "input_0.height");
                 checker.check_is_in_interval((int)in0.width, config.get_input_width_interval(w), "input_0.width");
 
                 checker.check_is_in_requirements((int)in0.channels, config.get_input_channels_restriction(w),
                                                  "input_0.channels");
+
+                checker.check_is_in_requirements((int)in0.batch, config.get_batch_restrictions(), "input_0.batch");
 
                 checker.check_is_in_list(in0.datatype, config.get_input_valid_datatypes(w), "input_0.datatype");
                 checker.check_is_in_list(in0.layout, config.get_valid_layouts(), "input_0.layout");
@@ -206,6 +207,8 @@ public:
                 checker.check_is_in_requirements(
                         (int)w.output_0.channels, config.get_output_channels_restriction(w),
                         "output_0.channels");  // we check out ch here especially for CONV and CM_CONV
+
+                checker.check_is_in_requirements((int)w.output_0.batch, config.get_batch_restrictions(), "output_0.batch");
 
                 //
                 {  // layout and types for output_0
@@ -308,7 +311,8 @@ protected:
 /// configuration bundle for Workloads at the most atomic level. workloads that are to be subjected to DPU
 using OperationsContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations
                                                   VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues,
-                                                  VPU4_0_WorkloadValidValues>;
+                                                  VPU4_0_WorkloadValidValues
+                                                  >;
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;
 

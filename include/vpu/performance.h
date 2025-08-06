@@ -10,8 +10,10 @@
 #ifndef VPUNN_PERFORMANCE_H
 #define VPUNN_PERFORMANCE_H
 
+#include <cassert>
+#include <tuple>
+#include "specific_device_HW_characteristics.h"
 #include "vpu/cycles_interface_types.h"
-
 #include "vpu/dma_types.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
@@ -24,22 +26,14 @@ namespace VPUNN {
  * @param device a VPUDevice
  * @return unsigned int
  */
-inline constexpr unsigned int get_dpu_fclk(const VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-        return 700;
-    case VPUDevice::VPU_2_1:
-        return 850;
-    case VPUDevice::VPU_2_7:
-        return 1300;
-    case VPUDevice::VPU_4_0:
-        return 1700;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 1950;  // at 0.78V KPI point
-    default:
-        return 1;
-    }
+
+inline constexpr unsigned int get_dpu_fclk(VPUDevice device) {
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_dpu_freq_clk();
+            },
+            config);
 }
 
 /**
@@ -48,37 +42,23 @@ inline constexpr unsigned int get_dpu_fclk(const VPUDevice device) {
  * @param device a VPUDevice
  * @return unsigned int
  */
-inline constexpr unsigned int get_cmx_fclk(const VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-        return 700;
-    case VPUDevice::VPU_2_1:
-        return 850;
-    case VPUDevice::VPU_2_7:
-        return 975;
-    case VPUDevice::VPU_4_0:
-        return 971;  // changed from 975
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 1114;  // at KPI point
-    default:
-        return 1;
-    }
+
+inline constexpr unsigned int get_cmx_fclk(VPUDevice device) {
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_cmx_freq_clk();
+            },
+            config);
 }
 
-inline constexpr unsigned int get_cmx_fclk_Legacy(const VPUDevice device) {
-    switch (device) {
-    // case VPUDevice::VPU_2_0:
-    // case VPUDevice::VPU_2_1:
-    // case VPUDevice::VPU_2_7:
-    // case VPUDevice::NPU_RESERVED:
-    // case VPUDevice::NPU_RESERVED_W:
-    //     return get_cmx_fclk(device);
-    case VPUDevice::VPU_4_0:
-        return 975;
-    default:
-        return get_cmx_fclk(device);
-    }
+inline constexpr unsigned int get_cmx_fclk_Legacy(VPUDevice device) {
+    Characteristics config = get_HWCharacteristics_Legacy(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_cmx_freq_clk();
+            },
+            config);
 }
 
 /**
@@ -89,19 +69,12 @@ inline constexpr unsigned int get_cmx_fclk_Legacy(const VPUDevice device) {
  * @return unsigned int
  */
 inline constexpr unsigned int get_cmx_word_size_bytes(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-    case VPUDevice::VPU_2_7:
-        return 16;
-    case VPUDevice::VPU_4_0:
-        return 32;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 32;  // no change
-    default:
-        return 16;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_cmx_word_size_B();
+            },
+            config);
 }
 
 ///// normal, non decompressed upscaled , bandwidth
@@ -128,19 +101,12 @@ inline constexpr unsigned int get_cmx_word_size_bytes(VPUDevice device) {
  * @return unsigned int
  */
 inline constexpr int get_DMA_DDR_interface_bytes(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-    case VPUDevice::VPU_2_7:
-        return 32;
-    case VPUDevice::VPU_4_0:
-        return 64;  // 512 bits AXI
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 64;  // no change
-    default:
-        return -1;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_DMA_engine_B();
+            },
+            config);
 }
 
 /**
@@ -149,20 +115,14 @@ inline constexpr int get_DMA_DDR_interface_bytes(VPUDevice device) {
  * @param device a VPUDevice
  * @return unsigned int
  */
+
 inline constexpr unsigned int get_dpu_cmx_num_read_ports(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 4;  // RO
-    case VPUDevice::VPU_2_7:
-        return 8;  // RO
-    case VPUDevice::VPU_4_0:
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 8;  // 4x RO, 4x RW
-    default:
-        return 8;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_dpu_cmx_num_read_ports();
+            },
+            config);
 }
 
 /**
@@ -172,20 +132,12 @@ inline constexpr unsigned int get_dpu_cmx_num_read_ports(VPUDevice device) {
  * @return float
  */
 inline constexpr float get_dram_bandwidth_MBps_Legacy(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 20000.0f;
-    case VPUDevice::VPU_2_7:
-        return 27000.0f;
-    case VPUDevice::VPU_4_0:
-        return 45000.0f;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 45000.0f;  //?
-    default:
-        return 1;
-    }
+    Characteristics config = get_HWCharacteristics_Legacy(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_dram_bandwidth_MBps();
+            },
+            config);
 }
 /**
  * @brief Get the DRAM bandwidth in MB/s for a specific VPU IP
@@ -194,20 +146,12 @@ inline constexpr float get_dram_bandwidth_MBps_Legacy(VPUDevice device) {
  * @return float
  */
 inline constexpr float get_dram_bandwidth_MBps(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 20000.0f;
-    case VPUDevice::VPU_2_7:
-        return 27000.0f;
-    case VPUDevice::VPU_4_0:
-        return 136000.0f;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 136000.0f;  //?
-    default:
-        return 1;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_dram_bandwidth_MBps();
+            },
+            config);
 }
 
 /**
@@ -252,6 +196,7 @@ inline unsigned int get_sram_word_sizeLegacy(const VPUTensor& tensor, bool compr
  * @param permute if a permute operation is required
  * @return float
  */
+
 inline float get_bandwidth_cycles_per_bytesLegacy(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
                                                   bool compression = false, bool permute = false,
                                                   bool half_duplex = false) {
@@ -284,49 +229,14 @@ inline float get_bandwidth_cycles_per_bytesLegacy(const VPUTensor& tensor, VPUDe
 //    return fclk / bw_cycles_per_bytes;
 //}
 
-inline constexpr CyclesInterfaceType get_DMA_latency_NPU27(MemoryLocation location) {
-    constexpr VPUDevice const_device{VPUDevice::VPU_2_7};
-    constexpr int dramLatency_Nanoseconds{956};   // nanoseconds
-    constexpr int cmxLatency_CMXClockCycles{16};  // 16 clock cycles at VPU frequency
-
-    //[ns]*[MHz] ->normalize to SI=> [ns/1 000 000 000]*[MHz*1 000 000]=[ns/1000]*[MHz]
-    constexpr int dram_DPUCycles{(dramLatency_Nanoseconds * (int)get_dpu_fclk(const_device)) / 1000};
-    // normally (cmx_clk/CMX_frq)*DPU_frq, but multiplication done first to be OK on int
-    constexpr int cmx_DPUCycles{cmxLatency_CMXClockCycles * (int)get_dpu_fclk(const_device) /
-                                (int)get_cmx_fclk(const_device)};
-
-    return (location == MemoryLocation::DRAM) ? dram_DPUCycles : cmx_DPUCycles;
-}
-
-inline constexpr CyclesInterfaceType get_DMA_latency_NPU40_Legacy(MemoryLocation location) {
-    //@todo: update for VPU4.0 actual latency (now a clone of 2.7)
-    constexpr VPUDevice const_device{VPUDevice::VPU_4_0};
-    constexpr int dramLatency_Nanoseconds{956};   // nanoseconds
-    constexpr int cmxLatency_CMXClockCycles{16};  // 16 clock cycles at VPU frequency
-
-    //[ns]*[MHz] ->normalize to SI=> [ns/1 000 000 000]*[MHz*1 000 000]=[ns/1000]*[MHz]
-    constexpr int dram_DPUCycles{(dramLatency_Nanoseconds * (int)get_dpu_fclk(const_device)) / 1000};
-    // normally (cmx_clk/CMX_frq)*DPU_frq, but multiplication done first to be OK on int
-    constexpr int cmx_DPUCycles{cmxLatency_CMXClockCycles * (int)get_dpu_fclk(const_device) /
-                                (int)get_cmx_fclk_Legacy(const_device)};
-
-    return (location == MemoryLocation::DRAM) ? dram_DPUCycles : cmx_DPUCycles;
-}
-
-inline constexpr CyclesInterfaceType get_DMA_latency_NPU_RESERVED_Legacy(MemoryLocation location) {
-    //@todo: update for VPU_RESERVED actual latency (now a clone of 2.7)
-    constexpr VPUDevice const_device{VPUDevice::NPU_RESERVED};
-    constexpr int dramLatency_Nanoseconds{956};   // nanoseconds
-    constexpr int cmxLatency_CMXClockCycles{16};  // 16 clock cycles at VPU frequency
-
-    //[ns]*[MHz] ->normalize to SI=> [ns/1 000 000 000]*[MHz*1 000 000]=[ns/1000]*[MHz]
-    constexpr int dram_DPUCycles{(dramLatency_Nanoseconds * (int)get_dpu_fclk(const_device)) / 1000};
-    // normally (cmx_clk/CMX_frq)*DPU_frq, but multiplication done first to be OK on int
-    constexpr int cmx_DPUCycles{cmxLatency_CMXClockCycles * (int)get_dpu_fclk(const_device) /
-                                (int)get_cmx_fclk_Legacy(const_device)};
-
-    return (location == MemoryLocation::DRAM) ? dram_DPUCycles : cmx_DPUCycles;
-}
+// these functions are no longer used in get_DMA_latency_Legacy, because their content was redirected to the new design
+// in device HWCharacteristics specific classes
+//
+// inline constexpr CyclesInterfaceType get_DMA_latency_NPU27(MemoryLocation location)
+//
+// inline constexpr CyclesInterfaceType get_DMA_latency_NPU40_Legacy(MemoryLocation location)
+//
+// inline constexpr CyclesInterfaceType get_DMA_latency_NPU_RESERVED_Legacy(MemoryLocation location)
 
 /**
  * @brief Get the DMA latency in DPU cycles
@@ -336,69 +246,29 @@ inline constexpr CyclesInterfaceType get_DMA_latency_NPU_RESERVED_Legacy(MemoryL
  * @return CyclesInterfaceType
  */
 inline constexpr CyclesInterfaceType get_DMA_latency_Legacy(VPUDevice device, MemoryLocation location) {
-    switch (device) {
-    case VPUDevice::VPU_2_7: {
-        return get_DMA_latency_NPU27(location);
-    } break;
-    case VPUDevice::VPU_4_0: {  //@todo: update for VPU4.0 actual latency (now a clone of 2.7)
-        return get_DMA_latency_NPU40_Legacy(location);
-    } break;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W: {  //@todo: update for VPU_RESERVED actual latency (now a clone of 2.7)
-        return get_DMA_latency_NPU_RESERVED_Legacy(location);
-    } break;
-
-    default:
-        return 0;
-    }
+    Characteristics config = get_HWCharacteristics_Legacy(device);
+    return std::visit(
+            [location](auto& obj) {
+                return obj.get_DMA_latency(location);
+            },
+            config);
 }
 
-inline constexpr CyclesInterfaceType get_DMA_latency_NPU40(MemoryLocation location) {
-    //@todo: update for VPU4.0 actual latency (now a clone of 2.7)
-    constexpr VPUDevice const_device{VPUDevice::VPU_4_0};
-    constexpr int dramLatency_Nanoseconds{300};   // nanoseconds
-    constexpr int cmxLatency_CMXClockCycles{32};  // 32 clock cycles at VPU frequency
-
-    //[ns]*[MHz] ->normalize to SI=> [ns/1 000 000 000]*[MHz*1 000 000]=[ns/1000]*[MHz]
-    constexpr int dram_DPUCycles{(dramLatency_Nanoseconds * (int)get_dpu_fclk(const_device)) / 1000};
-    // normally (cmx_clk/CMX_frq)*DPU_frq, but multiplication done first to be OK on int
-    constexpr int cmx_DPUCycles{cmxLatency_CMXClockCycles * (int)get_dpu_fclk(const_device) /
-                                (int)get_cmx_fclk(const_device)};
-
-    return (location == MemoryLocation::DRAM) ? dram_DPUCycles : cmx_DPUCycles;
-}
-
-inline constexpr CyclesInterfaceType get_DMA_latency_NPU_RESERVED(MemoryLocation location) {
-    //@todo: update for VPU_RESERVED actual latency (now a clone of 2.7)
-    constexpr VPUDevice const_device{VPUDevice::NPU_RESERVED};
-    constexpr int dramLatency_Nanoseconds{300};   //  nanoseconds
-    constexpr int cmxLatency_CMXClockCycles{32};  // 32 clock cycles at VPU frequency
-
-    //[ns]*[MHz] ->normalize to SI=> [ns/1 000 000 000]*[MHz*1 000 000]=[ns/1000]*[MHz]
-    constexpr int dram_DPUCycles{(dramLatency_Nanoseconds * (int)get_dpu_fclk(const_device)) / 1000};
-    // normally (cmx_clk/CMX_frq)*DPU_frq, but multiplication done first to be OK on int
-    constexpr int cmx_DPUCycles{cmxLatency_CMXClockCycles * (int)get_dpu_fclk(const_device) /
-                                (int)get_cmx_fclk(const_device)};
-
-    return (location == MemoryLocation::DRAM) ? dram_DPUCycles : cmx_DPUCycles;
-}
+// these functions are no longer used in get_DMA_latency, because their content was redirected to the new design
+// in device HWCharacteristics specific classes
+//
+// inline constexpr CyclesInterfaceType get_DMA_latency_NPU40(MemoryLocation location)
+//
+// inline constexpr CyclesInterfaceType get_DMA_latency_NPU_RESERVED(MemoryLocation location)
+//
 
 inline constexpr CyclesInterfaceType get_DMA_latency(VPUDevice device, MemoryLocation location) {
-    switch (device) {
-    case VPUDevice::VPU_2_7: {
-        return get_DMA_latency_NPU27(location);
-    } break;
-    case VPUDevice::VPU_4_0: {
-        return get_DMA_latency_NPU40(location);
-    } break;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W: {
-        return get_DMA_latency_NPU_RESERVED(location);
-    } break;
-
-    default:
-        return 0;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [location](auto& obj) {
+                return obj.get_DMA_latency(location);
+            },
+            config);
 }
 
 /**
@@ -408,19 +278,12 @@ inline constexpr CyclesInterfaceType get_DMA_latency(VPUDevice device, MemoryLoc
  * @return unsigned int
  */
 inline constexpr unsigned int get_nr_macs(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 256;
-    case VPUDevice::VPU_2_7:
-    case VPUDevice::VPU_4_0:
-        return 2048;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 4096;
-    default:
-        return 2048;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_nr_macs();
+            },
+            config);
 }
 
 /**
@@ -430,13 +293,12 @@ inline constexpr unsigned int get_nr_macs(VPUDevice device) {
  * @return
  */
 inline constexpr unsigned int get_fp_ratio(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 4;
-    default:
-        return 2;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_fp_ratio();
+            },
+            config);
 }
 
 /**
@@ -446,19 +308,12 @@ inline constexpr unsigned int get_fp_ratio(VPUDevice device) {
  * @return unsigned int
  */
 inline constexpr unsigned int get_nr_ppe(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 16;
-    case VPUDevice::VPU_2_7:
-    case VPUDevice::VPU_4_0:
-        return 64;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 32;  // less ppe
-    default:
-        return 64;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_nr_ppe();
+            },
+            config);
 }
 
 /**
@@ -467,13 +322,37 @@ inline constexpr unsigned int get_nr_ppe(VPUDevice device) {
  * @param DPUWorkload a DPUWorkload
  * @return bool
  */
-inline bool native_comp_is_fp(const DPUWorkload& wl) {
+inline bool native_comp_is_any_fp(const DPUWorkload& wl) {
     // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
     bool found_at_least_one_float = false;
     for (const auto& i : wl.inputs) {
-        found_at_least_one_float = found_at_least_one_float || i.is_float();
+        found_at_least_one_float = found_at_least_one_float || i.is_any_float();
     }
     return found_at_least_one_float;
+}
+
+inline bool native_comp_on_fp16(const DPUWorkload& wl) {
+    // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
+    static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+
+    return wl.inputs[0].is_fp16family();
+}
+
+inline bool native_comp_on_fp8(const DPUWorkload& wl) {
+    // to do : look at weights also?
+    static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+    // to do  redesign xx family methods to be based on Datatype operations
+    const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
+    return wl.inputs[0].is_fp8family() && (!wts.is_fp16family());
+}
+
+inline bool native_comp_on_i8(const DPUWorkload& wl) {
+    static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+
+    // to do  redesign xx family methods to be based on Datatype operations
+    const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
+
+    return wl.inputs[0].is_i8family() && (!wts.is_any_float());
 }
 
 /**
@@ -483,14 +362,12 @@ inline bool native_comp_is_fp(const DPUWorkload& wl) {
  * @return unsigned int
  */
 inline constexpr unsigned int input_channels_mac(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        /* code */
-        return 1;
-    default:
-        return 8;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_input_channels_mac();
+            },
+            config);
 }
 
 /**
@@ -500,13 +377,12 @@ inline constexpr unsigned int input_channels_mac(VPUDevice device) {
  * @return unsigned int
  */
 inline constexpr unsigned int nDPU_per_tile(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 5;
-    default:
-        return 1;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_nDPU_per_tile();
+            },
+            config);
 }
 
 /**
@@ -517,60 +393,36 @@ inline constexpr unsigned int nDPU_per_tile(VPUDevice device) {
  * @return int
  */
 inline constexpr int get_dma_ports(VPUDevice device) {
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-        return 2;
-    case VPUDevice::VPU_2_7:
-        return 2;
-    case VPUDevice::VPU_4_0:
-        return 2;
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return 2;
-    default:
-        return 1;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_dma_ports();
+            },
+            config);
 }
 
 /// provides the Profiler clock in MHz , depending on device
 /// \param device for which the information is requested
 /// \returns the frequency or zero in case the device is not known
 inline constexpr float get_profiling_clk_MHz(VPUDevice device) {
-    constexpr float PROF_CLK_MHz{38.4f};
-
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-    case VPUDevice::VPU_2_7:
-        return PROF_CLK_MHz;
-    case VPUDevice::VPU_4_0:
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return PROF_CLK_MHz / 2.0f;
-    default:
-        return 0;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_profiling_clk_MHz();
+            },
+            config);
 }
 
 /// provides the Profiler clock in Hz , depending on device
 /// \param device for which the information is requested
 /// \returns the frequency or zero in case the device is not known
 inline constexpr int get_profiling_clk_Hz(VPUDevice device) {
-    constexpr int PROF_CLK{38400000};  // Hz
-
-    switch (device) {
-    case VPUDevice::VPU_2_0:
-    case VPUDevice::VPU_2_1:
-    case VPUDevice::VPU_2_7:
-        return PROF_CLK;
-    case VPUDevice::VPU_4_0:
-    case VPUDevice::NPU_RESERVED:
-    case VPUDevice::NPU_RESERVED_W:
-        return PROF_CLK / 2;
-    default:
-        return 0;
-    }
+    Characteristics config = get_HWCharacteristics(device);
+    return std::visit(
+            [](auto& obj) {
+                return obj.get_profiling_clk_Hz();
+            },
+            config);
 }
 
 }  // namespace VPUNN

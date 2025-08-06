@@ -108,16 +108,16 @@ TEST_F(SHAVECacheDescriptorTest, BasicAssertionsSHAVE) {
         {
             const CyclesInterfaceType v_1{425};
             mycache.add(wl, v_1);
-            const CyclesInterfaceType* res = mycache.get(wl);
+            const auto res = mycache.get(wl);
 
-            EXPECT_TRUE(res != nullptr);
+            EXPECT_TRUE(res.has_value());
             EXPECT_EQ(*res, v_1);
         }
         {
             const CyclesInterfaceType v_2{800};
             mycache.add(wl2, v_2);
-            const CyclesInterfaceType* res2 = mycache.get(wl2);
-            EXPECT_TRUE(res2 != nullptr);
+            const auto res2 = mycache.get(wl2);
+            EXPECT_TRUE(res2.has_value());
             EXPECT_EQ(*res2, v_2);
         }
 
@@ -129,7 +129,7 @@ TEST_F(SHAVECacheDescriptorTest, BasicAssertionsSHAVE) {
 TEST_F(SHAVECacheDescriptorTest, BasicAssertionsSHAVE_LUT) {
     {
         const SHAVEWorkload::Param p2{2.9f};
-        //p2.f = 2.9f;
+        // p2.f = 2.9f;
         const SHAVEWorkload::Param p3{p2};
 
         const SHAVEWorkload wl{"sigmoid",
@@ -149,30 +149,30 @@ TEST_F(SHAVECacheDescriptorTest, BasicAssertionsSHAVE_LUT) {
                 {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
         };
 
-        SimpleLUTKeyCache<CyclesInterfaceType, SHAVEWorkload> mycache(1000);
+        /*SimpleLUTKeyCache*/ LRUKeyCache<CyclesInterfaceType, SHAVEWorkload> mycache(1000);
 
         {
             const CyclesInterfaceType v_1{425};
             mycache.add(wl, v_1);
-            const CyclesInterfaceType* res = mycache.get(wl);
+            const auto res = mycache.get(wl);
 
-            EXPECT_TRUE(res != nullptr);
+            EXPECT_TRUE(res.has_value());
             EXPECT_EQ(*res, v_1);
         }
         {
             const CyclesInterfaceType v_2{800};
             mycache.add(wl2, v_2);
-            const CyclesInterfaceType* res2 = mycache.get(wl2);
-            EXPECT_TRUE(res2 != nullptr);
+            const auto res2 = mycache.get(wl2);
+            EXPECT_TRUE(res2);
             EXPECT_EQ(*res2, v_2);
         }
-        EXPECT_NE(mycache.get(wl2), nullptr);
+        EXPECT_TRUE(mycache.get(wl2));
         EXPECT_EQ(*mycache.get(wl2), 800);
 
-        EXPECT_NE(mycache.get(wl), nullptr);
+        EXPECT_TRUE(mycache.get(wl));
         EXPECT_EQ(*mycache.get(wl), 425);
 
-        EXPECT_EQ(mycache.get(wl3), nullptr);
+        EXPECT_FALSE(mycache.get(wl3));
     }
 }
 

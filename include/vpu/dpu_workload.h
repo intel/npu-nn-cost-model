@@ -98,6 +98,12 @@ struct DPUWorkload {
     /// Superdense memory. ODU specific, superdense_output
     std::optional<bool> superdense_memory{};
 
+    /// Input autopad - IDU specific
+    std::optional<bool> input_autopad{};
+
+    /// Output autopad - ODU specific
+    std::optional<bool> output_autopad{};
+
     std::string get_layer_info() const {
         return layer_info;
     }
@@ -173,10 +179,47 @@ struct DPUWorkload {
         }
     }
 
+    /// in autopad getter
+    bool is_input_autopad() const {
+        if (input_autopad.has_value()) {
+            return input_autopad.value();
+        } else {
+            return false;
+        }
+    }
+
+    /// out autopad getter
+    bool is_output_autopad() const {
+        if (output_autopad.has_value()) {
+            return output_autopad.value();
+        } else {
+            return false;
+        }
+    }
+
+    /// in autopad setter
+    void set_input_autopad(bool autopad) {
+        input_autopad = autopad;
+    }
+
+    /// out autopad setter
+    void set_output_autopad(bool autopad) {
+        output_autopad = autopad;
+    }
+
     void set_all_swizzlings(Swizzling toSet) {
         input_swizzling[0] = toSet;
         input_swizzling[1] = toSet;
         output_swizzling[0] = toSet;
+    }
+    /// gets the type of the weight tensor, considering also input type in case not set
+    DataType get_weight_type() const {
+        if (weight_type.has_value()) {
+            return weight_type.value();
+        } else {
+            // if not set, we assume the same type as input_0
+            return inputs[0].get_dtype();
+        }
     }
 
 protected:
@@ -261,6 +304,8 @@ public:
         r = r && (weightless_operation == b.weightless_operation);      // weightless_operation
         r = r && (in_place_output_memory == b.in_place_output_memory);  // in_place_output_memory
         r = r && (superdense_memory == b.superdense_memory);            // superdense_memory
+        r = r && (input_autopad == b.input_autopad);                    // input_autopad
+        r = r && (output_autopad == b.output_autopad);                  // output_autopad
         return r;
     }
 };
@@ -317,7 +362,11 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& 
            << (d.in_place_output_memory.has_value() ? std::to_string(d.in_place_output_memory.value()) : "NA") << " ;\n"
            << " superdense_memory: \t"
            << (d.superdense_memory.has_value() ? std::to_string(d.superdense_memory.value()) : "NA") << " ;\n"  //
-           << out_terminator() << "Workload "  // terminator
+           << (d.input_autopad.has_value() ? " input_autopad: \t" + std::to_string(d.input_autopad.value())
+                                           : " input_autopad: NA")  //
+           << (d.output_autopad.has_value() ? " output_autopad: \t" + std::to_string(d.output_autopad.value())
+                                            : " output_autopad: NA")  //
+           << out_terminator() << "Workload "                         // terminator
             ;
     return stream;
 }

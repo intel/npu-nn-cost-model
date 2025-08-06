@@ -255,7 +255,6 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
             std::cout << "\n  : " << o;
         }
     }
-
     {  // special in-existing
         const auto d{VPUDevice::__size};
         auto ops = empty_model.getShaveSupportedOperations(d);

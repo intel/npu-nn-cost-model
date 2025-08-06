@@ -24,7 +24,7 @@ private:
     VPUComputeNodeMap<VPULayerStrategy> _map;
 
 public:
-    explicit VPUNetworkStrategy(){};
+    explicit VPUNetworkStrategy() {};
 
     VPULayerStrategy& operator[](const std::shared_ptr<VPUComputeNode>& _key) {
         return _map[_key];
@@ -44,7 +44,10 @@ public:
  * @brief The VPUNN network cost model (also called VPUNN Level3 API)
  *
  */
-class VPUNN_API(VPUNetworkCostModel): public VPULayerCostModel {
+class VPUNN_API VPUNetworkCostModel
+        : public VPULayerCostModel,
+          virtual protected VPU_MutexAcces  // for mutex access
+{
 public:
     /**
      * @brief Using the same VPULayerCostModel constructor

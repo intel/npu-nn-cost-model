@@ -130,6 +130,10 @@ struct DPUOperation {
     /// optional. By default(no value) is considered as missing = false
     bool superdense{false};
 
+    bool input_autopad{false};
+
+    bool output_autopad{false};
+
     using _ref_supported_type =
             std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<Operation>,
                          std::reference_wrapper<DataType>, std::reference_wrapper<Layout>,
@@ -161,7 +165,9 @@ struct DPUOperation {
               sep_activators{w.sep_activators},  // copy sep
               weightless_operation{w.is_weightless_operation()},
               in_place_output_memory{w.is_inplace_output_memory()},
-              superdense{w.is_superdense()} {
+              superdense{w.is_superdense()},
+              input_autopad{w.input_autopad},
+              output_autopad{w.output_autopad} {
         // from WL to tensors
         input_0.swizzling = w.input_swizzling[0];
         input_0.sparsity = w.act_sparsity;
@@ -197,7 +203,9 @@ struct DPUOperation {
               sep_activators{r.sep_activators}, /*_member_map{}*/
               weightless_operation{r.weightless_operation},
               in_place_output_memory{r.in_place_output_memory},
-              superdense{r.superdense} {
+              superdense{r.superdense},
+              input_autopad(r.input_autopad),
+              output_autopad(r.output_autopad) {
     }
 
     DPUOperation(DPUOperation&) = delete;
@@ -256,6 +264,9 @@ struct DPUOperation {
         wl.set_inplace_output_memory(in_place_output_memory);
 
         wl.set_superdense(superdense);
+
+        wl.input_autopad = input_autopad;
+        wl.output_autopad = output_autopad;
 
         return wl;
     }
@@ -486,6 +497,8 @@ struct DPUOperation {
                  return in_place_output_memory;
              }},
             {"superdense_output", std::ref(superdense)},
+            {"input_autopad", std::ref(input_autopad)},
+            {"output_autopad", std::ref(output_autopad)},
     };
 
     static const std::vector<std::string>& _get_member_names() {
@@ -567,6 +580,8 @@ struct DPUOperation {
                 "in_place_input1",    // not the same name as the attribute weightless_operation
                 "in_place_output",    // not the same name as the attribute in_place_output_memory
                 "superdense_output",  // not the same name as the attribute superdense
+                "input_autopad",
+                "output_autopad",
         };
 
         return names;

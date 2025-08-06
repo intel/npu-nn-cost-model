@@ -20,8 +20,7 @@ namespace VPUNN {
 /// @brief The interfacefor DCim COst model operations at  workload level (L1/variant)
 /// DCiM_Workload_Alias can be a DCIMWorkload or a variant of it, or a DPUWorkload if reused the datastructure.
 template <class DCiM_Workload_Alias>
-class DCiMCostModelInterface :
-        virtual protected VPU_MutexAcces  // for mutex access
+class DCiMCostModelInterface
 {
 public:
     // future potential functionalities
@@ -31,8 +30,6 @@ public:
 
     // first interface
     CyclesInterfaceType dCiM(const DCiM_Workload_Alias& wl, std::string& info) const {
-        std::lock_guard<std::recursive_mutex> lock(L1_mutex);  // for future
-
         info = "";
         if (wl.kernels[0])
             return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;

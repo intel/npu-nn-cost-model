@@ -151,9 +151,10 @@ protected:
         const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
         const float exceedMax = power_factor_lut.get_PowerVirus_exceed_factor(wl.device);
 
+        const IEnergy& my_energy = crt_model.getEnergyInterface();
         const auto energy = crt_model.DPUEnergy(wl);
-        const auto af = crt_model.DPUActivityFactor(wl);
-        const auto util = crt_model.hw_utilization(wl);
+        const auto af = my_energy.DPUActivityFactor(wl);
+        const auto util = my_energy.hw_utilization(wl);
         const auto util_idealCyc = crt_model.DPU_Power_IdealCycles(wl);
         const auto efficiency_idealCyc = crt_model.DPU_Efficency_IdealCycles(wl);
         const auto theorCyc = crt_model.DPUTheoreticalCycles(wl);
@@ -188,9 +189,10 @@ protected:
         const VPUPowerFactorLUT power_factor_lut;
         const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
 
+        const IEnergy& my_energy = crt_model.getEnergyInterface();
         const auto energy = crt_model.DPUEnergy(wl);
-        const auto af = crt_model.DPUActivityFactor(wl);
-        const auto util = crt_model.hw_utilization(wl);
+        const auto af = my_energy.DPUActivityFactor(wl);
+        const auto util = my_energy.hw_utilization(wl);
         const auto util_idealCyc = crt_model.DPU_Power_IdealCycles(wl);
         const auto efficiency_idealCyc = crt_model.DPU_Efficency_IdealCycles(wl);
         const auto theorCyc = crt_model.DPUTheoreticalCycles(wl);
@@ -346,23 +348,15 @@ public:
 protected:
     const DataType defaultTensorType{DataType::FLOAT16};
     const VPUDevice defaultDevice{VPUDevice::VPU_2_0};
-    const float refPowerVirusFactor{VPUPowerFactorLUT().getFP_overI8_maxPower_ratio(VPUDevice::VPU_2_0) /* 0.87f*/};
+    const float refPowerVirusFactor{
+            0.87f /*VPUPowerFactorLUT().getFP_overI8_maxPower_ratio(VPUDevice::VPU_2_0) */ /* 0.87f*/};  // to be put by
+                                                                                                         // hand
 
     const std::array<VPUTensor, 1> outputs{VPUTensor(56, 56, 32, 1, defaultTensorType)};
     const std::array<unsigned int, 2> kernels{3, 3};                   ///< kernel sizes WH
     const std::array<unsigned int, 2> strides{1, 1};                   ///< kernel strides WH
     const std::array<unsigned int, 4> padding{1, 1, 1, 1};             ///< kernel padding  Top, Bottom, Left,  Right
     const ExecutionMode execution_order{ExecutionMode::CUBOID_16x16};  ///< execution mod
-
-    // vpu_2_0_values{{Operation::CONVOLUTION,
-    //                 {
-    //                         {4, 0.87f},
-    //                         {5, 0.92f},
-    //                         {6, 1.0f},
-    //                         {7, 0.95f},
-    //                         {8, 0.86f},
-    //                         {9, 0.87f},
-    //                 }},
 
     void SetUp() override {
         //        TestCostModel::SetUp();
@@ -559,4 +553,63 @@ TEST_F(TestVPUPowerFactorLUT, AfterLastSample) {
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
 }
+
+
+TEST_F(TestVPUPowerFactorLUT, NPU40_AvailabilitySmoke) {
+    const VPUPowerFactorLUT power_factor_lut{};
+
+    const VPUDevice device{VPUDevice::VPU_4_0};
+    {  // FP16
+        const std::array<VPUTensor, 1> outputs3200{VPUTensor(10, 10, 32, 1, DataType::FLOAT16)};
+        const std::array<VPUTensor, 1> inputs1600{VPUTensor(10, 10, 16, 1, DataType::FLOAT16)};
+
+        DPUWorkload wl{device,
+                       Operation::CONVOLUTION,  // 3200X9x16 = 460800 ops
+                       inputs1600,
+                       outputs3200,
+                       kernels,  // 3x3 =9
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << "FP16" << wl;
+        EXPECT_NEAR(operation_pf, 1.3f, 0.005) << "FP16" << wl;
+    }
+    {  // fp8
+        const std::array<VPUTensor, 1> outputs3200{VPUTensor(10, 10, 32, 1, DataType::BF8)};
+        const std::array<VPUTensor, 1> inputs1600{VPUTensor(10, 10, 16, 1, DataType::HF8)};
+
+        DPUWorkload wl{device,
+                       Operation::CONVOLUTION,  // 3200X9x16 = 460800 ops
+                       inputs1600,
+                       outputs3200,
+                       kernels,  // 3x3 =9
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << "FP8" << wl;
+        EXPECT_NEAR(operation_pf, 0.0f, 0.005) << "FP8" << wl;
+    }
+    {  // int8
+        const std::array<VPUTensor, 1> outputs3200{VPUTensor(10, 10, 32, 1, DataType::UINT8)};
+        const std::array<VPUTensor, 1> inputs1600{VPUTensor(10, 10, 16, 1, DataType::UINT8)};
+
+        DPUWorkload wl{device,
+                       Operation::CONVOLUTION,  // 3200X9x16 = 460800 ops
+                       inputs1600,
+                       outputs3200,
+                       kernels,  // 3x3 =9
+                       strides,
+                       padding,
+                       execution_order};
+
+        float operation_pf{0.0f};
+        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << "I8 " << wl;
+        EXPECT_NEAR(operation_pf, 1.0f, 0.005) << "I8 " << wl;
+    }
+}
+
 }  // namespace VPUNN_unit_tests

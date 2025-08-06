@@ -23,9 +23,9 @@ namespace VPUNN {
  * @param output the output tensor
  * @param n_neighbours number of neighbors to consider. must be >=1
  */
-VPUNN_API(void)
-kNN(const VPUNN::Tensor<float>* weights,const VPUNN::Tensor<float>* targets, const VPUNN::Tensor<float>* activations,
-    VPUNN::Tensor<float>* output, unsigned int n_neighbours = 1);
+VPUNN_API void kNN(const VPUNN::Tensor<float>* weights, const VPUNN::Tensor<float>* targets,
+                   const VPUNN::Tensor<float>* activations, VPUNN::Tensor<float>* output,
+                   unsigned int n_neighbours = 1);
 
 }  // namespace VPUNN
 

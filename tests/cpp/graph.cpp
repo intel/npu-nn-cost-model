@@ -70,8 +70,8 @@ protected:
 };
 
 TEST_F(TestVPUCompute, NetworkLoadModels) {
-    EXPECT_EQ(model_2_7.nn_initialized(), true);
-    EXPECT_EQ(model_2_0.nn_initialized(), true);
+    EXPECT_EQ(model_2_7.get_cost_model().nn_initialized(), true);
+    EXPECT_EQ(model_2_0.get_cost_model().nn_initialized(), true);
 }
 
 TEST_F(TestVPUCompute, ComputeNodeBasicAssertions) {
@@ -135,7 +135,7 @@ TEST_F(TestVPUCompute, SmokeTestNetworkCostModel) {
     const unsigned long int cost = model.Network(dag, strategy);
     // Naive cost (no spilling, or fancy strategy)
     const unsigned long int naive_cost =
-            static_cast<unsigned int>(dag.nodes()) * model.SHAVE(*generate_helper_shv_layer(32, 64));
+            static_cast<unsigned int>(dag.nodes()) * model.get_cost_model().SHAVE(*generate_helper_shv_layer(32, 64));
 
     EXPECT_GT(cost, 0u);
     // The cost of this simple dag is the same as the

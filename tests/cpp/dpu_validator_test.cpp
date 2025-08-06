@@ -409,6 +409,7 @@ TEST_F(DPU_OperationValidator_Test, InputSparsity_and_SEP_memory_test) {
     verify_input0_memory(tests);
 }
 
+
 TEST_F(DPU_OperationValidator_Test, OutputSparsity_and_SEP_memory_test) {
     const VPUNN::DPUWorkload wl_ref_18x18x64{
             VPUNN::VPUDevice::VPU_2_7,
@@ -2514,6 +2515,7 @@ TEST_F(DPU_OperationValidator_Test, Check_Memory_size_32Bit_output_NPU40) {
         EXPECT_EQ(mem.output_0, align(21 * 21 * (512) * 1 * 4, device_req)); /* 21, 21, 512, 1 */
     }
 }
+
 
 TEST_F(DPU_OperationValidator_Test, Check_halo_inputs_test) {
     const VPUNN::DPUWorkload wl_ref{

@@ -29,7 +29,7 @@ namespace VPUNN {
  * @brief VPUNN performance model
  *
  */
-class VPUNN_API(VPUNNPerformanceModel) {
+class VPUNN_API VPUNNPerformanceModel {
 private:
     /**
      * @brief Estimate theoretical reduction in cycles from padding for ZMAJOR convolution
@@ -68,10 +68,14 @@ private:
         unsigned long int Pt_cycles, Pb_cycles;
         unsigned long int Pl_cycles, Pr_cycles;
 
-        Pt_cycles = static_cast<unsigned long>(Pt_zeros) * static_cast<unsigned long>(Kw) * ceil_division(inp_width, Sw);
-        Pb_cycles = static_cast<unsigned long>(Pb_zeros) * static_cast<unsigned long>(Kw) * ceil_division(inp_width, Sw);
-        Pl_cycles = static_cast<unsigned long>(Pl_zeros) * static_cast<unsigned long>(Kh) * ceil_division(inp_height, Sh);
-        Pr_cycles = static_cast<unsigned long>(Pr_zeros) * static_cast<unsigned long>(Kh) * ceil_division(inp_height, Sh);
+        Pt_cycles =
+                static_cast<unsigned long>(Pt_zeros) * static_cast<unsigned long>(Kw) * ceil_division(inp_width, Sw);
+        Pb_cycles =
+                static_cast<unsigned long>(Pb_zeros) * static_cast<unsigned long>(Kw) * ceil_division(inp_width, Sw);
+        Pl_cycles =
+                static_cast<unsigned long>(Pl_zeros) * static_cast<unsigned long>(Kh) * ceil_division(inp_height, Sh);
+        Pr_cycles =
+                static_cast<unsigned long>(Pr_zeros) * static_cast<unsigned long>(Kh) * ceil_division(inp_height, Sh);
 
         // Subtract double counted padding cycles at top-left corner from top
         for (int i = Pt, j = Pl; i > 0 && j > 0; i -= Sh, j -= Sw)
@@ -173,7 +177,7 @@ public:
         return DPU_MAC_based_cycles(wl, operations_cnt);
     }
 
-protected:
+    // protected:
     /**
      * @brief Compute the DPU ideal cycles
      * @details Calculates cycles that a single issue scalar CPU would require to execute
@@ -195,7 +199,7 @@ protected:
         const unsigned int fp_to_int_resource_ratio{get_fp_ratio(wl.device)};  // more cycles for fp vs int
 
         const unsigned int nr_macs_adjusted_with_type{
-                native_comp_is_fp(wl) ? ceil_division(nr_macs, fp_to_int_resource_ratio) : nr_macs};
+                native_comp_on_fp16(wl) ? ceil_division(nr_macs, fp_to_int_resource_ratio) : nr_macs};
 
         // Compute the MACs needed to generate the output tensor
         const unsigned long int operations_cnt = MACs_to_compute;
@@ -333,8 +337,8 @@ public:
         // Ceil division cycles by DPU MACs
         cycles = ceil_division(cycles, (unsigned long int)nr_macs);
 
-        // Adjust cycles for ratio of FP to int compute
-        if (native_comp_is_fp(wl)) {
+        // Adjust cycles for ratio of FP16 to int(or fp) 8 bit compute
+        if (native_comp_on_fp16(wl)) {
             cycles *= fp_ratio;
         }
 
@@ -354,7 +358,7 @@ public:
             } else if (wl.device > VPUDevice::VPU_4_0 && PerformanceMode::forceLegacy_G5) {
                 return DMATheoreticalCyclesLegacyLNL(wl);
             }
-            return DMATheoreticalCycles_RESERVED_ON(wl);//Updated theoretical model
+            return DMATheoreticalCycles_RESERVED_ON(wl);  // Updated theoretical model
         }
     }
 
@@ -418,35 +422,12 @@ protected:
                        : false;
     }
 
-    //// CMX CLocks
-    // float compute_DRAM_bandwith_cycPerB(const VPUDevice& device) const {
-    //     // DRAM bw is given in MBps
-    //     const float ddr_cycPerBytes{get_cmx_fclk(device) / get_dram_bandwidth_MBps(device)};
-    //     const float cmx_bounded_maxCyclesPerByte{1.0f / get_DMA_DDR_interface_bytes(device)};
-    //     return std::max(ddr_cycPerBytes, cmx_bounded_maxCyclesPerByte);  // take worst case
-    // }
-    //  cmx clock
     int compute_DRAM_bandwith_BytesPerCyc(const VPUDevice& device) const {
         // DRAM bw is given in MBps
         const int ddr_BytesPerCyc{static_cast<int>(std::floor(get_dram_bandwidth_MBps(device) / get_cmx_fclk(device)))};
         const int cmx_bounded_maxBytesPerCyc{get_DMA_DDR_interface_bytes(device)};
         return std::min(ddr_BytesPerCyc, cmx_bounded_maxBytesPerCyc);
     }
-
-    //// cmx clock
-    // float get_cycles_per_byte_read_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
-    //                                   bool half_duplex = false) const {
-    //     switch (location) {
-    //     case MemoryLocation::DRAM:
-    //         return compute_DRAM_bandwith_cycPerB(device);
-
-    //    case MemoryLocation::CMX:
-    //    case MemoryLocation::CSRAM:  //?
-    //    case MemoryLocation::UPA:    //?
-    //    default:
-    //        return (1.0F / (float)get_sram_word_size(tensor, false, false, half_duplex));
-    //    }
-    //}
 
     // cmx clock
     int get_bytes_per_cycle_read_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
@@ -495,23 +476,6 @@ protected:
         return nominal_bw;
     }
 
-    // float get_cycles_per_bytes_write_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
-    //                                     bool half_duplex = false) const {
-    //     switch (location) {
-    //     case MemoryLocation::DRAM:
-    //         // noy influenced by permuted!
-    //         // not influenced by compression!
-    //         return compute_DRAM_bandwith_cycPerB(device);
-
-    //    case MemoryLocation::CMX:
-    //    case MemoryLocation::CSRAM:  //?
-    //    case MemoryLocation::UPA:    //?
-    //    default:
-
-    //        // SRAM bw is twice in compression mode
-    //        return (1.0F / (float)get_sram_word_size(tensor, false, false, half_duplex));
-    //    }
-    //}
     int get_bytes_per_cycle_write_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
                                      bool half_duplex, bool permute, bool compression,
                                      float decompression_ratio /*= 1.0F*/,
