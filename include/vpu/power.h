@@ -110,7 +110,8 @@ private:
                              {7, 232.71f * getFP_overI8_maxPower_ratio()},
                      }},
             };
-            const device_lut_t this_device{VPUDevice::VPU_2_0, virus_logical_limit, vpu_values_int, vpu_values_fp16};
+            const device_lut_t this_device{VPUDevice::VPU_2_0, virus_logical_limit,  std::move(vpu_values_int),  std::move(vpu_values_fp16)};
+            /* coverity[copy_instead_of_move] */
             return this_device;
         }
     };  // PowerVPU2x
@@ -176,7 +177,8 @@ private:
                              {8, 5.0f * getFP_overI8_maxPower_ratio()},
                      }},
             };
-            const device_lut_t this_device{VPUDevice::VPU_2_7, virus_logical_limit, vpu_values_int, vpu_values_fp16};
+            const device_lut_t this_device{VPUDevice::VPU_2_7, virus_logical_limit,  std::move(vpu_values_int),  std::move(vpu_values_fp16)};
+            /* coverity[copy_instead_of_move] */
             return this_device;
         }
     };  // PowerVPU27
