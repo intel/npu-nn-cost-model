@@ -29,17 +29,18 @@
 #include "vpu/validation/layer_sanitizer.h"
 #include "vpu_cost_model.h"
 
-#include "vpu/vpu_tiling_strategy.h"
 #include "vpu_dma_cost_model.h"
 #include "vpu_dma_cost_model_variant.h"
 #include "vpu_layer_strategy.h"
+#include "vpu/vpu_tiling_strategy.h"
 
 #include "vpu/layer_split_info.h"
 
 namespace VPUNN {
 
 /// @brief The VPUNN layer cost model (also called VPUNN Level2 API)
-class VPUNN_API VPULayerCostModel {
+class VPUNN_API VPULayerCostModel
+{
 private:
     /// DPU cost provider, used for DPU workloads
     std::shared_ptr<VPUCostModel> ptr_internal_dpu_cost_provider;  //< shared ownership of L1 , either received from
@@ -222,20 +223,21 @@ public:
     }
 
     /// @brief Construct a new VPULayerCostModel object,  DPU L1 from outside, DMA from outside
+    ///
     explicit VPULayerCostModel(
             std::shared_ptr<VPUCostModel> dpu_cost_provider,  ///< shared pointer to a valid VPUCostModel
-            const DMACostModelVariant dma_cost_model          ///< dma from outside, as pointer in a variant, non owning
+            const DMACostModelVariant dma_cost_model          ///< dma from outside, as pointer, non owning
             )
-            : ptr_internal_dpu_cost_provider{std::move(dpu_cost_provider)},
-              the_dma_cost_model(std::move(dma_cost_model)) {
+            : ptr_internal_dpu_cost_provider{dpu_cost_provider}, the_dma_cost_model(dma_cost_model) {
         initialize_serializers();
     }
 
     /// @brief Construct a new VPULayerCostModel object,  DPU L1 from outside, DMA from inside, theoretical
+    ///
     explicit VPULayerCostModel(
             std::shared_ptr<VPUCostModel> dpu_cost_provider  ///< shared pointer to a valid VPUCostModel
             )
-            : ptr_internal_dpu_cost_provider{std::move(dpu_cost_provider)} {
+            : ptr_internal_dpu_cost_provider{dpu_cost_provider} {
         initialize_serializers();
     }
 
@@ -374,12 +376,12 @@ public:
      *
      * @return measured best cycles for the overall vector of layers or error code . \see Cycles for error codes
      */
-    CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
-                                       bool input_in_ddr, bool output_in_ddr, bool prefetching,
-                                       LayerSplitInfo& detailed_split,
-                                       const size_t fullLayerHash = 0,  // hash on layer only, computed by VPUX
-                                       const std::optional<VPUTilingStrategy> strategyOfSplit =
-                                               (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
+    CyclesInterfaceType LayersPreSplit(
+            const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU, bool input_in_ddr, bool output_in_ddr,
+            bool prefetching, LayerSplitInfo& detailed_split,
+            const size_t fullLayerHash = 0,  // hash on layer only, computed by VPUX
+            const std::optional<VPUTilingStrategy> strategyOfSplit =
+                    (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
     ) {
         //        VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
         return layer_pre_split_cycles(internal_dpu_cost_provider, layers_pre_split, nDPU, input_in_ddr, output_in_ddr,
@@ -388,7 +390,7 @@ public:
 
     /// version without detailed split output parameter and no hash or tiling strategy.
     CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
-                                       bool input_in_ddr, bool output_in_ddr, bool prefetching) {
+                                               bool input_in_ddr, bool output_in_ddr, bool prefetching) {
         //        VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
         return layer_pre_split_cycles(internal_dpu_cost_provider, layers_pre_split, nDPU, input_in_ddr, output_in_ddr,
                                       prefetching, nullptr);

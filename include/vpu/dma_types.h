@@ -311,27 +311,22 @@ struct DMANNWorkload_NPU40_RESERVED {
             {"num_dim", std::ref(num_dim)},
             {"num_engine", std::ref(num_engine)},
             {"direction", std::ref(transfer_direction)},
-
             {"src_stride_1", std::ref(e_dim[0].src_stride)},
             {"dst_stride_1", std::ref(e_dim[0].dst_stride)},
             {"src_dim_size_1", std::ref(e_dim[0].src_dim_size)},
             {"dst_dim_size_1", std::ref(e_dim[0].dst_dim_size)},
-
             {"src_stride_2", std::ref(e_dim[1].src_stride)},
             {"dst_stride_2", std::ref(e_dim[1].dst_stride)},
             {"src_dim_size_2", std::ref(e_dim[1].src_dim_size)},
             {"dst_dim_size_2", std::ref(e_dim[1].dst_dim_size)},
-
             {"src_stride_3", std::ref(e_dim[2].src_stride)},
             {"dst_stride_3", std::ref(e_dim[2].dst_stride)},
             {"src_dim_size_3", std::ref(e_dim[2].src_dim_size)},
             {"dst_dim_size_3", std::ref(e_dim[2].dst_dim_size)},
-
             {"src_stride_4", std::ref(e_dim[3].src_stride)},
             {"dst_stride_4", std::ref(e_dim[3].dst_stride)},
             {"src_dim_size_4", std::ref(e_dim[3].src_dim_size)},
             {"dst_dim_size_4", std::ref(e_dim[3].dst_dim_size)},
-
             {"src_stride_5", std::ref(e_dim[4].src_stride)},
             {"dst_stride_5", std::ref(e_dim[4].dst_stride)},
             {"src_dim_size_5", std::ref(e_dim[4].src_dim_size)},

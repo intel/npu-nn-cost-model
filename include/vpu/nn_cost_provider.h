@@ -95,7 +95,7 @@ public:
 
 protected:
     template <typename WlT>
-    float infer(const WlT& workload) const {
+    float infer(const WlT& workload) {
         auto& ctx = get_execution_context();
 
         float postProcessed_value{default_NN_output};
@@ -137,7 +137,7 @@ protected:
 
     /// returns a reference that is owned by the executor context, normally thread bounded
     template <typename WlT>
-    const std::vector<float>& infer(const std::vector<WlT>& workloads) const {
+    const std::vector<float>& infer(const std::vector<WlT>& workloads) {
         auto& ctx = get_execution_context();
 
         ctx.workloads_results_buffer.resize(workloads.size());
@@ -184,8 +184,6 @@ protected:
         return ctx.workloads_results_buffer;
     }
 
-    /// provides the context or creates a new one in case it does not exist yet
-    /// the context containers are (must be ) mutable
     NNExecutionContext& get_execution_context() const {
         const auto thread_id = std::this_thread::get_id();
 
@@ -217,7 +215,7 @@ protected:
 
 public:
     template <typename WlT>
-    CyclesInterfaceType get_cost(const WlT& workload) const {
+    CyclesInterfaceType get_cost(const WlT& workload) {
         if (!is_initialized()) {
             return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
         }
@@ -230,7 +228,7 @@ public:
         }
     }
 
-    std::vector<CyclesInterfaceType> get_cost(const std::vector<DPUWorkload>& workloads) const {
+    std::vector<CyclesInterfaceType> get_cost(const std::vector<DPUWorkload>& workloads) {
         const auto number_of_workloads{workloads.size()};  ///< fixed value remembered here, workloads is non const
         std::vector<CyclesInterfaceType> cycles_vector(number_of_workloads);
 
@@ -249,7 +247,7 @@ public:
     }
 
     /// @brief Only used as a WA to share fixed cache outside of nn_cost_provider - will be removed in future.
-    CyclesInterfaceType get_cached(const DPUWorkload& workload) const {
+    CyclesInterfaceType get_cached(const DPUWorkload& workload) {
         if (!is_initialized()) {
             return Cycles::ERROR_CACHE_MISS;
         }
@@ -268,8 +266,7 @@ public:
         }
     }
 
-    /// Is const because the cache is mutable.
-    void add_to_cache(const DPUWorkload& workload, const float value) const {
+    void add_to_cache(const DPUWorkload& workload, const float value) {
         if (!is_initialized()) {
             return;
         }
@@ -317,7 +314,7 @@ private:
     const Preprocessing<float>& preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
     const PostProcessSupport results_config;
     const IPostProcess& post_processing;
-    mutable LRUCache<std::vector<float>, float>
+    LRUCache<std::vector<float>, float>
             cache;  ///< cache for inferred values, used only for single workload, not for batches
     mutable CSVSerializer cache_miss_serializer;            ///< serializer for missed cache
     const std::string model_nickname{make_DPU_nickname()};  ///< nickname for the model, used for cache and serializer
@@ -382,7 +379,7 @@ private:
      *
      * @param v is the model version we took info about the full_raw_name in case we have an empty model
      */
-    void check_post_config(const ModelVersion& v) const {
+    void check_post_config(const ModelVersion& v) {
         const auto raw_name_intf = v.get_raw_name();
 
         // in case we have an empty ideal model the raw_name is defaulted to none and we should continue the run
@@ -407,7 +404,7 @@ private:
     /// This mechanism is unsafe at this moment and lets you change the preprocessing output to a bigger or smaller size
     /// The result may be impossibility to run (if smaller) or leaving empty zeros at the end (only partial fill)
     ///
-    void correlate_preprocessor_with_model_inputs() const {
+    void correlate_preprocessor_with_model_inputs() {
         auto& ctx = get_execution_context();
 
         const auto model_input_size = (ctx.runtime_buffer_data.input_shapes()[0])[1];

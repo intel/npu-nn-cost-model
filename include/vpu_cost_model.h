@@ -27,6 +27,7 @@
 
 #include "inference/post_process.h"
 #include "inference/postprocessing_factory.h"
+//#include "inference/preprocessing.h"
 #include "inference/preprop_factory.h"
 
 #include "core/utils.h"
@@ -56,10 +57,10 @@
 #include "http_client/http_cost_provider.h"
 #endif
 
-#include "vpu/energy_interface.h"
 #include "vpu/vpu_mutex.h"
 
 namespace VPUNN {
+
 using DCiM_Workload_Interface = DCIMWorkload;  ///< alias for DCIMWorkload
 // using DCiM_Workload_Alias = DPUWorkload;        ///< alias for DCIMWorkload
 
@@ -75,23 +76,22 @@ class VPUNN_API VPUCostModel :
         protected DCiMCostModelInterface<DCiM_Workload_Interface>  // for DCiM CM interface, implementation TBD
 {
 private:
+    const VPUPowerFactorLUT power_factor_lut;  /// < this is the lookup table for power factors.
+
     mutable CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
 
-    const IEnergy my_energy{*this};  ///< energy aspects, this is the current cost model
-
 protected:
-    const NNCostProvider dpu_nn_cost_provider;  ///< NN cost provider for DPU
+    NNCostProvider dpu_nn_cost_provider;  ///< NN cost provider for DPU
 #ifdef VPUNN_BUILD_HTTP_CLIENT
     std::unique_ptr<HttpDPUCostProvider> http_dpu_cost_provider;  ///< HTTP cost provider for DPU
 #endif
     const std::string default_host = "irlccggpu04.ir.intel.com";  ///< default host for HTTP cost provider
     const int default_port = 5000;                                ///< default port for HTTP cost provider
-    // should be const and init at ctor!
-    std::string profiling_backend{"silicon"};  ///< backend for profiling service [silicon, vpuem]
-    bool is_profiling_service_enabled{false};  ///< true if profiling service is enabled
+    std::string profiling_backend{"silicon"};                     ///< backend for profiling service [silicon, vpuem]
+    bool is_profiling_service_enabled{false};                     ///< true if profiling service is enabled
 
-    const DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
-    const ShaveConfiguration shave_gen_2;    ///< second generation of shaves
+    DPU_OperationSanitizer sanitizer;      ///< sanitizer mechanisms
+    const ShaveConfiguration shave_gen_2;  ///< second generation of shaves
 
 private:
     /**
@@ -155,14 +155,6 @@ private:
     }
 
 public:
-    /// returns a reference of energy object
-    /// owned by the current costmodel
-    /// the lifetime of this pointer is bound to the lifetime of costmodel object
-    /// if costmodel is destroyed or goes out of scope, the reference will also become invalid
-    const IEnergy& getEnergyInterface() const {
-        return my_energy;
-    }
-
     const IDeviceValidValues& getSanitizerDeviceConfiguration(VPUDevice device) const {
         return sanitizer.getDeviceConfiguration(device);  // just a forwarder
     }
@@ -187,8 +179,7 @@ public:
     void compressConv_replace_by_CM_CONV_VPU27(DPUWorkload& workload) const {
         if (workload.device >= VPUDevice::VPU_2_7) {
             if ((workload.op == Operation::CONVOLUTION) &&
-                ((workload.inputs[0].channels() >= 1) && (workload.inputs[0].channels() < 16) &&
-                 !workload.input_autopad)) {
+                ((workload.inputs[0].channels() >= 1) && (workload.inputs[0].channels() < 16) && !workload.input_autopad)) {
                 Logger::warning() << "Workload with CONVOLUTION compressed IC[1..15] transformed to CM_CONV ";
                 workload.op = Operation::CM_CONVOLUTION;
             }
@@ -215,7 +206,7 @@ public:
         return serializer;
     }
 
-    const NNCostProvider& get_NN_cost_provider() const noexcept {
+    NNCostProvider& get_NN_cost_provider() noexcept {
         return dpu_nn_cost_provider;
     }
 
@@ -261,7 +252,6 @@ public:
         serializer.initialize("l1_dpu_workloads", FileMode::READ_WRITE,
                               dpu_nn_cost_provider.get_names_for_serializer());
     }
-
     VPUCostModel(const VPUCostModel&) = delete;
     // VPUCostModel(VPUCostModel&&) = default; //explicitly defaulted move constructor is implicitly deleted
     virtual ~VPUCostModel() = default;
@@ -321,7 +311,7 @@ protected:
      * @param workload is the workload to be inferred
      * @return the runtime or error
      */
-    CyclesInterfaceType get_cost_dualsparsity(const DPUWorkload& workload) const {
+    CyclesInterfaceType get_cost_dualsparsity(const DPUWorkload& workload) {
         // run twice
         std::string info, cost_source;
         const auto wl_noAct{cloneDeactivateActSparsity(workload)};
@@ -357,7 +347,7 @@ protected:
      * @param workload is the workload to be inferred
      * @return the runtime or error
      */
-    CyclesInterfaceType get_cost(const DPUWorkload& workload, std::string& info, std::string& cost_source) const {
+    CyclesInterfaceType get_cost(const DPUWorkload& workload, std::string& info, std::string& cost_source) {
         // @todo : impact on energy?, CHeck if energy/DPUINfo/Theoretical cycles/ops considers this situation to reduce
         // energy
 
@@ -381,8 +371,7 @@ protected:
      * @param cost_source A string to store the source of the cost.
      * @return The number of cycles required for the workload.
      */
-    CyclesInterfaceType run_cost_providers(const DPUWorkload& workload, std::string& info,
-                                           std::string& cost_source) const {
+    CyclesInterfaceType run_cost_providers(const DPUWorkload& workload, std::string& info, std::string& cost_source) {
         auto cycles = Cycles::NO_ERROR;
         const auto is_inference_posible = dpu_nn_cost_provider.is_initialized();
 
@@ -444,7 +433,7 @@ protected:
      * @param wl is the workload
      * @return a clone of the original wl with deactivated sparsity
      */
-    DPUWorkload cloneDeactivateActSparsity(const DPUWorkload& wl) const {
+    DPUWorkload cloneDeactivateActSparsity(const DPUWorkload& wl) {
         DPUWorkload out{wl};
         out.act_sparsity = 0.0;
         out.inputs[0].set_sparsity(false);
@@ -457,7 +446,7 @@ protected:
      * @param wl is teh workload
      * @return a clone of the original wl with deactivated sparsity
      */
-    DPUWorkload cloneDeactivateWeightSParsity(const DPUWorkload& wl) const {
+    DPUWorkload cloneDeactivateWeightSParsity(const DPUWorkload& wl) {
         DPUWorkload out{wl};
         out.weight_sparsity = 0.0;
         out.weight_sparsity_enabled = false;
@@ -475,7 +464,7 @@ protected:
      * @throws runtime_error: when input sparsity and weight sparsity are active at the same time for at least one
      * workload (first workload)
      */
-    const std::vector<CyclesInterfaceType> get_cost(const std::vector<DPUWorkload>& workloads) const {
+    const std::vector<CyclesInterfaceType> get_cost(const std::vector<DPUWorkload>& workloads) {
         // here we check if at least one wl in vector workloads has act sparsity and weight sparsity active
         const bool exists_dual_spars{
                 std::any_of(workloads.cbegin(), workloads.cend(), VPUCostModel::is_dualsparsity_active)};
@@ -495,6 +484,7 @@ protected:
     }
 
 protected:
+
 public:
     /**
      * @brief Check if the internal VPUNN is initialized
@@ -549,7 +539,7 @@ public:
      *
      */
     /* coverity[pass_by_value] */
-    CyclesInterfaceType DPU(DPUWorkload wl) const {
+    CyclesInterfaceType DPU(DPUWorkload wl) {
         std::string dummy_info{};
         return DPU(std::move(wl), dummy_info);
     }
@@ -559,7 +549,7 @@ public:
     /// @param wl the workload to infer on
     /// @param li will collect error info regarding wl checking.
     /* coverity[pass_by_value] */
-    std::tuple<CyclesInterfaceType, std::string> DPUMsg(DPUWorkload wl) const {
+    std::tuple<CyclesInterfaceType, std::string> DPUMsg(DPUWorkload wl) {
         std::string dummy_info{};
         auto previous_print_mode{Checker::set_print_tags(false)};
         const auto r{DPU(wl, dummy_info)};
@@ -572,7 +562,7 @@ public:
     /// @param wl the workload to infer on
     /// @param info [out] will collect error info regarding wl checking.
     /* coverity[pass_by_value] */
-    CyclesInterfaceType DPU(DPUWorkload wl, std::string& info) const {
+    CyclesInterfaceType DPU(DPUWorkload wl, std::string& info) {
         return DPU_and_sanitize(wl, info);
     }
 
@@ -580,7 +570,7 @@ protected:
     /* @brief DPU + wl param is also output as sanitized one.
      *  Provides workload outside so we know on what(post sanitization) was done the inference
      */
-    CyclesInterfaceType DPU_and_sanitize(DPUWorkload& wl, std::string& info) const {
+    CyclesInterfaceType DPU_and_sanitize(DPUWorkload& wl, std::string& info) {
         swizzling_turn_OFF(wl);  // swizz guard sanitization
 
         if (serializer.is_serialization_enabled()) {  // has to be factored out
@@ -634,7 +624,8 @@ public:
      * @return std::vector<CyclesInterfaceType> the DPUWorklaods execution cycles, @sa DPU for single wl for more
      * explanations
      */
-    std::vector<CyclesInterfaceType> DPU(std::vector<DPUWorkload> workloads) const {
+    std::vector<CyclesInterfaceType> DPU(std::vector<DPUWorkload> workloads) {
+
         std::vector<DPUWorkload> serializer_orig_wls;  // should be const
         if (serializer.is_serialization_enabled()) {   // has to be factored out
             serializer_orig_wls = std::vector<DPUWorkload>(workloads.size());
@@ -705,6 +696,82 @@ public:
         return cycles_vector;
     }
 
+    /**
+     * @brief Compute DPUWorkload hw utilization based on ideal cycles considering also HW/sparsity.
+     * This is in the context of the operation's datatype. (do not compare float with int values)
+     * Represents the percentage [0,1+] of ideal resources(MAC based) used by this workload.
+     * 1 = 100% of MACs are used
+     * The value is calculated using the Estimated Runtime (cycles) by VPUNN.
+     * If VPUNN is missing the TheoreticalCycles are used
+     *
+     * @param workload a DPUWorkload
+     * @return  DPUWorkload hardware utilization (zero signals problems)
+     */
+    float hw_utilization(const DPUWorkload& wl) {
+        return power_mac_hw_utilization(wl);
+    }
+
+    /**
+     * @brief Compute DPUWorkload hw utilization based on ideal cycles considering also HW/sparsity.
+     * This is in the context of the operation's datatype. (do not compare float with int values)
+     * Represents the percentage [0,1+] of ideal resources(MAC based) used by this workload.
+     * 1 = 100% of MACs are used
+     * The value is calculated using the Estimated Runtime (cycles) by VPUNN.
+     * If VPUNN is missing the TheoreticalCycles are used
+     *
+     * @param workload a DPUWorkload
+     * @return  DPUWorkload hardware utilization (zero signals problems)
+     */
+    float power_mac_hw_utilization(const DPUWorkload& wl) {
+        return mac_hw_utilization(wl, &VPUCostModel::DPU_Power_IdealCycles);
+    }
+
+    /** @bief utilization without sparsity, can be larger than one, uses CostModel */
+    float efficiency_mac_hw_utilization(const DPUWorkload& wl) {
+        return mac_hw_utilization(wl, &VPUCostModel::DPU_Efficency_IdealCycles);
+    }
+
+protected:
+    static_assert(std::is_same<decltype(&VPUCostModel::DPU_Efficency_IdealCycles),
+                               decltype(&VPUCostModel::DPU_Power_IdealCycles)>::value,
+                  "must be same signature ");
+
+    /// uses CostModel
+    float mac_hw_utilization(const DPUWorkload& wl,
+                             decltype(&VPUCostModel::DPU_Efficency_IdealCycles) CalculateCycles) {
+        std::string dummy_info{};
+        DPUWorkload w{wl};
+        const auto nn_output_cycles = DPU_and_sanitize(w, dummy_info);  // might change W, considers sparsities
+        const auto ideal_cycles = (this->*CalculateCycles)(w);          //< this is independent of NN cycles
+
+        return relative_mac_hw_utilization(nn_output_cycles, ideal_cycles);
+    }
+
+    /**
+     * @brief Compute DPUWorkload hw utilization based on received ideal cycles.
+     * This is in the context of the operation's datatype. (do not compare float with int values)
+     * Represents the percentage [0,1+] of ideal resources(MAC based) used by this workload.
+     * 1 = 100% of MACs are used
+     * The value is calculated using the Estimated Runtime (cycles) by VPUNN.
+     * If VPUNN is missing the TheoreticalCycles are used
+     * Values larger than 1 can  be obtained if the ideal_cycles are larger than eNN estimated ones
+     * result = ideal_cycles/estimatedNNCycles
+     *
+     * @param workload a DPUWorkload
+     * @param ideal_cycles the reference ideal cycles against to compute the utilization
+     * @return  DPUWorkload hardware utilization (zero signals problems)
+     */
+    float relative_mac_hw_utilization(const CyclesInterfaceType real_cycles,
+                                      const unsigned long int ideal_cycles) const {
+        float utilization = 0.0F;  // zero signals problems
+        const auto& nn_output_cycles = real_cycles;
+        if ((!Cycles::isErrorCode(nn_output_cycles)) && nn_output_cycles != 0) {
+            utilization = (float)ideal_cycles / nn_output_cycles;  // NORMAL CASE,
+        }
+
+        return utilization;
+    }
+
 public:
     /**
      * @brief Return the number of cycles needed to compute a DMA transfer
@@ -719,8 +786,9 @@ public:
      * @deprecated Will be removed in future releases
      */
     unsigned int DMA(VPUDevice device, const VPUTensor& input, const VPUTensor& output,
-                     MemoryLocation input_location = MemoryLocation::DRAM,
-                     MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
+                             MemoryLocation input_location = MemoryLocation::DRAM,
+                             MemoryLocation output_location = MemoryLocation::CMX,
+                             unsigned int output_write_tiles = 1) const {
         // Call the helper function. TO DO Adjust theoretical based on some measured data!
         return DMATheoreticalCycles({device, input, output, input_location, output_location, output_write_tiles});
     }
@@ -778,6 +846,69 @@ public:
         return shave_gen_2.getShaveInstance(std::move(name), device);  // may throw
     }
 
+    /**
+     * @brief proxy for DPU_RelativeActivityFactor_hw
+     */
+    float DPUActivityFactor(const DPUWorkload& wl) {
+        return DPU_PowerActivityFactor(wl);
+    }
+
+    /**
+     * @brief Compute the activity factor of a DPUWorkload.
+     * @details Activity factor is an estimation of the dynamic power of the DPUWorkload
+     * relative to the worst case (reference dynamic power) DPUWorkload.
+     * Interval [0, 1 or more], where 1 means the power virus activity factor
+     * reference dynamic power is considered for INT8 operations
+     * It can be more than 1 in case the PowerViruschosen for reference is not the fact the highest (like if reference
+     * is power virus INT8,  the float operations can have the AF >1).
+     * Internally uses CostModel
+     *
+     * @param wl a DPUWorkload
+     * @return float the DPUWorkload activity factor relative to reference PowerVirus  (now is INT8)
+     */
+    float DPU_PowerActivityFactor(const DPUWorkload& wl) {
+        const float mac_utilization_rate = power_mac_hw_utilization(wl);  // if zero will propagate error
+
+        // if we have sparsity , the power per cycle might be higher (more hardware firing  for the same operation)?
+        // do we need a power correction here or only at energy computation.
+        // what happens when sparsity (w) is o n but we have dense values, no sparsity gain, but should be more energy
+        // spent also?
+
+        const float rough_powerVirus_relative_af = DPU_AgnosticActivityFactor(wl, mac_utilization_rate);
+
+        const float maximum_acepted_af{power_factor_lut.get_PowerVirus_exceed_factor(wl.device)};
+
+        const float restricted_powerVirus_relative_af = std::min(rough_powerVirus_relative_af, maximum_acepted_af);
+
+        return restricted_powerVirus_relative_af;
+    }
+
+    /// Internally uses CostModel
+    float DPU_EfficiencyActivityFactor(const DPUWorkload& wl) {
+        const float mac_utilization_rate = efficiency_mac_hw_utilization(wl);  // if zero will propagate error
+
+        const float powerVirus_relative_af = DPU_AgnosticActivityFactor(wl, mac_utilization_rate);
+        // no limitation  known to be applied
+        return powerVirus_relative_af;
+    }
+
+protected:
+    float DPU_AgnosticActivityFactor(const DPUWorkload& wl, const float reference_hw_util,
+                                     const float sparse_correction_factor_experimental = 1.0F) const {
+        const float power_factor_value = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+
+        return DPU_AgnosticActivityFactor_formula(power_factor_value, reference_hw_util,
+                                                  sparse_correction_factor_experimental);
+    }
+
+    float DPU_AgnosticActivityFactor_formula(const float power_factor_value, const float reference_hw_util,
+                                             const float sparse_correction_factor_experimental = 1.0F) const {
+        const float rough_powerVirus_relative_af{(reference_hw_util * power_factor_value) *
+                                                 sparse_correction_factor_experimental};
+
+        return rough_powerVirus_relative_af;
+    }
+
 public:
     /**
      * @brief Compute the energy of a DPUWorkload.
@@ -788,7 +919,32 @@ public:
      * @return float the DPUWorkload energy, measured  PowerVirus*cycle
      */
     float DPUEnergy(const DPUWorkload& wl) const {
-        return getEnergyInterface().DPUEnergy(wl);
+        // const float activity_factor_powerVirus = DPU_PowerActivityFactor(wl);
+        // const CyclesInterfaceType cycles{DPU(wl)};
+        // return calculateEnergyFromAFandTime(activity_factor_powerVirus, cycles);
+
+        // can be further reduced to power_ideal_cycles * power_factor_value  if no limitation desired
+        return calculateEnergyFromIdealCycles(wl, DPU_Power_IdealCycles(wl));
+    }
+
+protected:
+    /** @brief integrates activity factor over the cycles duration=> from power to energy
+     */
+    float calculateEnergyFromAFandTime(const float activity_factor_powerVirus,
+                                       const CyclesInterfaceType& cycles) const {
+        const float checked_cycles{Cycles::isErrorCode(cycles) ? 0.0F : (float)cycles};  // zero if error
+        const float energy = activity_factor_powerVirus * checked_cycles;
+        return energy;
+    }
+
+    float calculateEnergyFromIdealCycles(const DPUWorkload& wl, const unsigned long int reference_ideal_cycles) const {
+        const float power_factor_value = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+
+        // should we scale with sparse ON but dense?
+        // is there a limit, probably not as long as this is time independent
+
+        const float energy = reference_ideal_cycles * power_factor_value;
+        return energy;
     }
 
 public:
@@ -803,7 +959,11 @@ public:
      * \deprecated
      */
     float SHAVEEnergy(const SWOperation& swl) const {
-        return getEnergyInterface().SHAVEEnergy(swl);
+        constexpr float activity_factor{0.5f};      //<assume a constant activity factor of 0.5
+        const float max_power_ratio_to_DPU{0.05f};  //<assume a max power of 5% of the DPU max power.
+        const float energy = (activity_factor * max_power_ratio_to_DPU) * (float)SHAVE(swl);
+
+        return energy;
     }
 
     /** @brief Compute the energy of a SHAVE SHAVEWorkload.
@@ -815,7 +975,15 @@ public:
      * @return float the operation energy, in units relative to DPU PowerVirus. WIl return zero in case of error
      */
     float SHAVEEnergy(const SHAVEWorkload& swl) const {
-        return getEnergyInterface().SHAVEEnergy(swl);
+        constexpr float activity_factor{0.5f};      //<assume a constant activity factor of 0.5
+        const float max_power_ratio_to_DPU{0.05f};  //<assume a max power of 5% of the DPU max power.
+
+        std::string infoOut;
+        const auto shave_raw_time{SHAVE_2(swl, infoOut)};
+        const float shave_ftime{Cycles::isErrorCode(shave_raw_time) ? 0.0f : (float)(shave_raw_time)};
+        const float energy = (activity_factor * max_power_ratio_to_DPU) * shave_ftime;
+
+        return energy;
     }
 
     /// @brief same like  @see DPU(DPUWorkload wl) but return a Pack of information regarding the workload
@@ -825,14 +993,41 @@ public:
     /// This method has the potential to be more efficient that the collection of individual ones.
     /// @param wl the workload to infer on
     /// @returns a Structure with all info that L1 APi can provide about this Workload
-    DPUInfoPack DPUInfo(const DPUWorkload& workload) const {
+    DPUInfoPack DPUInfo(const DPUWorkload& workload) {
         DPUInfoPack allData;      // expect RVO when returning it!
         DPUWorkload w{workload};  // local clone
 
         allData.DPUCycles = DPU_and_sanitize(
                 w, allData.errInfo);  // do this first, might change w. It considers both sparsities if activated
 
-        getEnergyInterface().fillDPUInfo(allData, w);
+        {
+            allData.sparse_mac_operations = compute_HW_MAC_operations_cnt(w);
+            allData.power_ideal_cycles = DPU_Power_IdealCycles(w);
+            allData.power_mac_utilization = relative_mac_hw_utilization(allData.DPUCycles, allData.power_ideal_cycles);
+            // to be restricted
+            {
+                const float rough_powerVirus_relative_af =
+                        DPU_AgnosticActivityFactor(w, allData.power_mac_utilization);  // DPU_PowerActivityFactor(w);
+
+                const float nominal_allowed_Virus_exceed_factor{
+                        power_factor_lut.get_PowerVirus_exceed_factor(w.device)};
+                const float restricted_powerVirus_relative_af =
+                        std::min(rough_powerVirus_relative_af, nominal_allowed_Virus_exceed_factor);
+                allData.power_activity_factor = restricted_powerVirus_relative_af;
+            }
+
+            // allData.energy = calculateEnergyFromAFandTime(allData.power_activity_factor, allData.DPUCycles);
+            allData.energy = calculateEnergyFromIdealCycles(w, allData.power_ideal_cycles);
+        }
+
+        {
+            allData.dense_mac_operations = compute_Ideal_MAC_operations_cnt(w);
+            allData.efficiency_ideal_cycles = DPU_Efficency_IdealCycles(w);
+            allData.efficiency_mac_utilization =
+                    relative_mac_hw_utilization(allData.DPUCycles, allData.efficiency_ideal_cycles);
+            allData.efficiency_activity_factor = DPU_AgnosticActivityFactor(
+                    w, allData.efficiency_mac_utilization);  // DPU_EfficiencyActivityFactor(w);
+        }
 
         allData.hw_theoretical_cycles = DPUTheoreticalCycles(w);
 

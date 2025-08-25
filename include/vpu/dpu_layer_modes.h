@@ -28,7 +28,7 @@ private:
     /// @return std::vector<ExecutionMode>
     static std::vector<ExecutionMode> getValidExecutionMode_2_0(const DPULayer& wl) {
         // Float input or output -> ExecutionMode::VECTOR_FP16
-        if (wl.inputs[0].is_fp16family() || wl.outputs[0].is_fp16family())
+        if (wl.inputs[0].is_float() || wl.outputs[0].is_float())
             return {ExecutionMode::VECTOR_FP16};
         // Find the optimal Execution Mode given output tensor layout
         auto shape = wl.outputs[0].get_shape();

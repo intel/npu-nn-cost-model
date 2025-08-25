@@ -177,7 +177,7 @@ public:
         return DPU_MAC_based_cycles(wl, operations_cnt);
     }
 
-    // protected:
+protected:
     /**
      * @brief Compute the DPU ideal cycles
      * @details Calculates cycles that a single issue scalar CPU would require to execute
@@ -199,7 +199,7 @@ public:
         const unsigned int fp_to_int_resource_ratio{get_fp_ratio(wl.device)};  // more cycles for fp vs int
 
         const unsigned int nr_macs_adjusted_with_type{
-                native_comp_on_fp16(wl) ? ceil_division(nr_macs, fp_to_int_resource_ratio) : nr_macs};
+                native_comp_is_fp(wl) ? ceil_division(nr_macs, fp_to_int_resource_ratio) : nr_macs};
 
         // Compute the MACs needed to generate the output tensor
         const unsigned long int operations_cnt = MACs_to_compute;
@@ -337,8 +337,8 @@ public:
         // Ceil division cycles by DPU MACs
         cycles = ceil_division(cycles, (unsigned long int)nr_macs);
 
-        // Adjust cycles for ratio of FP16 to int(or fp) 8 bit compute
-        if (native_comp_on_fp16(wl)) {
+        // Adjust cycles for ratio of FP to int compute
+        if (native_comp_is_fp(wl)) {
             cycles *= fp_ratio;
         }
 
@@ -422,12 +422,15 @@ protected:
                        : false;
     }
 
+
     int compute_DRAM_bandwith_BytesPerCyc(const VPUDevice& device) const {
         // DRAM bw is given in MBps
         const int ddr_BytesPerCyc{static_cast<int>(std::floor(get_dram_bandwidth_MBps(device) / get_cmx_fclk(device)))};
         const int cmx_bounded_maxBytesPerCyc{get_DMA_DDR_interface_bytes(device)};
         return std::min(ddr_BytesPerCyc, cmx_bounded_maxBytesPerCyc);
     }
+
+
 
     // cmx clock
     int get_bytes_per_cycle_read_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
@@ -475,6 +478,7 @@ protected:
         // normal speed is the constant CMX bytes per cycle
         return nominal_bw;
     }
+
 
     int get_bytes_per_cycle_write_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
                                      bool half_duplex, bool permute, bool compression,

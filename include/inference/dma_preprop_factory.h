@@ -20,7 +20,13 @@
 
 #include "vpu/compatibility/dma_types_01x.h"  // detailed implementations  pp_v01
 
+
+// #include "preprocessing.h"
+
 namespace VPUNN {
+
+//    template <class DMADesc>
+// IPreprocessingDMA<float, DMADesc>& makeSupportedVersions();
 
 template <class DMADesc>
 class DMAVersionsMapTypes {
@@ -35,7 +41,6 @@ class DMAVersionsMap : DMAVersionsMapTypes<DMADesc> {};
 template <>
 class DMAVersionsMap<DMANNWorkload_NPU27> : DMAVersionsMapTypes<DMANNWorkload_NPU27> {
     Preprocessing_Interface01_DMA<float> pp_v01;
-
 public:
     /// @brief the map of versions mapped to preprocessing concrete objects
     const PreprocessingMap pp_map{
@@ -46,13 +51,10 @@ public:
 template <>
 class DMAVersionsMap<DMANNWorkload_NPU40_RESERVED> : DMAVersionsMapTypes<DMANNWorkload_NPU40_RESERVED> {
     Preprocessing_Interface02_DMA<float> pp_v02;
-    Preprocessing_Interface03_DMA<float> pp_v03;
-
 public:
     /// @brief the map of versions mapped to preprocessing concrete objects
     const PreprocessingMap pp_map{
             {pp_v02.getInterfaceVersion(), pp_v02},
-            {pp_v03.getInterfaceVersion(), pp_v03},
     };
 };
 

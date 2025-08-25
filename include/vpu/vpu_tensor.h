@@ -48,8 +48,11 @@ public:
      */
     explicit VPUTensor(const std::array<unsigned int, 4>& shape = {1, 1, 1, 1}, DataType dtype = DataType::UINT8,
                        Layout layout = Layout::ZXY /*ZMAJOR equivalent*/, bool sparsity = false)
-            : shape(shape), dtype(dtype), layout(layout), sparsity(sparsity) {
-                  // throw_if_invalid();
+            : shape(shape),
+              dtype(dtype),
+              layout(layout),
+              sparsity(sparsity){
+                      // throw_if_invalid();
               };
 
     /**
@@ -65,7 +68,7 @@ public:
      */
     explicit VPUTensor(unsigned int width, unsigned int height, unsigned int channels, unsigned int batch,
                        DataType dtype, Layout layout = Layout::ZXY /*ZMAJOR equivalent*/, bool sparsity = false)
-            : VPUTensor({width, height, channels, batch}, dtype, layout, sparsity) {};
+            : VPUTensor({width, height, channels, batch}, dtype, layout, sparsity){};
 
     /**
      * @brief Construct a new VPUTensor object based on a shape , and taken the rest of attributes from another tensor
@@ -74,7 +77,7 @@ public:
      * @param rest a reference to a tensor that provides all info besides shape
      */
     explicit VPUTensor(const std::array<unsigned int, 4>& shape_, const VPUTensor& rest)
-            : VPUTensor(shape_, rest.get_dtype(), rest.get_layout(), rest.get_sparsity()) {};
+            : VPUTensor(shape_, rest.get_dtype(), rest.get_layout(), rest.get_sparsity()){};
 
     /// @brief Get the x dimension
     unsigned int x() const noexcept {
@@ -124,56 +127,13 @@ public:
 
     /// @brief Check if the tensor is floating point
     /// @return true if floating point type
-    bool is_any_float() const noexcept {
+    bool is_float() const noexcept {
         switch (dtype) {
         case DataType::FLOAT32:
         case DataType::FLOAT16:
         case DataType::BFLOAT16:
         case DataType::BF8:
         case DataType::HF8:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    bool is_fp16family() const noexcept {
-        switch (dtype) {
-        case DataType::FLOAT32:
-        case DataType::FLOAT16:
-        case DataType::BFLOAT16:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    bool is_fp8family() const noexcept {
-        switch (dtype) {
-        case DataType::BF8:
-        case DataType::HF8:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    bool is_i8family() const noexcept {
-        switch (dtype) {
-        case DataType::UINT8:
-        case DataType::INT8:
-        case DataType::UINT4:
-        case DataType::INT4:
-        case DataType::UINT2:
-        case DataType::INT2:
-        case DataType::UINT1:
-        case DataType::INT1:
-
-        case DataType::INT32:
-
-        case DataType::UINT16:
-        case DataType::INT16:
-
             return true;
         default:
             return false;
@@ -182,8 +142,8 @@ public:
 
     /// @brief Check if the tensor is integer
     /// @return true if integer type
-    bool is_any_int() const noexcept {
-        return !is_any_float();
+    bool is_int() const noexcept {
+        return !is_float();
     }
 
     /// @brief Get the shape
@@ -279,8 +239,8 @@ private:
     /// overflowBits can not be greater than 8, as 8 bits equal one byte
     /// example: an INT8 occupies a whole byte, since overflowBits checks how many bits are occupied in the last byte, x
     /// will be 8, same if type is FLOAT16, it occupies 2 bytes in memory, meaning the last byte will also have all 8
-    /// bits occupied
-    /// @return true if overflowBits is in interval [1, 8] , false if not
+    /// bits occupied 
+    /// @return true if overflowBits is in interval [1, 8] , false if not 
     bool isOverflowBitsValid(const int overflowBits) const noexcept {
         if (overflowBits < 1 || overflowBits > 8)
             return false;
@@ -317,7 +277,7 @@ private:
         //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
         const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension_B - 1);
 
-        if (!isOverflowBitsValid(overflowBits))
+         if (!isOverflowBitsValid(overflowBits))
             return std::make_pair(-1, -1);
 
         // the number of elements that can be placed in memory one after the other without an element spanning more
@@ -491,9 +451,10 @@ private:
         // number of bits occupied in the last byte of the type dimension
         // example: if type_dim=1 and dtype=INT3 => there is 1 byte and only 3 bits occupied
         //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
-        const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension - 1);
+        const int overflowBits =
+                dtype_to_bits(dtype) - 8 * (type_dimension - 1);
 
-        if (!isOverflowBitsValid(overflowBits))
+         if (!isOverflowBitsValid(overflowBits))
             return false;
 
         // number of elements of that type that you can place in memory one after one without exceeding the allowed
@@ -534,9 +495,9 @@ private:
         // number of bits occupied in the last byte of the type dimension
         // example: if type_dim=1 and dtype=INT3 => there is 1 byte and only 3 bits occupied
         //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
-        const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension - 1);
+        const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension - 1); 
 
-        if (!isOverflowBitsValid(overflowBits))
+         if (!isOverflowBitsValid(overflowBits))
             return false;
 
         // number of elements of that type that you can place in memory one after one without exceeding the allowed

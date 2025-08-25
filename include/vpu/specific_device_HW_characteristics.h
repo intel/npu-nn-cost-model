@@ -20,17 +20,14 @@
 #include "device_HW_characteristics_VPU2_7.h"
 #include "device_HW_characteristics_VPU4.h"
 
-
 namespace VPUNN {
 constexpr auto characteristics = std::make_tuple(
         VPU2_0_HWCharacteristics{}, VPU2_1_HWCharacteristics{}, VPU2_7_HWCharacteristics{},
-        VPU2_7_HWCharacteristics_legacy{}, VPU4_0_HWCharacteristics{}, VPU4_0_HWCharacteristics_legacy{},
-        Default_HWCharacteristics{});
+        VPU2_7_HWCharacteristics_legacy{}, VPU4_0_HWCharacteristics{}, VPU4_0_HWCharacteristics_legacy{}, Default_HWCharacteristics{});
 
 using Characteristics =
         std::variant<VPU2_0_HWCharacteristics, VPU2_1_HWCharacteristics, VPU2_7_HWCharacteristics,
-                     VPU2_7_HWCharacteristics_legacy, VPU4_0_HWCharacteristics, VPU4_0_HWCharacteristics_legacy,
-                      Default_HWCharacteristics>;
+                     VPU2_7_HWCharacteristics_legacy, VPU4_0_HWCharacteristics, VPU4_0_HWCharacteristics_legacy, Default_HWCharacteristics>;
 
 /// get specific HW characteristics
 constexpr Characteristics get_HWCharacteristics(VPUDevice device) {

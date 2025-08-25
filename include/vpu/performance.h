@@ -322,37 +322,13 @@ inline constexpr unsigned int get_nr_ppe(VPUDevice device) {
  * @param DPUWorkload a DPUWorkload
  * @return bool
  */
-inline bool native_comp_is_any_fp(const DPUWorkload& wl) {
+inline bool native_comp_is_fp(const DPUWorkload& wl) {
     // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
     bool found_at_least_one_float = false;
     for (const auto& i : wl.inputs) {
-        found_at_least_one_float = found_at_least_one_float || i.is_any_float();
+        found_at_least_one_float = found_at_least_one_float || i.is_float();
     }
     return found_at_least_one_float;
-}
-
-inline bool native_comp_on_fp16(const DPUWorkload& wl) {
-    // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
-    static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
-
-    return wl.inputs[0].is_fp16family();
-}
-
-inline bool native_comp_on_fp8(const DPUWorkload& wl) {
-    // to do : look at weights also?
-    static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
-    // to do  redesign xx family methods to be based on Datatype operations
-    const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
-    return wl.inputs[0].is_fp8family() && (!wts.is_fp16family());
-}
-
-inline bool native_comp_on_i8(const DPUWorkload& wl) {
-    static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
-
-    // to do  redesign xx family methods to be based on Datatype operations
-    const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
-
-    return wl.inputs[0].is_i8family() && (!wts.is_any_float());
 }
 
 /**

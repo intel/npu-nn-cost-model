@@ -42,7 +42,7 @@ if os.path.isdir(build_dir):
 setup(
     name="vpunn_cost_model",
     version=get_version(),
-    author="",
+    author="Alessandro Palla",
     author_email="",
     description="VPUNN cost model",
     license="Apache License 2.0",

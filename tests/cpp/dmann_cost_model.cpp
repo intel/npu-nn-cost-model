@@ -351,28 +351,6 @@ TEST_F(TestDMANNCostModel, Mock_40_vs_VPU27_DPU) {
                 << wl_glob_40M << Cycles::toErrorText(cycles_40);  // theoretical, but at 1700MHz
     }
 }
-// this test is for post process for DMA interface 02
-TEST_F(TestDMANNCostModel, DMA_PostProcessing_Test) {
-    DMANNWorkload_NPU40 wl{
-            VPUNN::VPUDevice::VPU_4_0,  // VPUDevice device;  ///< NPU device
-            65535,                      // int src_width;
-            65535,                      // int dst_width;
-            0,                          // int num_dim;
-            {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
-            Num_DMA_Engine::Num_Engine_1,
-            MemoryDirection::CMX2CMX  // MemoryDirection transfer_direction;
-    };
-
-    ConvertFromDirectCycleToDPUCyc<DMANNWorkload_NPU40> pp_DirectCycToDPUCyc_converter;
-
-    std::string info{};
-    float nn_output = 222.9F;
-    CyclesInterfaceType cyc_direct = pp_DirectCycToDPUCyc_converter.process(nn_output, wl, info);
-
-    EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cyc_direct)) << "CASE ConvertFromDirectCycleToDPUCyc " << cyc_direct;
-    EXPECT_FALSE(pp_DirectCycToDPUCyc_converter.is_NN_value_invalid(nn_output))
-            << "CASE ConvertFromDirectCycleToDPUCyc ";
-}
 
 TEST_F(TestDMANNCostModel, DISABLED_SweepDMATime_27) {
     const std::vector<int> dmaTxSize{1024,   2048,   4096,   8192,   12288,  16384,  20480,  24576,  28672,  32768,
@@ -1462,7 +1440,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_regresion_NPU27) {
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
 
-    for (const auto& t : tc) {
+    for (const auto &t : tc) {
         check(t);
     }
 }
@@ -1519,7 +1497,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_regresion_NPU40) {
         }
     };
 
-    for (const auto& t : tc) {
+    for (const auto &t : tc) {
         check(t);
     }
 }

@@ -39,7 +39,7 @@ static ExecutionMode aux_select_optimal_execution(VPUCostModel& model, const DPU
     return available_modes[min_index];
 }
 
-ExecutionMode select_optimal_grid_VPU2x(VPUCostModel& model, const DPULayer& layer,
+ExecutionMode select_optimal_grid(VPUCostModel& model, const DPULayer& layer,
                                   const std::vector<ExecutionMode>& available_modes = {ExecutionMode::VECTOR,
                                                                                        ExecutionMode::MATRIX}) {
     if (layer.device != VPUDevice::VPU_2_0 && layer.device != VPUDevice::VPU_2_1) {
@@ -47,7 +47,7 @@ ExecutionMode select_optimal_grid_VPU2x(VPUCostModel& model, const DPULayer& lay
     }
 
     // If the input tensor is float, then the optimal mode is VECTOR_FP16
-    if (layer.inputs[0].is_fp16family()) {
+    if (layer.inputs[0].is_float()) {
         return ExecutionMode::VECTOR_FP16;
     }
 
@@ -72,7 +72,7 @@ ExecutionMode select_optimal_execution_mode(VPUCostModel& model, const DPULayer&
     switch (layer.device) {
     case VPUDevice::VPU_2_0:
     case VPUDevice::VPU_2_1:
-        return select_optimal_grid_VPU2x(model, layer);
+        return select_optimal_grid(model, layer);
     case VPUDevice::VPU_2_7:
     case VPUDevice::VPU_4_0:
     case VPUDevice::NPU_RESERVED:

@@ -749,7 +749,7 @@ public:
         switch (device) {
         case VPUDevice::VPU_2_0:
         case VPUDevice::VPU_2_1:
-            this->execution_order = inputs[0].is_any_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
+            this->execution_order = inputs[0].is_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
             break;
         case VPUDevice::VPU_2_7:
         case VPUDevice::VPU_4_0:
@@ -769,7 +769,7 @@ public:
         switch (device) {
         case VPUDevice::VPU_2_0:
         case VPUDevice::VPU_2_1:
-            this->execution_order = inputs[0].is_any_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
+            this->execution_order = inputs[0].is_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
             break;
         case VPUDevice::VPU_2_7:
         case VPUDevice::VPU_4_0:

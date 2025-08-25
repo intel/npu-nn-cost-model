@@ -883,8 +883,7 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
             if (t.t_exp.cyc_err == Cycles::NO_ERROR) {
                 EXPECT_TRUE(!Cycles::isErrorCode(cyc));
             } else {
-                EXPECT_EQ(cyc, t.t_exp.cyc_err) << "Actual: " << Cycles::toErrorText(cyc)
-                                                << " Expected: " << Cycles::toErrorText(t.t_exp.cyc_err);
+                EXPECT_EQ(cyc, t.t_exp.cyc_err) << "Actual: " << Cycles::toErrorText(cyc) << " Expected: " << Cycles::toErrorText(t.t_exp.cyc_err);
             }
 
             i++;
@@ -893,27 +892,18 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
 
     /// for VPUDevice::VPU2_0, VPUDevice::VPU2_7, VPUDevice::VPU4_0 we accept any value for batch (ex: 1, 2, 3, ...)
     /// but for VPUDevice::NPU_RESERVED batch is restricted to 1
-    const TestsVector tests = {{{mkWl(VPUDevice::VPU_2_0, 0U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "VPU2_0, B=0"},
-                               {{mkWl(VPUDevice::VPU_2_0, 1U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
-                                {Cycles::NO_ERROR},
-                                "VPU2_0, B=1"},
-                               {{mkWl(VPUDevice::VPU_2_0, 2U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
-                                {Cycles::NO_ERROR},
-                                "VPU2_0, B=2"},
+    const TestsVector tests = {
+            {{mkWl(VPUDevice::VPU_2_0, 0U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH}, {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}, "VPU2_0, B=0"},
+            {{mkWl(VPUDevice::VPU_2_0, 1U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_0, B=1"},
+            {{mkWl(VPUDevice::VPU_2_0, 2U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_0, B=2"},
 
-                               {{mkWl(VPUDevice::VPU_2_7, 0U), VPU_2_7_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "VPU2_7, B=0"},
-                               {{mkWl(VPUDevice::VPU_2_7, 1U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=1"},
-                               {{mkWl(VPUDevice::VPU_2_7, 2U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=2"},
+            {{mkWl(VPUDevice::VPU_2_7, 0U), VPU_2_7_MODEL_PATH}, {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}, "VPU2_7, B=0"},
+            {{mkWl(VPUDevice::VPU_2_7, 1U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=1"},
+            {{mkWl(VPUDevice::VPU_2_7, 2U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=2"},
 
-                               {{mkWl(VPUDevice::VPU_4_0, 0U), VPU_4_0_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "VPU4_0, B=0"},
-                               {{mkWl(VPUDevice::VPU_4_0, 1U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=1"},
-                               {{mkWl(VPUDevice::VPU_4_0, 2U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=2"},
+            {{mkWl(VPUDevice::VPU_4_0, 0U), VPU_4_0_MODEL_PATH}, {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}, "VPU4_0, B=0"},
+            {{mkWl(VPUDevice::VPU_4_0, 1U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=1"},
+            {{mkWl(VPUDevice::VPU_4_0, 2U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=2"},
     };
 
     verify_cyc(tests);
@@ -1419,12 +1409,11 @@ TEST_F(TestCostModel, ComaparativeRuns) {
 
     auto modelRun = [](const std::string& model_path, VPUNN::DPUWorkload& wld) {
         VPUNN::VPUCostModel vpunn_model(model_path);
-        const IEnergy& my_energy = vpunn_model.getEnergyInterface();
         std::cout << model_path << " : initialized: " << vpunn_model.nn_initialized() << std::endl;
 
         // std::cout << "run_NN(wl)   : " << vpunn_model.run_NN(wld) << std::endl;
         std::cout << "DPU(wl)   : " << vpunn_model.DPU(wld) << std::endl;
-        std::cout << "hw_utilization(wl)   : " << my_energy.hw_utilization(wld) << std::endl;
+        std::cout << "hw_utilization(wl)   : " << vpunn_model.hw_utilization(wld) << std::endl;
     };
 
     std::cout << "----------------------------------------------------------\n";
@@ -1580,7 +1569,8 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
         EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
     }
 
-}
+
+    }
 TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 20
         const DPUWorkload wl_device{wl_glob_20};
