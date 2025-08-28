@@ -70,10 +70,6 @@ find_package(Threads REQUIRED)
 
 include_directories(${EXTERNAL_INSTALL_LOCATION}/include ${CMAKE_VPUNN_BINARY_DIR}/include)
 
-add_compile_definitions(INTEL_EMBARGO_NPU5) # INTEL_EMBARGO_NPU5_Content
-add_compile_definitions(INTEL_EMBARGO_NPU6) # INTEL_EMBARGO_NPU6_Content
-add_compile_definitions(INTEL_EMBARGO_COMMON) # INTEL_EMBARGO_COMMON_Content
-
 if(NOT CMAKE_BUILD_TYPE)
     message(AUTHOR_WARNING "-- Defaulting build type to Release because CMAKE_BUILD_TYPE is not set")
     set(CMAKE_BUILD_TYPE Release)
