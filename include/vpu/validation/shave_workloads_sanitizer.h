@@ -23,16 +23,16 @@ public:
     void check_and_sanitize(const SHAVEWorkload& swl, SanityReport& result) const {
         result.resetOK();
 
-        // Check the datatype of the input and output tensors
-        {
-            const auto intype_0{swl.get_inputs()[0].get_dtype()};
-            const auto outtype_0{swl.get_outputs()[0].get_dtype()};
-            if (intype_0 != DataType::FLOAT16 || outtype_0 != DataType::FLOAT16) {
-                result.info = "SHAVE workload input/output tensor datatype can only be FLOAT16 for profiled regressions";
-                result.mark_invalid_SHAVE_workload();
-                return;
-            }
-        };
+        // Check the datatype of the input and output tensors - Disable datatype check for SHAVE workloads
+        // {
+        //     const auto intype_0{swl.get_inputs()[0].get_dtype()};
+        //     const auto outtype_0{swl.get_outputs()[0].get_dtype()};
+        //     if (intype_0 != DataType::FLOAT16 || outtype_0 != DataType::FLOAT16) {
+        //         result.info = "SHAVE workload input/output tensor datatype can only be FLOAT16 for profiled regressions";
+        //         result.mark_invalid_SHAVE_workload();
+        //         return;
+        //     }
+        // };
         // Check if it fits in CMX
         const auto& config = get_config(swl.get_device());
         const auto cmx_memory = memory_calculator.compute_memory(swl);

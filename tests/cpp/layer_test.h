@@ -217,8 +217,8 @@ protected:
         );
     }
 
-    VPUNN::SHVSigmoid generate_helper_sw_layer(const unsigned int dim, const unsigned int channels) {
-        return VPUNN::SHVSigmoid(VPUNN::VPUDevice::VPU_2_0,                                          // VPU device
+    VPUNN::SHVSigmoid generate_helper_sw_layer(const VPUNN::VPUDevice device, const unsigned int dim, const unsigned int channels) {
+        return VPUNN::SHVSigmoid(device,                                                             // VPU device
                                  VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16),  // Input tensor
                                  VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)   // Output tensor
         );
@@ -228,6 +228,16 @@ protected:
                                                         const unsigned int channels) {
         return VPUNN::SHAVEWorkload(
                 "sigmoid",                                                            // name
+                device,                                                               // VPU device
+                {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)},  // Input tensor
+                {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)}   // Output tensor
+        );
+    }
+
+    VPUNN::SHAVEWorkload generate_helper_old_shave_wl_layer(const VPUNN::VPUDevice device, const unsigned int dim,
+                                                            const unsigned int channels) {
+        return VPUNN::SHAVEWorkload(
+                "Sigmoid",                                                            // name
                 device,                                                               // VPU device
                 {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)},  // Input tensor
                 {VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)}   // Output tensor

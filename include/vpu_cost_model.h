@@ -52,6 +52,12 @@
 
 #include "vpu/nn_cost_provider.h"
 
+#include "vpu/dma_theoretical_cost_provider.h"
+#include "vpu/dpu_theoretical_cost_provider.h"
+#include "vpu/shave_theoretical_cost_provider.h"
+
+#include "vpu/serialization/l1_cost_serialization_wrapper.h"
+
 #ifdef VPUNN_BUILD_HTTP_CLIENT
 #include "http_client/http_cost_provider.h"
 #endif
@@ -70,17 +76,29 @@ using DCiM_Workload_Interface = DCIMWorkload;  ///< alias for DCIMWorkload
  * ALso behind it need to have a dCIm model for the ops that support dCIM
  *
  */
+/* coverity[rule_of_three_violation:FALSE] */
 class VPUNN_API VPUCostModel :
-        public VPUNNPerformanceModel,
         protected DCiMCostModelInterface<DCiM_Workload_Interface>  // for DCiM CM interface, implementation TBD
 {
 private:
     mutable CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
 
-    const IEnergy my_energy{*this};  ///< energy aspects, this is the current cost model
+    const HWPerformanceModel performance{};       // performance instance, not used here
+    const IEnergy my_energy{*this, performance};  ///< energy aspects, not used here but instantiated
 
 protected:
-    const NNCostProvider dpu_nn_cost_provider;  ///< NN cost provider for DPU
+    // DPU cost providers
+    const NNCostProvider dpu_nn_cost_provider;                      ///< NN cost provider for DPU
+    const DPUTheoreticalCostProvider dpu_theoretical{performance};  ///< theoretical cost provider for DPU
+
+    // DMA cost providers
+    // No NN or measured DMA cost provider available
+    const DMATheoreticalCostProvider dma_theoretical{};  ///< theoretical cost provider for DMA
+
+    // SHAVE cost providers
+    // No NN or measured SHAVE cost provider available
+    const ShaveTheoreticalCostProvider shave_theoretical{};  ///< theoretical cost provider for SHAVE
+
 #ifdef VPUNN_BUILD_HTTP_CLIENT
     std::unique_ptr<HttpDPUCostProvider> http_dpu_cost_provider;  ///< HTTP cost provider for DPU
 #endif
@@ -163,6 +181,12 @@ public:
         return my_energy;
     }
 
+    // choose a better name
+    /// returns a reference of performance object
+    const HWPerformanceModel& getPerformanceModel() const {
+        return performance;
+    }
+
     const IDeviceValidValues& getSanitizerDeviceConfiguration(VPUDevice device) const {
         return sanitizer.getDeviceConfiguration(device);  // just a forwarder
     }
@@ -228,8 +252,8 @@ public:
      *
      */
     explicit VPUCostModel(const std::string& filename, const std::string& dpu_cache_filename,
-                          const std::string& shave_cache_filename, bool tryToLoadPairedCache = false)
-            : VPUCostModel(filename, false, 16384, 1, dpu_cache_filename, shave_cache_filename, tryToLoadPairedCache) {
+                          const std::string& shave_cache_filename, bool use_shave_2_api = false, bool tryToLoadPairedCache = false)
+            : VPUCostModel(filename, false, 16384, 1, dpu_cache_filename, shave_cache_filename, use_shave_2_api, tryToLoadPairedCache) {
         /* coverity[uninit_member] */
     }
 
@@ -248,10 +272,10 @@ public:
      */
     explicit VPUCostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
                           const unsigned int batch_size = 1, const std::string& dpu_cache_filename = "",
-                          const std::string& shave_cache_filename = "", bool tryToLoadPairedCache = false)
+                          const std::string& shave_cache_filename = "", bool use_shave_2_api = false, bool tryToLoadPairedCache = false)
             : dpu_nn_cost_provider(sanitizer, filename, batch_size, profile, cache_size, dpu_cache_filename,
                                    tryToLoadPairedCache),
-              shave_gen_2(cache_size, shave_cache_filename) {
+              shave_gen_2(cache_size, shave_cache_filename, use_shave_2_api) {
         Logger::initialize();
 
         if (!dpu_nn_cost_provider.is_initialized()) {
@@ -279,10 +303,10 @@ public:
     explicit VPUCostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
                           const char* dpu_cache_data = nullptr, size_t dpu_cache_data_length = 0,
-                          const char* shave_cache_data = nullptr, size_t shave_cache_data_length = 0)
+                          const char* shave_cache_data = nullptr, size_t shave_cache_data_length = 0, bool use_shave_2_api = false)
             : dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, sanitizer, profile,
                                    cache_size, dpu_cache_data, dpu_cache_data_length),
-              shave_gen_2(cache_size, shave_cache_data, shave_cache_data_length) {
+              shave_gen_2(cache_size, shave_cache_data, shave_cache_data_length, use_shave_2_api) {
         Logger::initialize();
 
         if (!dpu_nn_cost_provider.is_initialized()) {
@@ -323,12 +347,12 @@ protected:
      */
     CyclesInterfaceType get_cost_dualsparsity(const DPUWorkload& workload) const {
         // run twice
-        std::string info, cost_source;
+        std::string info;
         const auto wl_noAct{cloneDeactivateActSparsity(workload)};
-        const CyclesInterfaceType act_off = run_cost_providers(wl_noAct, info, cost_source);
+        const CyclesInterfaceType act_off = run_cost_providers(wl_noAct, info);
 
         const auto wl_noWt{cloneDeactivateWeightSParsity(workload)};
-        const CyclesInterfaceType wt_off = run_cost_providers(wl_noWt, info, cost_source);
+        const CyclesInterfaceType wt_off = run_cost_providers(wl_noWt, info);
 
         // case when act_off is invalid, also this catch the case when both of values are invalid
         //   does not count which of them we return if both are invalid
@@ -357,7 +381,7 @@ protected:
      * @param workload is the workload to be inferred
      * @return the runtime or error
      */
-    CyclesInterfaceType get_cost(const DPUWorkload& workload, std::string& info, std::string& cost_source) const {
+    CyclesInterfaceType get_cost(const DPUWorkload& workload, std::string& info, std::string* cost_source = nullptr) const {
         // @todo : impact on energy?, CHeck if energy/DPUINfo/Theoretical cycles/ops considers this situation to reduce
         // energy
 
@@ -382,20 +406,19 @@ protected:
      * @return The number of cycles required for the workload.
      */
     CyclesInterfaceType run_cost_providers(const DPUWorkload& workload, std::string& info,
-                                           std::string& cost_source) const {
+                                           std::string* cost_source = nullptr) const {
         auto cycles = Cycles::NO_ERROR;
         const auto is_inference_posible = dpu_nn_cost_provider.is_initialized();
 
         // First look into dpu_nn_cost_provider cache.
         // This has to be redesigned for the fixed cache to be a standalone cost provider.
-        const auto cached_cost{dpu_nn_cost_provider.get_cached(workload)};
+        const auto cached_cost{dpu_nn_cost_provider.get_cached(workload, cost_source)};
         if (!Cycles::isErrorCode(cached_cost)) {
-            cost_source = "cache";
             cycles = cached_cost;
         } else {
             if (is_profiling_service_enabled) {
                 auto dpu_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
-                cost_source = "profiling_service_" + profiling_backend;
+                if (cost_source) *cost_source = "profiling_service_" + profiling_backend;
 #ifdef VPUNN_BUILD_HTTP_CLIENT
                 cycles = http_dpu_cost_provider->getCost(dpu_op, info, profiling_backend);
 #else
@@ -409,11 +432,11 @@ protected:
                 // if the profiling service is not available, we will use the NN cost provider
                 // if the NN is not available, we will use the theoretical cycles
                 if (is_inference_posible) {
-                    cost_source = "nn_" + dpu_nn_cost_provider.get_DPU_nickname();
+                    if (cost_source) *cost_source = "nn_" + dpu_nn_cost_provider.get_DPU_nickname();
                     cycles = dpu_nn_cost_provider.get_cost(workload);
                 } else {
-                    cost_source = "theoretical";
-                    cycles = DPUTheoreticalCycles(workload);
+                    if (cost_source) *cost_source = "theoretical";
+                    cycles = dpu_theoretical.DPUTheoreticalCycles(workload);
                 }
             }
 
@@ -485,7 +508,7 @@ protected:
             cycles_vector.reserve(workloads.size());
             std::transform(workloads.cbegin(), workloads.cend(), cycles_vector.begin(), [this](const DPUWorkload& wl) {
                 std::string info, source;
-                return get_cost(wl, info, source);
+                return get_cost(wl, info, &source);
             });
 
             return cycles_vector;
@@ -583,17 +606,10 @@ protected:
     CyclesInterfaceType DPU_and_sanitize(DPUWorkload& wl, std::string& info) const {
         swizzling_turn_OFF(wl);  // swizz guard sanitization
 
-        if (serializer.is_serialization_enabled()) {  // has to be factored out
-            try {
-                auto wl_op = DPUOperation(wl, sanitizer.getDeviceConfiguration(wl.device));
-                const size_t wl_uid = wl_op.hash();
-                serializer.serialize(wl_op, SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)},
-                                     SerializableField<std::string>{"info", wl.get_layer_info()});
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
-        }
+        L1CostSerializationWrap serialization_handler(serializer, sanitizer);
+
+        serialization_handler.serializeInfoAndComputeWorkloadUid(wl);  
+      
 
         // sanitize and check the input.
         SanityReport problems{};
@@ -604,24 +620,10 @@ protected:
         CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
 
         if (is_inference_relevant) {
-            cycles = get_cost(wl, info, cost_source);
+            cycles = get_cost(wl, info, &cost_source);
         }
 
-        if (serializer.is_serialization_enabled()) {  // has to be factored out
-            try {
-                if (!serializer.is_write_buffer_clean()) {
-                    serializer.serialize(SerializableField<decltype(cycles)>{"vpunn_cycles", cycles});
-                    serializer.serialize(SerializableField<std::string>{"cost_source", cost_source});
-                    auto trimmed_info = trim_csv_str(info);
-                    serializer.serialize(SerializableField<std::string>{"error_info", trimmed_info});
-                    serializer.end();
-                }
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
-            serializer.clean_buffers();
-        }
+       serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(cost_source), info);
 
         return cycles;
     }
@@ -668,7 +670,7 @@ public:
             auto& wl{workloads[idx]};
             const SanityReport& problems{sanitization_results[idx].problems};
             const auto is_inference_relevant{sanitization_results[idx].inference_relevance};
-            const auto theoretical_cycles = DPUTheoreticalCycles(wl);
+            const auto theoretical_cycles = dpu_theoretical.DPUTheoreticalCycles(wl);
 
             CyclesInterfaceType cycles{problems.value()};  // neutral value or sanitization error
             if (is_inference_relevant) {
@@ -683,24 +685,9 @@ public:
             cycles_vector[idx] = cycles;
         }
 
-        if (serializer.is_serialization_enabled()) {  // has to be factored out
-            for (unsigned int idx = 0; idx < serializer_orig_wls.size(); ++idx) {
-                try {
-                    swizzling_turn_OFF(serializer_orig_wls[idx]);  // swizz guard sanitization
-                    auto wl_op = DPUOperation(serializer_orig_wls[idx],
-                                              sanitizer.getDeviceConfiguration(serializer_orig_wls[idx].device));
-                    const size_t wl_uid = wl_op.hash();
-                    serializer.serialize(wl_op, SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)});
-
-                    serializer.serialize(SerializableField<decltype(cycles_vector[idx])>{
-                            dpu_nn_cost_provider.get_DPU_nickname(), cycles_vector[idx]});
-                    serializer.end();
-                } catch (const std::exception& e) {
-                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                    serializer.clean_buffers();
-                }
-            }
-        }
+        const std::string dpu_nickname{get_NN_cost_provider().get_DPU_nickname()};
+        L1CostSerializationWrap serialization_handler(serializer, sanitizer);
+        serialization_handler.serializeCyclesAndComputeWorkloadUid_closeLine(std::move(serializer_orig_wls), cycles_vector, dpu_nickname);
 
         return cycles_vector;
     }
@@ -722,7 +709,8 @@ public:
                      MemoryLocation input_location = MemoryLocation::DRAM,
                      MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
         // Call the helper function. TO DO Adjust theoretical based on some measured data!
-        return DMATheoreticalCycles({device, input, output, input_location, output_location, output_write_tiles});
+        return dma_theoretical.DMATheoreticalCycles(
+                {device, input, output, input_location, output_location, output_write_tiles});
     }
 
     /**
@@ -742,9 +730,10 @@ public:
      * @param swl a Shave Kernel
      * @return unsigned int the number of cycles of the Shave kernel
      * \deprecated
-     */
+    **/
+   
     unsigned int SHAVE(const SWOperation& swl) const {
-        return SHAVETheoreticalCycles(swl);
+        return shave_theoretical.SHAVETheoreticalCycles(swl);
     }
 
     /**
@@ -755,9 +744,27 @@ public:
      * @param infoOut  a string that will contain informative error information (in case of error)
      * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
      */
-    CyclesInterfaceType SHAVE_2(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
+    CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
         return shave_gen_2.computeCycles(shave_wl, infoOut);
     }
+
+    CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl) const {
+        std::string infoOut;
+        return shave_gen_2.computeCycles(shave_wl, infoOut);
+    }
+
+    /**
+     * @brief Return the number of cycles needed to compute a Shave kernel without posibility of skipping Cache
+     *
+     * @param shave_wl a Shave workload contains: name of kernel, device, in out tensor. PLus optional parameters of the
+     * operations
+     * @param infoOut  a string that will contain informative error information (in case of error)
+     * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
+     */
+    CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut, bool skipCacheValues) const {
+        return shave_gen_2.computeCycles(shave_wl, infoOut, skipCacheValues);
+    }
+
 
     /// gets the list of names of supported operators on a specified device. Each device has own operators
     ///
@@ -776,6 +783,14 @@ public:
     /// @returns a ref (no ownership transfered. exists as long as this VPUCostModel instance exists)
     const ShaveOpExecutor& getShaveInstance(std::string name, VPUDevice device) const {
         return shave_gen_2.getShaveInstance(std::move(name), device);  // may throw
+    }
+
+    /**
+     * @brief Checks if the SHAVE Gen 2 API is being used.
+     * @return True if the SHAVE Gen 2 API is used, otherwise false.
+     */
+    bool isShave2ApiUsed() const {
+        return shave_gen_2.isShave2APIused();
     }
 
 public:
@@ -834,7 +849,7 @@ public:
 
         getEnergyInterface().fillDPUInfo(allData, w);
 
-        allData.hw_theoretical_cycles = DPUTheoreticalCycles(w);
+        allData.hw_theoretical_cycles = dpu_theoretical.DPUTheoreticalCycles(w);
 
         return allData;  // rvo
     }
@@ -850,6 +865,9 @@ public:
         return dpu_nn_cost_provider.getPreloadedCacheCounter();
     }
 
+    const AccessCounter& getPreloadedShaveCacheCounter() const {
+        return shave_gen_2.getPreloadedCacheCounter();
+    }
 };  // class
 }  // namespace VPUNN
 

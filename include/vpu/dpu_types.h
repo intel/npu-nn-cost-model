@@ -21,13 +21,13 @@
 namespace VPUNN {
 
 /// @brief mapping an enum value to its string/text representation
-using EnumMap = std::map<int, const std::string>;
+using EnumMap = std::map<const int, const std::string>;
 
 /// @brief creates a pair to be added to the EnumMap
 /// @tparam T , the enumeration type
 template <class T>
 EnumMap::value_type link(const T& enum_val, const char* name) {
-    return EnumMap::value_type{static_cast<int>(enum_val), std::string(name)};
+    return EnumMap::value_type{static_cast<const int>(enum_val), std::string(name)};
 }
 
 /// @brief reverse of EnumMap (from string to value)
@@ -43,9 +43,9 @@ inline const EnumInverseMap createInverseMap(const EnumMap& direct_map) {
 }
 
 /// @brief Holds mappings between names (usually used for direct mapping between interfaces)
-using EnumTextLogicalMap = std::map<std::string, std::string>;
+using EnumTextLogicalMap = std::map<const std::string, const std::string>;
 /// @brief creates a pair to be added to the EnumTextLogicalMap
-inline EnumTextLogicalMap::value_type link_logical(std::string name, std::string mapped_name) {
+inline EnumTextLogicalMap::value_type link_logical(const std::string name, const std::string mapped_name) {
     return EnumTextLogicalMap::value_type{name, mapped_name};
 }
 
@@ -103,10 +103,11 @@ inline typename std::enable_if<has_mapToText<E>::value, const EnumInverseMap&>::
  * @brief VPU IP generations
  *
  */
-enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_RESERVED, NPU_RESERVED_W, __size };
+enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_RESERVED, NPU_RESERVED_W, NPU_6_0, __size };
 static const EnumMap VPUDevice_ToText{link(VPUDevice::VPU_2_0, "VPU_2_0"), link(VPUDevice::VPU_2_1, "VPU_2_1"),
                                       link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_4_0, "VPU_4_0"),
-                                      link(VPUDevice::NPU_RESERVED, "NPU_RESERVED"), link(VPUDevice::NPU_RESERVED_W, "NPU_RESERVED_W")};
+                                      link(VPUDevice::NPU_RESERVED, "NPU_RESERVED"), link(VPUDevice::NPU_RESERVED_W, "NPU_RESERVED_W"),
+                                      link(VPUDevice::NPU_6_0, "NPU_6_0")};
 template <>
 inline const EnumMap& mapToText<VPUDevice>() {
     return VPUDevice_ToText;
@@ -139,6 +140,7 @@ enum class DataType {
     FLOAT32,  ///< 32bit float
     UINT16,
     INT16,
+    FLOAT4,
     __size  ///< last element, its value  equals number of useful enum values
 };
 static const EnumMap DataType_ToText{
@@ -147,7 +149,7 @@ static const EnumMap DataType_ToText{
         link(DataType::UINT4, "UINT4"),       link(DataType::INT4, "INT4"),       link(DataType::UINT2, "UINT2"),
         link(DataType::INT2, "INT2"),         link(DataType::UINT1, "UINT1"),     link(DataType::INT1, "INT1"),
         link(DataType::INT32, "INT32"),       link(DataType::FLOAT32, "FLOAT32"), link(DataType::UINT16, "UINT16"),
-        link(DataType::INT16, "INT16")};
+        link(DataType::INT16, "INT16"),       link(DataType::FLOAT4, "FLOAT4")};
 template <>
 inline const EnumMap& mapToText<DataType>() {
     return DataType_ToText;
@@ -217,7 +219,7 @@ inline std::string enumName<ActivationFunction>() {
 enum class Swizzling { KEY_0 /*disabled*/, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, __size };
 static const EnumMap Swizzling_ToText{
         link(Swizzling::KEY_0, "KEY_0"), link(Swizzling::KEY_1, "KEY_1"), link(Swizzling::KEY_2, "KEY_2"),
-        link(Swizzling::KEY_3, "KEY_3"), link(Swizzling::KEY_4, "KEY_4"), link(Swizzling::KEY_5, "KEY_5"),
+        link(Swizzling::KEY_3, "KEY_3"), link(Swizzling::KEY_4, "KEY_4"), link(Swizzling::KEY_5, "KEY_5")
 };
 template <>
 inline const EnumMap& mapToText<Swizzling>() {
@@ -236,9 +238,9 @@ enum class ExecutionMode {
     VECTOR,
     MATRIX,
     VECTOR_FP16,   //
-    CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,   50 : NTHW/NTK = 16/2
-    CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8     50 : NTHW/NTK = 8/4
-    CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16    50 : NTHW/NTK = 4/8
+    CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,
+    CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8  
+    CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16 
     __size
 };
 static const EnumMap ExecutionMode_ToText{

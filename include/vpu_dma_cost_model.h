@@ -36,7 +36,6 @@
 #include "inference/vpunn_runtime.h"
 #include "vpu/utils.h"
 #include "vpu/validation/checker_utils.h"
-#include "vpu/vpu_performance_model.h"
 
 #include "vpu/cycles_interface_types.h"
 #include "vpu/validation/dpu_operations_sanitizer.h"
@@ -47,18 +46,23 @@
 #include "core/serializer.h"
 #include "vpu/vpu_mutex.h"
 
+#include "vpu/dma_theoretical_cost_provider.h"
+#include "vpu/serialization/dma_cost_serialization_wrapper.h"
+
 #include <typeinfo>
 
 namespace VPUNN {
 
 /**
- * @brief The DMACostModel class
- *
- * Has behind a loaded DMACostModel neural network that infers cycle times for DMA
- *
+ * @brief
+ *Has to be factored to own file or to be redesigned, why we need this, what's the purpose
+ * WE want from the VPUX to use same interface or same descriptor as we use in DMANN part
+ * ALso the theoretical DMA should have a common interface(datatype dma workload) with the DMANN
  */
-class VPUNN_API DMATheoreticalCostModel /*: protected VPUNNPerformanceModel */ {
+class VPUNN_API DMATheoreticalCostModel {
 private:
+    const DMATheoreticalCostProvider dma_theoretical{};
+
 public:
     explicit DMATheoreticalCostModel() {
         Logger::initialize();
@@ -80,8 +84,8 @@ protected:
                      MemoryLocation input_location = MemoryLocation::DRAM,
                      MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
         // Call the helper function
-        VPUNNPerformanceModel pm;
-        return pm.DMATheoreticalCycles({device, input, output, input_location, output_location, output_write_tiles});
+        return dma_theoretical.DMATheoreticalCycles(
+                {device, input, output, input_location, output_location, output_write_tiles});
     }
 
     /**
@@ -92,8 +96,7 @@ protected:
      */
     unsigned int DMA(const DMAWorkload& wl) const {
         // Call the helper function
-        VPUNNPerformanceModel pm;
-        return pm.DMATheoreticalCycles(wl);
+        return dma_theoretical.DMATheoreticalCycles(wl);
     }
 };
 
@@ -349,18 +352,8 @@ public:
             // Add result to the cache
             cache.add(vector, infered_value);  // raw
 
-            if (cache_miss_serializer.is_serialization_enabled()) {  // has to be factored out
-                // do we need to post process?
-                try {
-                    cache_miss_serializer.serialize(SerializableField<VPUDevice>{"device", workload.device});
-                    serialize_workload(workload, cache_miss_serializer);
-                    cache_miss_serializer.end();
-                } catch (const std::exception& e) {
-                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                    cache_miss_serializer.clean_buffers();
-                }
-                cache_miss_serializer.clean_buffers();
-            }
+            DMACostSerializationWrap<DMADesc> serialization_handler(cache_miss_serializer);
+            serialization_handler.serializeDMAWorkload_closeLine(workload);
 
             return infered_value;  // raw
         }
@@ -494,17 +487,8 @@ private:
         SanityReport problems{};
         info = problems.info;
 
-        if (interogation_serializer.is_serialization_enabled()) {  // has to be factored out
-            try {
-                interogation_serializer.serialize(SerializableField<VPUDevice>{"device", wl.device});
-
-                serialize_workload(wl, interogation_serializer);
-
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                interogation_serializer.clean_buffers();
-            }
-        }
+        DMACostSerializationWrap<DMADesc> serialization_handler(interogation_serializer);
+        serialization_handler.serializeDMAWorkload(wl);
 
         CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
         if (is_inference_posible) {
@@ -537,71 +521,11 @@ private:
             }
         }
 
-        if (interogation_serializer.is_serialization_enabled()) {  // has to be factored out
-            try {
-                if (!interogation_serializer.is_write_buffer_clean()) {
-                    interogation_serializer.serialize(SerializableField<decltype(cycles)>{"cycles", cycles});
-                    interogation_serializer.end();
-                }
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                interogation_serializer.clean_buffers();
-            }
-            interogation_serializer.clean_buffers();
-        }
+         serialization_handler.serializeCycles(cycles);
 
         return cycles;
     }
 
-    void serialize_workload(const DMANNWorkload_NPU27& wl, CSVSerializer& serializer) {
-        if (serializer.is_serialization_enabled()) {
-            try {
-                serializer.serialize(SerializableField{"num_planes", wl.num_planes});
-                serializer.serialize(SerializableField{"length", wl.length});
-                serializer.serialize(SerializableField{"src_width", wl.src_width});
-                serializer.serialize(SerializableField{"dst_width", wl.dst_width});
-                serializer.serialize(SerializableField{"src_stride", wl.src_stride});
-                serializer.serialize(SerializableField{"dst_stride", wl.dst_stride});
-                serializer.serialize(SerializableField{"src_plane_stride", wl.src_plane_stride});
-                serializer.serialize(SerializableField{"dst_plane_stride", wl.dst_plane_stride});
-                serializer.serialize(SerializableField{"transfer_direction", wl.transfer_direction});
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
-        }
-    }
-
-    void serialize_workload(const DMANNWorkload_NPU40_RESERVED& wl, CSVSerializer& serializer) {
-        if (serializer.is_serialization_enabled()) {
-            try {
-                serializer.serialize(SerializableField{"src_width", wl.src_width});
-                serializer.serialize(SerializableField{"dst_width", wl.dst_width});
-                serializer.serialize(SerializableField{"num_dim", wl.num_dim});
-
-                for (int i = 0; i < wl.num_dim; i++) {
-                    const auto& dim{wl.e_dim[i]};
-                    serializer.serialize(SerializableField{"src_stride_" + std::to_string(i + 1), dim.src_stride});
-                    serializer.serialize(SerializableField{"dst_stride_" + std::to_string(i + 1), dim.dst_stride});
-                    serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), dim.src_dim_size});
-                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), dim.dst_dim_size});
-                }
-
-                for (int i = wl.num_dim; i < wl.MaxExtraDimensions; i++) {
-                    serializer.serialize(SerializableField{"src_stride_" + std::to_string(i + 1), 0});
-                    serializer.serialize(SerializableField{"dst_stride_" + std::to_string(i + 1), 0});
-                    serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), 0});
-                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), 0});
-                }
-
-                serializer.serialize(SerializableField{"num_engine", wl.num_engine});
-                serializer.serialize(SerializableField{"direction", wl.transfer_direction});
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
-        }
-    }
 };
 
 }  // namespace VPUNN

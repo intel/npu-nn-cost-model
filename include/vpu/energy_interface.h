@@ -28,12 +28,21 @@ class VPUCostModel;  // fw declaration, at least for now we depend on the big co
 class IEnergy {
 private:
     const VPUCostModel& all_service_provider;  ///< service as dpu, dma, performance.. providers
+    const HWPerformanceModel& performance;     ///< HW performance model
 
     const VPUPowerFactorLUT
             power_factor_lut{};  /// < this is the lookup table for power factors. to be split on generations
 
 public:
-    IEnergy(VPUCostModel& all_service_provider_): all_service_provider(all_service_provider_) {
+    /**
+     * @param all_service_provider_ is a reference to the cost model: Used to provide services as DPU, DMA and other
+     * services that are now part of VPUCostModel. In the feature this all_service_provider_ will be removed and
+     * replaced with some specific providers for each service
+     *
+     * @param performance_ is a reference to the performance model: Used to access the performance provider
+     */
+    IEnergy(const VPUCostModel& all_service_provider_, const HWPerformanceModel& performance_)
+            : all_service_provider(all_service_provider_), performance(performance_) {
     }
 
     /**
@@ -51,8 +60,7 @@ public:
         // return calculateEnergyFromAFandTime(activity_factor_powerVirus, cycles);
 
         // can be further reduced to power_ideal_cycles * power_factor_value  if no limitation desired
-        const VPUNNPerformanceModel perf;
-        return calculateEnergyFromIdealCycles(wl, perf.DPU_Power_IdealCycles(wl));
+        return calculateEnergyFromIdealCycles(wl, performance.DPU_Power_IdealCycles(wl));
     }
 
     /**
@@ -120,12 +128,12 @@ public:
      * @return  DPUWorkload hardware utilization (zero signals problems)
      */
     float power_mac_hw_utilization(const DPUWorkload& wl) const {
-        return mac_hw_utilization(wl, &VPUNNPerformanceModel::DPU_Power_IdealCycles);
+        return mac_hw_utilization(wl, &HWPerformanceModel::DPU_Power_IdealCycles);
     }
 
     /** @bief utilization without sparsity, can be larger than one, uses CostModel */
     float efficiency_mac_hw_utilization(const DPUWorkload& wl) const {
-        return mac_hw_utilization(wl, &VPUNNPerformanceModel::DPU_Efficency_IdealCycles);
+        return mac_hw_utilization(wl, &HWPerformanceModel::DPU_Efficency_IdealCycles);
     }
 
 public:
@@ -196,7 +204,8 @@ public:
     // protected: now public to can be accessed in VPUCostModel
     float DPU_AgnosticActivityFactor(const DPUWorkload& wl, const float reference_hw_util,
                                      const float sparse_correction_factor_experimental = 1.0F) const {
-        const float power_factor_value = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+        const float power_factor_value =
+                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, getPerformanceModel());
 
         return DPU_AgnosticActivityFactor_formula(power_factor_value, reference_hw_util,
                                                   sparse_correction_factor_experimental);
@@ -211,7 +220,8 @@ public:
     }
 
     float calculateEnergyFromIdealCycles(const DPUWorkload& wl, const unsigned long int reference_ideal_cycles) const {
-        const float power_factor_value = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+        const float power_factor_value =
+                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, getPerformanceModel());
 
         // should we scale with sparse ON but dense?
         // is there a limit, probably not as long as this is time independent
@@ -254,12 +264,12 @@ public:
     }
 
 protected:
-    static_assert(std::is_same<decltype(&VPUNN::VPUNNPerformanceModel::DPU_Efficency_IdealCycles),
-                               decltype(&VPUNN::VPUNNPerformanceModel::DPU_Power_IdealCycles)>::value,
+    static_assert(std::is_same<decltype(&VPUNN::HWPerformanceModel::DPU_Efficency_IdealCycles),
+                               decltype(&VPUNN::HWPerformanceModel::DPU_Power_IdealCycles)>::value,
                   "must be same signature ");
 
     float mac_hw_utilization(const DPUWorkload& wl,
-                             decltype(&VPUNNPerformanceModel::DPU_Efficency_IdealCycles) CalculateCycles) const;
+                             decltype(&HWPerformanceModel::DPU_Efficency_IdealCycles) CalculateCycles) const;
 
 private:
     const VPUCostModel& getDPUprovider() const {
@@ -269,7 +279,9 @@ private:
     const VPUCostModel& getSHAVEprovider() const {
         return all_service_provider;
     }
-    const VPUNNPerformanceModel& getPerformanceModel() const;
+
+public:
+    const HWPerformanceModel& getPerformanceModel() const;
 };
 
 }  // namespace VPUNN

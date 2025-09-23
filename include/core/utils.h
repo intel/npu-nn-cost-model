@@ -62,6 +62,7 @@ static inline std::unordered_map<std::string, std::string> get_env_vars(const st
 }
 
 template <typename KeyType, typename ValueType>
+/* coverity[rule_of_three_violation:FALSE] */
 class ThreadSafeMap {
 protected:
     using MapType = std::map<KeyType, ValueType>;  ///< no hash

@@ -358,7 +358,7 @@ protected:
 public:
     /// @brief the descriptor interface that this type was designed to fill/comply with
     static int getInterfaceVersion() {
-        return static_cast<std::underlying_type_t<NNVersionsDMA>>(NNVersionsDMA::VERSION_03_50_v1);
+        return static_cast<std::underlying_type_t<NNVersionsDMA>>(NNVersionsDMA::VERSION_03_RESERVED_v1);
     }
 
     ///@brief Ctor , inits the content with expected size

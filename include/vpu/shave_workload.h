@@ -40,17 +40,19 @@ private:
     std::string loc_name{};            ///< The location name
 
 public:
-    using Param = std::variant<int, float>;
-    using Parameters = std::vector<SHAVEWorkload::Param>;
+using Param = std::variant<int, float, std::string, bool>;
+using Parameters = std::vector<SHAVEWorkload::Param>;
+using ExtraParameters = std::map<std::string, Param>;
 
 private:
-    Parameters call_params{};  ///<  can emulate call parameters
+Parameters call_params{};  ///<  can emulate call parameters
+ExtraParameters extra_params{};  ///< Additional parameters as a map
 
 public:
     /// @brief ctor must exist since we have aggregate initialization possible on this type (abstract type)
     SHAVEWorkload(const std::string& operation_name, const VPUDevice& device, const std::vector<VPUTensor>& inputs,
-                  const std::vector<VPUTensor>& outputs, const Parameters& params = {}, const std::string& loc_name = "")
-            : name(operation_name), device{device}, inputs{inputs}, outputs{outputs}, loc_name(loc_name), call_params{params} {
+                  const std::vector<VPUTensor>& outputs, const Parameters& params = {}, const ExtraParameters& extra_param = {}, const std::string& loc_name = "")
+            : name(operation_name), device{device}, inputs{inputs}, outputs{outputs}, loc_name(loc_name), call_params{params}, extra_params{extra_param} {
     }
 
     SHAVEWorkload(const SHAVEWorkload&) = default;
@@ -78,6 +80,10 @@ public:
         return call_params;
     };
 
+    const ExtraParameters& get_extra_params() const {
+        return extra_params;
+    }
+
     const std::string& get_loc_name() const {
         return loc_name;
     };
@@ -87,10 +93,10 @@ public:
         ss << static_cast<int>(get_device()) << ",";
         ss << get_name() << ",";
         for (const auto& input : get_inputs()) {
-            ss << input.batches() << "," << input.channels() << "," << input.height() << "," << input.width() << ",";
+            ss << input.batches() << "," << input.channels() << "," << input.height() << "," << input.width() << "," << (int)input.get_dtype() << "," << (int)input.get_layout() << ",";
         }
         for (const auto& output : get_outputs()) {
-            ss << output.batches() << "," << output.channels() << "," << output.height() << "," << output.width()
+            ss << output.batches() << "," << output.channels() << "," << output.height() << "," << output.width() << "," << (int)output.get_dtype() << "," << (int)output.get_layout()
                << ",";
         }
 
@@ -102,6 +108,20 @@ public:
                     param);
         }
 
+        for(const auto& extra_param : get_extra_params()) {
+            ss << extra_param.first << "/";
+            std::visit(
+                [&ss](auto&& arg) {
+                    if constexpr (std::is_same_v<std::decay_t<decltype(arg)>, std::string>) {
+                        ss << arg;
+                    } else {
+                        ss << std::to_string(arg);
+                    }
+                },
+                extra_param.second);
+            ss << ",";
+        }
+        
         return fnv1a_hash(ss.str());
     }
 
@@ -132,6 +152,10 @@ public:
                 stream << *pvali;
             } else if (const float* pvalf = std::get_if<float>(&v)) {
                 stream << *pvalf;
+            } else if (const std::string* pvals = std::get_if<std::string>(&v)) {
+                stream << *pvals;
+            } else if (const bool* pvalb = std::get_if<bool>(&v)) {
+                stream << (*pvalb ? "true" : "false");
             }
         };
         {  // parameters
@@ -140,6 +164,15 @@ public:
                 stream << " param[" << i << "]: \t{ ";  //
                 toStream(call_params[i]);
                 stream << " } ;\n";  //
+            }
+            stream << "\t} \n";
+        }
+        {  // extra parameters
+            stream << " extra parameters: \t{\n";
+            for (const auto& [key, value] : extra_params) {
+                stream << " key: " << key << " -> value: ";
+                toStream(value);
+                stream << " ;\n";
             }
             stream << "\t} \n";
         }

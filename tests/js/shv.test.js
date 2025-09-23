@@ -14,7 +14,7 @@ beforeAll(async () => await test_setup.initialize())
 const VPUNN = test_setup.VPUNN;
 
 
-test.each(['SIGMOID', 'SWISH', 'HARDSWISH'])('test SHV cost', (op) => {
+test.each(['Sigmoid', 'Swish', 'HardSwish'])('test SHV cost', (op) => {
 
     const inT = VPUNN.createTensor(56, 56, 64, 1, VPUNN.DataType.UINT8);
     const outT = VPUNN.createTensor(56, 56, 64, 1, VPUNN.DataType.UINT8);
@@ -23,8 +23,8 @@ test.each(['SIGMOID', 'SWISH', 'HARDSWISH'])('test SHV cost', (op) => {
     const path = `models/vpu_2_7.vpunn`
 
     const wl = VPUNN.createSHV(
+        op,
         VPUNN_device,
-        VPUNN.SWActivationFunction[op],
         inT, outT)
 
     expect(wl).toBeTruthy();

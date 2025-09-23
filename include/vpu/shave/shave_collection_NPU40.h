@@ -20,6 +20,7 @@
 namespace VPUNN {
 
 using ShaveInstanceHolder_Mock_NPU40_BASE = ShaveInstanceHolder_Mock<ShaveInstanceHolder_VPU27, VPUDevice::VPU_4_0>;
+using ShaveInstanceHolder_NPU40CLassic = ShaveInstanceHolder_VPU27CLassic; 
 class ShaveInstanceHolder_Mock_NPU40 : public ShaveInstanceHolder_Mock_NPU40_BASE {
 public:
     ShaveInstanceHolder_Mock_NPU40(): ShaveInstanceHolder_Mock_NPU40_BASE(1.0f) {
@@ -40,6 +41,7 @@ public:
 
     void populate();  ///< to be implemented automatically in a .cpp file
 };
+
 
 }  // namespace VPUNN
 #endif

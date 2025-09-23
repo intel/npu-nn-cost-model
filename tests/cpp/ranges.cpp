@@ -213,6 +213,7 @@ TEST_F(MultiSmartRangesTest, ConstructionAndCopyMove) {
     EXPECT_EQ(msr_move.get_range(1).getUpperBound(), 30);
 
     // Copy assignment
+    /* coverity[copy_instead_of_move] */
     MultiSmartRanges msr_assign = msr;
     EXPECT_EQ(msr_assign.get_range(1).getLowerBound(), 20);
 
@@ -239,15 +240,15 @@ TEST_F(MultiSmartRangesTest, IsInWithMask) {
 
     std::vector<bool> mask1 = {true, false};
     EXPECT_TRUE(msr.is_in(4, mask1));    // in r1
-    EXPECT_FALSE(msr.is_in(25, mask1));  // not in r1
+    EXPECT_FALSE(msr.is_in(25, std::move(mask1)));  // not in r1
 
     std::vector<bool> mask2 = {false, true};
     EXPECT_FALSE(msr.is_in(4, mask2));  // not in r2
-    EXPECT_TRUE(msr.is_in(25, mask2));  // in r2
+    EXPECT_TRUE(msr.is_in(25, std::move(mask2)));  // in r2
 
     std::vector<bool> mask3 = {false, false};
     EXPECT_FALSE(msr.is_in(4, mask3));   // none enabled
-    EXPECT_FALSE(msr.is_in(25, mask3));  // none enabled
+    EXPECT_FALSE(msr.is_in(25, std::move(mask3)));  // none enabled
 }
 
 TEST_F(MultiSmartRangesTest, MaskAutoResize) {
@@ -258,11 +259,11 @@ TEST_F(MultiSmartRangesTest, MaskAutoResize) {
     // mask smaller than ranges: should pad with false
     std::vector<bool> mask = {true};
     EXPECT_TRUE(msr.is_in(4, mask));    // only r1 enabled
-    EXPECT_FALSE(msr.is_in(25, mask));  // only r1 enabled
+    EXPECT_FALSE(msr.is_in(25, std::move(mask)));  // only r1 enabled
 
     // mask larger than ranges: extra entries ignored
     std::vector<bool> mask_large = {false, true, true, false};
-    EXPECT_TRUE(msr.is_in(25, mask_large));  // only r2 enabled
+    EXPECT_TRUE(msr.is_in(25, std::move(mask_large)));  // only r2 enabled
 }
 
 TEST_F(MultiSmartRangesTest, GetRangeAndBounds) {

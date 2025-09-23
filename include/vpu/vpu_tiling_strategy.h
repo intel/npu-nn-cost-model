@@ -30,7 +30,7 @@ enum class VPUTilingStrategy {
     UNKNOWN,           // not known, or not communicated (is not receiver decision to implement/apply)
     __size
 };
-static const EnumMap VPUTilingStrategy_ToText{
+inline static const EnumMap VPUTilingStrategy_ToText{
         link(VPUTilingStrategy::NONE, "NONE"),
         link(VPUTilingStrategy::SOH_Overlapped, "SOHO"),
         link(VPUTilingStrategy::SOK, "SOK"),

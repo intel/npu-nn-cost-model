@@ -7,6 +7,7 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
+
 cmake_minimum_required(VERSION 3.12)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")

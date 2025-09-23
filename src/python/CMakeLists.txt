@@ -70,7 +70,13 @@ if (${GENERATE_PYTHON_BINDING})
         -I${FLATBUFFERS_SRC_DIR}/include
         -I${CMAKE_VPUNN_BINARY_DIR}/include
         -I${pybind11_SOURCE_DIR}/include
-        -I${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+        -I${CMAKE_CURRENT_SOURCE_DIR}/../../include
+        
+        # One time fix for pybind11 issue with chrono, if on your system this is not needed, you can remove it
+        # It will take more time to generate the bindings, but it will not fail
+        # COMMAND perl -i -pe "s|#include <bits/chrono.h>|#include <chrono>|g" ${PYTHON_BINDING_CPP}
+        # VERBATIM
+    )
 
     add_custom_target(generated-bindings-code EXCLUDE_FROM_ALL
         DEPENDS ${PYTHON_BINDING_CPP})

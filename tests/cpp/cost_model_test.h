@@ -43,6 +43,7 @@ protected:
     DPUWorkload wl_glob_20;
     DPUWorkload wl_glob_40;
 
+
     VPUCostModel model{};
 
     void SetUp() override {
@@ -52,6 +53,7 @@ protected:
 
         wl_glob_40 = wl_glob_27;
         wl_glob_40.device = VPUDevice::VPU_4_0;
+
 
         Logger::clear2ndlog();
         // Logger::activate2ndlog();
@@ -154,6 +156,7 @@ protected:
     VPUCostModel g_model_2_0{VPU_2_0_MODEL_PATH};
     VPUCostModel g_model_2_7{VPU_2_7_MODEL_PATH};
     VPUCostModel g_model_4_0{VPU_4_0_MODEL_PATH};
+
 
     VPUCostModel& getModel(const VPUDevice device) {
         switch (device) {

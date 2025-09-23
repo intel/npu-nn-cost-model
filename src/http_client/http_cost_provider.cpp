@@ -124,6 +124,7 @@ VPUNN::CyclesInterfaceType VPUNN::HttpDPUCostProvider::getCost(const DPUOperatio
     payload["params"] = nlohmann::json::object();
     payload["params"]["backend"] = backend;
     payload["params"]["name"] = "profiling_request";
+    payload["params"]["timeout"] = -1; // Need to wait for the profiling to finish
 
     payload["dpu_workload"] = nlohmann::json::object();
     payload["dpu_workload"] = dpuop_as_json(op);
@@ -200,6 +201,7 @@ const nlohmann::json VPUNN::HttpDPUCostProvider::dpuop_as_json(const DPUOperatio
     json_op["isi_strategy"] = "ISIStrategy." + mapToText<ISIStrategy>().at(static_cast<int>(op.isi_strategy));
     json_op["output_write_tiles"] = op.output_write_tiles;
 
+    json_op["in_place_input1"] = static_cast<int>(op.weightless_operation);
     json_op["in_place_output"] = static_cast<int>(op.in_place_output_memory);
     json_op["superdense_output"] = static_cast<int>(op.superdense);
     json_op["workload_uid"] = op.hash();

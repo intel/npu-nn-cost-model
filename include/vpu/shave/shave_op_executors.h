@@ -125,11 +125,6 @@ public:
         const auto& out = w.get_outputs()[0];  // the only output
         // what happens if datatype is not anymore as the model ??
 
-        // Layout WHCB is the only one supported
-        if (out.get_layout() != Layout::XYZ) {
-            return Cycles::ERROR_SHAVE_LAYOUT;
-        }
-
         // Supporting only with batch = 1
         if (out.b() > 1) {
             return Cycles::ERROR_SHAVE_INVALID_INPUT;

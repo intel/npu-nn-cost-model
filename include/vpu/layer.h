@@ -737,52 +737,10 @@ public:
      */
     DPULayer(VPUDevice device, Operation op, std::array<VPUTensor, 1> inputs, std::array<VPUTensor, 1> outputs,
              std::array<unsigned int, 2> kernels, std::array<unsigned int, 2> strides,
-             std::array<unsigned int, 4> padding) {
-        this->device = device;
-        this->op = op;
-        this->inputs = inputs;
-        this->outputs = outputs;
-        this->kernels = kernels;
-        this->strides = strides;
-        this->padding = padding;
-
-        switch (device) {
-        case VPUDevice::VPU_2_0:
-        case VPUDevice::VPU_2_1:
-            this->execution_order = inputs[0].is_any_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
-            break;
-        case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_4_0:
-        case VPUDevice::NPU_RESERVED:
-        case VPUDevice::NPU_RESERVED_W:
-            this->execution_order = ExecutionMode::CUBOID_16x16;
-            break;
-        default:
-            Logger::error() << "Invalid VPU device type";
-        }
-
-        // rest of fields are the workload default (CLUSTERING, output write tiles  =1)
-    }
+             std::array<unsigned int, 4> padding);
 
     /// @brief ctor from base class
-    explicit DPULayer(const DPUWorkload& wl): DPUWorkload(wl) {
-        switch (device) {
-        case VPUDevice::VPU_2_0:
-        case VPUDevice::VPU_2_1:
-            this->execution_order = inputs[0].is_any_float() ? ExecutionMode::VECTOR_FP16 : ExecutionMode::MATRIX;
-            break;
-        case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_4_0:
-        case VPUDevice::NPU_RESERVED:
-        case VPUDevice::NPU_RESERVED_W:
-            this->execution_order = ExecutionMode::CUBOID_16x16;
-            break;
-        default:
-            Logger::error() << "Invalid VPU device type";
-        }
-
-        // rest of fields are the workload default (CLUSTERING, output write tiles  =1)
-    }
+    explicit DPULayer(const DPUWorkload& wl);
 
     /**
      * @brief Split a DPULayer across N CMX tiles

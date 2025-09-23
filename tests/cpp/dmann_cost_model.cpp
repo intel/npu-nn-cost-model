@@ -13,6 +13,7 @@
 #include "common_helpers.h"
 #include "vpu/compatibility/types01.h"
 #include "vpu/cycles_interface_types.h"
+#include "vpu/dma_theoretical_cost_provider.h"
 #include "vpu/sample_generator/random_task_generator.h"
 #include "vpu/validation/interface_valid_values.h"
 #include "vpu_cost_model.h"
@@ -254,6 +255,27 @@ TEST_F(TestDMANNCostModel, SmokeTestDMA_40) {
     }
 }
 
+TEST_F(TestDMANNCostModel, SerializerTestDMA) {
+    const std::string model_path = VPU_DMA_4_0_MODEL_PATH;
+    ASSERT_NO_THROW(DMACostModel<DMANNWorkload_NPU40> x{model_path});
+    DMACostModel<DMANNWorkload_NPU40> dma_model(model_path);
+    ASSERT_TRUE(dma_model.nn_initialized());
+
+        DMANNWorkload_NPU40 wl{
+                VPUNN::VPUDevice::VPU_4_0,  // VPUDevice device;  ///< NPU device
+                65535,                      // int src_width;
+                65535,                      // int dst_width;
+                0,                          // int num_dim;
+                {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+                Num_DMA_Engine::Num_Engine_1,
+                MemoryDirection::CMX2CMX  // MemoryDirection transfer_direction;
+        };
+        auto dma_cycles = dma_model.computeCycles(wl);
+
+        EXPECT_EQ(dma_cycles, 2041 /*@1700MHz*/) << wl << Cycles::toErrorText(dma_cycles);
+ 
+}
+
 
 // Demonstrate some basic assertions.
 TEST_F(TestDMANNCostModel, SmokeTestDMA_RAWNN) {
@@ -328,7 +350,8 @@ TEST_F(TestDMANNCostModel, Mock_40_vs_VPU27_DPU) {
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_27));
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_40));
 
-        auto conv_cyc27_40 = (cycles_27 * get_dpu_fclk(wl_glob_40M.device) / get_dpu_fclk(wl_glob_27.device) /
+        auto conv_cyc27_40 = (cycles_27 * GlobalHarwdwareCharacteristics::get_dpu_fclk(wl_glob_40M.device) /
+                              GlobalHarwdwareCharacteristics::get_dpu_fclk(wl_glob_27.device) /
                               2);  // 2 is the speed up factor, 64 instead of 32?
         auto delta = std::abs((int)conv_cyc27_40 - (int)cycles_40);
 
@@ -486,6 +509,7 @@ TEST_F(TestDMANNCostModel, SweepGT_DMATime_27) {
                 1,                                             // owt
         };
         const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload(dmaOld_);
+        // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return dmaNN;
     };
@@ -647,6 +671,7 @@ TEST_F(TestDMANNCostModel, SweepGT_DMATime_27_GEAR4) {
                 1,                                             // owt
         };
         const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload(dmaOld_);
+        // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return dmaNN;
     };
@@ -797,6 +822,7 @@ TEST_F(TestDMANNCostModel, SweepGT_DMATime_40) {
                 1,                                             // owt
         };
         const DMANNWorkload_NPU40 dmaNN = DMAWorkloadTransformer::create_NPU40_workload(dmaOld_);
+        // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return dmaNN;
     };
@@ -1314,6 +1340,8 @@ TEST_F(TestDMANNCostModel, SweepGT_DMATime_40_Theoretical) {
 class TestDMA_TH_CostModel : public ::testing::Test {
 public:
 protected:
+    static constexpr int evoX{0};  // factor to adjust expectation between evo 0 and 1
+
     DMANNWorkload_NPU27 wl_glob_27{
             VPUNN::VPUDevice::VPU_2_7,  // VPUDevice device;  ///< NPU device
 
@@ -1349,6 +1377,9 @@ protected:
             MemoryDirection::CMX2CMX  // MemoryDirection transfer_direction;
 
             //
+    };
+
+    std::vector<VPUDevice> valid_dev_post_LNL{VPUDevice::VPU_4_0
     };
 
     using ModelDescriptor =
@@ -1395,7 +1426,7 @@ protected:
         return dpuCycles * (1.0f / frequencyMHz);
     }
     float computeMicroseconds(CyclesInterfaceType dpuCycles, const VPUDevice device) const {
-        return dpuCycles * (1.0f / get_dpu_fclk(device));
+        return dpuCycles * (1.0f / GlobalHarwdwareCharacteristics::get_dpu_fclk(device));
     }
 
 private:
@@ -1471,42 +1502,45 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_regresion_NPU40) {
     VPUCostModel cm("empty");
     ASSERT_TRUE(!cm.nn_initialized());
     VPUDevice device{VPUDevice::VPU_4_0};
+    const int p = (50 * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::VPU_4_0)) /
+                  (int)GlobalHarwdwareCharacteristics::get_cmx_fclk(VPUDevice::VPU_4_0);
+    EXPECT_EQ(87, p);
 
     const std::vector<TestCase> tc{
-            {mkwl(1024, MemoryLocation::DRAM, MemoryLocation::CMX, device), 539, "1k DC"},    //
-            {mkwl(2048, MemoryLocation::DRAM, MemoryLocation::CMX, device), 567, "2k DC"},    //
-            {mkwl(10000, MemoryLocation::DRAM, MemoryLocation::CMX, device), 784, "10k DC"},  //
+            {mkwl(1024, MemoryLocation::DRAM, MemoryLocation::CMX, device), 539 + p + 1, "1k DC"},     //
+            {mkwl(2048, MemoryLocation::DRAM, MemoryLocation::CMX, device), 567 + p + 2, "2k DC"},     //
+            {mkwl(10000, MemoryLocation::DRAM, MemoryLocation::CMX, device), 784 + p + 12, "10k DC"},  //
 
-            {mkwl(1024, MemoryLocation::CMX, MemoryLocation::DRAM, device), 539, "1k CD"},    //
-            {mkwl(2048, MemoryLocation::CMX, MemoryLocation::DRAM, device), 567, "2k CD"},    //
-            {mkwl(10000, MemoryLocation::CMX, MemoryLocation::DRAM, device), 784, "10k CD"},  //
+            {mkwl(1024, MemoryLocation::CMX, MemoryLocation::DRAM, device), 539 + p + 1, "1k CD"},     //
+            {mkwl(2048, MemoryLocation::CMX, MemoryLocation::DRAM, device), 567 + p + 2, "2k CD"},     //
+            {mkwl(10000, MemoryLocation::CMX, MemoryLocation::DRAM, device), 784 + p + 12, "10k CD"},  //
 
-            {mkwl(1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 85, "1k CC"},     //
-            {mkwl(2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113, "2k CC"},    //
-            {mkwl(10000, MemoryLocation::CMX, MemoryLocation::CMX, device), 330, "10k CC"},  //
+            {mkwl(1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 85 + p, "1k CC"},     //
+            {mkwl(2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113 + p, "2k CC"},    //
+            {mkwl(10000, MemoryLocation::CMX, MemoryLocation::CMX, device), 330 + p, "10k CC"},  //
 
-            {mkwl(1024, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 539, "1k DD"},    //
-            {mkwl(2048, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 567, "2k DD"},    //
-            {mkwl(10000, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 784, "10k DD"},  //
+            {mkwl(1024, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 539 + p, "1k DD"},    //
+            {mkwl(2048, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 567 + p, "2k DD"},    //
+            {mkwl(10000, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 784 + p, "10k DD"},  //
 
             // compressed
-            {mkwl_compr(1024, 2048, MemoryLocation::DRAM, MemoryLocation::CMX, device), 539, "1kto2k DC"},  //
-            {mkwl_compr(2048, 1024, MemoryLocation::DRAM, MemoryLocation::CMX, device), 567, "2kto1k DC"},  //
+            {mkwl_compr(1024, 2048, MemoryLocation::DRAM, MemoryLocation::CMX, device), 539 + p + 1, "1kto2k DC"},  //
+            {mkwl_compr(2048, 1024, MemoryLocation::DRAM, MemoryLocation::CMX, device), 567 + p, "2kto1k DC"},      //
 
-            {mkwl_compr(1024, 2048, MemoryLocation::CMX, MemoryLocation::DRAM, device), 567, "1kto2k CD"},  //
-            {mkwl_compr(2048, 1024, MemoryLocation::CMX, MemoryLocation::DRAM, device), 567, "2kto1k CD"},  //
+            {mkwl_compr(1024, 2048, MemoryLocation::CMX, MemoryLocation::DRAM, device), 567 + p, "1kto2k CD"},      //
+            {mkwl_compr(2048, 1024, MemoryLocation::CMX, MemoryLocation::DRAM, device), 567 + p + 2, "2kto1k CD"},  //
 
-            {mkwl_compr(1024, 2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113, "1kto2k CC"},  //
-            {mkwl_compr(2048, 1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 113, "2kto1k CC"},  //
+            {mkwl_compr(1024, 2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113 + p, "1kto2k CC"},  //
+            {mkwl_compr(2048, 1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 113 + p, "2kto1k CC"},  //
 
-            {mkwl_compr(1024, 2048, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 567, "1kto2k  DD"},  //
-            {mkwl_compr(2048, 1024, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 567, "2kto1k DD"},   //
+            {mkwl_compr(1024, 2048, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 567 + p, "1kto2k  DD"},  //
+            {mkwl_compr(2048, 1024, MemoryLocation::DRAM, MemoryLocation::DRAM, device), 567 + p, "2kto1k DD"},   //
 
             // permute
-            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, DRAM, CMX, device), 539, "1k DCperm"},    //
-            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, CMX, DRAM, device), 539, "1k CD perm"},   //
-            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, CMX, CMX, device), 1849, "1k CC perm"},   //
-            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, DRAM, DRAM, device), 539, "1k DD perm"},  //
+            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, DRAM, CMX, device), 539 + p + 1, "1k DCperm"},   //
+            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, CMX, DRAM, device), 539 + p + 1, "1k CD perm"},  //
+            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, CMX, CMX, device), 1849 + p, "1k CC perm"},      //
+            {mkwl_(1024, 1024, dt, dt, Layout::ZXY, Layout::XYZ, DRAM, DRAM, device), 539 + p, "1k DD perm"},     //
 
     };
 
@@ -1530,8 +1564,8 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
         auto dma_cyc = cm.DMA(tc.t_in);
         const VPUDevice d{tc.t_in.device};
         const auto exp_dpu{tc.t_exp};
-        const auto f_dpu{get_dpu_fclk(d)};
-        const auto f_cmx{get_cmx_fclk(d)};
+        const auto f_dpu{GlobalHarwdwareCharacteristics::get_dpu_fclk(d)};
+        const auto f_cmx{GlobalHarwdwareCharacteristics::get_cmx_fclk(d)};
         const float exp_CMX{(float)exp_dpu * f_cmx / f_dpu};
         const float dma_CMX_cyc{(float)dma_cyc * f_cmx / f_dpu};
 
@@ -1552,28 +1586,31 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
     {
         std::cout << "\n\n NPU40 \n";
         VPUDevice device{VPUDevice::VPU_4_0};
+        const int p = (50 * evoX * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::VPU_4_0)) /
+                      (int)GlobalHarwdwareCharacteristics::get_cmx_fclk(VPUDevice::VPU_4_0);
+        EXPECT_EQ(87 * evoX, p);
 
         const std::vector<TestCase> tc_40{
 
-                {mkwl(1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 85, "1k CC"},   //
-                {mkwl(2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113, "2k CC"},  //
+                {mkwl(1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 85 + p, "1k CC"},   //
+                {mkwl(2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113 + p, "2k CC"},  //
 
                 // compressed
-                {mkwl_compr(1024, 2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113, "1kto2k CC"},  //
-                {mkwl_compr(2048, 1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 113, "2kto1k CC"},  //
+                {mkwl_compr(1024, 2048, MemoryLocation::CMX, MemoryLocation::CMX, device), 113 + p, "1kto2k CC"},  //
+                {mkwl_compr(2048, 1024, MemoryLocation::CMX, MemoryLocation::CMX, device), 113 + p, "2kto1k CC"},  //
 
                 // zero
-                {mkwl(0, DRAM, CMX, device), 510, "\nzero DC"},  //
-                {mkwl(0, DRAM, DRAM, device), 510, "zero DD"},
-                {mkwl(0, CMX, CMX, device), 56, "zero CC"},
-                {mkwl(0, CMX, DRAM, device), 510, "zero CD"},
+                {mkwl(0, DRAM, CMX, device), 510 + p, "\nzero DC"},  //
+                {mkwl(0, DRAM, DRAM, device), 510 + p, "zero DD"},
+                {mkwl(0, CMX, CMX, device), 56 + p, "zero CC"},
+                {mkwl(0, CMX, DRAM, device), 510 + p, "zero CD"},
 
                 // examples
-                {mkwl(8192, DRAM, CMX, device), 735, "\n8k DC"},     // 0.572 expected at 800MHz VPU
-                {mkwl(8192 * 2, CMX, DRAM, device), 959, "16k CD"},  // 0.468  expected at 800MHz VPU
+                {mkwl(8192, DRAM, CMX, device), 735 + p + 9 * evoX, "\n8k DC"},      // 0.572 expected at 800MHz VPU
+                {mkwl(8192 * 2, CMX, DRAM, device), 959 + p + 19 * evoX, "16k CD"},  // 0.468  expected at 800MHz VPU
 
-                {mkwl(3 * 512 * 172 * 2, DRAM, CMX, device), 14965, "\n500K theory DC"},  //
-                {mkwl(3 * 512 * 256 * 2, DRAM, CMX, device), 22024,
+                {mkwl(3 * 512 * 172 * 2, DRAM, CMX, device), 14965 + p + 624 * evoX, "\n500K theory DC"},  //
+                {mkwl(3 * 512 * 256 * 2, DRAM, CMX, device), 22024 + p + 929 * evoX,
                  "\n786K real DC"},  // 10.2, and 13.8 exp at 800MHz VPU
 
         };
@@ -1613,7 +1650,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
 
         };
 
-        for (auto t : tc_27) {
+        for (auto& t : tc_27) {
             check(t);
         }
     }
@@ -1621,15 +1658,17 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
     // EXPECT_TRUE(false);
 }
 
-TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767) {
+TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
     VPUCostModel cm("empty");
+    DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_lnl;
+
     ASSERT_TRUE(!cm.nn_initialized());
     auto check = [&](const TestCase& tc) {
         auto dma_cyc = cm.DMA(tc.t_in);
         const VPUDevice d{tc.t_in.device};
         const auto exp_dpu{tc.t_exp};
-        const auto f_dpu{get_dpu_fclk(d)};
-        const auto f_cmx{get_cmx_fclk(d)};
+        const auto f_dpu{GlobalHarwdwareCharacteristics::get_dpu_fclk(d)};
+        const auto f_cmx{GlobalHarwdwareCharacteristics::get_cmx_fclk(d)};
         const float exp_CMX{(float)exp_dpu * f_cmx / f_dpu};
         const float dma_CMX_cyc{(float)dma_cyc * f_cmx / f_dpu};
 
@@ -1652,21 +1691,20 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767) {
         const VPUDevice device{VPUDevice::VPU_4_0};
 
         TestCase case1{mkwl(4864, MemoryLocation::DRAM, MemoryLocation::CMX, device),
-                       PerformanceMode::forceLegacy_G4 ? 1891 : 644,
+                       PerformanceMode::forceLegacy_G4 ? 1891 : 644 + (87 + 5) * evoX,
                        "2k CC"};  // original on develop branch the cost is 1891. With vpucostmodel updated, the cost
                                   // changes to 644
         check(case1);
 
         const DMAWorkload wl{case1.t_in};
         auto dma_now = cm.DMA(wl);
-        auto dma_n = cm.DMATheoreticalCycles_RESERVED_ON(wl);
-        auto dma_o = cm.DMATheoreticalCyclesLegacyLNL(wl);
+        auto dma_o = dma_theoretical_lnl.DMATheoreticalCyclesLegacyLNL(wl);
 
-        EXPECT_EQ(dma_now, PerformanceMode::forceLegacy_G4 ? 1891 : 644);
-        EXPECT_EQ(dma_n, 644);
+        EXPECT_EQ(dma_now, PerformanceMode::forceLegacy_G4 ? 1891 : 644 + (87 + 5) * evoX);
         EXPECT_EQ(dma_o, 1891);
     }
 
     // EXPECT_TRUE(false);
 }
+
 }  // namespace VPUNN_unit_tests

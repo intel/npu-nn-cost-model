@@ -27,6 +27,7 @@ class TestSHAVE : public ::testing::Test {
 public:
 protected:
     VPUNN::VPUCostModel empty_model{};
+    VPUNN::VPUCostModel model_with_cache{"", false, 16384, 1, "", "../../../models/shave_5_1.cachebin", false};
 
     const VPUNN::VPUTensor input_0{56, 56, 16, 1, VPUNN::DataType::FLOAT16};   // input dimensions
     const VPUNN::VPUTensor output_0{56, 56, 16, 1, VPUNN::DataType::FLOAT16};  // output dimensions
@@ -37,99 +38,57 @@ protected:
 private:
 };
 
-/// @brief tests that an activation can be instantiated
-TEST_F(TestSHAVE, BasicAssertionsActivationCategory) {
-    constexpr unsigned int efficiencyx1K{2000};
-    constexpr unsigned int latency{1000};
-    auto swwl = VPUNN::SHVActivation<efficiencyx1K, latency>(VPUNN::VPUDevice::VPU_2_7,
-                                                             input_0,  // input dimensions
-                                                             output_0  // output dimensions
-    );
-    // init part
-    EXPECT_EQ(swwl.device, VPUNN::VPUDevice::VPU_2_7);
-    ASSERT_EQ(swwl.inputs.size(), 1);
-    EXPECT_EQ(swwl.inputs[0].size(), input_0.size()) << " clearly they are not the same" << std::endl;
+TEST_F(TestSHAVE, DISABLED_CheckTheCacheTest){
+    
+    const VPUNN::VPUTensor input_tensor{128,64,64,1, VPUNN::DataType::FLOAT16, Layout::XYZ};
+    const VPUNN::VPUTensor out_tensor{128,64,64,1, VPUNN::DataType::FLOAT16, Layout::XYZ};
+    
+    SHAVEWorkload::Param param = 2;
+    SHAVEWorkload::Parameters params = {param};
+    SHAVEWorkload::ExtraParameters extra_params = {};
+    
+    std::string false_string = "False";
+    std::string true_string = "True";
+    std::string level = "VPU";
+    float eps = 0.000010f;
+    
+    extra_params["across_channels"] = false_string;
+    extra_params["eps"] = eps;
+    extra_params["high_precision_normalize"] = false_string;
+    extra_params["normalize_variance"] = true_string;
 
-    ASSERT_EQ(swwl.outputs.size(), 1);
-    EXPECT_EQ(swwl.outputs[0].size(), output_0.size()) << " clearly they are not the same" << std::endl;
+    SHAVEWorkload swwl {
+        "MVN_2Ax",
+        VPUDevice::NPU_RESERVED,
+        {input_tensor},
+        {out_tensor},
+        params,
+        extra_params
+    };
 
-    // behavioral part
-    EXPECT_NEAR(swwl.getKernelEfficiency(), efficiencyx1K / 1000.0F, 0.001F);
-    EXPECT_EQ(swwl.getLatency(), latency);
-
-    const auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
-    const auto op_count = swwl.outputs[0].size();
-
-    EXPECT_NEAR(shave_cycles_sigmoid, std::round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
+    std::string info;
+    auto shave_cycles = model_with_cache.SHAVE(swwl, info);
+    EXPECT_GT(shave_cycles, 251000);
+    EXPECT_LT(shave_cycles, 252000);
 }
 
-/// @brief tests that an Element wise can be instantiated
-TEST_F(TestSHAVE, BasicAssertionsELMWiseCategory) {
-    constexpr unsigned int efficiencyx1K{800};
-    constexpr unsigned int latency{1300};
-    auto swwl = VPUNN::SHVElementwise<efficiencyx1K, latency>(VPUNN::VPUDevice::VPU_2_7, {input_0},  // input dimensions
-                                                              output_0  // output dimensions
-    );
-    // init part
-    EXPECT_EQ(swwl.device, VPUNN::VPUDevice::VPU_2_7);
-    ASSERT_EQ(swwl.inputs.size(), 1);
-    EXPECT_EQ(swwl.inputs[0].size(), input_0.size()) << " clearly they are not the same" << std::endl;
+TEST_F(TestSHAVE, ShavePresentOldNotNew) {
+    SHAVEWorkload swwl {
+        "HardSigmoid",
+        VPUDevice::VPU_4_0,
+        {input_0},
+        {output_0},
+    };
+    EXPECT_EQ(swwl.get_device(), VPUNN::VPUDevice::VPU_4_0);
+    ASSERT_EQ(swwl.get_inputs().size(), 1);
+    ASSERT_EQ(swwl.get_outputs().size(), 1);
+    ASSERT_EQ(swwl.get_params().size(), 0);
 
-    ASSERT_EQ(swwl.outputs.size(), 1);
-    EXPECT_EQ(swwl.outputs[0].size(), output_0.size()) << " clearly they are not the same" << std::endl;
+    std::string info;
+    auto shave_cycles = empty_model.SHAVE(swwl, info);
+    EXPECT_GT(shave_cycles, Cycles::NO_ERROR);
+    EXPECT_LE(shave_cycles, Cycles::START_ERROR_RANGE);
 
-    // behavioral part
-    EXPECT_NEAR(swwl.getKernelEfficiency(), efficiencyx1K / 1000.0F, 0.001F);
-    EXPECT_EQ(swwl.getLatency(), latency);
-
-    const auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
-    const auto op_count = swwl.outputs[0].size();
-
-    EXPECT_NEAR(shave_cycles_sigmoid, std::round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
-}
-
-/// @brief tests that an Data Movement can be instantiated
-TEST_F(TestSHAVE, BasicAssertionsDataMovementCategory) {
-    constexpr unsigned int efficiencyx1K{2050};
-    constexpr unsigned int latency{3000};
-    auto swwl = VPUNN::SHVDataMovement<efficiencyx1K, latency>(VPUNN::VPUDevice::VPU_2_7,
-                                                               input_0,  // input dimensions
-                                                               output_0  // output dimensions
-    );
-    // init part
-    EXPECT_EQ(swwl.device, VPUNN::VPUDevice::VPU_2_7);
-    ASSERT_EQ(swwl.inputs.size(), 1);
-    EXPECT_EQ(swwl.inputs[0].size(), input_0.size()) << " clearly they are not the same" << std::endl;
-
-    ASSERT_EQ(swwl.outputs.size(), 1);
-    EXPECT_EQ(swwl.outputs[0].size(), output_0.size()) << " clearly they are not the same" << std::endl;
-
-    // behavioral part
-    EXPECT_NEAR(swwl.getKernelEfficiency(), efficiencyx1K / 1000.0F, 0.001F);
-    EXPECT_EQ(swwl.getLatency(), latency);
-
-    const auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
-    const auto op_count = swwl.outputs[0].size();
-
-    EXPECT_NEAR(shave_cycles_sigmoid, std::round(op_count / swwl.getKernelEfficiency()) + swwl.getLatency(), 1.0F);
-}
-
-/// @brief tests that an Sigmoid can be instantiated
-TEST_F(TestSHAVE, BasicAssertionsActivationSigmoid) {
-    auto swwl = VPUNN::SHVSigmoid(VPUNN::VPUDevice::VPU_2_7,
-                                  input_0,  // input dimensions
-                                  output_0  // output dimensions
-    );
-    EXPECT_EQ(swwl.device, VPUNN::VPUDevice::VPU_2_7);
-    ASSERT_EQ(swwl.inputs.size(), 1);
-    EXPECT_EQ(swwl.inputs[0].size(), input_0.size()) << " clearly they are not the same" << std::endl;
-
-    ASSERT_EQ(swwl.outputs.size(), 1);
-    EXPECT_EQ(swwl.outputs[0].size(), output_0.size()) << " clearly they are not the same" << std::endl;
-
-    auto shave_cycles_sigmoid = empty_model.SHAVE(swwl);
-    // Expect equality.
-    EXPECT_GE(shave_cycles_sigmoid, 0u);
 }
 
 /// @brief tests that V2 prototypeinterface s usable
@@ -147,7 +106,7 @@ TEST_F(TestSHAVE, SHAVE_v2_Smoke) {
         ASSERT_EQ(swwl.get_params().size(), 0);
 
         std::string info;
-        auto shave_cycles = empty_model.SHAVE_2(swwl, info);
+        auto shave_cycles = empty_model.SHAVE(swwl, info);
         EXPECT_EQ(shave_cycles, V(Cycles::ERROR_SHAVE));
     }
 
@@ -165,7 +124,7 @@ TEST_F(TestSHAVE, SHAVE_v2_Smoke) {
         ASSERT_EQ(swwl.get_params().size(), 3);
 
         std::string info;
-        auto shave_cycles = empty_model.SHAVE_2(swwl, info);
+        auto shave_cycles = empty_model.SHAVE(swwl, info);
         EXPECT_EQ(shave_cycles, V(Cycles::ERROR_SHAVE));
     }
 }
@@ -204,26 +163,26 @@ TEST_F(TestSHAVE, SHAVE_v2_Cache_Smoke) {
     shave_cacheToBe.write_cache(temp_cache_file);
 
     // need to load a cache that contains 1 & 2  values already cached
-    VPUCostModel model_shave_cache{"", "", temp_cache_file};
+    VPUCostModel model_shave_cache{"", "", temp_cache_file, true};
 
     {
         std::string info;
-        auto shave_cycles = model_shave_cache.SHAVE_2(wlp7, info);
+        auto shave_cycles = model_shave_cache.SHAVE(wlp7, info);
         EXPECT_EQ(shave_cycles, V(1));
     }
     {
         std::string info;
-        auto shave_cycles = model_shave_cache.SHAVE_2(wlp10, info);
+        auto shave_cycles = model_shave_cache.SHAVE(wlp10, info);
         EXPECT_EQ(shave_cycles, V(2));
     }
     {  // not in oracolo cache
         std::string info;
-        auto shave_cycles = model_shave_cache.SHAVE_2(wls, info);
+        auto shave_cycles = model_shave_cache.SHAVE(wls, info);
         EXPECT_GT(shave_cycles, V(100)) << wls << info;
     }
     {  // not in oracolo cache
         std::string info;
-        auto shave_cycles = empty_model.SHAVE_2(wls, info);
+        auto shave_cycles = empty_model.SHAVE(wls, info);
         EXPECT_GT(shave_cycles, V(100)) << wls << info;
     }
 }

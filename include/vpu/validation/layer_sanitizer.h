@@ -115,8 +115,9 @@ public:
                 splitLayer_validator.check_workload_consistency(w, config, operation_behaviour, result);
             }
 
-        } catch (const std::runtime_error&) {
+        } catch (const std::runtime_error& e) {
             result.mark_unknown_operation();
+            std::cerr << "Exception detected during sanitization: " << e.what() << std::endl;
         }
     }
 

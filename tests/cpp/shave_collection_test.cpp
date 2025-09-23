@@ -190,10 +190,12 @@ TEST_F(ComplexOpsCollectionTestsNPU40, SoftmaxCheckForLayoutError) {
 
     const TestsVector tests{
             {{shaveOp, swl_1},
-             {V(Cycles::ERROR_SHAVE_LAYOUT), V(Cycles::ERROR_SHAVE_LAYOUT)},
+             //{V(Cycles::ERROR_SHAVE_LAYOUT), V(Cycles::ERROR_SHAVE_LAYOUT)},
+             {V(Cycles::NO_ERROR), V(Cycles::START_ERROR_RANGE)},
              "Error layout testcase type 8"},  // 195.9558724 *1700 ~= 331500
             {{shaveOp, swl_2},
-             {V(Cycles::ERROR_SHAVE_LAYOUT), V(Cycles::ERROR_SHAVE_LAYOUT)},
+             //{V(Cycles::ERROR_SHAVE_LAYOUT), V(Cycles::ERROR_SHAVE_LAYOUT)},
+             {V(Cycles::NO_ERROR), V(Cycles::START_ERROR_RANGE)},
              "Error layout testcase type 2"}  // 17.37302728 * 1700 ~= 29534
     };
 
@@ -816,12 +818,12 @@ protected:
 
 private:
     const ShaveConfiguration shaves2{
-            0, ""};  // must be {} value initized here if const otherwise no default ctor for test class.
+            0, "", true};  // must be {} value initized here if const otherwise no default ctor for test class.
 public:
 };
 
 TEST_F(ShaveDevicesTest, config_Smoke) {
-    const ShaveConfiguration shaves{0, ""};
+    const ShaveConfiguration shaves{0, "", true};
 
     {
         VPUDevice d = VPUDevice::VPU_2_0;

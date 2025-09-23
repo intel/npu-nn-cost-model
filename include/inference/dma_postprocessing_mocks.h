@@ -61,7 +61,7 @@ public:
     ConvertFromSizeDivCycleToDPUCyc(): IPostProcessDMA<DMADesc>(low_threshold, high_threshold) {};
     CyclesInterfaceType process(float nn_size_div_cycle,  // [0 to 1], 0% to 100% of  device's bytes per cycle
                                 const DMADesc& wl, std::string& info) const override {
-        const auto maxBytesPerCycle{get_DMA_DDR_interface_bytes(wl.device)};
+        const auto maxBytesPerCycle{GlobalHarwdwareCharacteristics::get_DMA_DDR_interface_bytes(wl.device)};
         const auto raw_bandwith_BPC{nn_size_div_cycle *
                                     maxBytesPerCycle};  // range 0 to device bytes per cycle (full max speed) .
 
@@ -73,7 +73,8 @@ public:
         if (bandwith_BPC > 0.0f) {
             const float vpu_cycles_f{size / bandwith_BPC};  // measured in VPU cycles
 
-            const float dpu_cycles_f{vpu_cycles_f * get_dpu_fclk(wl.device) / get_cmx_fclk(wl.device)};
+            const float dpu_cycles_f{vpu_cycles_f * GlobalHarwdwareCharacteristics::get_dpu_fclk(wl.device) /
+                                     GlobalHarwdwareCharacteristics::get_cmx_fclk(wl.device)};
             const CyclesInterfaceType dpu_cycles{Cycles::toCycleInterfaceType(dpu_cycles_f)};
 
             return dpu_cycles;
