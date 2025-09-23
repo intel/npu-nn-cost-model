@@ -10,8 +10,5 @@
 include_directories(${CMAKE_BINARY_DIR}/include)
 include_directories(${FLATBUFFERS_SRC_DIR}/include)
 
-add_executable(workload_mode_selection workload_mode_selection.cpp)
-target_link_libraries(workload_mode_selection inferenceStatic)
-
 add_executable(vpunn_profile cost_model.profiler.cpp)
 target_link_libraries(vpunn_profile inferenceStatic)

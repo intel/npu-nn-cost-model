@@ -63,6 +63,15 @@ struct TensorInfo {
     long long numberOfElements() const {
         return height * width * channels * batch;
     }
+
+    /// @brief Get the size in bytes based on packmode
+    /// @return size in bytes
+    unsigned int tensor_size_B() const {
+        const std::array<unsigned int, 4> shape{static_cast<unsigned int>(width), static_cast<unsigned int>(height),
+                                                static_cast<unsigned int>(channels), static_cast<unsigned int>(batch)};
+        VPUTensor t{shape, datatype, layout, sparsity_enabled};
+        return t.size();
+    }
 };
 
 /// @brief kernel related informations, including stride and padding
@@ -237,7 +246,7 @@ struct DPUOperation {
                 {static_cast<unsigned int>(kernel.pad_top), static_cast<unsigned int>(kernel.pad_bottom),
                  static_cast<unsigned int>(kernel.pad_left), static_cast<unsigned int>(kernel.pad_right)},  // padding
                 execution_order  // execution mode
-        };                       // looks like local  object , but  hope  for Return Value Optimization (RVO)
+        };  // looks like local  object , but  hope  for Return Value Optimization (RVO)
 
         wl.activation_function = activation_function;
 

@@ -44,14 +44,19 @@ def generate_dpu_layer(activation=56, channels=64):
 
 
 def generate_shv_layer(activation=56, channels=64):
-    return VPUNN_lib.SHVSigmoid(
+    return VPUNN_lib.SHAVEWorkload(
+        "sigmoid",
         VPUNN_lib.VPUDevice.VPU_2_7,
-        VPUNN_lib.VPUTensor(
-            [activation, activation, channels, 1], VPUNN_lib.DataType.UINT8
-        ),
-        VPUNN_lib.VPUTensor(
-            [activation, activation, channels, 1], VPUNN_lib.DataType.UINT8
-        ),
+        [
+            VPUNN_lib.VPUTensor(
+                [activation, activation, channels, 1], VPUNN_lib.DataType.UINT8
+            )
+        ],
+        [
+            VPUNN_lib.VPUTensor(
+                [activation, activation, channels, 1], VPUNN_lib.DataType.UINT8
+            )
+        ],
     )
 
 

@@ -20,7 +20,6 @@
 
 namespace VPUNN {
 
-
 struct DMA_CyclesInfo {
     CyclesInterfaceType cycles{Cycles::NO_ERROR};  ///< cycles
     // pipelined? y/n or 0,1,2,3

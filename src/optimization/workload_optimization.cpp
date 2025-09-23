@@ -28,6 +28,9 @@ inline bool operator<(const DPUWorkloadsWithCyclesSplit& lhs, const DPUWorkloads
 class DPUTilerImplementation : public IDPUTiler {
 private:
     VPUCostModel& model;  /// < The DPU cost model used for performance estimation
+    const HWPerformanceModel& get_HWPerformance() const {
+        return model.getPerformanceModel();
+    }
 
     VPUDevice getWorkloadsDevice(const DPUWorkloadsWithCyclesSplit& workloads) const {
         if (workloads.workloads.size() == 0) {
@@ -201,8 +204,10 @@ public:
         }
 
         // Compute the total execution cycles, on good values (no overflow protection)
-        auto total_cycles = dpu_schedule<CyclesInterfaceType>(nDPU_per_tile(getWorkloadsDevice(workloads_split)),
-                                                              workloads_split.cycles, runtimeOverhead);
+        auto total_cycles = dpu_schedule<CyclesInterfaceType>(
+                get_HWPerformance().get_hw_info(getWorkloadsDevice(workloads_split)).nDPU_per_tile(),
+                // GlobalHarwdwareCharacteristics::nDPU_per_tile(getWorkloadsDevice(workloads_split)),
+                workloads_split.cycles, runtimeOverhead);
 
         // Get the average power by computing the workload on ratio by dividing its cycles by the total layer cycles
         float average_power = 0.0f;

@@ -118,13 +118,19 @@ protected:
             DeviceValues(specific_behaviours)...  //
     };
 
-    /// static rules (described by data) for each device
-    const std::vector<const IDeviceValidValues*> validators_config{
-            &(std::get<0>(specific_vv)),  //
-            &(std::get<1>(specific_vv)),  //
+    // helper function to convert tuple of variable lenght to a vector of pointers
+    static auto make_validators_config(const std::tuple<DeviceValues...>& tup) {
+        std::vector<const IDeviceValidValues*> vec;
+        std::apply(
+                [&vec](const auto&... elems) {     // lvalues
+                    (vec.push_back(&elems), ...);  // fold expression
+                },
+                tup);
+        return vec;
+    }
 
-            &(std::get<2>(specific_vv)),  //
-    };
+    /// static rules (described by data) for each device
+    const std::vector<const IDeviceValidValues*> validators_config{make_validators_config(specific_vv)};
 
 public:
     /// @brief true if the device is supported by this instance

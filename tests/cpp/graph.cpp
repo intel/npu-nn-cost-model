@@ -32,10 +32,10 @@ protected:
     void SetUp() override {
     }
 
-    std::shared_ptr<VPUNN::SWOperation> generate_helper_shv_layer(const unsigned int dim, const unsigned int channels) {
-        return std::make_shared<VPUNN::SHVSigmoid>(VPUNN::VPUDevice::VPU_2_0,
-                                                   VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16),
-                                                   VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16));
+    std::shared_ptr<VPUNN::SHAVEWorkload> generate_helper_shv_layer(const unsigned int dim, const unsigned int channels) {
+        return std::make_shared<VPUNN::SHAVEWorkload>("Sigmoid", VPUNN::VPUDevice::VPU_2_0,
+                                                   std::vector<VPUNN::VPUTensor>{VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)},
+                                                   std::vector<VPUNN::VPUTensor>{VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)});
     }
 
     std::shared_ptr<VPUNN::DPULayer> generate_helper_dpu_layer(const unsigned int dim, const unsigned int channels) {
@@ -133,9 +133,10 @@ TEST_F(TestVPUCompute, SmokeTestNetworkCostModel) {
         strategy[layer] = basic_strategy;
     }
     const unsigned long int cost = model.Network(dag, strategy);
+    std::string infoOut{};
     // Naive cost (no spilling, or fancy strategy)
     const unsigned long int naive_cost =
-            static_cast<unsigned int>(dag.nodes()) * model.get_cost_model().SHAVE(*generate_helper_shv_layer(32, 64));
+            static_cast<unsigned int>(dag.nodes()) * model.get_cost_model().SHAVE(*generate_helper_shv_layer(32, 64), infoOut);
 
     EXPECT_GT(cost, 0u);
     // The cost of this simple dag is the same as the

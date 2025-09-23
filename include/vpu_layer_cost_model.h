@@ -13,6 +13,7 @@
 #include <exception>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <variant>
 
@@ -35,6 +36,9 @@
 #include "vpu_layer_strategy.h"
 
 #include "vpu/layer_split_info.h"
+
+#include "vpu/serialization/l2_cost_serialization_wrapper.h"
+#include "vpu/device_layer_properties/device_layer_properties_holder.h"
 
 namespace VPUNN {
 
@@ -75,6 +79,10 @@ public:
     const VPUCostModel& get_TheoreticalDMA_cost_model() const noexcept {
         const VPUCostModel& retv{internal_dpu_cost_provider};
         return retv;
+    }
+
+    const HWPerformanceModel& get_HWPerformance() const {
+        return internal_dpu_cost_provider.getPerformanceModel();
     }
 
     // sharing the internal  shared pointers for a temporary easier integration in VPUX
@@ -126,11 +134,12 @@ public:
             const unsigned int batch_size = 1,             ///< model batch size for DPU
             const std::string& dpu_cache_filename = "",    /// < the name of the preloaded cache file for DPU model
             const std::string& shave_cache_filename = "",  /// < the name of the preloaded cache file for SHAVE
+            bool use_shave_2_api = false,                  /// < Use the Shave2 API 
             bool tryToLoadPairedCache = false              ///< see L1 DPU constructor details for this
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(filename, profile, cache_size, batch_size,
                                                                             dpu_cache_filename, shave_cache_filename,
-                                                                            tryToLoadPairedCache)},
+                                                                            use_shave_2_api, tryToLoadPairedCache)},
               the_dma_cost_model(dma_cost_model) {
         initialize_serializers();
     }
@@ -157,11 +166,12 @@ public:
             const char* dpu_cache_data = nullptr,      /// < the content of the preloaded cache file for DPU model
             size_t dpu_cache_data_length = 0,          ///< the size of the dpu_cache_data buffer
             const char* shave_cache_data = nullptr,    ///< the content of the preloaded cache file for SHAVE
-            size_t shave_cache_data_length = 0         /// < the size of the shave_cache_data buffer
+            size_t shave_cache_data_length = 0,        /// < the size of the shave_cache_data buffer
+            bool use_shave_2_api = false               /// < Enable usage of SHAVE2 api
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(
                       model_data, model_data_length, copy_model_data, profile, cache_size, batch_size, dpu_cache_data,
-                      dpu_cache_data_length, shave_cache_data, shave_cache_data_length)},
+                      dpu_cache_data_length, shave_cache_data, shave_cache_data_length, use_shave_2_api)},
               the_dma_cost_model(dma_cost_model) {
         initialize_serializers();
     }
@@ -184,11 +194,12 @@ public:
             const unsigned int batch_size = 1,             ///< model batch size for DPU
             const std::string& dpu_cache_filename = "",    /// < the name of the preloaded cache file for DPU model
             const std::string& shave_cache_filename = "",  /// < the name of the preloaded cache file for SHAVE
+            bool use_shave_2_api = false,                  /// < Enable usage of Shave2 API
             bool tryToLoadPairedCache = false              ///< see L1 DPU constructor details for this
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(filename, profile, cache_size, batch_size,
-                                                                            dpu_cache_filename, shave_cache_filename,
-                                                                            tryToLoadPairedCache)} {
+                                                                            dpu_cache_filename, shave_cache_filename, 
+                                                                            use_shave_2_api, tryToLoadPairedCache)} {
         initialize_serializers();
     }
 
@@ -213,11 +224,12 @@ public:
             const char* dpu_cache_data = nullptr,    /// < the content of the preloaded cache file for DPU model
             size_t dpu_cache_data_length = 0,        ///< the size of the dpu_cache_data buffer
             const char* shave_cache_data = nullptr,  ///< the content of the preloaded cache file for SHAVE
-            size_t shave_cache_data_length = 0       /// < the size of the shave_cache_data buffer
+            size_t shave_cache_data_length = 0,       /// < the size of the shave_cache_data buffer
+            bool use_shave_2_api = false               /// < Enable usage of SHAVE2 api
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(
                       model_data, model_data_length, copy_model_data, profile, cache_size, batch_size, dpu_cache_data,
-                      dpu_cache_data_length, shave_cache_data, shave_cache_data_length)} {
+                      dpu_cache_data_length, shave_cache_data, shave_cache_data_length, use_shave_2_api)} {
         initialize_serializers();
     }
 
@@ -394,6 +406,12 @@ public:
                                       prefetching, nullptr);
     }
 
+    /// version without detailed split output parameter and no hash or tiling strategy.
+    CyclesInterfaceType LayersPreSplit(const std::vector<SHAVEWorkload>& layers_pre_split, unsigned int nSHV,
+                                               bool input_in_ddr, bool output_in_ddr) {
+        return layer_pre_split_cycles(internal_dpu_cost_provider, layers_pre_split, nSHV, input_in_ddr, output_in_ddr);
+    }
+
 protected:
     /**
      * @brief Check if the DMACostModelVariant holds a valid DMACostModel
@@ -507,23 +525,7 @@ protected:
                                      DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU = 1,
                                      unsigned int nTiles = 1, bool input_in_ddr = false, bool output_in_ddr = false,
                                      bool prefetching = true, LayerSplitInfo* detailed_split = nullptr) const {
-        auto isSerializationON = [this]() {
-            return serializer.is_serialization_enabled();
-        };
-
         dpu_cost_provider.swizzling_turn_OFF(layer);
-
-        size_t serializer_layer_uid{0};  ///< only for serialize ops
-        const bool is_serializer_local_instance_for_detailed_split{isSerializationON() && (nullptr == detailed_split)};
-        const std::unique_ptr<LayerSplitInfo> self_delete_detailed_split_guard{
-                is_serializer_local_instance_for_detailed_split ? new LayerSplitInfo() : nullptr};
-        if (is_serializer_local_instance_for_detailed_split) {
-            detailed_split = self_delete_detailed_split_guard.get();
-        }
-
-        if (detailed_split) {  // always
-            detailed_split->clear();
-        }
 
         if (nTiles == 0) {
             Logger::warning() << "Number of tiles can't be zero, should be at least one!";
@@ -532,24 +534,18 @@ protected:
 
         VPUDevice device{nTiles ? layer.device : VPUDevice::__size};
 
-        if (isSerializationON()) {  // has to be factored out
-            try {
-                auto& cfg = the_layer_validator.getDeviceConfiguratorForTiles(device);
-                const auto op = DPUOperation(layer, cfg);  // not all wl details are relevant at layer
-                serializer_layer_uid = op.hash() ^ std::hash<unsigned int>{}(nTiles);
+        // serialization init logic
+        const L2CostSerializationWrap::LayerSerializationContext layer_cyc_ctxt{nDPU, nTiles, strategy, device};
+        L2CostSerializationWrap serialization_handler(serializer, layer_cyc_ctxt, the_layer_validator,
+                                                      dpu_cost_provider, L2CostSerializationWrap::layer_info_content,
+                                                      detailed_split);
 
-                serializer.serialize(op, SerializableField<decltype(nTiles)>{"n_requested_tiles", nTiles},
-                                     SerializableField<decltype(nDPU)>{"n_dpu", nDPU},
-                                     SerializableField<decltype(strategy)>{"tiling_strategy", strategy},
-                                     SerializableField<std::string>{"level", "layer"},
-                                     SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)},
-                                     SerializableField<std::string>{"info", layer.get_layer_name()},
-                                     SerializableField<std::string>{"name", layer.get_compiler_pass()});
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
+        if (detailed_split) {  // always
+            detailed_split->clear();
         }
+
+        serialization_handler.serializeLayerInformation_header_and_compute_layer_uid(
+                layer);  // must keep the csv line open!
 
         std::vector<CyclesInterfaceType> tiles_cost;  // cost of each tile
         std::vector<DPULayer> tiles_layer;            //< layer list after split
@@ -575,19 +571,7 @@ protected:
                                       << "\n Result: Early termination with Error code: " << unsplit_result.value()
                                       << " : " << Cycles::toErrorText(unsplit_result.value()) << "\n";
 
-                    if (isSerializationON()) {  // has to be factored out
-                        try {
-                            if (!serializer.is_write_buffer_clean()) {
-                                serializer.serialize(
-                                        SerializableField<CyclesInterfaceType>{"vpunn_cycles", unsplit_result.value()});
-                                serializer.end();
-                            }
-                        } catch (const std::exception& e) {
-                            Logger::warning()
-                                    << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                            serializer.clean_buffers();
-                        }
-                    }
+                    serialization_handler.serializeCycles_closeLine(unsplit_result.value());
 
                     return unsplit_result.value();  // EARLY RETURN
                 }
@@ -622,19 +606,7 @@ protected:
                         }
                     }
 
-                    if (isSerializationON()) {  // has to be factored out
-                        try {
-                            if (!serializer.is_write_buffer_clean()) {
-                                serializer.serialize(
-                                        SerializableField<CyclesInterfaceType>{"vpunn_cycles", post_result.value()});
-                                serializer.end();
-                            }
-                        } catch (const std::exception& e) {
-                            Logger::warning()
-                                    << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                            serializer.clean_buffers();
-                        }
-                    }
+                    serialization_handler.serializeCycles_closeLine(post_result.value());
 
                     return post_result.value();  // EARLY RETURN
                 }
@@ -677,74 +649,13 @@ protected:
         // any regular value)
         CyclesInterfaceType cost = extractLargestTime(tiles_cost);
 
+        // serialize remaining line with cycles
+        serialization_handler.serializeCyclesAndTilesCnt_closeLine(cost, tiles_layer.size());
+
         // serialize the complete detailed splits
-        if (isSerializationON()) {  // has to be factored out
-            if (!serializer.is_write_buffer_clean()) {
-                try {
-                    serializer.serialize(SerializableField<CyclesInterfaceType>{"vpunn_cycles", cost});
-                    serializer.serialize(SerializableField{"n_computed_tiles", tiles_layer.size()});
-                    serializer.end();
-
-                    auto& cfg = the_layer_validator.getDeviceConfiguratorForTiles(layer.device);
-
-                    int idx = 0;
-                    for (const auto& split : *detailed_split) {
-                        const auto op = DPUOperation(split.inter_tile_split_layer, cfg);
-
-                        serializer.serialize(
-                                op, SerializableField<decltype(nTiles)>{"n_requested_tiles", nTiles},
-                                SerializableField{"n_computed_tiles", tiles_layer.size()},
-                                SerializableField<decltype(nDPU)>{"n_dpu", nDPU},
-                                SerializableField<decltype(strategy)>{"tiling_strategy", strategy},
-                                SerializableField<std::string>{"level", "layer_tile_split"},
-                                SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)},
-                                SerializableField<std::string>{
-                                        "info", layer.get_layer_name() + "/cluster_" + std::to_string(idx)},
-                                SerializableField<std::string>{"name", layer.get_compiler_pass()});
-
-                        serializer.serialize(SerializableField<CyclesInterfaceType>{"vpunn_cycles",
-                                                                                    split.best_intra_tile_split.first});
-                        serializer.end();
-
-                        for (size_t split_idx = 0; split_idx < split.all_intra_tile_splits.size(); split_idx++) {
-                            const auto& wls = split.all_intra_tile_splits[split_idx];
-
-                            for (size_t wl_idx = 0; wl_idx < wls.workloads.size(); wl_idx++) {
-                                const auto& wl = wls.workloads[wl_idx];
-                                const auto& wl_cost = wls.cycles[wl_idx];
-                                auto wl_op =
-                                        DPUOperation(wl, get_cost_model().getSanitizerDeviceConfiguration(wl.device));
-                                auto ss = std::stringstream();
-                                ss << wl_op;
-                                std::hash<std::string> hasher;
-                                const size_t wl_uid = hasher(ss.str());
-
-                                serializer.serialize(
-                                        wl_op, SerializableField<decltype(nTiles)>{"n_requested_tiles", nTiles},
-                                        SerializableField{"n_computed_tiles", tiles_layer.size()},
-                                        SerializableField<decltype(nDPU)>{"n_dpu", nDPU},
-                                        SerializableField<decltype(strategy)>{"tiling_strategy", strategy},
-                                        SerializableField<std::string>{"level", "intra_tile_split"},
-                                        SerializableField<std::string>{"layer_uid",
-                                                                       std::to_string(serializer_layer_uid)},
-                                        SerializableField<std::string>{
-                                                "info", layer.get_layer_name() + "/cluster_" + std::to_string(idx)},
-                                        SerializableField<std::string>{"intra_tile_seq_id",
-                                                                       "its_" + std::to_string(split_idx)},
-                                        SerializableField<std::string>{"name", layer.get_compiler_pass()},
-                                        SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)});
-                                serializer.serialize(SerializableField<CyclesInterfaceType>{"vpunn_cycles", wl_cost});
-                                serializer.end();
-                            }
-                        }
-                        idx++;
-                    }
-                } catch (const std::exception& e) {
-                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                    serializer.clean_buffers();
-                }
-            }
-        }
+        // should DO ONLY if no previous serialization error! Think about how to handler these situations
+        serialization_handler.serializeLayerSplitInfo(tiles_layer.size(),
+                                                      *detailed_split);  // info with cluster_ not with /#
 
         if (!Cycles::isErrorCode(cost)) {
             if (!prefetching) {
@@ -758,8 +669,11 @@ protected:
                     auto one_tile_w_cost = OneTileWeightsPrefetching(one_tile_layer);  // contains latency
                     w_costs.push_back(one_tile_w_cost);
                 }
-                const auto pipelined_cost =
-                        dpu_schedule(get_dma_ports(layer.device), w_costs);  // pipelines on dma channels
+                const auto pipelined_cost = dpu_schedule(get_HWPerformance()
+                                                                 .get_hw_info(layer.device)
+                                                                 .get_dma_ports(),  // get the number of DMA channels
+                                                         // GlobalHarwdwareCharacteristics::get_dma_ports(layer.device),
+                                                         w_costs);  // pipelines on dma channels
                 const auto prefetching_cost = pipelined_cost;
                 cost = Cycles::cost_adder(cost, prefetching_cost);
 
@@ -800,9 +714,7 @@ protected:
                             << "\n";
         }
 
-        if (isSerializationON()) {  //??
-            serializer.clean_buffers();
-        }
+        // serialization_handler.cleanBuffers();
 
         return cost;
     }
@@ -816,27 +728,20 @@ protected:
             const std::optional<VPUTilingStrategy> strategyOfSplit =
                     (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
     ) const {
-        const bool is_serialization_inhibited{(!strategyOfSplit.has_value()) ||
-                                              (fullLayerHash == 0)};  // no value no serialization
-
-        auto isSerializationON = [this, &is_serialization_inhibited]() {
-            // enabled and NOT inhibited!
-            return presplit_serializer.is_serialization_enabled() && !is_serialization_inhibited;
-        };
-
-        const size_t serializer_layer_uid{fullLayerHash};  ///< only for serialize ops
-        const bool is_serializer_local_instance_for_detailed_split{isSerializationON() && (nullptr == detailed_split)};
-        const std::unique_ptr<LayerSplitInfo> self_delete_detailed_split_guard{
-                is_serializer_local_instance_for_detailed_split ? new LayerSplitInfo() : nullptr};
-        if (is_serializer_local_instance_for_detailed_split) {
-            detailed_split = self_delete_detailed_split_guard.get();
-        }
-
         // add missing info by deducing it (not anymore received by params)
         VPUTilingStrategy strategy{strategyOfSplit.value_or(VPUTilingStrategy::UNKNOWN)};  //< unknown
         unsigned int nTiles{(unsigned int)layers_pre_split.size()};
         VPUDevice device{nTiles ? layers_pre_split[0].device : VPUDevice::__size};
         //  end of missing info
+
+        // serialization init logic
+        const bool is_serialization_inhibited{(!strategyOfSplit.has_value()) ||
+                                              (fullLayerHash == 0)};  // no value no serialization
+        const L2CostSerializationWrap::LayerSerializationContext pre_split_ctxt{nDPU, nTiles, strategy, device};
+        L2CostSerializationWrap serialization_handler(presplit_serializer, pre_split_ctxt, the_layer_validator,
+                                                      dpu_cost_provider,
+                                                      L2CostSerializationWrap::pre_split_info_content, detailed_split,
+                                                      is_serialization_inhibited, fullLayerHash);
 
         // there is no layer to be serialized! only the split layers
         if (detailed_split) {  // always
@@ -939,74 +844,13 @@ protected:
         CyclesInterfaceType cost = extractLargestTime(tiles_cost);
 
         // serialize the complete detailed splits (needs layer info)
-        if (isSerializationON()) {  // has to be factored out
-            try {
-                presplit_serializer.serialize(SerializableField<CyclesInterfaceType>{"vpunn_cycles", cost});
-                presplit_serializer.serialize(SerializableField{"n_computed_tiles", tiles_layer.size()});
-                presplit_serializer.serialize(SerializableField<std::string>{"level", "layer"});
-                presplit_serializer.serialize(
-                        SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)});
-                presplit_serializer.end();
+        serialization_handler.serializeCyclesAndLayerTilesInfo_closeLine(cost, tiles_layer.size());
 
-                auto& cfg = the_layer_validator.getDeviceConfiguratorForTiles(device);
-
-                int idx = 0;
-                for (const auto& split : *detailed_split) {
-                    const auto op = DPUOperation(split.inter_tile_split_layer, cfg);
-                    const auto& spliLayer{split.inter_tile_split_layer};
-
-                    presplit_serializer.serialize(
-                            op, SerializableField<decltype(nTiles)>{"n_requested_tiles", nTiles},
-                            SerializableField{"n_computed_tiles", tiles_layer.size()},
-                            SerializableField<decltype(nDPU)>{"n_dpu", nDPU},
-                            SerializableField<decltype(strategy)>{"tiling_strategy", strategy},
-                            SerializableField<std::string>{"level", "layer_tile_split"},
-                            SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)},
-                            SerializableField<std::string>{"info",
-                                                           spliLayer.get_layer_name() + "/#_" + std::to_string(idx)},
-                            SerializableField<std::string>{"name", spliLayer.get_compiler_pass()});
-
-                    presplit_serializer.serialize(
-                            SerializableField<CyclesInterfaceType>{"vpunn_cycles", split.best_intra_tile_split.first});
-                    presplit_serializer.end();
-
-                    for (size_t split_idx = 0; split_idx < split.all_intra_tile_splits.size(); split_idx++) {
-                        const auto& wls = split.all_intra_tile_splits[split_idx];
-
-                        for (size_t wl_idx = 0; wl_idx < wls.workloads.size(); wl_idx++) {
-                            const auto& wl = wls.workloads[wl_idx];
-                            const auto& wl_cost = wls.cycles[wl_idx];
-                            auto wl_op = DPUOperation(wl, get_cost_model().getSanitizerDeviceConfiguration(wl.device));
-                            auto ss = std::stringstream();
-                            ss << wl_op;
-                            std::hash<std::string> hasher;
-                            const size_t wl_uid = hasher(ss.str());
-
-                            presplit_serializer.serialize(
-                                    wl_op, SerializableField<decltype(nTiles)>{"n_requested_tiles", nTiles},
-                                    SerializableField{"n_computed_tiles", tiles_layer.size()},
-                                    SerializableField<decltype(nDPU)>{"n_dpu", nDPU},
-                                    SerializableField<decltype(strategy)>{"tiling_strategy", strategy},
-                                    SerializableField<std::string>{"level", "intra_tile_split"},
-                                    SerializableField<std::string>{"layer_uid", std::to_string(serializer_layer_uid)},
-                                    SerializableField<std::string>{
-                                            "info", spliLayer.get_layer_name() + "/#_" + std::to_string(idx)},
-                                    SerializableField<std::string>{"intra_tile_seq_id",
-                                                                   "its_" + std::to_string(split_idx)},
-                                    SerializableField<std::string>{"name", spliLayer.get_compiler_pass()},
-                                    SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)});
-                            presplit_serializer.serialize(
-                                    SerializableField<CyclesInterfaceType>{"vpunn_cycles", wl_cost});
-                            presplit_serializer.end();
-                        }
-                    }
-                    idx++;
-                }
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                presplit_serializer.clean_buffers();
-            }
-        }
+        // serialize the complete detailed splits
+        // should DO ONLY if no previous serialization error! Think about how to handler these situations
+        serialization_handler.serializeLayerSplitInfo(
+                tiles_layer.size(), *detailed_split);  // info with cluster_ not with /#, but it should
+                                                       // have been with # fro presplit layers part
 
         if (!Cycles::isErrorCode(cost)) {
             if (!prefetching) {
@@ -1020,7 +864,10 @@ protected:
                     auto one_tile_w_cost = OneTileWeightsPrefetching(one_tile_layer);  // contains latency
                     w_costs.push_back(one_tile_w_cost);
                 }
-                const auto pipelined_cost = dpu_schedule(get_dma_ports(device), w_costs);  // pipelines on dma channels
+                const auto pipelined_cost = dpu_schedule(
+                        get_HWPerformance().get_hw_info(device).get_dma_ports(),  // get the number of DMA channels
+                        // GlobalHarwdwareCharacteristics::get_dma_ports(device),
+                        w_costs);  // pipelines on dma channels
                 const auto prefetching_cost = pipelined_cost;
                 cost = Cycles::cost_adder(cost, prefetching_cost);
 
@@ -1098,8 +945,106 @@ protected:
                             << ", nTiles: " << nTiles << "\n";
         }
 
-        if (isSerializationON()) {  //??
-            presplit_serializer.clean_buffers();
+        // serialization_handler.cleanBuffers();
+
+        return cost;
+    }
+
+    CyclesInterfaceType layer_pre_split_cycles(
+            VPUCostModel& shave_cost_provider, // cost model to be used
+            const std::vector<SHAVEWorkload>& layers_pre_split, unsigned int nSHV = 1, 
+            bool input_in_ddr = false, bool output_in_ddr = false
+    ) const {
+        // add missing info by deducing it (not anymore received by params)
+        unsigned int nTiles{(unsigned int)layers_pre_split.size()};
+        VPUDevice device{nTiles ? layers_pre_split[0].get_device() : VPUDevice::__size};
+        //  end of missing info
+
+        // sanitize
+        if (nTiles == 0) {
+            Logger::warning() << "Number of tiles can't be zero, should be at least one!";
+            return Cycles::ERROR_L2_INVALID_PARAMETERS;
+        }
+
+        std::vector<CyclesInterfaceType> tiles_cost;          // cost of each tile
+        std::vector<SHAVEWorkload> tiles_layer{layers_pre_split};  //< layers are already split, make a copy
+
+        // split the layer section, all splits
+        {
+            {  // tile-layers must be verified to be valid
+                SanityReport post_result;
+
+                if (0 >= tiles_layer.size()) {  // no split present
+                    post_result.mark_split_error();
+                }
+
+                if (!post_result.is_usable()) {
+                    return post_result.value();  // EARLY RETURN
+                }
+            }  // inter tile layers sanitized and validated
+
+            for (auto& one_tile_layer : tiles_layer) {
+                try {
+                    std::string infoOut{};
+                    const auto cycles =static_cast<CyclesInterfaceType>((float)shave_cost_provider.SHAVE(one_tile_layer, infoOut) / (float)nSHV);
+                    tiles_cost.push_back(cycles);
+
+                } catch (const std::exception& e) {
+                    Logger::warning() << "\n Exception thrown while performing intra tile split "
+                                      << "\n Exception: " << e.what() << "\n *** This LAYER: "
+                                      << "\n " << one_tile_layer << ", nSHV: " << nSHV << ", nTiles: " << nTiles
+                                      << "\nResult: this tile will have error result ERROR_TILE_SPLIT_EXCEPTION: "
+                                      << (CyclesInterfaceType)Cycles::ERROR_TILE_SPLIT_EXCEPTION << " \n";
+
+                    // add the error result
+                    tiles_cost.push_back((CyclesInterfaceType)Cycles::ERROR_TILE_SPLIT_EXCEPTION);  // big value
+                }
+            }
+        }  // split the layer section, all splits
+
+        // The cost of the worst case in the tiles (since error codes are large the largest error code will dominate
+        // any regular value)
+        CyclesInterfaceType cost = extractLargestTime(tiles_cost);
+
+        if (!Cycles::isErrorCode(cost)) {
+            // Data fetch time is computed considering the split layers input tensors, that are summed up.
+            if (input_in_ddr) {
+                // Add cost of loading input activation from DDR to CMX
+                std::vector<CyclesInterfaceType> dma_costs;
+                for (auto& one_tile_layer : tiles_layer) {
+                    const auto& inTs{one_tile_layer.get_inputs()}; // Multiple inputs possible
+                    CyclesInterfaceType one_tile_cost{};
+                    for(const auto& inT : inTs)
+                        one_tile_cost +=
+                            compute_dma_cycles({device, static_cast<int>(inT.size()), MemoryDirection::DDR2CMX});
+                    dma_costs.push_back(one_tile_cost);
+                }
+
+                const auto sum_dma_layers = std::accumulate(dma_costs.begin(), dma_costs.end(), 0u, Cycles::cost_adder);
+                cost = Cycles::cost_adder(cost, sum_dma_layers);
+            }
+
+            // Data fetch time is computed considering the split layers output tensors, that are summed up.
+            if (output_in_ddr) {
+                // Add cost of spilling output activation from CMX to DDR
+                std::vector<CyclesInterfaceType> dma_costs;
+                for (auto& one_tile_layer : tiles_layer) {
+                    const auto& outTs{one_tile_layer.get_outputs()};
+                    CyclesInterfaceType one_tile_cost{};
+                    for (const auto& outT : outTs)
+                        one_tile_cost +=
+                            compute_dma_cycles({device, static_cast<int>(outT.size()), MemoryDirection::CMX2DDR});
+                    dma_costs.push_back(one_tile_cost);
+                }
+
+                const auto sum_dma_layers = std::accumulate(dma_costs.begin(), dma_costs.end(), 0u, Cycles::cost_adder);
+                cost = Cycles::cost_adder(cost, sum_dma_layers);
+            }
+
+        } else {
+            Logger::error() << "\n Layer cost has an error, skipping DMA/memory time computation: "
+                            << "ERROR code: " << cost << " : " << Cycles::toErrorText(cost) << "\n"
+                            << ", nSHV: " << nSHV << ", nTiles: " << nTiles << "\n";
         }
 
         return cost;
@@ -1160,6 +1105,7 @@ public:
         return Layer(layer, strategy.nSHVs, strategy.nTiles, strategy.input_fetching, strategy.output_spilling);
     }
 
+
     /**
      * @brief Compute the optimal cost of a SHV kernel
      *
@@ -1211,7 +1157,7 @@ public:
                               const bool input_in_ddr = false, const bool output_in_ddr = false) const {
         // For shave layer we use a simplistic model, as we assume the cost can be scale up to 4 tiles
         std::string infoOut;
-        const CyclesInterfaceType single_shv_cost = get_SHV_cost_model().SHAVE_2(layer, infoOut);
+        const CyclesInterfaceType single_shv_cost = get_SHV_cost_model().SHAVE(layer, infoOut);
         if (Cycles::isErrorCode(single_shv_cost)) {
             Logger::error() << "\n While analyzing a SHAVEWorkload, the cycle time value was with error: "
                             << "ERROR code: " << single_shv_cost << " : " << Cycles::toErrorText(single_shv_cost)
@@ -1312,32 +1258,10 @@ public:
      * @return std::vector<VPUTilingStrategy>
      */
     static std::vector<VPUTilingStrategy> getValidTilingStrategies(const VPUDevice& device) {
-        switch (device) {
-        case VPUDevice::VPU_2_0:
-        case VPUDevice::VPU_2_1:
-        case VPUDevice::VPU_2_7:
-            return {
-                    VPUTilingStrategy::NONE,            //
-                    VPUTilingStrategy::SOH_Overlapped,  //
-                    VPUTilingStrategy::SOK
-                    /*,VPUTilingStrategy::SOH_HaloRead, VPUTilingStrategy::SOHO_K_SWITCH,
-                       VPUTilingStrategy::SOH_K_SWITCH */
-            };
-        case VPUDevice::VPU_4_0:
-        case VPUDevice::NPU_RESERVED:
-        case VPUDevice::NPU_RESERVED_W:
-            return {
-                    VPUTilingStrategy::NONE,            //
-                    VPUTilingStrategy::SOH_Overlapped,  //
-                    VPUTilingStrategy::SOK,
-                    VPUTilingStrategy::SOW,
-                    VPUTilingStrategy::SOHW,
-                    VPUTilingStrategy::SOHK,
-                    VPUTilingStrategy::SOHO_K_SWITCH,
-            };
-        default:
+        if (device >= VPUDevice::__size)
             return {};
-        }
+        else
+            return LayerPropertiesHolder::get_properties(device).getValidTilingStrategies();
     }
 };
 

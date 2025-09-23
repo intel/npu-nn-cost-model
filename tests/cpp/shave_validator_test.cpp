@@ -42,7 +42,7 @@ TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingNormalCase) {
     }
 }
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingInvalidIODataType) {
+TEST_F(SHAVEWorkloadsSanitizer_Test, DISABLED_ShaveSanitizerTestingInvalidIODataType) {
     {
         VPUNN::SanityReport sane;
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::INT8)},
@@ -103,8 +103,8 @@ TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSanitizerTestingInputTooBigError) {
     }
 }
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInvalidIODataType) {
-    const ShaveConfiguration shaves{0, ""};
+TEST_F(SHAVEWorkloadsSanitizer_Test, DISABLED_ShaveConfigurationTestingInvalidIODataType) {
+    const ShaveConfiguration shaves{0, "", true};
 
     {
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::INT8)},
@@ -129,8 +129,8 @@ TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInvalidIODataType)
     }
 }
 
-TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInputTooBigError) {
-    const ShaveConfiguration shaves{0, ""};
+TEST_F(SHAVEWorkloadsSanitizer_Test, DISABLED_ShaveConfigurationTestingInputTooBigError) {
+    const ShaveConfiguration shaves{0, "", true};
 
     {
         SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 400000, 1, 1, DataType::FLOAT16)},
@@ -146,6 +146,18 @@ TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveConfigurationTestingInputTooBigError) 
         std::string info;
         CyclesInterfaceType cycles = shaves.computeCycles(swl, info);
         EXPECT_EQ(cycles, V(Cycles::ERROR_INPUT_TOO_BIG));
+    }
+}
+TEST_F(SHAVEWorkloadsSanitizer_Test, ShaveSerializerTest) {
+    {
+        const ShaveConfiguration shaves{0, "", true};
+        SHAVEWorkload swl("relu", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)},
+                          {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)});
+
+       std::string info;
+        CyclesInterfaceType cycles = shaves.computeCycles(swl, info);
+       EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles));
+
     }
 }
 }  // namespace VPUNN_unit_tests

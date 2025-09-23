@@ -266,7 +266,7 @@ enum class NNVersionsDMA : int {
     VERSION_00_LATEST_NONE = 0,  ///< no version OR last version
     VERSION_01_27 = 1,           ///< initial version, first one for 2.7
     VERSION_02_40 = 2,           ///< 6D dedicated to 4.0+
-    VERSION_03_50_v1 = 3,        ///< 6D dedicated to 5.0 iteration 1 . Probably supports max 2D
+    VERSION_03_RESERVED_v1 = 3,        ///< 6D dedicated to RESERVED iteration 1 . Probably supports max 2D
 };
 
 }  // namespace VPUNN

@@ -58,6 +58,7 @@ protected:
 
     VPUNN::VPUCostModel ideal_model{""};  // model without NN, output is interface 1-hw overhead
     const IEnergy& my_energy_ideal_model = ideal_model.getEnergyInterface();
+    const HWPerformanceModel& performance_ideal_model{ideal_model.getPerformanceModel()};
 
 private:
 };
@@ -67,7 +68,7 @@ TEST_F(TestNNModelCompatibility, Ideal_Empty_Model) {
     {
         VPUNN::DPUWorkload wl{wl_20};
         const auto theoretical_dpu_cycles = ideal_model.DPU(wl);  //
-        const auto ideal_dpu_cycles{ideal_model.DPU_Power_IdealCycles(wl)};
+        const auto ideal_dpu_cycles{performance_ideal_model.DPU_Power_IdealCycles(wl)};
         float theoretical_hw_util = my_energy_ideal_model.hw_utilization(wl);  // a float
 
         EXPECT_NEAR(theoretical_hw_util, (float)ideal_dpu_cycles / (float)theoretical_dpu_cycles, epsilon);
@@ -77,7 +78,7 @@ TEST_F(TestNNModelCompatibility, Ideal_Empty_Model) {
     {
         VPUNN::DPUWorkload wl{wl_27};
         const auto theoretical_dpu_cycles = ideal_model.DPU(wl);  //
-        const auto ideal_dpu_cycles{ideal_model.DPU_Power_IdealCycles(wl)};
+        const auto ideal_dpu_cycles{performance_ideal_model.DPU_Power_IdealCycles(wl)};
         float theoretical_hw_util = my_energy_ideal_model.hw_utilization(wl);  // a float
 
         EXPECT_NEAR(theoretical_hw_util, (float)ideal_dpu_cycles / (float)theoretical_dpu_cycles, epsilon);
@@ -156,7 +157,7 @@ TEST_F(TestNNModelCompatibility, VPU_10_2) {
     EXPECT_GE(hw_util, 0.35F);
 
     const auto theoretical_dpu_cycles = ideal_model.DPU(wl);              //
-    const auto ideal_dpu_cycles = ideal_model.DPU_Power_IdealCycles(wl);  //
+    const auto ideal_dpu_cycles = performance_ideal_model.DPU_Power_IdealCycles(wl);  //
 
     EXPECT_NEAR(dpu_cycles / (ideal_dpu_cycles / hw_util), 1.0F, epsilon)
             << " info: " << dpu_cycles << ", ideal: " << ideal_dpu_cycles
@@ -189,7 +190,7 @@ TEST_F(TestNNModelCompatibility, VPU_11_2) {
     EXPECT_GE(hw_util, 0.37F);
 
     const auto theoretical_dpu_cycles = ideal_model.DPU(wl);              //
-    const auto ideal_dpu_cycles = ideal_model.DPU_Power_IdealCycles(wl);  //
+    const auto ideal_dpu_cycles = performance_ideal_model.DPU_Power_IdealCycles(wl);  //
 
     EXPECT_NEAR(dpu_cycles / (ideal_dpu_cycles / hw_util), 1.0F, epsilon)
             << " info: " << dpu_cycles << ", ideal: " << ideal_dpu_cycles

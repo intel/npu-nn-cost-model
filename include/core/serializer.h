@@ -289,13 +289,7 @@ public:
         if constexpr (FMT == FileFormat::CSV) {
             // Read header line
             std::getline(file_stream, header_line);
-
-            // Decode header line
-            std::istringstream header_line_ss(header_line);
-            std::string key;
-            while (std::getline(header_line_ss, key, ',')) {
-                header_keys.push_back(key);
-            }
+            header_keys = split_csv_line(header_line);
 
         } else if constexpr (FMT == FileFormat::TEXT) {
             // TODO: settle on a header format for text files
@@ -395,16 +389,7 @@ public:
 
         if constexpr (FMT == FileFormat::CSV) {
             // Decode CSV line
-            // TODO: Handle cells where content is between quotes
-            // eg. cell1, cell2, "cell3,other stuff"
-            // should be decoded into 3 cells instead of 4
-            while (std::getline(iss, token, ',')) {  // fails to read and empty info after last  delimiter
-                read_tokens.push_back(token);
-            }
-            const auto last{line.rbegin()};  // special handling for empty last
-            if ((last != line.crend()) && (*last == ',')) {
-                read_tokens.push_back("");  // empty last
-            }
+            read_tokens = split_csv_line(line);
         } else if constexpr (FMT == FileFormat::TEXT) {
             // TODO
         }
@@ -429,6 +414,33 @@ private:
     std::filesystem::path file_path{};             ///> Absolute path to the file
     FileMode file_open_mode{};                     ///> File open mode
     std::vector<std::streampos> line_positions{};  ///> Store the position of each line in the file
+
+    /// @brief Trims leading and trailing whitespace (including newlines) from a string, in-place.
+    inline void trim(std::string& s){
+        s.erase(s.find_last_not_of(" \t\r\n") + 1);
+        s.erase(0, s.find_first_not_of(" \t\r\n"));
+    }
+
+    /// @brief Splits a CSV line into tokens, trimming whitespace from each token.
+    /// Handles empty trailing fields.
+    inline std::vector<std::string>
+    split_csv_line(const std::string& line) {
+        std::vector<std::string> tokens;
+        std::string token;
+        std::istringstream iss(line);
+        // TODO: Handle cells where content is between quotes
+        // eg. cell1, cell2, "cell3,other stuff"
+        // should be decoded into 3 cells instead of 4
+        while (std::getline(iss, token, ',')) {
+            trim(token);
+            tokens.push_back(token);
+        }
+        // Handle trailing comma (empty last field)
+        if (!line.empty() && line.back() == ',') {
+            tokens.push_back("");
+        }
+        return tokens;
+    }
 };
 
 /**

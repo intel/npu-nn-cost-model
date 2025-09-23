@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include "common_helpers.h"
 #include "vpu/cycles_interface_types.h"
+#include "vpu/dpu_theoretical_cost_provider.h"
 
 #include <algorithm>
 #include <unordered_map>
@@ -130,6 +131,8 @@ protected:
     std::vector<DPUWorkload> wl_list_sparse{wl_conv, wl_ELT};           // only supported
     std::vector<DPUWorkload> wl_list_FP_sparse{wl_conv_FP, wl_ELT_FP};  // only supported
 
+    const HWPerformanceModel performanceProvider{};
+
     void SetUp() override {
         // TestCostModel::SetUp();
     }
@@ -148,16 +151,19 @@ protected:
         DPUWorkload wl{workload};
 
         const VPUPowerFactorLUT power_factor_lut;
-        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider);
         const float exceedMax = power_factor_lut.get_PowerVirus_exceed_factor(wl.device);
 
         const IEnergy& my_energy = crt_model.getEnergyInterface();
+        const HWPerformanceModel& performance{crt_model.getPerformanceModel()};
+        const DPUTheoreticalCostProvider& dpu_theoretical{performanceProvider};
+
         const auto energy = crt_model.DPUEnergy(wl);
         const auto af = my_energy.DPUActivityFactor(wl);
         const auto util = my_energy.hw_utilization(wl);
-        const auto util_idealCyc = crt_model.DPU_Power_IdealCycles(wl);
-        const auto efficiency_idealCyc = crt_model.DPU_Efficency_IdealCycles(wl);
-        const auto theorCyc = crt_model.DPUTheoreticalCycles(wl);
+        const auto util_idealCyc = performance.DPU_Power_IdealCycles(wl);
+        const auto efficiency_idealCyc = performance.DPU_Efficency_IdealCycles(wl);
+        const auto theorCyc = dpu_theoretical.DPUTheoreticalCycles(wl);
         std::string errInfo;
         const auto nnCyc = crt_model.DPU(wl, errInfo);
 
@@ -187,15 +193,18 @@ protected:
     void basicDPUPackEquivalenceTest(const DPUWorkload& workload, VPUCostModel& crt_model, std::string info = "") {
         DPUWorkload wl{workload};
         const VPUPowerFactorLUT power_factor_lut;
-        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider);
 
         const IEnergy& my_energy = crt_model.getEnergyInterface();
+        const HWPerformanceModel& performance{crt_model.getPerformanceModel()};
+        const DPUTheoreticalCostProvider& dpu_theoretical{performanceProvider};
+
         const auto energy = crt_model.DPUEnergy(wl);
         const auto af = my_energy.DPUActivityFactor(wl);
         const auto util = my_energy.hw_utilization(wl);
-        const auto util_idealCyc = crt_model.DPU_Power_IdealCycles(wl);
-        const auto efficiency_idealCyc = crt_model.DPU_Efficency_IdealCycles(wl);
-        const auto theorCyc = crt_model.DPUTheoreticalCycles(wl);
+        const auto util_idealCyc = performance.DPU_Power_IdealCycles(wl);
+        const auto efficiency_idealCyc = performance.DPU_Efficency_IdealCycles(wl);
+        const auto theorCyc = dpu_theoretical.DPUTheoreticalCycles(wl);
         std::string errInfo;
         const auto nnCyc = crt_model.DPU(wl, errInfo);
 
@@ -230,7 +239,7 @@ protected:
         DPUWorkload wl{workload};
 
         const VPUPowerFactorLUT power_factor_lut;
-        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl);
+        const float operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider);
 
         // const auto energy = crt_model.DPUEnergy(wl);
         // const auto af = crt_model.DPUActivityFactor(wl);
@@ -358,6 +367,8 @@ protected:
     const std::array<unsigned int, 4> padding{1, 1, 1, 1};             ///< kernel padding  Top, Bottom, Left,  Right
     const ExecutionMode execution_order{ExecutionMode::CUBOID_16x16};  ///< execution mod
 
+    const HWPerformanceModel performanceProvider{};
+
     void SetUp() override {
         //        TestCostModel::SetUp();
     }
@@ -381,7 +392,9 @@ TEST_F(TestVPUPowerFactorLUT, InsideMatchSamples) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.92F * refPowerVirusFactor, 0.005) << wl;
     }
     {
@@ -395,7 +408,9 @@ TEST_F(TestVPUPowerFactorLUT, InsideMatchSamples) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.95F * refPowerVirusFactor, 0.005) << wl;
     }
     {
@@ -409,7 +424,9 @@ TEST_F(TestVPUPowerFactorLUT, InsideMatchSamples) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.005) << wl;
     }
 
@@ -425,7 +442,9 @@ TEST_F(TestVPUPowerFactorLUT, InsideMatchSamples) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, ((0.95F + 0.86F) / 2) * refPowerVirusFactor, 0.001) << wl;
     }
 
@@ -441,7 +460,9 @@ TEST_F(TestVPUPowerFactorLUT, InsideMatchSamples) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, (1.0F + 0.333F * (0.95F - 1.0F)) * refPowerVirusFactor, 0.001) << wl;
     }
 }
@@ -459,7 +480,9 @@ TEST_F(TestVPUPowerFactorLUT, BeforeFirstSample) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
     {
@@ -473,7 +496,9 @@ TEST_F(TestVPUPowerFactorLUT, BeforeFirstSample) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
     // just before it
@@ -488,7 +513,9 @@ TEST_F(TestVPUPowerFactorLUT, BeforeFirstSample) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
     // exactly at first
@@ -503,7 +530,9 @@ TEST_F(TestVPUPowerFactorLUT, BeforeFirstSample) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
 }
@@ -521,7 +550,9 @@ TEST_F(TestVPUPowerFactorLUT, AfterLastSample) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
     {
@@ -535,7 +566,9 @@ TEST_F(TestVPUPowerFactorLUT, AfterLastSample) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
     {
@@ -549,7 +582,9 @@ TEST_F(TestVPUPowerFactorLUT, AfterLastSample) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << wl;
         EXPECT_NEAR(operation_pf, 0.87F * refPowerVirusFactor, 0.001) << wl;
     }
 }
@@ -573,7 +608,9 @@ TEST_F(TestVPUPowerFactorLUT, NPU40_AvailabilitySmoke) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << "FP16" << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << "FP16" << wl;
         EXPECT_NEAR(operation_pf, 1.3f, 0.005) << "FP16" << wl;
     }
     {  // fp8
@@ -590,7 +627,9 @@ TEST_F(TestVPUPowerFactorLUT, NPU40_AvailabilitySmoke) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << "FP8" << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << "FP8" << wl;
         EXPECT_NEAR(operation_pf, 0.0f, 0.005) << "FP8" << wl;
     }
     {  // int8
@@ -607,7 +646,9 @@ TEST_F(TestVPUPowerFactorLUT, NPU40_AvailabilitySmoke) {
                        execution_order};
 
         float operation_pf{0.0f};
-        ASSERT_NO_THROW(operation_pf = power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl)) << "I8 " << wl;
+        ASSERT_NO_THROW(operation_pf =
+                                power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+                << "I8 " << wl;
         EXPECT_NEAR(operation_pf, 1.0f, 0.005) << "I8 " << wl;
     }
 }

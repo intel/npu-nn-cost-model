@@ -26,7 +26,7 @@ namespace VPUNN {
 class VPUComputeNode {
 private:
     std::shared_ptr<DPULayer> dpu;
-    std::shared_ptr<SWOperation> shv;
+    std::shared_ptr<SHAVEWorkload> shv;
     int _hash;
 
 public:
@@ -61,7 +61,7 @@ public:
      *
      * @param shv_op a SHV layer
      */
-    VPUComputeNode(const std::shared_ptr<SWOperation>& shv_op): shv(shv_op) {
+    VPUComputeNode(const std::shared_ptr<SHAVEWorkload>& shv_op): shv(shv_op) {
         std::random_device rd;   // create a random device to obtain a seed for the random number generator
         std::mt19937 gen(rd());  // initialize the random number generator with the random seed
         std::uniform_int_distribution<int> distrib(0, RAND_MAX);  // uniform distribution, range{0, RAND_MAX}

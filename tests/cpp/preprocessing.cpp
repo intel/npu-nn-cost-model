@@ -2068,6 +2068,7 @@ TEST_F(TestPreprocessing_Interface14, wI2_MappingTo_wI4) {
 TEST_F(TestPreprocessing_Interface14, EISXW164800_Tensor_CH_padding) {
     auto pp = Preprocessing_Interface14<float>();
     size_t data_written = 0;
+
     DPUWorkload wl_ref{
             VPUDevice::NPU_RESERVED,
             Operation::ELTWISE,

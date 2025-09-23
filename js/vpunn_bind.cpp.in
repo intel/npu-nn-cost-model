@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <vpu/types.h>
 #include <vpu_cost_model.h>
-#include "vpu/shave/layers.h"
 
 #define SW_LAYER_ENUMERATIONS @SW_LAYER_ENUMERATIONS@
 #define SW_LAYER_BINDINGS @SW_LAYER_BINDINGS@
@@ -38,10 +37,8 @@ DMAWorkload createDMA(VPUDevice device, VPUTensor& inT, VPUTensor& outT, MemoryL
     return DMAWorkload({device, inT, outT, input_location, output_location, output_write_tiles});
 }
 
-std::unique_ptr<SWOperation> createSHV(VPUDevice device, SWActivationFunction op, VPUTensor& inT, VPUTensor& outT) {
-    switch (op) {
-        SW_LAYER_SWITCH_CASE
-    }
+SHAVEWorkload createSHV(const std::string& operation_name, const VPUDevice& device, const VPUTensor& input, const VPUTensor& output) {
+    return SHAVEWorkload(operation_name, device, {input}, {output});
 }
 
 std::unique_ptr<VPUCostModel> createVPUCostModel(std::string buff) {
@@ -91,7 +88,7 @@ EMSCRIPTEN_BINDINGS(vpunn) {
             .function("DPU", select_overload<unsigned int(DPUWorkload) const>(&VPUCostModel::DPU))
             .function("DMA", select_overload<unsigned int(VPUDevice, const VPUTensor&, const VPUTensor&, MemoryLocation, MemoryLocation, unsigned int) const>(
                                      &VPUCostModel::DMA))
-            .function("SHAVE", select_overload<unsigned int(const SWOperation&) const>(&VPUCostModel::SHAVE))
+            .function("SHAVE", select_overload<unsigned int(const SHAVEWorkload&) const>(&VPUCostModel::SHAVE))
             .function("initialized", &VPUCostModel::nn_initialized);
 
     // Helper functions
@@ -113,6 +110,6 @@ EMSCRIPTEN_BINDINGS(vpunn) {
 
     class_<DPUWorkload>("DPUWorkload");
     class_<DMAWorkload>("DMAWorkload");
-    class_<SWOperation>("SWOperation");
+    class_<SHAVEWorkload>("SHAVEWorkload");
 }
 }

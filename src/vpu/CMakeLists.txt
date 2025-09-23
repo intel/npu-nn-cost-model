@@ -10,7 +10,7 @@
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../include)
 include_directories(${FLATBUFFERS_SRC_DIR}/include)
 
-add_library(vpunn_vpu ./validation/checker_utils.cpp ./validation/data_dpu_operation.cpp energy_impl.cpp)
+add_library(vpunn_vpu ./validation/checker_utils.cpp ./validation/data_dpu_operation.cpp energy_impl.cpp "layer.cpp" )
 add_dependencies(vpunn_vpu cpp_schema)
 target_link_libraries(vpunn_vpu flatbuffers ${VPUNN_HTTP_CLIENT_LIB})
 

@@ -74,6 +74,7 @@ private:
     };
 
     inline static const int weigths_alignment_def{32};
+    inline static const int out_innermost_dim_alignment_def{16};  ////bytes
     inline static const int input_heigth_start_factor_SOH_def{1};
 
     static constexpr int alignement_size_bytes_def{16384};  // 16KB or 32KB?
@@ -162,7 +163,8 @@ public:
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
-                                 alignement_size_bytes_def) {};
+                                 alignement_size_bytes_def,          //
+                                 out_innermost_dim_alignment_def) {};
 
     /// constructor with link to operations dynamic behavior, input channels rules and restrictions
     VPU4_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
@@ -179,8 +181,9 @@ public:
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
-                                 alignement_size_bytes_def),
-              input_channels_restrictions{input_channels_restrictions_}{};
+                                 alignement_size_bytes_def,          //
+                                 out_innermost_dim_alignment_def),
+              input_channels_restrictions{input_channels_restrictions_} {};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden (and input channels
     /// rules)
@@ -199,8 +202,9 @@ public:
                                  input_heigth_start_factor_SOH_,     // special
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
-                                 alignement_size_bytes_def),
-              input_channels_restrictions{input_channels_restrictions_}{};
+                                 alignement_size_bytes_def,          //
+                                 out_innermost_dim_alignment_def),
+              input_channels_restrictions{input_channels_restrictions_} {};
 
     MultiSmartRanges get_output_channels_restriction(const DPUOperation&) const override {
         return output_channels_restrictions;
@@ -214,8 +218,9 @@ public:
         return batch_restrictions;
     }
 
-    inline static const SmartRanges allValues_range{1, SmartRanges::max_limit};  /// a SmartRange that contains all possible values,
-                                                                                 /// from 1 to maxim number accepted => [1, max_limit] 
+    inline static const SmartRanges allValues_range{
+            1, SmartRanges::max_limit};  /// a SmartRange that contains all possible values,
+                                         /// from 1 to maxim number accepted => [1, max_limit]
 
     Layout adapt_device_comaptible_tensor_layout(Layout layout) const override {
         if (layout == Layout::ZMAJOR) {

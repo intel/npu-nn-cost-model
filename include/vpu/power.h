@@ -19,6 +19,7 @@
 #include "vpu/types.h"
 #include "vpu/utils.h"
 // #include "vpunn.h"
+#include "vpu/vpu_performance_model.h"
 
 namespace VPUNN {
 
@@ -35,9 +36,17 @@ private:
     // unsigned int key represents the log2(number of input channels)
     // and the float value represents the power factor calculated based on simulation measurements
 
+    struct AdjustmentAtEnd {
+        float int8_adjustor{1.0f};
+        float fp16_adjustor{1.0f};
+        float fpx8_adjustor{1.0f};
+    };
+
     struct Device_LUT {
         VPUDevice device;
         float maxvirus;
+        AdjustmentAtEnd adjusters{};  ///< adjusters for the final result
+        // lut for all types
         lut_t int8_lut;
         lut_t fp16_lut;
         lut_t fp8_lut{};
@@ -110,7 +119,10 @@ private:
                              {7, 232.71f * getFP_overI8_maxPower_ratio()},
                      }},
             };
-            const device_lut_t this_device{VPUDevice::VPU_2_0, virus_logical_limit,  std::move(vpu_values_int),  std::move(vpu_values_fp16)};
+            const device_lut_t this_device{VPUDevice::VPU_2_0, virus_logical_limit,
+                                           AdjustmentAtEnd(),  // no adjusters for VPU2.0
+                                           std::move(vpu_values_int), std::move(vpu_values_fp16)};
+            // clang and gcc does not support to use std::move here, so we need suppression
             /* coverity[copy_instead_of_move] */
             return this_device;
         }
@@ -177,7 +189,10 @@ private:
                              {8, 5.0f * getFP_overI8_maxPower_ratio()},
                      }},
             };
-            const device_lut_t this_device{VPUDevice::VPU_2_7, virus_logical_limit,  std::move(vpu_values_int),  std::move(vpu_values_fp16)};
+            const device_lut_t this_device{VPUDevice::VPU_2_7, virus_logical_limit,
+                                           AdjustmentAtEnd(),  // no adjusters for VPU2.7
+                                           std::move(vpu_values_int), std::move(vpu_values_fp16)};
+            // clang and gcc does not support to use std::move here, so we need suppression
             /* coverity[copy_instead_of_move] */
             return this_device;
         }
@@ -203,6 +218,7 @@ private:
                 {PowerVPU40::make_lut() /*VPUDevice::VPU_4_0, vpu_4_0_values_int, vpu_4_0_values_fp16*/},
         };
 
+        // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return pf_lut_l;
     }
@@ -266,16 +282,30 @@ private:
         return 1.0f;  // nothing found , use default
     }
 
-    inline static const lut_t& get_power_lut_based_on_type(const DPUWorkload& wl, const device_lut_t& device_lut) {
-        if (native_comp_on_fp16(wl)) {
+    inline static const lut_t& get_power_lut_based_on_type(const DPUWorkload& wl, const device_lut_t& device_lut,
+                                                           const HWPerformanceModel& performanceInfo) {
+        if (performanceInfo.native_comp_on_fp16(wl)) {
             return device_lut.fp16_lut;  // FP16;
-        } else if (native_comp_on_fp8(wl)) {
+        } else if (performanceInfo.native_comp_on_fp8(wl)) {
             return device_lut.fp8_lut;  // FP8
-        } else if (native_comp_on_i8(wl)) {
+        } else if (performanceInfo.native_comp_on_i8(wl)) {
             return device_lut.int8_lut;  // INT8
         }
 
         return device_lut.int8_lut;  // default to INT8;
+    }
+
+    inline static float get_adjustment_factor_based_on_type(const DPUWorkload& wl, const device_lut_t& device_lut,
+                                                            const HWPerformanceModel& performanceInfo) {
+        if (performanceInfo.native_comp_on_fp16(wl)) {
+            return device_lut.adjusters.fp16_adjustor;  // FP16;
+        } else if (performanceInfo.native_comp_on_fp8(wl)) {
+            return device_lut.adjusters.fpx8_adjustor;  // FP8
+        } else if (performanceInfo.native_comp_on_i8(wl)) {
+            return device_lut.adjusters.int8_adjustor;  // INT8
+        }
+
+        return device_lut.adjusters.int8_adjustor;  // default to INT8;
     }
 
 public:
@@ -287,11 +317,12 @@ public:
      * @param wl the workload for which to compute the factor.
      * @return  the adjustment factor
      */
-    static float getOperationAndPowerVirusAdjustementFactor(const DPUWorkload& wl) {
+    static float getOperationAndPowerVirusAdjustementFactor(const DPUWorkload& wl,
+                                                            const HWPerformanceModel& performanceInfo) {
         //  Get values table for the device
         for (const auto& i_dev : pf_lut) {
             if (i_dev.device == wl.device) {
-                const lut_t& operations_table{get_power_lut_based_on_type(wl, i_dev)};
+                const lut_t& operations_table{get_power_lut_based_on_type(wl, i_dev, performanceInfo)};
 
                 // Get the power factor value
                 for (const auto& i : operations_table) {
@@ -301,7 +332,10 @@ public:
                         const std::map<unsigned int, float>& op_values_map = std::get<1>(i);
                         const auto pf_interpolated{
                                 getValueInterpolation(wl.inputs[0].channels(), op_values_map)};  // type knowing factor
-                        return pf_interpolated;                                                  // early exit OK
+                        const float pf_adjusted{
+                                pf_interpolated *
+                                get_adjustment_factor_based_on_type(wl, i_dev, performanceInfo)};  // type adjuster
+                        return pf_adjusted;                                                        // early exit OK
                     }
                 }
                 return 0.0f;  // error fast, no operation found

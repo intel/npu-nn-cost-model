@@ -26,6 +26,7 @@
 #include <shared_mutex>
 
 #include "vpu/nn_cost_provider_execution_context.h"
+#include "vpu/serialization/l1_cost_serialization_wrapper.h"
 
 namespace VPUNN {
 
@@ -113,19 +114,8 @@ protected:
             const auto infered_value{vpunn_runtime.predict<float>(descriptor, ctx.runtime_buffer_data)[0]};
             cache.add(descriptor, infered_value);
 
-            if (cache_miss_serializer.is_serialization_enabled()) {
-                try {
-                    auto wl_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
-                    const size_t wl_uid = wl_op.hash();
-                    cache_miss_serializer.serialize(
-                            wl_op, SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)},
-                            SerializableField<std::string>{"info", workload.get_layer_info()});
-                    cache_miss_serializer.end();
-                } catch (const std::exception& e) {
-                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                    cache_miss_serializer.clean_buffers();
-                }
-            }
+            L1CostSerializationWrap serialization_handler(cache_miss_serializer, sanitizer);
+            serialization_handler.serializeInfoAndComputeWorkloadUid(workload, true /*serializer close line*/);
 
             postProcessed_value = post_processing.process(workload, infered_value);
         } else {
@@ -249,13 +239,13 @@ public:
     }
 
     /// @brief Only used as a WA to share fixed cache outside of nn_cost_provider - will be removed in future.
-    CyclesInterfaceType get_cached(const DPUWorkload& workload) const {
+    CyclesInterfaceType get_cached(const DPUWorkload& workload, std::string* source = nullptr) const {
         if (!is_initialized()) {
             return Cycles::ERROR_CACHE_MISS;
         }
 
         const std::vector<float> vector = preprocessing.transformSingle(workload);
-        const auto cached_value = cache.get(vector);
+        const auto cached_value = cache.get(vector, source);
         if (!cached_value) {
             return Cycles::ERROR_CACHE_MISS;
         } else {
