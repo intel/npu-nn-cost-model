@@ -212,6 +212,7 @@ public:
 
         if (sample_made_OK) {  // generation done, move generated info to the actual WL
             const DPUWorkload wl{dpu.clone_as_DPUWorkload()};
+            // clang and gcc does not support to use std::move here, so we need suppression 
             /* coverity[copy_instead_of_move] */
             return wl;
         } else {

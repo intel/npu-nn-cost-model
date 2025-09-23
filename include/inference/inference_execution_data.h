@@ -28,6 +28,7 @@
 
 namespace VPUNN {
 /// holds the RW memory that reflects INference model and is used to execute the Model on it.
+/* coverity[rule_of_five_violation:FALSE] */
 class InferenceExecutionData {
 public:
     InferenceExecutionData(const unsigned int batch, const VPUNN_SCHEMA::Model* theModel)

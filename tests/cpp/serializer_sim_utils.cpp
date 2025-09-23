@@ -43,6 +43,7 @@ protected:
         if (found != std::string::npos) {
             const auto start_pos{found + sep.length()};
             const auto gt_str{info.substr(start_pos)};  // till the end
+            // clang and gcc does not support to use std::move here, so we need suppression 
             /* coverity[copy_instead_of_move] */
             return gt_str;
         }
@@ -504,6 +505,75 @@ public:
         }
     }  // method
 
+    auto Shave_Resim_Generic_ModelsList(const std::string& inputCSV, const std::string& outputCSV) {
+        std::cout << "\n Processing : " << inputCSV;
+
+        VPUCostModel empty_model{};
+
+        std::vector<std::string> sim_tags{"model_cost_shave"};
+
+        Serializer<FileFormat::CSV> serializer_IN{true};
+        {
+            // const auto stdfields{createStandardFieldNames()};
+            const std::vector<std::string> noFields{};
+            serializer_IN.initialize(inputCSV, FileMode::READONLY, std::move(noFields));  // open file, basic fields
+            EXPECT_TRUE(serializer_IN.is_initialized());
+        }
+
+        const std::vector<std::string> input_fields_names{serializer_IN.get_field_names()};
+        std::vector<std::string> output_fields_names{std::move(input_fields_names)};
+        output_fields_names.emplace_back(gtUT_tag);  // what if duplicate?
+        for (auto& tag : sim_tags) {
+            output_fields_names.emplace_back(tag);  // newField
+        }
+
+        Serializer<FileFormat::CSV> serializer_out{true};
+        {
+            serializer_out.initialize(outputCSV + "_Resim", FileMode::READ_WRITE, std::move(output_fields_names));
+            EXPECT_TRUE(serializer_out.is_initialized());
+        }
+
+        SHAVEWorkload wl_buff;
+        SerializableField<std::string> info_buff{info_tag, ""};  // from input, read 2nd time
+
+        // out over input
+        SerializableField<std::string> gt_UT_buff{gtUT_tag, ""};  // recompute this standard field
+
+        auto makeSimFields = [](const std::vector<std::string>& tags) {
+            Series simFields{};
+            for (const auto& tag : tags) {
+                simFields.emplace(tag, "");
+            }
+            return simFields;
+        };
+
+        Series simulateFieldsAll{makeSimFields(sim_tags)};
+        Series readFieldsAll{};
+
+        serializer_IN.jump_to_beginning();
+
+        /// below is the iterative processing of the csv
+
+        while (serializer_IN.deserialize(readFieldsAll, wl_buff, info_buff, gt_UT_buff)) {
+            {
+                gt_UT_buff.value = getGTfromInfo(info_buff.value) + "";
+
+                auto shave_wl = wl_buff;
+
+                auto run_model = [&shave_wl](VPUCostModel& model) {
+                    std::string info{};
+                    return std::to_string(model.SHAVE(shave_wl, info, true));
+                };
+
+                simulateFieldsAll[sim_tags[0]] = run_model(empty_model);
+                
+            }
+            serializer_out.serialize(readFieldsAll, simulateFieldsAll, gt_UT_buff);
+
+            serializer_out.end();
+        }
+    }  // method
+
     auto Model_Resim_Investigation(std::string inputCSV) {
         std::cout << "\n Processing : " << inputCSV;
         // new columns in CSV
@@ -610,6 +680,15 @@ public:
 
         std::cout << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
         model_Resim_Generic_ModelsList(theInputName, theOutputName, models);
+    }
+
+    auto Shave_Resim_in_subfolder(const std::string& folder, const std::string& input_csv, std::string subfolderOutput) {
+        const std::string theFullName{folder + input_csv};
+        const std::string theInputName{removeExtension(theFullName)};
+        const std::string theOutputName{addSubFolderInName(theInputName, std::move(subfolderOutput))};
+
+        std::cout << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
+        Shave_Resim_Generic_ModelsList(theInputName, theOutputName);
     }
 
     std::array<VPUCostModel, 6> the_models{
@@ -779,6 +858,18 @@ TEST_F(SerializerSimulator, Multi_Model_Resim_Agnostic_Configurable_GT) {
         model_Resim_in_subfolder(folder, input_csv, "res_all_l1", models_ptr);
     }
 }
+
+// THIS test has an Issue deserializing workloads, missing function for deserialize on Shave? Check the Cache creator app it has a specific function
+TEST_F(SerializerSimulator, DISABLED_SHAVE_resim_serializer_tool) {
+    const std::vector<std::string> inputs_custom{"merged_shave_workloads.csv"};
+        const std::string folder{folder_local};
+    const std::vector<std::string>& inputs{inputs_custom};
+
+    for (const auto& input_csv : inputs) {
+        Shave_Resim_in_subfolder(folder, input_csv, "res_all_shave");
+    }
+}
+
 
 TEST_F(SerializerSimulator, DISABLED_Model_Merge_All_AGNOSTIC) {
     const std::string folder{"c:\\gitwrk"};

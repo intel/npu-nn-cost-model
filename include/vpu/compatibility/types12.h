@@ -136,9 +136,9 @@ inline const EnumTextLogicalMap& mapToLogicalText<Operation>() {
  * @brief DPU execution modes , see SAS/HAS
  */
 enum class ExecutionMode {
-    CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,   50 : NTHW/NTK = 16/2
-    CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8     50 : NTHW/NTK = 8/4
-    CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16    50 : NTHW/NTK = 4/8
+    CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,
+    CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8  
+    CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16 
     __size
 };
 static const EnumMap ExecutionMode_ToText{

@@ -12,20 +12,22 @@
 
 #include "vpu/cycles_interface_types.h"
 
-#include "vpu/device_HW_characteristics.h"
 #include "vpu/dma_types.h"
+#include "vpu/hw_characteristics/device_HW_characteristics_base.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
+
+#include "vpu/hw_characteristics/device_HW_characterisics_itf_impl.h"  // for ALTERNATIVE interface
 
 namespace VPUNN {
 
 /// @brief specific VPU 2.0 HW characteristics values
-class VPU2_0_HWCharacteristics : public DeviceHWCharacteristics<VPU2_0_HWCharacteristics> {
+class VPU2_0_HWCharacteristics : public DeviceHWCharacteristicsBase {
 public:
-    constexpr VPU2_0_HWCharacteristics(): DeviceHWCharacteristics(hw_characteristics_def){};
+    constexpr VPU2_0_HWCharacteristics(): DeviceHWCharacteristicsBase(hw_characteristics_def, latency_values_def) {};
 
 private:
-    inline static constexpr HWCharacteristics hw_characteristics_def{
+    inline static constexpr HWCharacteristicsRawData hw_characteristics_def{
             700,           // dpu_freq_clk
             700,           // cmx_freq_clk
             16,            // cmx_word_size_B
@@ -42,12 +44,10 @@ private:
             PROF_CLK_Hz    // profiling_clk_Hz
     };
 
-public:
-    /// @return 0 to keep the old implementation behavior
-    constexpr CyclesInterfaceType get_DMA_latency(MemoryLocation /* location*/) {
-        return 0;
-    }
+    inline static constexpr LatencyValuesRawData latency_values_def{0, 0, 0};  // no action
 };
+
+using IAlt_VPU2_0_HWCharacteristics = ALT_VPUXX_HWCharacteristics<VPU2_0_HWCharacteristics>;
 
 }  // namespace VPUNN
 

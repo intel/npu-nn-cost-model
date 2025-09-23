@@ -39,7 +39,8 @@ inline SmartRanges::value_type Sampler::sample_list_decrease_prob<SmartRanges>(c
 }
 
 template <>
-inline MultiSmartRanges::value_type Sampler::sample_list_decrease_prob<MultiSmartRanges>(const MultiSmartRanges& elements) const {
+inline MultiSmartRanges::value_type Sampler::sample_list_decrease_prob<MultiSmartRanges>(
+        const MultiSmartRanges& elements) const {
     // lambda function to generate a list of elements for a SmartRanges object
     auto gen_SmartList = [](const MultiSmartRanges& elements) -> std::vector<MultiSmartRanges::value_type> {
         std::string text{""};
@@ -108,8 +109,8 @@ public:
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the weights
     long long input_1_contiguous_size_bytes(const IDeviceValidValues& config,
                                             const DPUOperation& dpu) const noexcept override final {
-        const auto elem_size{input_1_volume(dpu.input_1)};
-        auto in_1_size = config.compute_size_raw(elem_size, dpu.input_1.datatype);  // in bytes
+        const TensorInfo t{dpu.input_1};
+        auto in_1_size = static_cast<long long>(t.tensor_size_B());  // in bytes
 
         if (dpu.input_1.sparsity_enabled) {
             // reducing according to sparsity
@@ -133,69 +134,81 @@ public:
     /// @brief computes the aligned size in bytes for activators of a workload. the actual memory occupied considering
     /// SEP or sparsity.
     long long input_0_aligned_size_bytes(const IDeviceValidValues& config,
-                                         const DPUOperation& dpu) const noexcept override final {
+                                         const DPUOperation& dpu) const override final {
         const auto size_nonaligned{Base_Constraints::input_0_contiguous_size_bytes(config, dpu)};  // non polymorphic
         return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
     }
 
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the activators
     long long input_0_contiguous_size_bytes(const IDeviceValidValues& config,
-                                            const DPUOperation& dpu) const noexcept override final {
-        // has halo
-        const long long default_compute_tensor_samples{input_0_volume(dpu.input_0)};
-        const long long default_compute_memeory_samples{input_0_volume(dpu.input_0_memory_dense)};
+                                            const DPUOperation& dpu) const override final {
+        if (dtype_to_bits(dpu.input_0.datatype) < 8) {
+            throw std::runtime_error("Data Types that are smaller than INT8/UINT8 are not supported here, we do not "
+                                     "have support to compute memory in this case!");
+        } else {
+            // has halo
+            const long long default_compute_tensor_samples{input_0_volume(dpu.input_0)};
 
-        long long data_memory_samples{default_compute_memeory_samples};  //  actual values
-        long long sparsity_map_bytes{0};                                 // sparsity map is in general zero
-        long long storage_elements_table_samples{0};                     // SEP table is in general not present
+            TensorInfo t{dpu.input_0_memory_dense};
 
-        // has SEP
-        const SEPModeInfo& sep{dpu.sep_activators};
-        if (sep.isEnabled()) {
-            data_memory_samples = sep.actual_activators_input.numberOfElements();
-            storage_elements_table_samples = sep.storage_elements_pointers.numberOfElements();
-            if (false == sep.no_sparse_map) {  // sparse map is present
+            // long long data_memory_samples{default_compute_memeory_samples};  //  actual values
+            long long sparsity_map_bytes{0};              // sparsity map is in general zero
+            long long storage_elements_table_samples{0};  // SEP table is in general not present
+
+            // has SEP
+            const SEPModeInfo& sep{dpu.sep_activators};
+            if (sep.isEnabled()) {
+                t.width = sep.actual_activators_input.width();
+                t.height = sep.actual_activators_input.height();
+                t.channels = sep.actual_activators_input.channels();
+                t.batch = sep.actual_activators_input.batches();
+
+                storage_elements_table_samples = sep.storage_elements_pointers.numberOfElements();
+                if (false == sep.no_sparse_map) {  // sparse map is present
+                    sparsity_map_bytes = config.align_to(default_compute_tensor_samples / 8,
+                                                         16);  // one bit per all!!! compute samples, 16 bytes aligned
+
+                    // second option would be on compute tensor minus all halo read from others, and NOT adding extra
+                    // memory that ins not used (neg halo)!
+
+                    // third would be on memory dense input representation (all unpacked input memory , used and unused,
+                    // without halo read from others)
+
+                    // Case B , SEP with actual Memory  larger than compute tensor (sampling inside the big memory
+                    // tensor): OK use compute samples (maybe  option 2 minus halo read ones)
+
+                    // is it really possible to have SEP and halo for  extending memory? Rather the extension is part of
+                    // SEP's actual_activators_input
+                }  // SM
+            }  // SEP
+
+            // has sparsity,  can be also with SEP or HALO
+            if (dpu.input_0.sparsity_enabled) {
+                // actual memory data should be reduced with sparsity factor  (all of it, even the unused one!!?)
+                // reducing according to sparsity? A(yes); B(no) because the input data is not packed at runtime
+                /* data_memory_samples -= static_cast<decltype(data_memory_samples)>(
+                         std::floor((data_memory_samples * dpu.input_0.sparsity)));*/
+
+                // storage_elements_table remains as for HALO(0) or SEP, not used in sparsity
+
                 sparsity_map_bytes = config.align_to(default_compute_tensor_samples / 8,
                                                      16);  // one bit per all!!! compute samples, 16 bytes aligned
+            }
 
-                // second option would be on compute tensor minus all halo read from others, and NOT adding extra memory
-                // that ins not used (neg halo)!
+            const auto tensor_size_B{t.tensor_size_B()};  // tensor size in bytes
 
-                // third would be on memory dense input representation (all unpacked input memory , used and unused,
-                // without halo read from others)
+            // let's sum in bytes'
+            const long long size_nonaligned{tensor_size_B + sparsity_map_bytes +
+                                            storage_elements_table_samples * pointer_size};
 
-                // Case B , SEP with actual Memory  larger than compute tensor (sampling inside the big memory tensor):
-                // OK use compute samples (maybe  option 2 minus halo read ones)
-
-                // is it really possible to have SEP and halo for  extending memory? Rather the extension is part of
-                // SEP's actual_activators_input
-            }  // SM
-        }      // SEP
-
-        // has sparsity,  can be also with SEP or HALO
-        if (dpu.input_0.sparsity_enabled) {
-            // actual memory data should be reduced with sparsity factor  (all of it, even the unused one!!?)
-            // reducing according to sparsity? A(yes); B(no) because the input data is not packed at runtime
-            /* data_memory_samples -= static_cast<decltype(data_memory_samples)>(
-                     std::floor((data_memory_samples * dpu.input_0.sparsity)));*/
-
-            // storage_elements_table remains as for HALO(0) or SEP, not used in sparsity
-
-            sparsity_map_bytes = config.align_to(default_compute_tensor_samples / 8,
-                                                 16);  // one bit per all!!! compute samples, 16 bytes aligned
+            return size_nonaligned;
         }
-
-        // let's sum in bytes'
-        const long long size_nonaligned{config.compute_size_raw(data_memory_samples, dpu.input_0.datatype) +
-                                        sparsity_map_bytes + storage_elements_table_samples * pointer_size};
-
-        return size_nonaligned;
     }
 
     /// @brief computes the aligned size in bytes for  output activators of a workload. the actual memory occupied
     /// considering sparsity.
     long long output_0_aligned_size_bytes(const IDeviceValidValues& config,
-                                          const DPUOperation& dpu) const noexcept override final {
+                                          const DPUOperation& dpu) const override final {
         const auto size_nonaligned{Base_Constraints::output_0_contiguous_size_bytes(config, dpu)};  // non polymorphic
         return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
     }
@@ -203,25 +216,67 @@ public:
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the output. the actual memory occupied
     /// considering sparsity map
     long long output_0_contiguous_size_bytes(const IDeviceValidValues& config,
-                                             const DPUOperation& dpu) const noexcept override final {
-        // has halo
-        //       const long long default_compute_tensor_samples{dpu.output_0.numberOfElements()};/option 1
-        const long long default_compute_memeory_samples{dpu.output_0_memory_dense.numberOfElements()};  // option 2
+                                             const DPUOperation& dpu) const override final {
+        /// @brief aligns the innermost dimension of a tensor shape
+        /// @param dim_size the size of the dimension to be aligned
+        /// @param is_innermost_dim true if the dimension to be aligned is the innermost one, if false, no alignment is
+        /// done
+        ///
+        /// @returns the aligned dimension size if innermost, or the original size if not innermost
+        auto align_if_innermost_dim = [&config, &dpu](long long dim_size_B) -> long long {
+            if (dpu.superdense)
+                return dim_size_B;  // no alignment in superdense mode
 
-        long long data_memory_samples{default_compute_memeory_samples};  //  actual values
-        long long sparsity_map_bytes{0};                                 // sparsity map is in general zero
+            return config.align_to(
+                    dim_size_B,
+                    config.get_specific_out_innermost_dim_alignment());  // if innermost dimension, will be aligned
+        };
 
-        // has sparsity
-        if (dpu.output_0.sparsity_enabled) {
-            // no reduction of size due to sparsity
-            sparsity_map_bytes = config.align_to(default_compute_memeory_samples / 8,
-                                                 16);  // one bit per all!!! compute samples, 16 bytes aligned
+        const auto innermost_dim{layout_to_order(dpu.output_0.layout)[0]};  // innermost dimension
+        const int dtype_size_B{dtype_to_bytes(dpu.output_0.datatype)};      // datatype size in bytes
+
+        if (dtype_to_bits(dpu.output_0.datatype) < 8) {
+            throw std::runtime_error("Data Types that are smaller than INT8/UINT8 are not supported here, we do not "
+                                     "have support to compute memory in this case!");
+        } else {
+            TensorInfo t{dpu.output_0_memory_dense};
+
+            // alignment is done always in bytes, so we multiply each dim by dtype size, but then we return the number
+            // of elements, so we divide by dtype size at the end
+            switch (innermost_dim) {
+            case Dim::Act::X:
+                t.width = align_if_innermost_dim(t.width * dtype_size_B) / dtype_size_B;
+                break;
+            case Dim::Act::Y:
+                t.height = align_if_innermost_dim(t.height * dtype_size_B) / dtype_size_B;
+                break;
+            case Dim::Act::Z:
+                t.channels = align_if_innermost_dim(t.channels * dtype_size_B) / dtype_size_B;
+                break;
+            case Dim::Act::B:
+                t.batch = align_if_innermost_dim(t.batch * dtype_size_B) / dtype_size_B;
+                break;
+            default:
+                break;  // nothing
+            }
+
+            // has sparsity
+            long long sparsity_map_bytes{0};  // sparsity map is in general zero
+            const long long default_compute_memeory_samples{
+                    dpu.output_0_memory_dense
+                            .numberOfElements()};  // computation was made on real elements, no alignment here
+
+            if (dpu.output_0.sparsity_enabled) {
+                // no reduction of size due to sparsity
+                sparsity_map_bytes = config.align_to(default_compute_memeory_samples / 8,
+                                                     16);  // one bit per all!!! compute samples, 16 bytes aligned
+            }
+
+            const auto tensor_size_B{t.tensor_size_B()};  // tensor size in bytes
+            const long long size_nonaligned{tensor_size_B + sparsity_map_bytes};
+            // let's sum in bytes'
+            return size_nonaligned;
         }
-
-        // let's sum in bytes'
-        const long long size_nonaligned{config.compute_size_raw(data_memory_samples, dpu.output_0.datatype) +
-                                        sparsity_map_bytes};
-        return size_nonaligned;
     }
 };
 
@@ -366,10 +421,9 @@ protected:
         // this rule is here only for Fathom compliance, must be clarified in the future what's actually required.
         // Especially device dependency is a design break
         const auto is_16_align = dtype_to_bytes(dpu.input_1.datatype) > 1 || dpu.device == VPUDevice::VPU_2_7;
-        dpu.input_1.channels = config.align_to(
-            static_cast<long long>(dpu.kernel.height) * static_cast<long long>(dpu.kernel.width),
-            is_16_align ? 16 : 32
-        );
+        dpu.input_1.channels =
+                config.align_to(static_cast<long long>(dpu.kernel.height) * static_cast<long long>(dpu.kernel.width),
+                                is_16_align ? 16 : 32);
 
         dpu.input_1.batch = dpu.output_0.channels;
     }
@@ -395,10 +449,8 @@ protected:
         {
             // this rule is here only for Fathom compliance, must be clarified in the future what's actually required
             const int multiple{dtype_to_bytes(w.datatype) > 1 ? 16 : config.get_specific_weigths_alignment()};
-            w.channels = config.align_to(
-                static_cast<long long>(kernel.height) * static_cast<long long>(kernel.width),
-                multiple
-            );
+            w.channels = config.align_to(static_cast<long long>(kernel.height) * static_cast<long long>(kernel.width),
+                                         multiple);
         }
         w.batch = out_0.channels;
     }
@@ -421,7 +473,7 @@ protected:
         const auto out_channels_range{config.get_output_channels_restriction(dpu)};
 
         dpu.output_0.channels = sampler.sample_list_decrease_prob(out_channels_range);  //  non uniform
-        
+
         const int multiple{wts_mask_alignement(dpu.input_1.datatype)};
         dpu.input_1.channels = config.align_to(dpu.input_0.channels * dpu.kernel.height * dpu.kernel.width, multiple);
 
@@ -486,8 +538,7 @@ protected:
     bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
-        if (!dpu.output_autopad)
-        {
+        if (!dpu.output_autopad) {
             checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
                                      "output_0.channels == input_0.channels");
         }
@@ -585,8 +636,7 @@ protected:
                                               std::string& info) const override {
         Checker checker;
 
-        if (!dpu.output_autopad)
-        {
+        if (!dpu.output_autopad) {
             checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
                                      "output_0.channels == input_0.channels");
         }

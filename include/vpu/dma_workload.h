@@ -35,6 +35,7 @@ namespace VPUNN {
  * @param device a VPUDevice representing the VPU IP generation
  * @return std::vector<MemoryLocation>
  */
+// TODO: get rid of switches that depend on VPUDevice to make easier to perform OS Releases
 inline std::vector<MemoryLocation> memoryLocation(VPUDevice device) {
     switch (device) {
     case VPUDevice::VPU_2_0:
@@ -129,6 +130,8 @@ public:
                 0,                 // dst_plane_stride;
                 memory_direction,  // transfer_direction
         };
+
+        //clang and gcc does not support to use std::move here, so we need suppression 
         /* coverity[copy_instead_of_move] */
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
@@ -170,6 +173,7 @@ public:
                 Num_DMA_Engine::Num_Engine_1,
                 memory_direction  // MemoryDirection transfer_direction;
         };
+        // clang and gcc does not support to use std::move here, so we need suppression 
         /* coverity[copy_instead_of_move] */
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
@@ -232,6 +236,7 @@ public:
                 0,                     // dst_plane_stride;
                 dma.memory_direction,  // transfer_direction
         };
+        // clang and gcc does not support to use std::move here, so we need suppression 
         /* coverity[copy_instead_of_move] */
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }

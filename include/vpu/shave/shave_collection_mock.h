@@ -45,8 +45,9 @@ protected:
         for (const auto& n : names) {
             const auto& executor{mockable.getShaveExecutor(n)};
             // constexpr
-            AddMock<get_dpu_fclk(wanted_device), get_cmx_fclk(wanted_device)>(executor.getName(), executor,
-                                                                              speed_increase_factor);
+            AddMock<GlobalHarwdwareCharacteristics::get_dpu_fclk(wanted_device),
+                    GlobalHarwdwareCharacteristics::get_cmx_fclk(wanted_device)>(executor.getName(), executor,
+                                                                                 speed_increase_factor);
         }
 
     }  ///< to be implemented automatically

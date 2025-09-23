@@ -31,10 +31,11 @@
 #include "vpu/power.h"
 #include "vpu/types.h"
 
+#include "inference/dma_post_process.h"
+#include "inference/dma_postprocessing_factory.h"
 #include "inference/vpunn_runtime.h"
 #include "vpu/utils.h"
 #include "vpu/validation/checker_utils.h"
-#include "vpu/vpu_performance_model.h"
 
 #include "vpu/cycles_interface_types.h"
 #include "vpu/validation/dpu_operations_sanitizer.h"
@@ -45,18 +46,23 @@
 #include "core/serializer.h"
 #include "vpu/vpu_mutex.h"
 
+#include "vpu/dma_theoretical_cost_provider.h"
+#include "vpu/serialization/dma_cost_serialization_wrapper.h"
+
 #include <typeinfo>
 
 namespace VPUNN {
 
 /**
- * @brief The DMACostModel class
- *
- * Has behind a loaded DMACostModel neural network that infers cycle times for DMA
- *
+ * @brief
+ *Has to be factored to own file or to be redesigned, why we need this, what's the purpose
+ * WE want from the VPUX to use same interface or same descriptor as we use in DMANN part
+ * ALso the theoretical DMA should have a common interface(datatype dma workload) with the DMANN
  */
-class VPUNN_API DMATheoreticalCostModel /*: protected VPUNNPerformanceModel */ {
+class VPUNN_API DMATheoreticalCostModel {
 private:
+    const DMATheoreticalCostProvider dma_theoretical{};
+
 public:
     explicit DMATheoreticalCostModel() {
         Logger::initialize();
@@ -78,8 +84,8 @@ protected:
                      MemoryLocation input_location = MemoryLocation::DRAM,
                      MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
         // Call the helper function
-        VPUNNPerformanceModel pm;
-        return pm.DMATheoreticalCycles({device, input, output, input_location, output_location, output_write_tiles});
+        return dma_theoretical.DMATheoreticalCycles(
+                {device, input, output, input_location, output_location, output_write_tiles});
     }
 
     /**
@@ -90,8 +96,7 @@ protected:
      */
     unsigned int DMA(const DMAWorkload& wl) const {
         // Call the helper function
-        VPUNNPerformanceModel pm;
-        return pm.DMATheoreticalCycles(wl);
+        return dma_theoretical.DMATheoreticalCycles(wl);
     }
 };
 
@@ -112,14 +117,17 @@ public:
 
 private:
     const DMARuntimeProcessingFactory<DMADesc> preprocessing_factory;  ///< provides Preprocessing objects
+    const DMAPostProcessingFactory<DMADesc> postprocessing_factory;
     const Runtime vpunn_runtime;                 ///< the loaded inference model is here, used for FW propagation
     InferenceExecutionData runtime_buffer_data;  ///< the memory/buffers used for executing a model (in/out and inter
                                                  ///< layer buffers). It is paired with the model at creation.
 
     IPreprocessingDMA<float, DMADesc>&
             preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
+    const DMAPostProcessSupport results_config;
+    const IPostProcessDMA<DMADesc>& post_processing;
     LRUCache<std::vector<float>, float>
-            cache;  ///< cache for inferred values, used only for single workload, not for batches
+            cache;  ///< cache for inferred values, used only for single workload, not for batches, raw NN out values
     mutable CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
     mutable CSVSerializer cache_miss_serializer;    ///< serializer for missed cache DMADesc workloads
 
@@ -141,6 +149,27 @@ private:
                       "with "
                       "version ("
                    << input_version
+                   << ") is not known/supported by requested DMADescriptor template param: " << typeid(DMADesc).name()
+                   << "\nFilename: " << filename
+                   << " , DMANN file Version info (raw): " << version_service.get_raw_name();
+            std::string details = buffer.str();
+            Logger::error() << details;
+
+            throw std::runtime_error(details);
+        }
+    }
+
+    static const IPostProcessDMA<DMADesc>& init_postproc(const DMAPostProcessingFactory<DMADesc>& factory,
+                                                         const ModelVersion& version_service,
+                                                         std::string_view filename) {
+        const int version = version_service.get_output_interface_version();
+        //  checking if either we have some process or we have a unsupported version
+        if (factory.exists(version)) {
+            auto& proc = factory.make(version);
+            return proc;
+        } else {
+            std::stringstream buffer;
+            buffer << "Cannot create DMA post processing stage!.Post processing with version (" << version
                    << ") is not known/supported by requested DMADescriptor template param: " << typeid(DMADesc).name()
                    << "\nFilename: " << filename
                    << " , DMANN file Version info (raw): " << version_service.get_raw_name();
@@ -184,7 +213,7 @@ private:
             return;
         }
 
-        if (v.get_output_interface_version() != 1) {
+        if (!results_config.is_output_supported()) {
             std::stringstream buffer;
             buffer << "Cannot load/handle Models output version. The output version: ("
                    << v.get_output_interface_version()
@@ -210,28 +239,13 @@ private:
         }
     }
 
-    /// NN output limit, any higher should be treated like a not in range value given by the NN
-    static constexpr float high_threshold{1.1F};
-    static constexpr float low_threshold{-0.1F};
-
-    /// @brief checks if the NN returned value is invalid, is outside of usable range
-    /// @param nn_output_cycles , the value to be analyzed, this is assumed given by the NN inference
-    /// @return true if invalid value
-    bool is_NN_value_invalid(const float nn_output_cycles) const {
-        bool validity = false;
-        if ((nn_output_cycles > high_threshold) || (nn_output_cycles < low_threshold)) {
-            validity = true;
-        }
-        return validity;
-    }
-
 public:
     /// @brief provides the value interval where the NN raw outputs are considered valid and will be used to further
     /// compute information
     ///
     /// @returns a pair containing (minimum_valid_value maximum_valid_value)
     std::pair<float, float> get_NN_Valid_interval() const noexcept {
-        return std::make_pair(low_threshold, high_threshold);
+        return post_processing.get_NN_Valid_interval();
     }
 
     /**
@@ -248,9 +262,9 @@ public:
               runtime_buffer_data(vpunn_runtime.createNewInferenceExecutionData(batch_size)),
               preprocessing(
                       init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), filename, batch_size)),
-              cache(cache_size, /* preprocessing.output_size(),*/ cache_filename) /*,
-                results_config(vpunn_runtime.model_version_info().get_output_interface_version())*/
-    {
+              results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
+              post_processing(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), "")),
+              cache(cache_size, /* preprocessing.output_size(),*/ cache_filename) {
         Logger::initialize();
 
         interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
@@ -286,9 +300,9 @@ public:
               runtime_buffer_data(vpunn_runtime.createNewInferenceExecutionData(batch_size)),
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), "ConstCharInit",
                                          batch_size)),
-              cache(cache_size, /* preprocessing.output_size(), */ cache_data, cache_data_length) /*,
-                results_config(vpunn_runtime.model_version_info().get_output_interface_version())*/
-    {
+              results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
+              post_processing(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), "")),
+              cache(cache_size, /* preprocessing.output_size(), */ cache_data, cache_data_length) {
         Logger::initialize();
 
         interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
@@ -329,30 +343,21 @@ public:
      * @return float the NN raw output, not filtered
      */
     float run_NN(const DMADesc& workload) {
-        const auto& vector = preprocessing.transform(workload);
+        const auto& vector = preprocessing.transformSingle(workload);
         // Check for cache hit
         const auto cached_value = cache.get(vector);
         if (!cached_value) {
             // run the model in case of a cache miss
             const auto infered_value = vpunn_runtime.predict<float>(vector, runtime_buffer_data)[0];
             // Add result to the cache
-            cache.add(vector, infered_value);
+            cache.add(vector, infered_value);  // raw
 
-            if (cache_miss_serializer.is_serialization_enabled()) {  // has to be factored out
-                try {
-                    cache_miss_serializer.serialize(SerializableField<VPUDevice>{"device", workload.device});
-                    serialize_workload(workload, cache_miss_serializer);
-                    cache_miss_serializer.end();
-                } catch (const std::exception& e) {
-                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                    cache_miss_serializer.clean_buffers();
-                }
-                cache_miss_serializer.clean_buffers();
-            }
+            DMACostSerializationWrap<DMADesc> serialization_handler(cache_miss_serializer);
+            serialization_handler.serializeDMAWorkload_closeLine(workload);
 
-            return infered_value;
+            return infered_value;  // raw
         }
-        return *cached_value;
+        return *cached_value;  // raw
     }
 
 public:
@@ -363,7 +368,7 @@ public:
     ///
     /// @returns the descriptor of the workload for the scenario that this workload reaches the transform stage.
     std::vector<float> getDmaDescriptor(DMADesc wl) {
-        return preprocessing.transform(wl);
+        return preprocessing.transformSingle(wl);
     }
 
     /// @brief provides the input and output versions of the loaded NN (debug purposes)
@@ -482,43 +487,33 @@ private:
         SanityReport problems{};
         info = problems.info;
 
-        if (interogation_serializer.is_serialization_enabled()) {  // has to be factored out
-            try {
-                interogation_serializer.serialize(SerializableField<VPUDevice>{"device", wl.device});
-
-                serialize_workload(wl, interogation_serializer);
-
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                interogation_serializer.clean_buffers();
-            }
-        }
+        DMACostSerializationWrap<DMADesc> serialization_handler(interogation_serializer);
+        serialization_handler.serializeDMAWorkload(wl);
 
         CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
         if (is_inference_posible) {
-            const auto nn_size_div_cycle = run_NN(wl);
-            if (is_NN_value_invalid(nn_size_div_cycle)) {
+            const auto raw_nn_output = run_NN(wl);
+            if (post_processing.is_NN_value_invalid(raw_nn_output)) {
                 cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
                 // std::cout << "\n Problematic inf response: "<<nn_output_cycles<<std::endl<<wl<<"\n";
                 {
                     std::stringstream buffer;
                     buffer << "The NN returned a value outside of accepted ranges and is considered invalid. "
                               "NN_returned value :  "
-                           << nn_size_div_cycle << ".  Exiting with : " << Cycles::toErrorText(cycles)
+                           << raw_nn_output << ".  Exiting with : " << Cycles::toErrorText(cycles)
                            << "\nWorkload DMA: " << wl << "\n";
                     std::string details = buffer.str();
                     info = info + details;
                     Logger::error() << details;
                 }
             } else {
-                cycles = convert_from_sizeDivCycle_to_DPUCyc(nn_size_div_cycle, wl, info);  // NORMAL CASE
+                cycles = post_processing.process(raw_nn_output, wl, info);
             }
-        } else {  // NN not available, use theoretical cycles
-
+        } else {  // NN not available, use theoretical cycles?
             cycles = Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
             {
                 std::stringstream buffer;
-                buffer << "\nThe NN is not initialized. The inference is not possible"
+                buffer << "\nThe DMA NN is not initialized. The inference is not possible"
                        << ".  Exiting with : " << Cycles::toErrorText(cycles) << "\n";
                 std::string details = buffer.str();
                 info = info + details;
@@ -526,107 +521,11 @@ private:
             }
         }
 
-        if (interogation_serializer.is_serialization_enabled()) {  // has to be factored out
-            try {
-                if (!interogation_serializer.is_write_buffer_clean()) {
-                    interogation_serializer.serialize(SerializableField<decltype(cycles)>{"cycles", cycles});
-                    interogation_serializer.end();
-                }
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                interogation_serializer.clean_buffers();
-            }
-            interogation_serializer.clean_buffers();
-        }
+         serialization_handler.serializeCycles(cycles);
 
         return cycles;
     }
 
-    void serialize_workload(const DMANNWorkload_NPU27& wl, CSVSerializer& serializer) {
-        if (serializer.is_serialization_enabled()) {
-            try {
-                serializer.serialize(SerializableField{"num_planes", wl.num_planes});
-                serializer.serialize(SerializableField{"length", wl.length});
-                serializer.serialize(SerializableField{"src_width", wl.src_width});
-                serializer.serialize(SerializableField{"dst_width", wl.dst_width});
-                serializer.serialize(SerializableField{"src_stride", wl.src_stride});
-                serializer.serialize(SerializableField{"dst_stride", wl.dst_stride});
-                serializer.serialize(SerializableField{"src_plane_stride", wl.src_plane_stride});
-                serializer.serialize(SerializableField{"dst_plane_stride", wl.dst_plane_stride});
-                serializer.serialize(SerializableField{"transfer_direction", wl.transfer_direction});
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
-        }
-    }
-
-    void serialize_workload(const DMANNWorkload_NPU40_RESERVED& wl, CSVSerializer& serializer) {
-        if (serializer.is_serialization_enabled()) {
-            try {
-                serializer.serialize(SerializableField{"src_width", wl.src_width});
-                serializer.serialize(SerializableField{"dst_width", wl.dst_width});
-                serializer.serialize(SerializableField{"num_dim", wl.num_dim});
-
-                for (int i = 0; i < wl.num_dim; i++) {
-                    const auto& dim{wl.e_dim[i]};
-                    serializer.serialize(SerializableField{"src_stride_" + std::to_string(i + 1), dim.src_stride});
-                    serializer.serialize(SerializableField{"dst_stride_" + std::to_string(i + 1), dim.dst_stride});
-                    serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), dim.src_dim_size});
-                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), dim.dst_dim_size});
-                }
-
-                for (int i = wl.num_dim; i < wl.MaxExtraDimensions; i++) {
-                    serializer.serialize(SerializableField{"src_stride_" + std::to_string(i + 1), 0});
-                    serializer.serialize(SerializableField{"dst_stride_" + std::to_string(i + 1), 0});
-                    serializer.serialize(SerializableField{"src_dim_size_" + std::to_string(i + 1), 0});
-                    serializer.serialize(SerializableField{"dst_dim_size_" + std::to_string(i + 1), 0});
-                }
-
-                serializer.serialize(SerializableField{"num_engine", wl.num_engine});
-                serializer.serialize(SerializableField{"direction", wl.transfer_direction});
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
-        }
-    }
-
-    /// NN clamping from minimum bandwith to maximum one
-    static constexpr float max_NN_bandwith{1.F};
-    static constexpr float min_bandwith{1.0f / 200.0F};  // 1 byte per 200 VPU cycles
-
-    CyclesInterfaceType convert_from_sizeDivCycle_to_DPUCyc(
-            float nn_size_div_cycle,  // [0 to 1], 0% to 100% of  device's bytes per cycle
-            const DMADesc& wl, std::string& info) const {
-        const auto maxBytesPerCycle{get_DMA_DDR_interface_bytes(wl.device)};
-        const auto raw_bandwith_BPC{nn_size_div_cycle *
-                                    maxBytesPerCycle};  // range 0 to device bytes per cycle (full max speed) .
-
-        // BW is limited , the NN might be with error that go slightly over those limits
-        const auto bandwith_BPC = std::clamp(raw_bandwith_BPC, min_bandwith, max_NN_bandwith * maxBytesPerCycle);
-
-        const auto size = wl.getAccessedBytes();
-
-        if (bandwith_BPC > 0.0f) {
-            const float vpu_cycles_f{size / bandwith_BPC};  // measured in VPU cycles
-
-            const float dpu_cycles_f{vpu_cycles_f * get_dpu_fclk(wl.device) / get_cmx_fclk(wl.device)};
-            const CyclesInterfaceType dpu_cycles{Cycles::toCycleInterfaceType(dpu_cycles_f)};
-
-            return dpu_cycles;
-        } else {
-            {
-                std::stringstream buffer;
-                buffer << "\nThe computed DMA bandwidth is zero or negative :  " << bandwith_BPC
-                       << ". NN returned: " << nn_size_div_cycle << ". "
-                       << ".  Exiting with : " << Cycles::toErrorText(Cycles::ERROR_INVALID_OUTPUT_RANGE) << "\n";
-                std::string details = buffer.str();
-                info = info + details;
-            }
-            return Cycles::ERROR_INVALID_OUTPUT_RANGE;
-        }
-    }
 };
 
 }  // namespace VPUNN

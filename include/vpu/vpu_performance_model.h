@@ -17,129 +17,41 @@
 #include "vpu/types.h"
 #include "vpu/utils.h"
 
-#include "performance.h"
-
-#include "vpu/shave_old.h"
+#include "performance.h"  // to be replaced with the hw characteristics provider.
 
 #include "performance_mode.h"
+#include "vpu/hw_characteristics/itf_device_HW_characteristics.h"
+
+#include "vpu/hw_characteristics/HW_characteristics_set_base.h"
+#include "vpu/hw_characteristics/HW_characteristics_supersets.h"
+#include "vpu/hw_characteristics/device_HW_characteristics_const_repo.h"
 
 namespace VPUNN {
 
+// ?Q do we need different models  for different HWCharacteristicsSet details? DO we templatize?
+
 /**
- * @brief VPUNN performance model
+ * @brief Provides idealized performance modeling for DPU workloads.
+ * IT is based on main set of HW characteristics
  *
+ * This class is responsible for estimating the theoretical, best-case execution characteristics of DPU operations,
+ * such as the number of cycles required and the number of MAC operations performed.
+ * It serves as a reference model, ignoring non-ideal hardware effects and focusing on the maximum achievable
+ * performance under optimal conditions (e.g., full MAC utilization, ideal sparsity handling).
+ *
+ * An instance of this class is intended to be use as a provider for performance modeling for DPU workloads.
+ * DEvice dependent configuration is provided by the hw_characteristics sets.
+ * IN case Performance depends on Devices this should be redesigned
  */
-class VPUNN_API VPUNNPerformanceModel {
-private:
-    /**
-     * @brief Estimate theoretical reduction in cycles from padding for ZMAJOR convolution
-     * @details DPU always treats padding as sparse
-     *
-     * @param wl a DPUWorkload
-     * @return unsigned long theoretical CMX execution cycles
-     */
-    unsigned long int PaddingSkipCycles(const DPUWorkload& wl) const {
-        // Extract kernels and padding cycles from workload
-        unsigned int Kw = wl.kernels[0], Kh = wl.kernels[1];
-        unsigned int Sw = wl.strides[0], Sh = wl.strides[1];
-        unsigned int Pt = wl.padding[0], Pb = wl.padding[1];
-        unsigned int Pl = wl.padding[2], Pr = wl.padding[3];
-        unsigned int inp_width = wl.inputs[0].width();
-        unsigned int inp_height = wl.inputs[0].height();
-        unsigned int out_channels = wl.outputs[0].channels();
-        unsigned int in_channels = wl.inputs[0].channels();
+class VPUNN_API HWPerformanceModel {  // to be renamed DpuOpsPerformance !?
+protected:
+    // use the default main one
+    const IHWCharacteristicsSet& hw_characteristics{HWCharacteristicsSuperSets::get_mainConfigurationRef()};
 
-        // Accumulate padding zeros at top, left
-        unsigned int Pt_zeros = 0, Pb_zeros = 0;
-        unsigned int Pl_zeros = 0, Pr_zeros = 0;
-        for (int i = Pt; i > 0; i -= Sh)
-            Pt_zeros += i;
-        for (int i = Pl; i > 0; i -= Sw)
-            Pl_zeros += i;
-
-        // Accumulate padding zeros at right and bottom, depending on input width and stride
-        unsigned int Redge = inp_width % Sw;
-        unsigned int Bedge = inp_height % Sh;
-        for (int i = (Pr - Redge); i > 0; i -= Sw)
-            Pr_zeros += i;
-        for (int i = (Pb - Bedge); i > 0; i -= Sh)
-            Pb_zeros += i;
-
-        unsigned long int Pt_cycles, Pb_cycles;
-        unsigned long int Pl_cycles, Pr_cycles;
-
-        Pt_cycles =
-                static_cast<unsigned long>(Pt_zeros) * static_cast<unsigned long>(Kw) * ceil_division(inp_width, Sw);
-        Pb_cycles =
-                static_cast<unsigned long>(Pb_zeros) * static_cast<unsigned long>(Kw) * ceil_division(inp_width, Sw);
-        Pl_cycles =
-                static_cast<unsigned long>(Pl_zeros) * static_cast<unsigned long>(Kh) * ceil_division(inp_height, Sh);
-        Pr_cycles =
-                static_cast<unsigned long>(Pr_zeros) * static_cast<unsigned long>(Kh) * ceil_division(inp_height, Sh);
-
-        // Subtract double counted padding cycles at top-left corner from top
-        for (int i = Pt, j = Pl; i > 0 && j > 0; i -= Sh, j -= Sw)
-            Pt_cycles -= static_cast<unsigned long>(i) * static_cast<unsigned long>(j);
-
-        // Subtract double counted padding cycles at top-right corner from top
-        for (int i = Pt, j = (Pr - Redge); i > 0 && j > 0; i -= Sh, j -= Sw)
-            Pt_cycles -= static_cast<unsigned long>(i) * static_cast<unsigned long>(j);
-
-        // Subtract double counted padding cycles at bottom-left corner from bottom
-        for (int i = (Pb - Bedge), j = Pl; i > 0 && j > 0; i -= Sh, j -= Sw)
-            Pb_cycles -= static_cast<unsigned long>(i) * static_cast<unsigned long>(j);
-
-        // Subtract double counted padding cycles at bottom-right corner from bottom
-        for (int i = (Pb - Bedge), j = (Pr - Redge); i > 0 && j > 0; i -= Sh, j -= Sw)
-            Pb_cycles -= static_cast<unsigned long>(i) * static_cast<unsigned long>(j);
-
-        return (Pt_cycles + Pb_cycles + Pl_cycles + Pr_cycles) * in_channels * out_channels;
-    }
-
-    /**
-     * @brief Get the CMX reads in DPU clock cycles
-     *
-     * @param wl a DPUWorkload
-     * @return unsigned long theoretical CMX execution cycles
-     */
-    unsigned long cmx_reads(const DPUWorkload& wl) const {
-        if (wl.device == VPUDevice::VPU_2_0 || wl.device == VPUDevice::VPU_2_1) {
-            // For VPU2.0 CMX reads are encapsulated into the NN model
-            return 0;
-        }
-        // Get the MPE model NTHW/NTK grid on X, Y, Z, B
-        const auto grid = mpe_mode_to_nthw_ntk_grid(wl.execution_order);
-
-        // Get the number of weights and activation grid reads
-        const double num_wt_grids =
-                /*static_cast<long>*/ (std::ceil((double)wl.outputs[0].channels() / (double)grid[Dim::Act::Z]));
-        const double num_act_grids =
-                /*static_cast<long>*/ (std::ceil((double)wl.outputs[0].height() / (double)grid[Dim::Act::Y]) *
-                                       std::ceil((double)wl.outputs[0].width() / (double)grid[Dim::Act::X]));
-
-        const auto kernel_area = wl.kernels[Dim::Grid::W] * wl.kernels[Dim::Grid::H];
-
-        const auto datatype{wl.inputs[0].get_dtype()};  // use input zero, wt are not present
-
-        // Compute total number of bytes of activations and weights to read. @todo: review formulas
-
-        // @todo, review formula , what if INT4 and alignment is at innermost dimension?
-        const auto elements_count_act{
-                static_cast<long>(std::ceil(num_wt_grids * wl.outputs[0].height() * wl.outputs[0].width() *
-                                            wl.inputs[0].channels() * kernel_area))};
-        const auto act_reads{compute_size_in_bytes(elements_count_act, datatype)};
-
-        const auto elements_count_wt{static_cast<long>(
-                std::ceil(num_act_grids * wl.outputs[0].channels() * wl.inputs[0].channels() * kernel_area))};
-        const auto wt_reads{compute_size_in_bytes(elements_count_wt, datatype)};
-
-        // Compute idealized total number of read cycles
-        const auto reads = (double)(act_reads + wt_reads) /
-                           (get_cmx_word_size_bytes(wl.device) * get_dpu_cmx_num_read_ports(wl.device));
-
-        // Return the number of CMX reads in DPU clock cycles
-        return static_cast<unsigned long>(
-                std::ceil(reads * (double)get_cmx_fclk(wl.device) / (double)get_dpu_fclk(wl.device)));
+public:
+    // provides access to the hardware characteristics of a particular device
+    const IDeviceHWCharacteristics& get_hw_info(VPUDevice device) const {
+        return hw_characteristics.device(device);
     }
 
 public:
@@ -177,7 +89,7 @@ public:
         return DPU_MAC_based_cycles(wl, operations_cnt);
     }
 
-protected:
+    // protected:
     /**
      * @brief Compute the DPU ideal cycles
      * @details Calculates cycles that a single issue scalar CPU would require to execute
@@ -195,11 +107,12 @@ protected:
         if (wl.outputs.size() == 0) {  // If it computes no output, its duration is 0 cycles
             return 0;
         }
-        const unsigned int nr_macs{get_nr_macs(wl.device)};
-        const unsigned int fp_to_int_resource_ratio{get_fp_ratio(wl.device)};  // more cycles for fp vs int
+        const IDeviceHWCharacteristics& hw{get_hw_info(wl.device)};
+        const unsigned int nr_macs{hw.get_nr_macs()};
+        const unsigned int fp_to_int_resource_ratio{hw.get_fp_ratio()};  // more cycles for fp vs int
 
         const unsigned int nr_macs_adjusted_with_type{
-                native_comp_is_fp(wl) ? ceil_division(nr_macs, fp_to_int_resource_ratio) : nr_macs};
+                native_comp_on_fp16(wl) ? ceil_division(nr_macs, fp_to_int_resource_ratio) : nr_macs};
 
         // Compute the MACs needed to generate the output tensor
         const unsigned long int operations_cnt = MACs_to_compute;
@@ -288,265 +201,43 @@ protected:
         return hw_operations_cnt;
     }
 
-public:
     /**
-     * @brief Compute the DPU theoretical cycles, maximum HW knowledge
-     * @details Calculates cycles that a single issue scalar CPU would require to execute
-     *          a DPUWorkload then divides by number of MACs which can be performed in
-     *          parallel by DPU. Also considers data type, CMX memory bandwidth and some
-     *          other (non-ideal) factors.
-     * NO sparsity is considered.
-     * Note: THISIS OBSOLETE/NOT UPDATED
-     * @param wl a DPUWorkload
-     * @return unsigned long int theoretical execution cycles
-     */
-    unsigned long int DPUTheoreticalCycles(const DPUWorkload& wl) const {
-        if (wl.outputs.size() == 0) {
-            // If it computes no output, its duration is 0 cycles
-            return 0;
-        }
-
-        const unsigned int inp_channels{wl.inputs[0].channels()};
-
-        // Get the shape of the MPE grid
-        // auto mpe_grid = mpe_mode_to_grid(wl.execution_order);
-        // Compute the MACs needed to generate the output tensor
-        unsigned long int cycles = (unsigned long int)multiply_vector(wl.kernels) *
-                                   (unsigned long int)multiply_vector(wl.outputs[0].get_shape());
-
-        const unsigned int mt{(wl.output_write_tiles > 1) ? 2U : 1U};
-        const unsigned int nr_ppe{get_nr_ppe(wl.device)};
-        const unsigned int fp_ratio = {get_fp_ratio(wl.device)};
-
-        unsigned int nr_macs{get_nr_macs(wl.device)};
-
-        // As per Bernard David: ELTWISE_ST = (C*H*W)/64 --- ELTWISE_MT = (C*H*W)/(64/2) --- ST = single tile --- MT
-        // = multi tile The 64 is 64 Bytes per clock at the slow CMX frequency – if MC is enabled this reduces to 32
-        // Bytes per clock on ODU
-        if (wl.op == Operation::ELTWISE) {
-            cycles = ceil_division(multiply_vector(wl.inputs[0].get_shape()), (nr_ppe / mt));
-        }
-        // For CONV, we multiply over the input channels and remove padding, always treated as sparse
-        if (wl.op == Operation::CONVOLUTION || wl.op == Operation::CM_CONVOLUTION) {
-            cycles *= (unsigned long int)inp_channels;
-            cycles -= PaddingSkipCycles(wl);
-        } else {
-            nr_macs = nr_macs / input_channels_mac(wl.device);
-        }
-
-        // Ceil division cycles by DPU MACs
-        cycles = ceil_division(cycles, (unsigned long int)nr_macs);
-
-        // Adjust cycles for ratio of FP to int compute
-        if (native_comp_is_fp(wl)) {
-            cycles *= fp_ratio;
-        }
-
-        // Get CMX reads for NTHW/NTK
-        auto nthw_ntk_reads = cmx_reads(wl);
-
-        // Theoretical performance is the max between CMX reads and cycles (the bottleneck)
-        return std::max<unsigned long>(cycles, nthw_ntk_reads);
-    }
-
-    unsigned long int DMATheoreticalCycles(const DMAWorkload& wl) const {
-        if (wl.device < VPUDevice::VPU_4_0) {
-            return DMATheoreticalCyclesLegacyLNL(wl);
-        } else {  // VPU 4.0 and newer
-            if (wl.device == VPUDevice::VPU_4_0 && PerformanceMode::forceLegacy_G4) {
-                return DMATheoreticalCyclesLegacyLNL(wl);
-            } else if (wl.device > VPUDevice::VPU_4_0 && PerformanceMode::forceLegacy_G5) {
-                return DMATheoreticalCyclesLegacyLNL(wl);
-            }
-            return DMATheoreticalCycles_RESERVED_ON(wl);  // Updated theoretical model
-        }
-    }
-
-    /**
-     * @brief Compute the DMA theoretical cycles
+     * @brief Determine whether native computation for workload is floating point or int
      *
-     * @param wl a DMAWorkload
-     * @return unsigned long int theoretical execution DPU cycles
-     * @deprecated Will be removed in future releases
+     * @param DPUWorkload a DPUWorkload
+     * @return bool
      */
-    unsigned long int DMATheoreticalCyclesLegacyLNL(const DMAWorkload& wl) const {
-        // CMX2CMX is half-duplex on NPU 2.x
-        const bool is_half_duplex_limitation{((wl.device <= VPUDevice::VPU_2_7)  // specific device
-                                              && (wl.input_location == MemoryLocation::CMX) &&
-                                              (wl.output_location == MemoryLocation::CMX))
-                                                     ? true
-                                                     : false};
-
-        // Get if the input is permuted or compressed
-        const bool is_input_permuted = ((wl.input.get_layout() != wl.output.get_layout())  // changing layout
-                                        && (wl.input_location == MemoryLocation::CMX));    // and src from CMX
-
-        const bool is_input_compressed = ((wl.input.size() != wl.output.size())            // changing size
-                                          && (wl.input_location == MemoryLocation::CMX));  // and src from CMX
-
-        // Get the bandwidth in DPU cycles/bytes
-        const float input_bandwidth =
-                get_bandwidth_cycles_per_bytesLegacy(wl.input, wl.device, wl.input_location, is_input_compressed,
-                                                     is_input_permuted, is_half_duplex_limitation);
-        // Compute input cycles from dimensions and bw
-        const auto input_cycles = Cycles::toCycleInterfaceType((double)wl.input.size() * (double)input_bandwidth);
-
-        // Get if the output is permuted or compressed
-        const bool is_output_permuted = ((wl.input.get_layout() != wl.output.get_layout())  // changing layout
-                                         && (wl.output_location == MemoryLocation::CMX));   // and dst to CMX
-
-        const bool is_output_compressed = ((wl.input.size() != wl.output.size())             // changing size
-                                           && (wl.output_location == MemoryLocation::CMX));  // and dst to CMX
-
-        // Get the bandwidth in DPU cycles/bytes
-        const float output_bandwidth =
-                get_bandwidth_cycles_per_bytesLegacy(wl.output, wl.device, wl.output_location, is_output_compressed,
-                                                     is_output_permuted, is_half_duplex_limitation);
-        // Compute output cycles from dimensions and bw
-        const auto output_cycles = Cycles::toCycleInterfaceType((double)wl.output.size() * (double)output_bandwidth);
-
-        // Get latency in cycles
-        const auto input_latency = (unsigned long)get_DMA_latency_Legacy(wl.device, wl.input_location);
-        const auto output_latency = (unsigned long)get_DMA_latency_Legacy(wl.device, wl.output_location);
-
-        // Get the max between input and output cycles
-        return Cycles::cost_adder(std::max(input_latency, output_latency), std::max(input_cycles, output_cycles));
-    }
-
-protected:
-    /// CMX2CMX is half-duplex on NPU 2.x
-    bool isHalfDuplexContext(const DMAWorkload& wl) const {
-        return ((wl.device <= VPUDevice::VPU_2_7)  // specific device
-                && (wl.input_location == MemoryLocation::CMX) && (wl.output_location == MemoryLocation::CMX))
-                       ? true
-                       : false;
-    }
-
-
-    int compute_DRAM_bandwith_BytesPerCyc(const VPUDevice& device) const {
-        // DRAM bw is given in MBps
-        const int ddr_BytesPerCyc{static_cast<int>(std::floor(get_dram_bandwidth_MBps(device) / get_cmx_fclk(device)))};
-        const int cmx_bounded_maxBytesPerCyc{get_DMA_DDR_interface_bytes(device)};
-        return std::min(ddr_BytesPerCyc, cmx_bounded_maxBytesPerCyc);
-    }
-
-
-
-    // cmx clock
-    int get_bytes_per_cycle_read_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
-                                    bool half_duplex = false) const {
-        switch (location) {
-        case MemoryLocation::DRAM:
-            return compute_DRAM_bandwith_BytesPerCyc(device);
-
-        case MemoryLocation::CMX:
-        case MemoryLocation::CSRAM:  //?
-        case MemoryLocation::UPA:    //?
-        default:
-            // return (get_sram_word_size(tensor, false, false, half_duplex));
-            return cmx_agregated_bytes_per_cycle_bw(tensor, device, half_duplex, false, false);
+    inline bool native_comp_is_any_fp(const DPUWorkload& wl) const {
+        // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
+        bool found_at_least_one_float = false;
+        for (const auto& i : wl.inputs) {
+            found_at_least_one_float = found_at_least_one_float || i.is_any_float();
         }
-    }
-    int cmx_raw_word_size(const VPUDevice device, bool half_duplex) const {
-        if (half_duplex) {
-            return get_DMA_DDR_interface_bytes(device) / 2;
-        }
-        return get_DMA_DDR_interface_bytes(device);
+        return found_at_least_one_float;
     }
 
-    // CMX clock. COnsiders also limitation like compression...
-    int cmx_agregated_bytes_per_cycle_bw(const VPUTensor& tensor, VPUDevice device, bool half_duplex, bool permute,
-                                         bool compression, float decompression_ratio = 1.0F,
-                                         int compressed_BW_BytesPerCycle = 1) const {
-        // permute limits the bw to one element per cycle
-        if (permute) {
-            return dtype_to_bytes(tensor.get_dtype());  // size of one element (what about half duplex?). should not be
-                                                        // larger than CMX BW?
-        }
+    inline bool native_comp_on_fp16(const DPUWorkload& wl) const {
+        // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
+        static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
 
-        const auto nominal_bw = cmx_raw_word_size(device, half_duplex);  // nominal
-        if (compression) {
-            const auto max_bw = (float)nominal_bw * 2.0f;  // bpclock
-            const auto potential_speed_up_bw = (float)compressed_BW_BytesPerCycle * decompression_ratio;
-            // compression speeds up the bpCyc to compressed_BW_BytesPerCycle*decompression_ratio(>1) but not more than
-            // 2x of SRAM speed
-            const float real_speed_up_bw = std::min(max_bw, potential_speed_up_bw);  //
-
-            return (int)real_speed_up_bw;
-        }
-
-        // normal speed is the constant CMX bytes per cycle
-        return nominal_bw;
+        return wl.inputs[0].is_fp16family();
     }
 
-
-    int get_bytes_per_cycle_write_bw(const VPUTensor& tensor, VPUDevice device, MemoryLocation location,
-                                     bool half_duplex, bool permute, bool compression,
-                                     float decompression_ratio /*= 1.0F*/,
-                                     int compressed_BW_BytesPerCycle /* = 0*/) const {
-        switch (location) {
-        case MemoryLocation::DRAM:
-            // noy influenced by permuted!
-            // not influenced by compression!
-            return compute_DRAM_bandwith_BytesPerCyc(device);
-
-        case MemoryLocation::CMX:
-        case MemoryLocation::CSRAM:  //?
-        case MemoryLocation::UPA:    //?
-        default:
-            return (cmx_agregated_bytes_per_cycle_bw(tensor, device, half_duplex, permute, compression,
-                                                     decompression_ratio, compressed_BW_BytesPerCycle));
-        }
+    inline bool native_comp_on_fp8(const DPUWorkload& wl) const {
+        // to do : look at weights also?
+        static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+        // to do  redesign xx family methods to be based on Datatype operations
+        const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
+        return wl.inputs[0].is_fp8family() && (!wts.is_fp16family());
     }
 
-public:
-    unsigned long int DMATheoreticalCycles_RESERVED_ON(const DMAWorkload& wl) const {
-        const float dpuPerCmx_clock_ratio{(float)get_dpu_fclk(wl.device) / (float)get_cmx_fclk(wl.device)};
-        const bool is_half_duplex_limitation{isHalfDuplexContext(wl)};
+    inline bool native_comp_on_i8(const DPUWorkload& wl) const {
+        static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
 
-        const bool is_cmx2cmx_permutation = ((wl.input.get_layout() != wl.output.get_layout())  // changing layout
-                                             && (wl.input_location == MemoryLocation::CMX)      // and src/dest from CMX
-                                             && (wl.output_location == MemoryLocation::CMX));   // and src/dest from CMX
+        // to do  redesign xx family methods to be based on Datatype operations
+        const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
 
-        const bool is_DDR2CMX_decompresion =
-                ((wl.input.size() < wl.output.size())              // dest size is bigger (decompression)
-                 && (wl.input_location == MemoryLocation::DRAM)    // and src from DDR
-                 && (wl.output_location == MemoryLocation::CMX));  // and dst to CMX
-
-        const float decompression_ratio{is_DDR2CMX_decompresion ? ((float)wl.output.size() / (float)wl.input.size())
-                                                                : 1.0f};
-
-        const int input_bw_bpc =
-                get_bytes_per_cycle_read_bw(wl.input, wl.device, wl.input_location, is_half_duplex_limitation);
-        const auto CMX_cycles_read = (float)wl.input.size() / (float)input_bw_bpc;
-        const auto input_cycles_DPU = Cycles::toCycleInterfaceType(CMX_cycles_read * dpuPerCmx_clock_ratio);
-
-        const int output_bw_bpc = get_bytes_per_cycle_write_bw(
-                wl.output, wl.device, wl.output_location, is_half_duplex_limitation, is_cmx2cmx_permutation,
-                is_DDR2CMX_decompresion, decompression_ratio, input_bw_bpc);
-        const auto CMX_cycles_write = (float)wl.output.size() / (float)output_bw_bpc;
-        const auto output_cycles_DPU = Cycles::toCycleInterfaceType(CMX_cycles_write * dpuPerCmx_clock_ratio);
-
-        // Get latency in cycles
-        const auto input_latency_DPU = get_DMA_latency(wl.device, wl.input_location);
-        const auto output_latency_DPU = get_DMA_latency(wl.device, wl.output_location);
-
-        // Get the max between input and output cycles
-        return Cycles::cost_adder(std::max(input_latency_DPU, output_latency_DPU),
-                                  std::max(input_cycles_DPU, output_cycles_DPU));
-    }
-
-    /**
-     * @brief Compute the Shave Kernel theoretical cycles
-     *
-     * @param swl a Shave Kernel
-     * @return unsigned int theoretical execution cycles
-     */
-    unsigned int SHAVETheoreticalCycles(const SWOperation& swl) const {
-        if (swl.outputs.size() == 0) {  // If it computes no output, its duration is 0 cycles
-            return 0;
-        }
-        return swl.cycles();
+        return wl.inputs[0].is_i8family() && (!wts.is_any_float());
     }
 };
 

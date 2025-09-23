@@ -192,11 +192,12 @@ public:
      * @param wl the workload(key) descriptor
      * @return std::optional<V> the value stored in the cache, or nothing if not available
      */
-    std::optional<V> get(const K& wl) const {
+    std::optional<V> get(const K& wl, std::string* source = nullptr) const {
         // Check if the workload is in the deserialized table
         {
             const std::optional<V> found{FixedCacheAddON<K, V>::get(wl)};
             if (found) {
+                if (source) *source = "fixed_cache";
                 return found;
             }
         }
@@ -215,6 +216,7 @@ public:
         auto map_it = m_table.find(wl);
         if (map_it != m_table.cend()) {
             mark_as_most_recently_used(map_it);
+            if (source) *source = "dyn_cache";
             return (map_it->second->second);
         } else {
             return std::nullopt;

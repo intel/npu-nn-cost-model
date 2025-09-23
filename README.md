@@ -24,7 +24,7 @@ If you do not set CC and CXX environment variables, `which gcc` and `which g++` 
 
 Compile the library by typing `cmake -H. -Bbuild && cmake --build build`
 
-@TODO: environment compatible with newer compiler versions (gcc>=10, clamg >10 )  
+@TODO: environment compatible with newer compiler versions (gcc>=10, clang >10 )  
 
 ### Use Intel oneAPI MKL
 

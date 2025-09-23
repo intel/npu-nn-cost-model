@@ -64,7 +64,6 @@ protected:
      * @return std::vector<T>& a DMANNWorkload descriptor
      */
     virtual const std::vector<T>& generate_descriptor(const DMADesc& workload, size_t& debug_offset) = 0;
-    // virtual const std::vector<T>& generate_descriptor(const DMANNWorkload_NPU40& workload, size_t& debug_offset) = 0;
 
 public:
     /// @brief provides the interface number this instance implements
@@ -72,7 +71,7 @@ public:
     virtual int interface_version() const = 0;
 
     /// @brief Construct a new Preprocessing object
-    IPreprocessingDMA(){};
+    IPreprocessingDMA() {};
 
     /**
      * @brief Return the size of the DPUWorkload descriptors
@@ -117,7 +116,7 @@ public:
      * @param workload the DMANNWorkload to transform
      * @return std::vector<T>& a DMANNWorkload descriptor
      */
-    const std::vector<T>& transform(const DMADesc& workload) {
+    const std::vector<T>& transformSingle(const DMADesc& workload) {
         size_t unsused_output_written_offset;
         return generate_descriptor(workload, unsused_output_written_offset);
     };
@@ -236,9 +235,9 @@ protected:
     }
 
 public:
-    using IPreprocessingDMA<T, DMADesc>::transform;  ///< exposes the non virtual transform for  workloads vector
+    using IPreprocessingDMA<T, DMADesc>::transformSingle;  ///< exposes the non virtual transform for  workloads vector
 
-    PreprocessingInserterDMA(){};
+    PreprocessingInserterDMA() {};
     virtual ~PreprocessingInserterDMA() = default;
 
     int interface_version() const override {
@@ -248,7 +247,7 @@ public:
     /**
      * @brief Transform a DMANNWorkload into a DMANNWorkload descriptor
      *
-     * @param workload a DMANNWorkload_NPU27
+     * @param workload a dedicated workload type
      * @param debug_offset [out] is the offset where a new value can be written. interpreted as how many positions were
      * written
      * @return std::vector<T>& a DMANNWorkload descriptor
@@ -260,19 +259,14 @@ public:
 
         return derived->template transformOnly<false>(workload, debug_offset);
     };
-    // const std::vector<T>& generate_descriptor(const DMANNWorkload_NPU40& workload, size_t& debug_offset) override {
-    //     this->reset();                                                          // all on zero
-    //     this->check_and_throw_size(static_cast<D*>(this)->size_of_descriptor);  // will throw in case not enough
-    //     space
-
-    //    return static_cast<D*>(this)->template transformOnly<false>(workload, debug_offset);
-    //};
 };
+
 /// @brief enum for NN descriptor versions (input versions)
 enum class NNVersionsDMA : int {
     VERSION_00_LATEST_NONE = 0,  ///< no version OR last version
     VERSION_01_27 = 1,           ///< initial version, first one for 2.7
     VERSION_02_40 = 2,           ///< 6D dedicated to 4.0+
+    VERSION_03_RESERVED_v1 = 3,        ///< 6D dedicated to RESERVED iteration 1 . Probably supports max 2D
 };
 
 }  // namespace VPUNN

@@ -67,6 +67,7 @@ protected:
 /// for stable values (independent of operation) : holds the data values that a workload can take on its fields
 /// dynamic behavior is provided via methods, including pure virtual ones.
 /// has also a connection to the specific behavior interface that discriminated between operations
+/// /* coverity[rule_of_five_violation:FALSE] */
 class IDeviceValidValues : public ValidValuesInfrastructure {
 public:
     IDeviceValidValues(const IDeviceValidValues&) noexcept(false) = default;
@@ -111,7 +112,8 @@ protected:
                        const int& input_heigth_width_start_factor_SOHW_,                       //
                        const IDeviceValidValues::ValidDatatypes& valid_datatypes,              //
                        const Values<Operation>& valid_operations_,                             //
-                       const int& alignement_size_bytes_  // page size, NPU specific
+                       const int& alignement_size_bytes_ , // page size, NPU specific
+                       const int& out_innermost_dim_alignment_                                  //
                        )
             : operations_dynamic_behavior{op_dynamic_constraints},                          //
               valid_execution_order_map{valid_execution_order_},                            //
@@ -125,7 +127,8 @@ protected:
               input_heigth_width_start_factor_SOHW{input_heigth_width_start_factor_SOHW_},  //
               valid_datatypes_map{valid_datatypes},
               valid_operations{valid_operations_},
-              alignement_size_bytes{alignement_size_bytes_}{
+              alignement_size_bytes{alignement_size_bytes_},
+              out_innermost_dim_alignment{out_innermost_dim_alignment_} {
     }
 
 protected:
@@ -277,6 +280,10 @@ public:
         return weigths_alignment;
     }
 
+    int get_specific_out_innermost_dim_alignment() const {
+        return out_innermost_dim_alignment;
+    }
+
     const Values<Operation>& get_valid_operations() const {
         return valid_operations;
     };
@@ -343,6 +350,8 @@ protected:
     const Values<Operation> valid_operations;  ///< valid operations for this device
 
     const int alignement_size_bytes;  // page size, NPU specific
+
+    const int out_innermost_dim_alignment; ///< alignment for innermost dimension (in bytes), used when we compute output_0 tensor's memory 
 
     // const fixed here
 private:

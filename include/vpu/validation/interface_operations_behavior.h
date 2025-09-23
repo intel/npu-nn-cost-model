@@ -47,19 +47,19 @@ public:
     /// @brief computes the aligned size in bytes for activators of a workload. the actual memory occupied considering
     /// SEP or sparsity.
     virtual long long input_0_aligned_size_bytes(const IDeviceValidValues& config,
-                                                 const DPUOperation& dpu) const noexcept = 0;
+                                                 const DPUOperation& dpu) const = 0;
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the activators
     virtual long long input_0_contiguous_size_bytes(const IDeviceValidValues& config,
-                                                    const DPUOperation& dpu) const noexcept = 0;
+                                                    const DPUOperation& dpu) const = 0;
 
     /// @brief computes the aligned size in bytes for  output activators of a workload. the actual memory occupied
     /// considering sparsity map
     virtual long long output_0_aligned_size_bytes(const IDeviceValidValues& config,
-                                                  const DPUOperation& dpu) const noexcept = 0;
+                                                  const DPUOperation& dpu) const  = 0;
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the output. the actual memory occupied
     /// considering sparsity map
     virtual long long output_0_contiguous_size_bytes(const IDeviceValidValues& config,
-                                                     const DPUOperation& dpu) const noexcept = 0;
+                                                     const DPUOperation& dpu) const = 0;
 
     /// @returns a filtered strategy container that has the invalid ones eliminated. Operation dependent.
     virtual Values<ISIStrategy> filter_ISI_Strategy_Options(const Values<ISIStrategy>& strategies) const {

@@ -26,6 +26,7 @@
 #include <shared_mutex>
 
 #include "vpu/nn_cost_provider_execution_context.h"
+#include "vpu/serialization/l1_cost_serialization_wrapper.h"
 
 namespace VPUNN {
 
@@ -95,7 +96,7 @@ public:
 
 protected:
     template <typename WlT>
-    float infer(const WlT& workload) {
+    float infer(const WlT& workload) const {
         auto& ctx = get_execution_context();
 
         float postProcessed_value{default_NN_output};
@@ -113,19 +114,8 @@ protected:
             const auto infered_value{vpunn_runtime.predict<float>(descriptor, ctx.runtime_buffer_data)[0]};
             cache.add(descriptor, infered_value);
 
-            if (cache_miss_serializer.is_serialization_enabled()) {
-                try {
-                    auto wl_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
-                    const size_t wl_uid = wl_op.hash();
-                    cache_miss_serializer.serialize(
-                            wl_op, SerializableField<std::string>{"workload_uid", std::to_string(wl_uid)},
-                            SerializableField<std::string>{"info", workload.get_layer_info()});
-                    cache_miss_serializer.end();
-                } catch (const std::exception& e) {
-                    Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                    cache_miss_serializer.clean_buffers();
-                }
-            }
+            L1CostSerializationWrap serialization_handler(cache_miss_serializer, sanitizer);
+            serialization_handler.serializeInfoAndComputeWorkloadUid(workload, true /*serializer close line*/);
 
             postProcessed_value = post_processing.process(workload, infered_value);
         } else {
@@ -137,7 +127,7 @@ protected:
 
     /// returns a reference that is owned by the executor context, normally thread bounded
     template <typename WlT>
-    const std::vector<float>& infer(const std::vector<WlT>& workloads) {
+    const std::vector<float>& infer(const std::vector<WlT>& workloads) const {
         auto& ctx = get_execution_context();
 
         ctx.workloads_results_buffer.resize(workloads.size());
@@ -184,6 +174,8 @@ protected:
         return ctx.workloads_results_buffer;
     }
 
+    /// provides the context or creates a new one in case it does not exist yet
+    /// the context containers are (must be ) mutable
     NNExecutionContext& get_execution_context() const {
         const auto thread_id = std::this_thread::get_id();
 
@@ -215,7 +207,7 @@ protected:
 
 public:
     template <typename WlT>
-    CyclesInterfaceType get_cost(const WlT& workload) {
+    CyclesInterfaceType get_cost(const WlT& workload) const {
         if (!is_initialized()) {
             return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
         }
@@ -228,7 +220,7 @@ public:
         }
     }
 
-    std::vector<CyclesInterfaceType> get_cost(const std::vector<DPUWorkload>& workloads) {
+    std::vector<CyclesInterfaceType> get_cost(const std::vector<DPUWorkload>& workloads) const {
         const auto number_of_workloads{workloads.size()};  ///< fixed value remembered here, workloads is non const
         std::vector<CyclesInterfaceType> cycles_vector(number_of_workloads);
 
@@ -247,13 +239,13 @@ public:
     }
 
     /// @brief Only used as a WA to share fixed cache outside of nn_cost_provider - will be removed in future.
-    CyclesInterfaceType get_cached(const DPUWorkload& workload) {
+    CyclesInterfaceType get_cached(const DPUWorkload& workload, std::string* source = nullptr) const {
         if (!is_initialized()) {
             return Cycles::ERROR_CACHE_MISS;
         }
 
         const std::vector<float> vector = preprocessing.transformSingle(workload);
-        const auto cached_value = cache.get(vector);
+        const auto cached_value = cache.get(vector, source);
         if (!cached_value) {
             return Cycles::ERROR_CACHE_MISS;
         } else {
@@ -266,7 +258,8 @@ public:
         }
     }
 
-    void add_to_cache(const DPUWorkload& workload, const float value) {
+    /// Is const because the cache is mutable.
+    void add_to_cache(const DPUWorkload& workload, const float value) const {
         if (!is_initialized()) {
             return;
         }
@@ -314,7 +307,7 @@ private:
     const Preprocessing<float>& preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
     const PostProcessSupport results_config;
     const IPostProcess& post_processing;
-    LRUCache<std::vector<float>, float>
+    mutable LRUCache<std::vector<float>, float>
             cache;  ///< cache for inferred values, used only for single workload, not for batches
     mutable CSVSerializer cache_miss_serializer;            ///< serializer for missed cache
     const std::string model_nickname{make_DPU_nickname()};  ///< nickname for the model, used for cache and serializer
@@ -379,7 +372,7 @@ private:
      *
      * @param v is the model version we took info about the full_raw_name in case we have an empty model
      */
-    void check_post_config(const ModelVersion& v) {
+    void check_post_config(const ModelVersion& v) const {
         const auto raw_name_intf = v.get_raw_name();
 
         // in case we have an empty ideal model the raw_name is defaulted to none and we should continue the run
@@ -404,7 +397,7 @@ private:
     /// This mechanism is unsafe at this moment and lets you change the preprocessing output to a bigger or smaller size
     /// The result may be impossibility to run (if smaller) or leaving empty zeros at the end (only partial fill)
     ///
-    void correlate_preprocessor_with_model_inputs() {
+    void correlate_preprocessor_with_model_inputs() const {
         auto& ctx = get_execution_context();
 
         const auto model_input_size = (ctx.runtime_buffer_data.input_shapes()[0])[1];

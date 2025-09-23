@@ -96,8 +96,9 @@ public:
             auto& operation_behaviour = config.get_specific_behaviour(wl.op);
             DPU_OperationValidator::check_workload_consistency(w, config, operation_behaviour, result);
 
-        } catch (const std::runtime_error&) {
+        } catch (const std::runtime_error& e) {
             result.mark_unknown_operation();
+            std::cerr << "Exception detected during sanitization: " << e.what() << std::endl;
             return;
         }
     }

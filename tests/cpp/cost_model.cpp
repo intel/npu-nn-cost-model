@@ -34,7 +34,6 @@ using namespace VPUNN;
 //@todo Add all LNL profiling results for JIra tickets to a fixture of UNit tests for LNL
 //@todo Enhance DW-conv conversion factors to include the new ones from the LNL profiling results
 
-
 TEST_F(TestCostModel, MAXPOOL_172_VPU27_NoGT) {
     DPUWorkload tst_wl{
             VPUDevice::VPU_2_7,                         // dev
@@ -737,6 +736,87 @@ TEST_F(TestCostModel, SmokeTestDPUVPU27Model) {
     EXPECT_FALSE(Cycles::isErrorCode(overhead)) << overhead;
 }
 
+TEST_F(TestCostModel, Test_Serializer_for_DPU_function) {
+    VPUNN::DPUWorkload wl = {
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                     // kernels
+            {1, 1},                                                     // strides
+            {1, 1, 1, 1},                                               // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+    };
+    VPUNN::VPUCostModel model40{VPU_4_0_MODEL_PATH};
+    EXPECT_TRUE(model40.nn_initialized());
+
+    auto cycles = model40.DPU(std::move(wl));
+    EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
+}
+
+TEST_F(TestCostModel, Test_Serializer_for_NNCostProvider) {
+    VPUNN::DPUWorkload wl = {
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                     // kernels
+            {1, 1},                                                     // strides
+            {1, 1, 1, 1},                                               // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+    };
+
+    // uncomment to generate the csv from NNCostProvider
+   // set_env_var("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION", "TRUE");
+    VPUNN::VPUCostModel model40{VPU_4_0_MODEL_PATH};
+    EXPECT_TRUE(model40.nn_initialized());
+
+    auto cycles = model40.DPU(std::move(wl));
+    EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
+}
+
+TEST_F(TestCostModel, Test_Serializer_for_DPU_vec_function) {
+    VPUNN::DPUWorkload wl0 = {
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                     // kernels
+            {1, 1},                                                     // strides
+            {1, 1, 1, 1},                                               // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+    };
+    VPUNN::DPUWorkload wl1 = {
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(56, 40, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(56, 40, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                     // kernels
+            {1, 1},                                                     // strides
+            {1, 1, 1, 1},                                               // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
+    };
+    VPUNN::DPUWorkload wl2 = {
+            VPUNN::VPUDevice::VPU_4_0,
+            VPUNN::Operation::CONVOLUTION,
+            {VPUNN::VPUTensor(112, 12, 32, 1, VPUNN::DataType::UINT8)},  // input dimensions
+            {VPUNN::VPUTensor(112, 12, 32, 1, VPUNN::DataType::UINT8)},  // output dimensions
+            {3, 3},                                                      // kernels
+            {1, 1},                                                      // strides
+            {1, 1, 1, 1},                                                // padding
+            VPUNN::ExecutionMode::CUBOID_16x16                           // execution mode
+    };
+
+    std::vector<VPUNN::DPUWorkload> workloads = {std::move(wl0), std::move(wl1), std::move(wl2)};
+
+    VPUNN::VPUCostModel model_path{VPU_4_0_MODEL_PATH};
+
+    // run all in one vector
+    std::vector<VPUNN::CyclesInterfaceType> cycles;
+    ASSERT_NO_THROW(cycles = model_path.DPU(workloads));
+          
+}
+
 TEST_F(TestCostModel, SmokeTestDMA) {
     auto dma_cycles = model.DMA(VPUNN::VPUDevice::VPU_2_7, VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8),
                                 VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8), VPUNN::MemoryLocation::DRAM,
@@ -883,7 +963,8 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
             if (t.t_exp.cyc_err == Cycles::NO_ERROR) {
                 EXPECT_TRUE(!Cycles::isErrorCode(cyc));
             } else {
-                EXPECT_EQ(cyc, t.t_exp.cyc_err) << "Actual: " << Cycles::toErrorText(cyc) << " Expected: " << Cycles::toErrorText(t.t_exp.cyc_err);
+                EXPECT_EQ(cyc, t.t_exp.cyc_err) << "Actual: " << Cycles::toErrorText(cyc)
+                                                << " Expected: " << Cycles::toErrorText(t.t_exp.cyc_err);
             }
 
             i++;
@@ -892,18 +973,28 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
 
     /// for VPUDevice::VPU2_0, VPUDevice::VPU2_7, VPUDevice::VPU4_0 we accept any value for batch (ex: 1, 2, 3, ...)
     /// but for VPUDevice::NPU_RESERVED batch is restricted to 1
-    const TestsVector tests = {
-            {{mkWl(VPUDevice::VPU_2_0, 0U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH}, {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}, "VPU2_0, B=0"},
-            {{mkWl(VPUDevice::VPU_2_0, 1U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_0, B=1"},
-            {{mkWl(VPUDevice::VPU_2_0, 2U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_0, B=2"},
+    const TestsVector tests = {{{mkWl(VPUDevice::VPU_2_0, 0U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+                                "VPU2_0, B=0"},
+                               {{mkWl(VPUDevice::VPU_2_0, 1U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+                                {Cycles::NO_ERROR},
+                                "VPU2_0, B=1"},
+                               {{mkWl(VPUDevice::VPU_2_0, 2U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+                                {Cycles::NO_ERROR},
+                                "VPU2_0, B=2"},
 
-            {{mkWl(VPUDevice::VPU_2_7, 0U), VPU_2_7_MODEL_PATH}, {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}, "VPU2_7, B=0"},
-            {{mkWl(VPUDevice::VPU_2_7, 1U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=1"},
-            {{mkWl(VPUDevice::VPU_2_7, 2U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=2"},
+                               {{mkWl(VPUDevice::VPU_2_7, 0U), VPU_2_7_MODEL_PATH},
+                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+                                "VPU2_7, B=0"},
+                               {{mkWl(VPUDevice::VPU_2_7, 1U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=1"},
+                               {{mkWl(VPUDevice::VPU_2_7, 2U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=2"},
 
-            {{mkWl(VPUDevice::VPU_4_0, 0U), VPU_4_0_MODEL_PATH}, {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}, "VPU4_0, B=0"},
-            {{mkWl(VPUDevice::VPU_4_0, 1U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=1"},
-            {{mkWl(VPUDevice::VPU_4_0, 2U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=2"},
+                               {{mkWl(VPUDevice::VPU_4_0, 0U), VPU_4_0_MODEL_PATH},
+                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+                                "VPU4_0, B=0"},
+                               {{mkWl(VPUDevice::VPU_4_0, 1U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=1"},
+                               {{mkWl(VPUDevice::VPU_4_0, 2U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=2"},
+
     };
 
     verify_cyc(tests);
@@ -1314,9 +1405,10 @@ TEST_F(TestCostModel, Mock_Legacy159_40_DPU) {
 }
 
 TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
-    const auto ratio_27per40 = (float)get_dpu_fclk(VPUDevice::VPU_2_7) /
-                               (float)get_dpu_fclk(VPUDevice::VPU_4_0);  //[cycles27/cycles40] is the unit
-    {                                                                    // DMA
+    const auto ratio_27per40 =
+            (float)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::VPU_2_7) /
+            (float)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::VPU_4_0);  //[cycles27/cycles40] is the unit
+    {                                                                                 // DMA
         const std::string model_path = "NoFileHere.vpunn";
         VPUNN::VPUCostModel model_2_7{model_path};
         VPUNN::VPUCostModel model_4_0{model_path};
@@ -1326,9 +1418,9 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
         auto cycles_40_DtoC = model_4_0.DMA(wl_glob_40.device, wl_glob_40.inputs[0], wl_glob_40.outputs[0],
                                             MemoryLocation::DRAM, MemoryLocation::CMX);
 
-        EXPECT_GT(cycles_27_DtoC, (cycles_40_DtoC * ratio_27per40));               // 2.7 is slower
-        EXPECT_EQ(cycles_27_DtoC, 3658);                                           // theoretical DMA
-        EXPECT_EQ(cycles_40_DtoC, PerformanceMode::forceLegacy_G4 ? 4359 : 1883);  // theoretical DMA
+        EXPECT_GT(cycles_27_DtoC, (cycles_40_DtoC * ratio_27per40));                         // 2.7 is slower
+        EXPECT_EQ(cycles_27_DtoC, 3658);                                                     // theoretical DMA
+        EXPECT_EQ(cycles_40_DtoC, PerformanceMode::forceLegacy_G4 ? 4359 : 1883 + 87 + 59);  // theoretical DMA
 
         auto cycles_27_CtoD = model_2_7.DMA(wl_glob_27.device, wl_glob_27.inputs[0], wl_glob_27.outputs[0],
                                             MemoryLocation::CMX, MemoryLocation::DRAM);
@@ -1337,11 +1429,10 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
 
         EXPECT_GT(cycles_27_CtoD, (cycles_40_CtoD * ratio_27per40));  // 2.7 is slower
 
-        EXPECT_EQ(cycles_27_CtoD, 3658);                                           // theoretical DMA
-        EXPECT_EQ(cycles_40_CtoD, PerformanceMode::forceLegacy_G4 ? 4359 : 1883);  // theoretical DMA
+        EXPECT_EQ(cycles_27_CtoD, 3658);                                                     // theoretical DMA
+        EXPECT_EQ(cycles_40_CtoD, PerformanceMode::forceLegacy_G4 ? 4359 : 1883 + 87 + 59);  // theoretical DMA
     }
 }
-
 
 TEST_F(TestCostModel, Establish_unique_swizz_Test) {
     struct TestInput {
@@ -1409,11 +1500,12 @@ TEST_F(TestCostModel, ComaparativeRuns) {
 
     auto modelRun = [](const std::string& model_path, VPUNN::DPUWorkload& wld) {
         VPUNN::VPUCostModel vpunn_model(model_path);
+        const IEnergy& my_energy = vpunn_model.getEnergyInterface();
         std::cout << model_path << " : initialized: " << vpunn_model.nn_initialized() << std::endl;
 
         // std::cout << "run_NN(wl)   : " << vpunn_model.run_NN(wld) << std::endl;
         std::cout << "DPU(wl)   : " << vpunn_model.DPU(wld) << std::endl;
-        std::cout << "hw_utilization(wl)   : " << vpunn_model.hw_utilization(wld) << std::endl;
+        std::cout << "hw_utilization(wl)   : " << my_energy.hw_utilization(wld) << std::endl;
     };
 
     std::cout << "----------------------------------------------------------\n";
@@ -1541,7 +1633,7 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_dpu));
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
         EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
-    }
+    }  // namespace VPUNN_unit_tests
     {  // 27
         const DPUWorkload wl{wl_glob_27};
         const std::string modelFile{VPU_2_7_MODEL_PATH};
@@ -1570,7 +1662,7 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
     }
 
 
-    }
+}
 TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 20
         const DPUWorkload wl_device{wl_glob_20};
@@ -1839,13 +1931,14 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
 
     // this lambda function should verify if ideal cycles are computed correctly when sparsity influences the value
     // (power ideal cycles) and when not (efficiency ideal cycles)
-    auto verify_ideal_cyc = [](const TestCase& t, VPUCostModel& test_model) {
+    auto verify_ideal_cyc = [](const TestCase& t, VPUCostModel& test_model, const HWPerformanceModel& performance) {
         DPUInfoPack sparse_mac_op_info;
+
         ASSERT_NO_THROW(sparse_mac_op_info = test_model.DPUInfo(t.t_in.wl)) << t.t_in.wl;
 
         // direct method (calling functions) --> cycles
-        EXPECT_EQ(test_model.DPU_Power_IdealCycles(t.t_in.wl), t.t_exp.power_ideal_cycles);
-        EXPECT_EQ(test_model.DPU_Efficency_IdealCycles(t.t_in.wl), t.t_exp.efficiency_ideal_cycles);
+        EXPECT_EQ(performance.DPU_Power_IdealCycles(t.t_in.wl), t.t_exp.power_ideal_cycles);
+        EXPECT_EQ(performance.DPU_Efficency_IdealCycles(t.t_in.wl), t.t_exp.efficiency_ideal_cycles);
 
         // DPU Info Pack -->cycles
         EXPECT_EQ(sparse_mac_op_info.power_ideal_cycles, t.t_exp.power_ideal_cycles);
@@ -1855,11 +1948,12 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
     /// this lambda function verify that power ideal cyc is smaller than efficiency ideal cyc when input or/and weight
     /// sparsity is/are active when both sparsity are inactive then power ideal cyc should be equal with efficiency
     /// ideal cyc
-    auto verify_sparsity_influence = [](const TestCase& t, const VPUCostModel& test_model) {
+    auto verify_sparsity_influence = [](const TestCase& t, const VPUCostModel& /* test_model*/,
+                                        const HWPerformanceModel& performance) {
         DPUInfoPack sparse_mac_op_info;
 
-        unsigned long int power_cyc = test_model.DPU_Power_IdealCycles(t.t_in.wl);
-        unsigned long int efficiency_cyc = test_model.DPU_Efficency_IdealCycles(t.t_in.wl);
+        unsigned long int power_cyc = performance.DPU_Power_IdealCycles(t.t_in.wl);
+        unsigned long int efficiency_cyc = performance.DPU_Efficency_IdealCycles(t.t_in.wl);
         if (t.t_in.wl.inputs[0].get_sparsity() || t.t_in.wl.weight_sparsity_enabled)
             EXPECT_LT(power_cyc, efficiency_cyc);
         else
@@ -1869,9 +1963,10 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
     ///@brief this lambda function executes a given lambda function as a parameter on each test case in a test vector
     ///@param tests a test vector
     ///@param testChecker is a lambda function
-    auto run_Tests = [](const TestsVector& tests, VPUCostModel& test_model, auto testCheck) {
+    auto run_Tests = [](const TestsVector& tests, VPUCostModel& test_model,
+                        const HWPerformanceModel& performance, auto testCheck) {
         for (const auto& t : tests) {
-            testCheck(t, test_model);
+            testCheck(t, test_model, performance);
         }
     };
 
@@ -1892,9 +1987,10 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
         };
 
         VPUCostModel test_model{VPU_2_0_MODEL_PATH};
+        const HWPerformanceModel& performance{test_model.getPerformanceModel()};
         EXPECT_TRUE(test_model.nn_initialized());
-        run_Tests(tests2_0, test_model, verify_ideal_cyc);
-        run_Tests(tests2_0, test_model, verify_sparsity_influence);
+        run_Tests(tests2_0, test_model, performance, verify_ideal_cyc);
+        run_Tests(tests2_0, test_model, performance, verify_sparsity_influence);
     }
 
     // 2_7
@@ -1914,9 +2010,10 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
         };
 
         VPUCostModel test_model{VPU_2_7_MODEL_PATH};
+        const HWPerformanceModel& performance{test_model.getPerformanceModel()};
         EXPECT_TRUE(test_model.nn_initialized());
-        run_Tests(tests2_7, test_model, verify_ideal_cyc);
-        run_Tests(tests2_7, test_model, verify_sparsity_influence);
+        run_Tests(tests2_7, test_model, performance, verify_ideal_cyc);
+        run_Tests(tests2_7, test_model, performance, verify_sparsity_influence);
     }
 
     // 4_0
@@ -1935,9 +2032,10 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
                 // clang-format on
         };
         VPUCostModel test_model{VPU_4_0_MODEL_PATH};
+        const HWPerformanceModel& performance{test_model.getPerformanceModel()};
         EXPECT_TRUE(test_model.nn_initialized());
-        run_Tests(tests4_0, test_model, verify_ideal_cyc);
-        run_Tests(tests4_0, test_model, verify_sparsity_influence);
+        run_Tests(tests4_0, test_model, performance, verify_ideal_cyc);
+        run_Tests(tests4_0, test_model, performance, verify_sparsity_influence);
     }
 }
 
@@ -2302,6 +2400,7 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
                 VPUNN::ISIStrategy::CLUSTERING,                                 // isi_strategy
                 false,                                                          // weight_sparsity_enabled
         };
+        // clang and gcc does not support to use std::move here, so we need suppression 
         /* coverity[copy_instead_of_move] */
         return wl;
     };
@@ -2326,6 +2425,7 @@ TEST_F(TestCostModel, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713) {
                 VPUNN::ISIStrategy::CLUSTERING,                               // isi_strategy
                 false,                                                        // weight_sparsity_enabled
         };
+        // clang and gcc does not support to use std::move here, so we need suppression 
         /* coverity[copy_instead_of_move] */
         return wl;
     };

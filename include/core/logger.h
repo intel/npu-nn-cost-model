@@ -146,6 +146,7 @@ public:
      * @return auto
      */
     static auto level() {
+        std::lock_guard<std::mutex> lock(log_mutex);
         return _logLevel;
     }
 

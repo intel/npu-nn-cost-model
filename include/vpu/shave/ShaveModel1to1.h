@@ -258,7 +258,12 @@ protected:
         // taking the position in the block
         // Position is determined by the op count and in case of a displacement it is shifted to left
         // by the displacement size
-        int block_position = (op_count - displacement_size_) % block_size_;
+        int block_position{};
+        
+        if(block_size_ != 0)
+            block_position = (op_count - displacement_size_) % block_size_;
+        else 
+            block_position = (op_count - displacement_size_);
 
         // position inside a vectorial calculation
         int intra_vector_point = block_position % vector_size_;

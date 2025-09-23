@@ -1283,6 +1283,7 @@ TEST_F(VPULayerCM_InvestigationTest, RuntimeELT_CONV_SOH_SOK_EISXW_98656) {
                 isi,                                          // isi_strategy
                 false,                                        // weight_sparsity_enabled
         };
+        // clang and gcc does not support to use std::move here, so we need suppression 
         /* coverity[copy_instead_of_move] */
         return wl_elm_layer;
     };
@@ -1308,6 +1309,7 @@ TEST_F(VPULayerCM_InvestigationTest, RuntimeELT_CONV_SOH_SOK_EISXW_98656) {
                 isi,                                          // ISIStrategy::CLUSTERING,      // isi_strategy
                 true,                                         // weight_sparsity_enabled
         };
+        // clang and gcc does not support to use std::move here, so we need suppression 
         /* coverity[copy_instead_of_move] */
         return wl_elm_layer;
     };

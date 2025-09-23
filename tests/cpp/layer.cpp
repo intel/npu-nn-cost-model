@@ -128,11 +128,11 @@ TEST_F(VPULayerCostModelTest, LayerCostModelVPU_2_0) {
 }
 
 TEST_F(VPULayerCostModelTest, LayerCostModelVPU_2_7_shv) {
-    auto layer = generate_helper_sw_layer(16, 64);
-    auto vpu20_layer_cost = model_2_7.Layer(layer, 5, 4);
+    auto layer = generate_helper_sw_layer(VPUNN::VPUDevice::VPU_2_7, 16, 64);
+    auto vpu27_layer_cost = model_2_7.Layer(layer, 5, 4);
 
     // Basic expectations
-    EXPECT_GT(vpu20_layer_cost, 0u);
+    EXPECT_GT(vpu27_layer_cost, 0u);
 }
 
 TEST_F(VPULayerCostModelTest, LayerCostModelVPU_2_7_shv_workload) {
@@ -154,7 +154,6 @@ TEST_F(VPULayerCostModelTest, LayerCostModelVPU_2_7_shv_wl_bad_name) {
     // Basic expectations
     EXPECT_EQ(vpu20_layer_cost, Cycles::ERROR_SHAVE);
 }
-
 TEST_F(VPULayerCostModelTest, ELTWISE_Concrete_Add14_VPU27) {
     const VPUNN::DPULayer tst_layer(VPUNN::VPUDevice::VPU_2_7, VPUNN::Operation::ELTWISE,
                                     {VPUNN::VPUTensor(56, 56, 256, 1, VPUNN::DataType::UINT8)},  // input dimensions
@@ -491,37 +490,37 @@ TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
     unsigned int no_fail = 1;
     {
         const std::vector<TestCase> tests{
-                 {{mkLayer(VPUDevice::VPU_2_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 2.0, B=0 "},
-                 {{mkLayer(VPUDevice::VPU_2_0, 1, Layout::ZMAJOR), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_0, 1, Layout::ZMAJOR),
+                  {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 12500, 12500 * no_fail + 1000},
                  "Device 2.0, B=1 "},
-                 {{mkLayer(VPUDevice::VPU_2_0, 2, Layout::ZMAJOR), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_0, 2, Layout::ZMAJOR),
+                  {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 6500, 6500 * no_fail + 1000},
                  "Device 2.0, B=2 "},
 
-                 {{mkLayer(VPUDevice::VPU_2_7, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_7, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 2_7, B=0 "},
-                 {{mkLayer(VPUDevice::VPU_2_7, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_7, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1500, 1500 * no_fail + 1000},
                  "Device 2.7, B=1 "},
-                 {{mkLayer(VPUDevice::VPU_2_7, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_7, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1300, 1300 * no_fail + 1000},
                  "Device 2.7, B=2 "},
 
-                 {{mkLayer(VPUDevice::VPU_4_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_4_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 4.0, B=0 "},
-                 {{mkLayer(VPUDevice::VPU_4_0, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_4_0, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 2000, 2000 * no_fail + 1000},
                  "Device 4.0, B=1 "},
-                 {{mkLayer(VPUDevice::VPU_4_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_4_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1200, 1200 * no_fail + 1000},
                  "Device 4.0, B=2 "},
-               
-
         };
         executeTests(tests);
     }
@@ -1064,7 +1063,7 @@ TEST_F(VPULayerCostModelTest, AVEPOOL_Concrete_GlobalAveragePool_172_MaxWorkload
 
 TEST_F(VPULayerCostModelTest, Default_MaxWorkloadSPlitAndDetails_Test) {
     std::vector<const VPULayerCostModel*> all_models{
-            &model_2_0, &model_2_7, &model_2_7_no_dma, &model_4_0, 
+            &model_2_0, &model_2_7, &model_2_7_no_dma, &model_4_0,
     };
 
     for (const auto m : all_models) {
@@ -2768,6 +2767,21 @@ TEST_F(VPULayerCostModelTest, Layer_PRE_split_CLUSTERING) {
                 << toStringLayerSplitInfo(detailed_split_pre_layer2) << toStringLayerSplitInfo(detailed_split_pre_layer)
                 << Logger::get2ndlog() << "END ERR";
     }
+}
+
+TEST_F(VPULayerCostModelTest, Layer_PRE_split_Shave) {
+    const VPUNN::SHAVEWorkload test_shave_wl{
+        "sigmoid", VPUDevice::VPU_4_0,
+        {VPUNN::VPUTensor(60, 7, 512, 1, VPUNN::DataType::FLOAT16)},
+        {VPUNN::VPUTensor(60, 7, 512, 1, VPUNN::DataType::FLOAT16)},
+    };
+    VPULayerCostModel& theModel = model_4_0;
+
+    const std::vector<SHAVEWorkload> splitLayers{test_shave_wl, test_shave_wl, test_shave_wl};
+    CyclesInterfaceType pre_split_cost = theModel.LayersPreSplit(splitLayers, 2, true, true);
+
+    EXPECT_GT(pre_split_cost, Cycles::NO_ERROR);
+    EXPECT_LE(pre_split_cost, Cycles::START_ERROR_RANGE);
 }
 
 /// DMA CMX to/from DDRare equal because is limited by the maximum time (min bandwith)

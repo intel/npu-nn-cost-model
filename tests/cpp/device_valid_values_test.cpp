@@ -48,7 +48,8 @@ protected:
 
                                             valid_datatypes_map_default,  //
                                             valid_operations_default,     //
-                                            alignement_size_bytes_def) {
+                                            alignement_size_bytes_def,//
+                                            out_innermost_dim_alignment_def) {
         }
         DeviceValidValuesMock()
                 : VPUNN::IDeviceValidValues(specific_behaviours,
@@ -64,7 +65,8 @@ protected:
 
                                             valid_datatypes_map_default,  //
                                             valid_operations_default,     //
-                                            alignement_size_bytes_def) {
+                                            alignement_size_bytes_def, //
+                                            out_innermost_dim_alignment_def) {
         }
 
         // const VPUNN::Channels& get_output_channels_range(const VPUNN::DPUOperation&) const override {
@@ -149,6 +151,7 @@ protected:
         };
 
         inline static const int weigths_alignment_def{16};
+        inline static const int out_innermost_dim_alignment_def{1}; // bytes
         inline static const int input_heigth_start_factor_SOH_def{1};
 
         inline static const int alignement_size_bytes_def{16 * 1024};

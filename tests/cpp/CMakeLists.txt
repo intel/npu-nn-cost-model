@@ -64,10 +64,10 @@ foreach(LINE ${config})
 endforeach()
 
 #message(STATUS " >> Generated TEST code is : \n ${LIST_ACT_TEST_CASES} \n  >> Generated test code END")
- configure_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/shave_legacy_all.cpp.in"
-      "${CMAKE_CURRENT_BINARY_DIR}/shave/shave_legacy_all.cpp"
-    )
+# configure_file(
+#      "${CMAKE_CURRENT_SOURCE_DIR}/shave_legacy_all.cpp.in"
+#      "${CMAKE_CURRENT_BINARY_DIR}/shave/shave_legacy_all.cpp"
+#    )
 
 file(GLOB test_src "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 file(GLOB shv_test_src "${CMAKE_CURRENT_BINARY_DIR}/shave/*.cpp")
@@ -77,8 +77,8 @@ add_executable(
   ${test_src}
   ${shv_test_src} "dpu_saniter_tests.cpp")
  
-#DPU models
 
+#DPU models
 target_compile_definitions(test_cost_model PRIVATE VPU_2_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_0.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn")
 
@@ -91,17 +91,10 @@ target_compile_definitions(test_cost_model PRIVATE VPU_4_0_MODEL_PATH="${MODEL40
 set(MODEL41_REAL "${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_4_1_MODEL_PATH="${MODEL41_REAL}")
 
-
-set(MODEL50_REAL "${CMAKE_SOURCE_DIR}/models/vpu_5_1.vpunn")
-#set(MODEL50_MOCK "${MODEL40}")
-set(MODEL50 "${MODEL50_REAL}")
-target_compile_definitions(test_cost_model PRIVATE NPU_5_0_MODEL_PATH="${MODEL50}")
-
 #DMA models
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn")
 target_compile_definitions(test_cost_model PRIVATE VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
-target_compile_definitions(test_cost_model PRIVATE VPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
 
 add_dependencies(test_cost_model cpp_schema)
 target_link_libraries(
@@ -128,7 +121,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(GCOV_BIN "gcov-9")
   else()
-    message(FATAL "-- Building with unrecognised compiler, cannot enable code coverage")
+    message(FATAL_ERROR "-- Building with unrecognised compiler, cannot enable code coverage")
   endif()
 
   set(COVERAGE_DIR ${CMAKE_BINARY_DIR}/coverage)

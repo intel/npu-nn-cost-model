@@ -7,6 +7,7 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
+
 cmake_minimum_required(VERSION 3.12)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
@@ -15,7 +16,8 @@ set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 project(VPUNN)
 
 # Enable /bigobj for debug build type with MSVC - remove after vpunn headers are cleaned up
-if (MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+#if (MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
 endif()

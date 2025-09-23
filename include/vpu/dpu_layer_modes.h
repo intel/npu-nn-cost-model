@@ -16,6 +16,7 @@
 
 #include "vpu/dpu_types.h"
 #include "vpu/layer.h"
+#include "vpu/device_layer_properties/device_layer_properties_holder.h"
 
 namespace VPUNN {
 
@@ -28,7 +29,7 @@ private:
     /// @return std::vector<ExecutionMode>
     static std::vector<ExecutionMode> getValidExecutionMode_2_0(const DPULayer& wl) {
         // Float input or output -> ExecutionMode::VECTOR_FP16
-        if (wl.inputs[0].is_float() || wl.outputs[0].is_float())
+        if (wl.inputs[0].is_fp16family() || wl.outputs[0].is_fp16family())
             return {ExecutionMode::VECTOR_FP16};
         // Find the optimal Execution Mode given output tensor layout
         auto shape = wl.outputs[0].get_shape();
@@ -71,7 +72,6 @@ private:
     static std::vector<ExecutionMode> getValidExecutionMode_RESERVED(const DPULayer& wl) {
         // The available mode choice is based on the OP type
         switch (wl.op) {
-        case Operation::CM_CONVOLUTION:  // compressconv surogate
         case Operation::DW_CONVOLUTION:
         case Operation::AVEPOOL:
         case Operation::MAXPOOL:
@@ -85,6 +85,27 @@ private:
         }
     }
 
+    /// @brief Get the valid ExecutionMode for NPU_6.0
+    ///
+    /// @param wl the DPULayer
+    /// @return std::vector<ExecutionMode>
+    static std::vector<ExecutionMode> getValidExecutionMode_6_0(const DPULayer& wl) {
+        switch (wl.op) {
+            case Operation::CM_CONVOLUTION:
+            case Operation::DW_CONVOLUTION:
+            case Operation::AVEPOOL:
+            case Operation::MAXPOOL:
+                return {ExecutionMode::CUBOID_16x16};
+            case Operation::ELTWISE:
+            case Operation::ELTWISE_MUL:
+                return {ExecutionMode::CUBOID_8x16};
+            case Operation::LAYER_NORM:
+            default:
+                return {ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_8x16, ExecutionMode::CUBOID_4x16};
+        }
+    }
+
+
     DPULayerModes() = default;  // no instance possible
 
 public:
@@ -93,22 +114,10 @@ public:
     /// @param wl the DPULayer
     /// @return std::vector<ExecutionMode>
     static std::vector<ExecutionMode> getValidExecutionMode(const DPULayer& wl) {
-        switch (wl.device) {
-        case VPUDevice::VPU_2_0:
-        case VPUDevice::VPU_2_1: {
-            return getValidExecutionMode_2_0(wl);
-        }
-        case VPUDevice::VPU_2_7:
-        case VPUDevice::VPU_4_0: {
-            return getValidExecutionMode_2_7(wl);
-        }
-        case VPUDevice::NPU_RESERVED:
-        case VPUDevice::NPU_RESERVED_W: {
-            return getValidExecutionMode_RESERVED(wl);
-        }
-        default:
+        if (wl.device >= VPUDevice::__size)
             return {};
-        }
+        else
+            return LayerPropertiesHolder::get_properties(wl.device).getValidTilingExecutionMode(wl);
     }
 };
 

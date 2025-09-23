@@ -212,6 +212,15 @@ struct DPUWorkload {
         input_swizzling[1] = toSet;
         output_swizzling[0] = toSet;
     }
+    /// gets the type of the weight tensor, considering also input type in case not set
+    DataType get_weight_type() const {
+        if (weight_type.has_value()) {
+            return weight_type.value();
+        } else {
+            // if not set, we assume the same type as input_0
+            return inputs[0].get_dtype();
+        }
+    }
 
 protected:
     /// @brief checks if the memory for input and output have the preconditions to be 1-1 in order to support in place
@@ -357,7 +366,7 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& 
                                            : " input_autopad: NA")  //
            << (d.output_autopad.has_value() ? " output_autopad: \t" + std::to_string(d.output_autopad.value())
                                             : " output_autopad: NA")  //
-           << out_terminator() << "Workload "  // terminator
+           << out_terminator() << "Workload "                         // terminator
             ;
     return stream;
 }

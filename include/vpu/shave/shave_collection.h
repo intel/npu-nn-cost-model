@@ -29,6 +29,7 @@ namespace VPUNN {
 /// @brief list of shaves attached to a device
 /// must have access to the destructor of the ShaveOpExecutor.
 ///     owns the executor concrete instances (creation and destruction is in its responsibility)
+/* coverity[rule_of_three_violation:FALSE] */
 class DeviceShaveContainer {
 private:
     ///@brief in here we can delete a p because we are friends!
