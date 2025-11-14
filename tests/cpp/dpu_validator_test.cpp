@@ -409,6 +409,9 @@ TEST_F(DPU_OperationValidator_Test, InputSparsity_and_SEP_memory_test) {
     verify_input0_memory(tests);
 }
 
+
+/// @todo: should there be Compute_memory_subByte_dtypes test for NPU_RESERVED_1?
+
 TEST_F(DPU_OperationValidator_Test, OutputSparsity_and_SEP_memory_test) {
     const VPUNN::DPUWorkload wl_ref_18x18x64{
             VPUNN::VPUDevice::VPU_2_7,
@@ -758,34 +761,33 @@ TEST_F(DPU_OperationValidator_Test, Output_sparsity_memory_computation_test) {
 
             //for this test case we have an wl with weight sparsity active 
             {{wl_ref_weight_spars_on,  false}, "output sparsity disable, weight sparsity enable, data type UINT8",{229376}},
-            {{wl_ref_weight_spars_on,  true}, "output sparsity enable, weight sparsity enable, data type UINT8",{262144}}, 
+            {{wl_ref_weight_spars_on,  true}, "output sparsity enable, weight sparsity enable, data type UINT8",{262144}},
 
             // clang-format on
     };
 
     verify_output0_memory(tests);
 }
-
-TEST_F(DPU_OperationValidator_Test, Output_tensor_memory_computation_test_for_different_innermost_dim) {
+TEST_F(DPU_OperationValidator_Test, Output_tensor_memory_computation_test_for_different_innermost_dim_NPU4) {
     auto mk_wl = [](const unsigned int w, const unsigned int h, const unsigned int c, Layout layout) -> DPUWorkload {
         return VPUNN::DPUWorkload{
                 VPUNN::VPUDevice::VPU_4_0,
                 VPUNN::Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(32, 18, 64, 1, VPUNN::DataType::UINT8)},          // input dimensions
+                {VPUNN::VPUTensor(32, 18, 64, 1, VPUNN::DataType::UINT8)},       // input dimensions
                 {VPUNN::VPUTensor(w, h, c, 1, VPUNN::DataType::UINT8, layout)},  // output dimensions
-                {3, 3},                                                             // kernels
-                {1, 1},                                                             // strides
-                {0, 0, 0, 0},                                                       // padding
-                VPUNN::ExecutionMode::CUBOID_16x16,                                 // execution mode
-                VPUNN::ActivationFunction::NONE,                                    // activation
-                0.0F,                                                               // act_sparsity
-                0.0F,                                                               // weight_sparsity
-                {swz_def, swz_def},                                                 // input_swizzling
-                {swz_def},                                                          // output_swizzling
-                1,                                                                  // output_write_tiles
-                {0, 0, 0, 0},                                                       // offsets
-                VPUNN::ISIStrategy::CLUSTERING,                                     // isi_strategy
-                false                                                               // weight_sparsity_enabled
+                {3, 3},                                                          // kernels
+                {1, 1},                                                          // strides
+                {0, 0, 0, 0},                                                    // padding
+                VPUNN::ExecutionMode::CUBOID_16x16,                              // execution mode
+                VPUNN::ActivationFunction::NONE,                                 // activation
+                0.0F,                                                            // act_sparsity
+                0.0F,                                                            // weight_sparsity
+                {swz_def, swz_def},                                              // input_swizzling
+                {swz_def},                                                       // output_swizzling
+                1,                                                               // output_write_tiles
+                {0, 0, 0, 0},                                                    // offsets
+                VPUNN::ISIStrategy::CLUSTERING,                                  // isi_strategy
+                false                                                            // weight_sparsity_enabled
 
         };
         ;
@@ -806,7 +808,7 @@ TEST_F(DPU_OperationValidator_Test, Output_tensor_memory_computation_test_for_di
 
     using TestsVector = std::vector<TestCase>;
 
-     auto test_info = [](const DPUWorkload& wl) -> std::string {
+    auto test_info = [](const DPUWorkload& wl) -> std::string {
         std::string info = "output tensor layout: " + Layout_ToText.at(static_cast<int>(wl.outputs[0].get_layout())) +
                            ", output channels: " + std::to_string(wl.outputs[0].z());
         return info;
@@ -818,23 +820,21 @@ TEST_F(DPU_OperationValidator_Test, Output_tensor_memory_computation_test_for_di
         for (const auto& t : tests) {
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
             std::cout << "Test case "
-                      << " " << i <<": "<<test_info(wl_ref)<< "\n";
+                      << " " << i << ": " << test_info(wl_ref) << "\n";
 
             MemorySize memory;
             {
                 MemorySize& mem{memory};
                 auto wl{std::move(wl_ref)};
 
-                EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
+                EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << "Test : " << i << " ," << wl << std::endl;
                 EXPECT_EQ(mem.output_0, align(t.t_exp.mem_size_exp, wl.device))
-                        << mem << std::endl
+                        << "Test : " << i << " ," << mem << std::endl
                         << t.t_exp.mem_size_exp << std::endl;
             }
             i++;
         }
     };
-
- 
 
     /**************************************** HOW output0_memory is computed
     **********************************************
@@ -854,30 +854,30 @@ TEST_F(DPU_OperationValidator_Test, Output_tensor_memory_computation_test_for_di
             /************************************************ TABLE HEADER ********************************************************/
             /*  || workload || output0 memory expected ||    */
             
-            //innermost dim is C and is divisible by 16
+            //innermost dim is C and is divisible by 16 (NEW:DEACTIVATED, align to 1)
             {{mk_wl(32, 18, 64, Layout::ZXY)},{36864}}, //32*18*64
             {{mk_wl(32, 18, 32, Layout::ZYX)},{18432}}, //32*18*32
 
             //innermost dim is C and is NOT divisible by 16
-            {{mk_wl(32, 18, 63, Layout::ZXY)},{36864}}, //32*18*64 -> 63 aligned to 64
-            {{mk_wl(32, 18, 67, Layout::ZYX)},{46080}}, //32*18*80 -> 67 aligned to 80
+            {{mk_wl(32, 18, 63, Layout::ZXY)},{36288/*36864*/}}, //32*18*64 -> 63 aligned to 64
+            {{mk_wl(32, 18, 67, Layout::ZYX)},{38592/*46080*/}}, //32*18*80 -> 67 aligned to 80
 
             //innermost dim is W and is divisible by 16
-            {{mk_wl(32, 18, 65, Layout::XYZ)},{37440}}, //32*18*65
-            {{mk_wl(128, 18, 65, Layout::XZY)},{149760}}, //128*18*65
+            {{mk_wl(32, 18, 65, Layout::XYZ)}, {37440 /*37440*/}}, //32*18*65
+            {{mk_wl(128, 18, 65, Layout::XZY)},{149760/*149760*/}}, //128*18*65
 
             //innermost dim is W and is NOT divisible by 16
-            {{mk_wl(33, 18, 65, Layout::XZY)},{56160}}, //48**18*65 -> 33 aligned to 48
-            {{mk_wl(113, 18, 65, Layout::XYZ)},{149760}}, //128*18*65 -> 113 aligned to 128
+            {{mk_wl(33, 18, 65, Layout::XZY)}, {38610 /*56160*/}}, //48**18*65 -> 33 aligned to 48
+            {{mk_wl(113, 18, 65, Layout::XYZ)},{132210/*149760*/}}, //128*18*65 -> 113 aligned to 128
 
             //innermost dim is H and is divisible by 16
-            {{mk_wl(33, 32, 64, Layout::YXZ)},{67584}}, //33*32*64
-            {{mk_wl(32, 64, 65, Layout::YZX)},{133120}}, //32*64*65
+            {{mk_wl(33, 32, 64, Layout::YXZ)},{67584/*67584*/}}, //33*32*64
+            {{mk_wl(32, 64, 65, Layout::YZX)},{133120/*133120*/}}, //32*64*65
 
             //innermost dim is H and is NOT divisible by 16
-            {{mk_wl(32, 18, 64, Layout::YXZ)},{65536}}, //32*32*64 -> 18 aligned to 32
-            {{mk_wl(32, 37, 64, Layout::YZX)},{98304}}, //32*48*64 -> 37 aligned to 48
-   
+            {{mk_wl(32, 18, 64, Layout::YXZ)},{36864/*65536*/}}, //32*32*64 -> 18 aligned to 32
+            {{mk_wl(32, 37, 64, Layout::YZX)},{75776/*98304*/}}, //32*48*64 -> 37 aligned to 48
+
             // clang-format on
     };
 
@@ -989,7 +989,8 @@ TEST_F(DPU_OperationValidator_Test, Elementwise_weightless_inplace_MemorySize_Te
 // test situations :
 // - no in place memory due to layout OR data change
 // - no weights input (detected by: layout + float to int change)
-TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Test) {
+// test changed for out innermost dim alignment to 16 deactivation!
+TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Test_NPU4) {
     const DPUWorkload wl_ref_full{
             VPUDevice::VPU_4_0,
             Operation::ELTWISE,
@@ -1051,8 +1052,8 @@ TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Te
     {  // no in place + no weights
         auto wl{std::move(wl_ref_full)};
         EXPECT_TRUE(dut.is_supported(wl.device));
-        long long in_mem_bytes{180 * 4 * 640 * 2};                                       // float 16
-        long long out_mem_bytes{180 * 16 /*innermost dim is aligned to 16*/ * 640 * 1};  // int8
+        long long in_mem_bytes{180 * 4 * 640 * 2};                                              // float 16
+        long long out_mem_bytes{180 * 4 /*16 */ /*innermost dim is aligned to 16*/ * 640 * 1};  // int8
 
         EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
         auto alignedInMemory{align(in_mem_bytes, wl.device)};
@@ -1074,8 +1075,8 @@ TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Te
     {  // no in place(due to layout) + no weights (due to layout change)
         auto wl{std::move(wl_no_in_place_layout)};
         EXPECT_TRUE(dut.is_supported(wl.device));
-        long long in_mem_bytes{180 * 4 * 640 * 1};                                       // int8
-        long long out_mem_bytes{180 * 16 /*innermost dim is aligned to 16*/ * 640 * 1};  // int8
+        long long in_mem_bytes{180 * 4 * 640 * 1};                                             // int8
+        long long out_mem_bytes{180 * 4 /*16*/ /*innermost dim is aligned to 16*/ * 640 * 1};  // int8
 
         EXPECT_FALSE(isAligned(in_mem_bytes, wl.device));
         auto alignedInMemory{align(in_mem_bytes, wl.device)};
@@ -1118,7 +1119,6 @@ TEST_F(DPU_OperationValidator_Test, elementwiseMemorySizeNoInout1ANdNoInplace_Te
         EXPECT_EQ(mem.cmx, cmx_overhead + mem.input_0 + mem.input_1 + mem.output_0) << mem << std::endl;
     }
 }
-
 TEST_F(DPU_OperationValidator_Test, convolutionMemorySize_Test) {
     const VPUNN::DPUWorkload wl_ref{
             VPUNN::VPUDevice::VPU_2_7,
@@ -2633,6 +2633,9 @@ TEST_F(DPU_OperationValidator_Test, Check_Memory_size_32Bit_output_NPU40) {
         EXPECT_EQ(mem.output_0, align(21 * 21 * (512) * 1 * 4, device_req)); /* 21, 21, 512, 1 */
     }
 }
+
+
+/// @todo: should there be Check_Memory_size_32Bit_output_NPU_RESERVED_10 for NPU_RESERVED_1?
 
 TEST_F(DPU_OperationValidator_Test, Check_halo_inputs_test) {
     const VPUNN::DPUWorkload wl_ref{

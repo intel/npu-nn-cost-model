@@ -7,32 +7,48 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../include)
-include_directories(${FLATBUFFERS_SRC_DIR}/include)
+# src/inference/
+
+# Create library
+
+# Ensure that the shared library will be created
+# only if VPUNN_BUILD_SHARED_LIB will be set ON
+# and JS_BUILD OFF
+if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+    add_library(vpunn_inference SHARED)
+else()
+    add_library(vpunn_inference STATIC)
+endif()
+
+# Add source files
+target_sources(vpunn_inference 
+    PRIVATE 
+        model.cpp 
+        preprop_factory.cpp 
+        inference_execution_data.cpp
+)
+
+target_include_directories(vpunn_inference
+    PRIVATE 
+        $<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include>
+        $<BUILD_INTERFACE:${COST_MODEL_BINARY_DIR}/include>
+        $<BUILD_INTERFACE:${FLATBUFFERS_SRC_DIR}/include>
+) 
+
+# Link to common project settings
+target_link_libraries(vpunn_inference 
+    PRIVATE
+        vpunn_common_settings
+        vpunn_kernels
+        vpunn_core
+        flatbuffers
+)
+
+add_dependencies(vpunn_inference vpunn_cpp_schema)
 
 if(VPUNN_BUILD_SHARED_LIB)
-    add_library(inference SHARED model.cpp ../core/logger.cpp)
-    add_dependencies(inference cpp_schema)
-
-    if(CBLAS_LIB STREQUAL "internal")
-        target_link_libraries(inference flatbuffers kernels vpunn_optimization blas vpunn_vpu vpunn_shave)
-    else()
-        target_link_libraries(inference flatbuffers kernels vpunn_optimization vpunn_vpu vpunn_shave ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
-    endif()
-
-    add_custom_target(python ALL
-        DEPENDS python_schema inference
-        COMMENT "Generating python files")
+    add_custom_target(vpunn_python ALL 
+        DEPENDS vpunn_python_schema vpunn_inference
+        COMMENT "Generating python files"
+    )
 endif()
-
-add_library(inferenceStatic STATIC model.cpp preprop_factory.cpp inference_execution_data.cpp)
-add_dependencies(inferenceStatic cpp_schema)
-
-if(CBLAS_LIB STREQUAL "internal")
-    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization blasStatic vpunn_vpu vpunn_shave ${VPUNN_HTTP_CLIENT_LIB})
-else()
-    set(BLAS_STATIC ON)
-    target_link_libraries(inferenceStatic flatbuffers kernels vpunn_core vpunn_optimization vpunn_vpu vpunn_shave ${VPUNN_HTTP_CLIENT_LIB} ${BLAS_LIBRARIES} ${BLAS_LINKER_FLAGS})
-endif()
-
-set_target_properties(inferenceStatic PROPERTIES OUTPUT_NAME inference)

@@ -74,7 +74,7 @@ private:
     };
 
     inline static const int weigths_alignment_def{32};
-    inline static const int out_innermost_dim_alignment_def{16};  ////bytes
+    inline static const int out_innermost_dim_alignment_def{1};  ///bytes. Disabled due to regression
     inline static const int input_heigth_start_factor_SOH_def{1};
 
     static constexpr int alignement_size_bytes_def{16384};  // 16KB or 32KB?

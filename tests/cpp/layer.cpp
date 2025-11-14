@@ -462,6 +462,7 @@ TEST_F(VPULayerCostModelTest, DISABLED_Maxpool_layer_split_NPU40) {
     }
 }
 
+
 /// Test batch values for devices
 TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
     auto mkLayer = [](VPUDevice dev, unsigned int b, Layout layout = Layout::ZXY) -> DPULayer {

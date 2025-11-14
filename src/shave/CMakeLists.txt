@@ -7,6 +7,8 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
+# src/shave/
+
 function(vpu_cost_model_safe_file_write file content)
     # tracking of rewrite is required to avoid rebuild of the whole project
     # in case of cmake rerun. Need to rebuild only if content of content is changed
@@ -47,7 +49,7 @@ function(GENERATE_SHV_KERNEL KERNEL_TYPE KERNEL_NAME)
 
     # message(STATUS "Generate SHV Kernel ${KERNEL_NAME} with efficiency ${KERNEL_EFFICIENCY} bytes/cycle and latency ${KERNEL_LATENCY} cycles")
     set(GEN_HEADER_FILE "vpu/shave/${KERNEL_NAME}.h")
-    set(GEN_HEADER_FULL_FILE "${CMAKE_VPUNN_BINARY_DIR}/include/${GEN_HEADER_FILE}")
+    set(GEN_HEADER_FULL_FILE "${COST_MODEL_BINARY_DIR}/include/${GEN_HEADER_FILE}")
 
     set(content "
 #pragma once
@@ -91,15 +93,15 @@ foreach(LINE IN LISTS config)
     endif()
 endforeach()
 
-vpu_cost_model_safe_file_write("${CMAKE_VPUNN_BINARY_DIR}/include/vpu/shave/layers.h" ${GLOBAL_INCLUDE_FILE})
+vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/layers.h" ${GLOBAL_INCLUDE_FILE})
 
 #place inl file for legacy
 #message(STATUS " >> Generated code for Shave Legacy is : \n ${LIST_LEGACY_CSV} \n  >> Generated code END")
 set (SHAVE_ADD_LIST "${LIST_LEGACY_CSV}")
 
-message(STATUS " >> Generated Collection initializer for Shave Legacy is : \n ${SHAVE_ADD_LIST} \n  >> Generated code END")
+#message(STATUS " >> Generated Collection initializer for Shave Legacy is : \n ${SHAVE_ADD_LIST} \n  >> Generated code END")
 
-vpu_cost_model_safe_file_write("${CMAKE_VPUNN_BINARY_DIR}/include/vpu/shave/SHAVE_V27_Linear.inl" ${SHAVE_ADD_LIST})
+vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/SHAVE_V27_Linear.inl" ${SHAVE_ADD_LIST})
 
 #NEW SHAVE modeling.  v27 CSV import
 
@@ -114,7 +116,7 @@ function(GENERATE_SHV_INITIALIZER kernel_type kernel_name slope intercept scalar
 
     if(kernel_type STREQUAL "ShaveModel1on1" OR kernel_type STREQUAL "ShaveModel2on1")
         set (ADD_LINE "Add<${data_type},${vector_size},${unroll_size},${DPU_frequency},${SHV_frequency} >(\"${kernel_name}\", (float)${slope} , (float)${intercept}, (float)${scalar_offset}, (float)${unroll_offset})\;  //${kernel_type}")
-        message(STATUS "Parse SHV Kernel ${kernel_name} with: ${kernel_type} => ${slope},${intercept},${scalar_offset},${unroll_offset},${unroll_size},${vector_size},${DPU_frequency},${SHV_frequency}")
+        #message(STATUS "Parse SHV Kernel ${kernel_name} with: ${kernel_type} => ${slope},${intercept},${scalar_offset},${unroll_offset},${unroll_size},${vector_size},${DPU_frequency},${SHV_frequency}")
         # message(STATUS " >                  ${ADD_LINE}")
     endif()
 
@@ -133,7 +135,7 @@ function(GENERATE_SHV_INITIALIZER_NPU40 kernel_type kernel_name slope intercept 
 
 
     if(kernel_type STREQUAL "ShaveModel1on1NPU40" OR kernel_type STREQUAL "ShaveModel2on1NPU40")
-        message(STATUS "Parse SHV Kernel ${kernel_name} with: ${kernel_type} => ${slope},${intercept},${unroll_offset},${intra_block_offset},${vector_offset},${unroll_size},${vector_size},${DPU_frequency},${SHV_frequency}")
+        #message(STATUS "Parse SHV Kernel ${kernel_name} with: ${kernel_type} => ${slope},${intercept},${unroll_offset},${intra_block_offset},${vector_offset},${unroll_size},${vector_size},${DPU_frequency},${SHV_frequency}")
         set (ADD_LINE "Add<${data_type},${vector_size},${unroll_size},${DPU_frequency},${SHV_frequency} >(\"${kernel_name}\", (float)${slope} , (float)${intercept}, (float)${unroll_offset}, (float)${intra_block_offset}, (float)${vector_offset}, ${displacement_size})\;  //${kernel_type}")
     endif()
 
@@ -155,43 +157,6 @@ function(GET_MODEL_TYPE kernel_type)
     set(KERNEL_INFO ${kmode} PARENT_SCOPE)
     # message(STATUS "Identified as: ${KERNEL_INFO}, ${kmode}")
 endfunction()
-
-
-##   # Generating for 2.7
-##   message(STATUS "\n >> Starting to generate initializer for Shave 27 ")
-##   file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/shave_layers_vpu_2_7.csv" config)
-##   STRING(REPLACE "null" "" config "${config}")
-##   STRING(REPLACE " " "" config "${config}")
-##   STRING(REPLACE "\n" ";" config "${config}")
-##   
-##   set(SKIP_HEADER TRUE)
-##   set(LIST_INITIALIZER_FROM_CSV "")
-##   
-##   foreach(LINE IN LISTS config)
-##       if(SKIP_HEADER)
-##           set(SKIP_HEADER FALSE)
-##       else()
-##           STRING(REPLACE "," ";" PARAMETERS ${LINE})
-##   
-##           set (KERNEL_INFO "XXX")
-##           GET_MODEL_TYPE(${PARAMETERS})
-##   
-##           if(KERNEL_INFO STREQUAL "KType1" )
-##               GENERATE_SHV_INITIALIZER(${PARAMETERS})
-##           elseif(KERNEL_INFO STREQUAL "KTypeUnknown"  )
-##            message(STATUS " >    Line to parse not known:              ${PARAMETERS}")
-##           else()
-##            message(STATUS " >   ERROR in  Line to parse (unexpected kernel info):     ${KERNEL_INFO}  ::params=        ${PARAMETERS}")
-##           endif()
-##       endif()
-##   endforeach()
-##   
-##   #place inl file for legacy
-##   set(SHAVE_ADD_LIST "${LIST_INITIALIZER_FROM_CSV}")
-##   message(STATUS " >> Generated Collection initializer for Shave 27 is : \n ${SHAVE_ADD_LIST} \n  >> Generated code END")
-##   vpu_cost_model_safe_file_write("${CMAKE_VPUNN_BINARY_DIR}/include/vpu/shave/SHAVE_V27.inl" ${SHAVE_ADD_LIST})  #file is implicitly without prev content
-##   #end of generation of NPU2.7  collection from CSV
-
 
 function(PARSE_CSV csv_file  inl_out_file  info)
     message(STATUS "\n >> Starting to generate initializer for ${info}")
@@ -229,8 +194,8 @@ function(PARSE_CSV csv_file  inl_out_file  info)
 
     #place inl file for legacy
     set(SHAVE_ADD_LIST "${LIST_INITIALIZER_FROM_CSV}")
-    message(STATUS " >> Generated Collection initializer for ${info} is : \n ${SHAVE_ADD_LIST} \n  >> Generated code END (${info}) \n")
-    vpu_cost_model_safe_file_write("${CMAKE_VPUNN_BINARY_DIR}/include/vpu/shave/${inl_out_file}" ${SHAVE_ADD_LIST})  #file is implicitly without prev content
+    #message(STATUS " >> Generated Collection initializer for ${info} is : \n ${SHAVE_ADD_LIST} \n  >> Generated code END (${info}) \n")
+    vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/${inl_out_file}" ${SHAVE_ADD_LIST})  #file is implicitly without prev content
 endfunction()
 
 
@@ -249,17 +214,27 @@ PARSE_CSV( ${P1} ${P2} "Shave NPU40 WIP")
 # ####################################################################################################
 
 # shave library for new cpps
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../include)
-include_directories(${FLATBUFFERS_SRC_DIR}/include)
-
-add_library(vpunn_shave shave_collection.cpp shave_cache.cpp)
-# add_dependencies(vpunn_shave_shared cpp_schema)
-# target_link_libraries(vpunn_shave_shared flatbuffers)
-
-if(VPUNN_BUILD_SHARED_LIB)
-    add_library(vpunn_shave_shared SHARED shave_collection.cpp)
-    # add_dependencies(vpunn_shave_shared cpp_schema)
-    # target_link_libraries(vpunn_shave_shared flatbuffers)
-
-    set_target_properties(vpunn_shave_shared PROPERTIES OUTPUT_NAME vpunn_shave)
+if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+    add_library(vpunn_shave SHARED)
+else()
+    add_library(vpunn_shave STATIC)
 endif()
+
+target_include_directories(vpunn_shave
+    PRIVATE 
+        $<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include/>
+        $<BUILD_INTERFACE:${COST_MODEL_BINARY_DIR}/include>
+        $<BUILD_INTERFACE:${FLATBUFFERS_SRC_DIR}/include>
+)
+
+target_sources(vpunn_shave 
+    PRIVATE 
+        shave_cache.cpp
+        shave_collection.cpp # for shared builds
+)
+
+target_link_libraries(vpunn_shave
+    PRIVATE 
+        vpunn_common_settings
+        flatbuffers
+)

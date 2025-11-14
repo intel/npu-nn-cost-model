@@ -7,18 +7,35 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../include)
-include_directories(${FLATBUFFERS_SRC_DIR}/include)
+# src/vpu/
 
-add_library(vpunn_vpu ./validation/checker_utils.cpp ./validation/data_dpu_operation.cpp energy_impl.cpp "layer.cpp" )
-add_dependencies(vpunn_vpu cpp_schema)
-target_link_libraries(vpunn_vpu flatbuffers ${VPUNN_HTTP_CLIENT_LIB})
-
-if(VPUNN_BUILD_SHARED_LIB)
-    add_library(vpunn_vpu_shared SHARED ./validation/checker_utils.cpp ./validation/data_dpu_operation.cpp energy_impl.cpp)
-    add_dependencies(vpunn_vpu_shared cpp_schema)
-    target_link_libraries(vpunn_vpu_shared flatbuffers)
-    set_target_properties(vpunn_vpu_shared PROPERTIES OUTPUT_NAME vpunn_vpu)
-
-    add_dependencies(python vpunn_vpu_shared)
+if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+    add_library(vpunn_vpu SHARED)
+else()
+    add_library(vpunn_vpu STATIC)
 endif()
+
+target_include_directories(vpunn_vpu
+    PRIVATE 
+        $<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include>
+        # Accessing generated files that energy_impl.cpp depends on
+        $<BUILD_INTERFACE:${COST_MODEL_BINARY_DIR}/include>
+)
+
+target_sources(vpunn_vpu
+    PRIVATE 
+        validation/checker_utils.cpp 
+        validation/data_dpu_operation.cpp
+        energy_impl.cpp
+        layer.cpp
+)
+
+target_link_libraries(vpunn_vpu
+    PRIVATE 
+        vpunn_common_settings
+        flatbuffers
+        vpunn_inference
+        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
+)
+
+add_dependencies(vpunn_vpu vpunn_cpp_schema)

@@ -297,7 +297,7 @@ struct DMANNWorkload_NPU40_RESERVED {
     // -- Serialization --
 
     static const std::string get_wl_name() {
-        return "dma_workload_npu40_RESERVED_";
+        return "dma_workload_npu40_50_";
     }
 
     using _ref_supported_type = std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<MemoryDirection>,

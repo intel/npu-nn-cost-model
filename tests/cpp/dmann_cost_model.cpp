@@ -1661,6 +1661,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
 TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
     VPUCostModel cm("empty");
     DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_lnl;
+    DMATheoreticalCostProvider_NPU_RESERVED dma_theoretical_NPU_RESERVED(HWCharacteristicsSuperSets::get_mainConfigurationRef());
 
     ASSERT_TRUE(!cm.nn_initialized());
     auto check = [&](const TestCase& tc) {
@@ -1698,13 +1699,53 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
 
         const DMAWorkload wl{case1.t_in};
         auto dma_now = cm.DMA(wl);
+        auto dma_n = dma_theoretical_NPU_RESERVED.DMATheoreticalCyclesNPU_RESERVED_ON(wl);
         auto dma_o = dma_theoretical_lnl.DMATheoreticalCyclesLegacyLNL(wl);
 
         EXPECT_EQ(dma_now, PerformanceMode::forceLegacy_G4 ? 1891 : 644 + (87 + 5) * evoX);
+        EXPECT_EQ(dma_n, 644 + (87 + 5) * evoX);
         EXPECT_EQ(dma_o, 1891);
     }
 
     // EXPECT_TRUE(false);
+}
+
+TEST_F(TestDMA_TH_CostModel, DMATheoreticalNPU_RESERVED_ON_function_Test) {
+    auto mkWl = [](const VPUDevice dev) {
+        DMAWorkload dmaWl{
+                dev,                                                       // device
+                {VPUTensor(4864, 1, 1, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions WHCB
+                {VPUTensor(4864, 1, 1, 1, DataType::UINT8, Layout::ZXY)},  // output dimensions
+                MemoryLocation::CMX,                                       // src
+                MemoryLocation::DRAM,                                      // dst
+                1,                                                         // owt
+        };
+        return dmaWl;
+    };
+
+    DMATheoreticalCostProvider_NPU_RESERVED dma_theoretical_NPU_RESERVED(HWCharacteristicsSuperSets::get_mainConfigurationRef());
+    VPUCostModel cm("empty");
+    ASSERT_TRUE(!cm.nn_initialized());
+
+    {  // valid cases
+        for (const auto d : valid_dev_post_LNL) {
+            const DMAWorkload dmaWl{mkWl(d)};
+            auto dma_n = dma_theoretical_NPU_RESERVED.DMATheoreticalCyclesNPU_RESERVED_ON(dmaWl);
+            EXPECT_FALSE(Cycles::isErrorCode(dma_n)) << "Device:" << d << " Err::" << Cycles::toErrorText(dma_n);
+        }
+    }
+
+    {  // invalid cases, inside DMATheoreticalCyclesNPU_RESERVED_ON should be some negative values because of invalid devices =>
+       // we obtain error because we can not convert a negative value to cycles (=unsigned int)
+        std::vector<VPUDevice> invalid_dev{(VPUDevice)20, (VPUDevice)30};
+        for (const auto d : invalid_dev) {
+            const DMAWorkload dmaWl{mkWl(d)};
+            unsigned long int dma_n{0};
+            EXPECT_NO_THROW(dma_n = dma_theoretical_NPU_RESERVED.DMATheoreticalCyclesNPU_RESERVED_ON(dmaWl));
+            EXPECT_TRUE(Cycles::isErrorCode(dma_n)) << "Device:" << d << " Err::" << Cycles::toErrorText(dma_n);
+            EXPECT_EQ(dma_n, Cycles::ERROR_INVALID_CONVERSION_TO_CYCLES);
+        }
+    }
 }
 
 }  // namespace VPUNN_unit_tests

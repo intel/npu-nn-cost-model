@@ -7,8 +7,13 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-include_directories(${CMAKE_BINARY_DIR}/include)
-include_directories(${FLATBUFFERS_SRC_DIR}/include)
+# example/
 
 add_executable(vpunn_profile cost_model.profiler.cpp)
-target_link_libraries(vpunn_profile inferenceStatic)
+
+target_link_libraries(vpunn_profile 
+	PRIVATE 
+		npu_costmodel
+		vpunn_common_settings
+		flatbuffers
+)

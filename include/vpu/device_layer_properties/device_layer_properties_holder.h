@@ -13,6 +13,9 @@
 #include "device_layer_properties_VPU2_0.h"
 #include "device_layer_properties_VPU2_7.h"
 #include "device_layer_properties_VPU4_0.h"
+
+
+
 #include "device_layer_properties_default.h"
 #include "interface_device_layer_properties.h"
 #include "vpu/tuple_indexing_helper.h"
