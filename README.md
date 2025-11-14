@@ -24,6 +24,9 @@ If you do not set CC and CXX environment variables, `which gcc` and `which g++` 
 
 Compile the library by typing `cmake -H. -Bbuild && cmake --build build`
 
+General architecture diagram of target interactions, using command `cmake -DCBLAS_LIB=openblas -DVPUNN_BUILD_HTTP_CLIENT=ON -DVPUNN_BUILD_APPS=ON -DCMAKE_BUILD_TYPE=Coverage -H. -Bbuild` is presented here:
+![Architecture Diagram](docs/deps.png)
+
 @TODO: environment compatible with newer compiler versions (gcc>=10, clang >10 )  
 
 ### Use Intel oneAPI MKL

@@ -238,9 +238,9 @@ enum class ExecutionMode {
     VECTOR,
     MATRIX,
     VECTOR_FP16,   //
-    CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,
-    CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8  
-    CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16 
+    CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,   50 : NTHW/NTK = 16/2
+    CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8     50 : NTHW/NTK = 8/4
+    CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16    50 : NTHW/NTK = 4/8
     __size
 };
 static const EnumMap ExecutionMode_ToText{

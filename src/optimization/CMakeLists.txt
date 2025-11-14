@@ -7,18 +7,37 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../include)
-include_directories(${FLATBUFFERS_SRC_DIR}/include)
+# src/optimization/
 
-add_library(vpunn_optimization workload_optimization.cpp tiler.cpp splits.cpp)
-add_dependencies(vpunn_optimization cpp_schema)
-target_link_libraries(vpunn_optimization flatbuffers  ${VPUNN_HTTP_CLIENT_LIB})
+if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+    add_library(vpunn_optimization SHARED)
+else()
+    add_library(vpunn_optimization STATIC)
+endif()
+
+# Add source files
+target_sources(vpunn_optimization 
+    PRIVATE 
+        workload_optimization.cpp 
+        tiler.cpp 
+        splits.cpp
+)
+
+target_include_directories(vpunn_optimization
+    PRIVATE 
+        $<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include>
+        $<BUILD_INTERFACE:${COST_MODEL_BINARY_DIR}/include>
+)
+
+target_link_libraries(vpunn_optimization
+    PRIVATE
+        vpunn_common_settings
+        flatbuffers
+        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
+)
+
+add_dependencies(vpunn_optimization vpunn_cpp_schema)
 
 if(VPUNN_BUILD_SHARED_LIB)
-    add_library(vpunn_optimization_shared SHARED workload_optimization.cpp tiler.cpp splits.cpp)
-    add_dependencies(vpunn_optimization_shared cpp_schema)
-    target_link_libraries(vpunn_optimization_shared flatbuffers)
-    set_target_properties(vpunn_optimization_shared PROPERTIES OUTPUT_NAME vpunn_optimization)
-
-    add_dependencies(python vpunn_optimization_shared)
+    add_dependencies(vpunn_python vpunn_optimization)
 endif()

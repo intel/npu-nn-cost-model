@@ -7,8 +7,9 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+# src/python/
 
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 QUIET CONFIG)
 
 if(NOT pybind11_FOUND)
@@ -47,62 +48,79 @@ if (${GENERATE_PYTHON_BINDING})
         -DBINDER_ENABLE_TEST=OFF)
 
     add_custom_command(
-	OUTPUT ${PYTHON_BINDING_CPP}
-        DEPENDS
-        binder inferenceStatic vpunn_optimization
-        ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/binding.cfg # We also want to rebuild the bindings if we change the config file
-        COMMAND ${EXTERNAL_INSTALL_LOCATION}/binder/install/bin/binder
-        --annotate-includes
-        --bind=VPUNN
-        -p ${EXTERNAL_INSTALL_LOCATION}
-        --prefix=${CMAKE_CURRENT_SOURCE_DIR}
-        --flat
-        --single-file
-        --root-module=VPUNN
-        --include-pybind11-stl
-        --config ${CMAKE_CURRENT_SOURCE_DIR}/binding.cfg
-        ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
-        --
-        -x c++
-        -std=c++17
-        -I${CMAKE_CURRENT_SOURCE_DIR}
-        -I${FLATBUFFERS_SRC_DIR}/include
-        -I${CMAKE_VPUNN_BINARY_DIR}/include
-        -I${pybind11_SOURCE_DIR}/include
-        -I${CMAKE_CURRENT_SOURCE_DIR}/../../include
-        
-        # One time fix for pybind11 issue with chrono, if on your system this is not needed, you can remove it
-        # It will take more time to generate the bindings, but it will not fail
-        # COMMAND perl -i -pe "s|#include <bits/chrono.h>|#include <chrono>|g" ${PYTHON_BINDING_CPP}
-        # VERBATIM
+	    OUTPUT ${PYTHON_BINDING_CPP}
+            DEPENDS
+            binder vpunn_inference vpunn_optimization
+            ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/binding.cfg # We also want to rebuild the bindings if we change the config file
+            COMMAND ${EXTERNAL_INSTALL_LOCATION}/binder/install/bin/binder
+            --annotate-includes
+            --bind=VPUNN
+            -p ${EXTERNAL_INSTALL_LOCATION}
+            --prefix=${CMAKE_CURRENT_SOURCE_DIR}
+            --flat
+            --single-file
+            --root-module=VPUNN
+            --include-pybind11-stl
+            --config ${CMAKE_CURRENT_SOURCE_DIR}/binding.cfg
+            ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
+            --
+            -x c++
+            -std=c++17
+            -I${CMAKE_CURRENT_SOURCE_DIR}
+            -I${FLATBUFFERS_SRC_DIR}/include
+            -I${COST_MODEL_BINARY_DIR}/include
+            -I${pybind11_SOURCE_DIR}/include
+            -I${CMAKE_CURRENT_SOURCE_DIR}/../../include
+
+            # If therea are issues with chrono in pybydings, then uncomment following lines
+            # to replace the bits/chrono.h with chrono.h
+            # Generating pybindings will take longer, because of this workaround
+            # COMMAND perl -i -pe "s|#include <bits/chrono.h>|#include <chrono>|g" ${PYTHON_BINDING_CPP}
+            # COMMENT "Fixing chrono include in generated bindings"
+            # VERBATIM
     )
 
     add_custom_target(generated-bindings-code EXCLUDE_FROM_ALL
-        DEPENDS ${PYTHON_BINDING_CPP})
+        DEPENDS ${PYTHON_BINDING_CPP}
+    )
 endif()
 
 pybind11_add_module(vpunn_python_bindings MODULE
     ${PYTHON_BINDING_CPP}
-    binding.h)
-
-add_dependencies(vpunn_python_bindings python_schema)
-
-#following have no effect
-
-
-# The python bindings depend on some internal libraries
-target_link_libraries(vpunn_python_bindings PRIVATE inferenceStatic vpunn_optimization)
-
-# The name of the shared library must match the module name to keep python happy
-set_target_properties(vpunn_python_bindings PROPERTIES OUTPUT_NAME "VPUNN")
-
-add_custom_target(vpunn_python_create_init_file ALL
-    COMMAND echo "from .VPUNN import VPUNN as bindings; del VPUNN" > ${CMAKE_VPUNN_BINARY_DIR}/lib/__init__.py
-    VERBATIM
+    binding.h
 )
 
-include(GNUInstallDirs)
+target_include_directories(vpunn_python_bindings
+    PRIVATE 
+        $<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include>
+        $<BUILD_INTERFACE:${COST_MODEL_BINARY_DIR}/include>
+        $<BUILD_INTERFACE:${FLATBUFFERS_SRC_DIR}/include>
+)
+
+# The python bindings depend on some internal libraries
+target_link_libraries(vpunn_python_bindings 
+    PRIVATE 
+        vpunn_common_settings
+        vpunn_inference 
+        vpunn_optimization
+        vpunn_vpu
+        vpunn_shave
+        flatbuffers
+)
+
+add_dependencies(vpunn_python_bindings vpunn_python_schema)
+
+# The name of the shared library must match the module name to keep python happy
+set_target_properties(vpunn_python_bindings 
+    PROPERTIES 
+    OUTPUT_NAME "VPUNN"
+)
+
+add_custom_target(vpunn_python_create_init_file ALL
+    COMMAND echo "from .VPUNN import VPUNN as bindings; del VPUNN" > ${COST_MODEL_BINARY_DIR}/lib/__init__.py
+    VERBATIM
+)
 
 if(SKBUILD)
     find_package(PythonExtensions REQUIRED)
@@ -116,13 +134,13 @@ if(SKBUILD)
     )
 
     install(
-        FILES ${CMAKE_VPUNN_BINARY_DIR}/lib/__init__.py
+        FILES ${COST_MODEL_BINARY_DIR}/lib/__init__.py
         COMPONENT bindings
         DESTINATION ${VPUNN_PYTHON_INSTALLATION_FOLDER}
     )
 
     install(
-        DIRECTORY ${CMAKE_VPUNN_BINARY_DIR}/include/VPUNN_SCHEMA/
+        DIRECTORY ${COST_MODEL_BINARY_DIR}/include/VPUNN_SCHEMA/
         COMPONENT bindings
         DESTINATION ${VPUNN_SCHEMA_PYTHON_INSTALLATION_FOLDER}
     )

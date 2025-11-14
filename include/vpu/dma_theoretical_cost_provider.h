@@ -116,23 +116,23 @@ public:
 };
 
 /**
- * @brief Provides updated theoretical performance modeling for DMA workloads RESERVED or newer devices.
+ * @brief Provides updated theoretical performance modeling for DMA workloads on NPU_RESERVED or newer devices.
  *
  * This class estimates the number of cycles required for DMA operations using the latest calculation
  * methods, supporting advanced features such as decompression, permutation, and bandwidth aggregation.
  *
- * It is intended for use with RESERVED and newer devices in class DMATheoreticalCostProvider.
+ * It is intended for use with NPU_RESERVED and newer devices in class DMATheoreticalCostProvider.
  *
- * TODO: If RESERVED have multiple theoretical implementations, clearly they should be in different classes with the same
+ * TODO: If NPU_RESERVED have multiple theoretical implementations, clearly they should be in different classes with the same
  * interface. For now we do not know yet the final design, maybe this is just an intermediate step.
  *
  */
-class DMATheoreticalCostProvider_RESERVED {
+class DMATheoreticalCostProvider_NPU_RESERVED {
     /// hardware characteristics are configured at constructor
     const IHWCharacteristicsSet& hw_info;
 
 public:
-    DMATheoreticalCostProvider_RESERVED(const IHWCharacteristicsSet& hw_info_set): hw_info(hw_info_set) {
+    DMATheoreticalCostProvider_NPU_RESERVED(const IHWCharacteristicsSet& hw_info_set): hw_info(hw_info_set) {
     }
 
 protected:
@@ -206,16 +206,16 @@ protected:
 
 public:
     /**
-     * @brief Estimates the theoretical DMA execution cycles for RESERVED or newer devices => DMATheoreticalCycles_RESERVED_ON
+     * @brief Estimates the theoretical DMA execution cycles for NPU_RESERVED or newer devices => DMATheoreticalCyclesNPU_RESERVED_ON
      *
      * This method calculates the number of execution cycles required for a DMA
-     * operation using the updated RESERVED theoretical model
+     * operation using the updated NPU_RESERVED theoretical model
      *
      *
      * @param wl The DMAWorkload describing the DMA operation
      * @return The estimated number of DPU cycles required to complete the DMA operation.
      */
-    unsigned long int DMATheoreticalCycles_RESERVED_ON(const DMAWorkload& wl) const {
+    unsigned long int DMATheoreticalCyclesNPU_RESERVED_ON(const DMAWorkload& wl) const {
         // device is presumed to be at least LNL
         const auto& hw{hw_info.device(wl.device)};  // device characteristics
 
@@ -272,7 +272,7 @@ class DMATheoreticalCostProvider {
 public:
     unsigned long int DMATheoreticalCycles(const DMAWorkload& wl) const {
         DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_LNL;  // legacy one
-        DMATheoreticalCostProvider_RESERVED dma_theoretical_RESERVED(
+        DMATheoreticalCostProvider_NPU_RESERVED dma_theoretical_NPU_RESERVED(
                 HWCharacteristicsSuperSets::get_mainConfigurationRef());  // new one, default config
 
         if (wl.device < VPUDevice::VPU_4_0) {
@@ -283,7 +283,7 @@ public:
             } else if (wl.device > VPUDevice::VPU_4_0 && PerformanceMode::forceLegacy_G5) {
                 return dma_theoretical_LNL.DMATheoreticalCyclesLegacyLNL(wl);
             }
-            return dma_theoretical_RESERVED.DMATheoreticalCycles_RESERVED_ON(wl);  // Updated theoretical model
+            return dma_theoretical_NPU_RESERVED.DMATheoreticalCyclesNPU_RESERVED_ON(wl);  // Updated theoretical model
         }
     }
 };

@@ -51,4 +51,4 @@ using IAlt_Default_HWCharacteristics = ALT_VPUXX_HWCharacteristics<Default_HWCha
 
 }  // namespace VPUNN
 
-#endif
+#endif  // VPUNN_HW_CHARACTERISTICS_DEFAULT_H

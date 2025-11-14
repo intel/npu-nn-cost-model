@@ -7,11 +7,13 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
+# tests/cpp/
+
 include(FetchContent)
 FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG release-1.12.1
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG release-1.12.1
 )
 
 # For Windows: Prevent overriding the parent project's compiler/linker settings
@@ -20,31 +22,23 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-include_directories(${CMAKE_BINARY_DIR}/include)
-include_directories(${FLATBUFFERS_SRC_DIR}/include)
+#include_directories(${CMAKE_BINARY_DIR}/include)
+#include_directories(${FLATBUFFERS_SRC_DIR}/include)
 
 set (LIST_ACT_TEST_CASES "")
 
 function(GENERATE_SHV_KERNEL_TEST KERNEL_TYPE KERNEL_NAME)
-  set(K_NAME_csv "${KERNEL_NAME}")# original from csv
+    set(K_NAME_csv "${KERNEL_NAME}")# original from csv
 
-  set(KERNEL_NAME "SHV${KERNEL_NAME}")
-  set(TEST_NAME "SHV${KERNEL_NAME}Cost")
+    set(KERNEL_NAME "SHV${KERNEL_NAME}")
+    set(TEST_NAME "SHV${KERNEL_NAME}Cost")
 
-  if(${KERNEL_TYPE} STREQUAL "ACTIVATION")
- #   configure_file(
- #     "${CMAKE_CURRENT_SOURCE_DIR}/shave_act.cpp.in"
- #     "${CMAKE_CURRENT_BINARY_DIR}/shave/${KERNEL_NAME}.cpp"
- #   )
- #  message(STATUS "  > Generated SHV ACT Kernel TEST: ${TEST_NAME} for:${KERNEL_NAME}") 
+    if(${KERNEL_TYPE} STREQUAL "ACTIVATION")
+        set(TEST_NAME_SMOKE "${K_NAME_csv}_SmokeTest")
+        set (TEST_CASE_LINE "LEGACY_SHV_TEST_F( ${TEST_NAME_SMOKE}, ${KERNEL_NAME}) //${K_NAME_csv}")
 
-   set(TEST_NAME_SMOKE "${K_NAME_csv}_SmokeTest")
-   set (TEST_CASE_LINE "LEGACY_SHV_TEST_F( ${TEST_NAME_SMOKE}, ${KERNEL_NAME}) //${K_NAME_csv}")
-   #message(STATUS "  >                  ${TEST_CASE_LINE}")
-
-   set (LIST_ACT_TEST_CASES "${LIST_ACT_TEST_CASES} \n ${TEST_CASE_LINE} \n" PARENT_SCOPE)
-
-  endif()
+        set (LIST_ACT_TEST_CASES "${LIST_ACT_TEST_CASES} \n ${TEST_CASE_LINE} \n" PARENT_SCOPE)
+    endif()
 endfunction()
 
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../src/shave/layers_perf.csv" config)
@@ -55,12 +49,12 @@ set(SKIP_HEADER TRUE)
 message(STATUS " >> Generating Legacy Shave Unit TEST ")
 
 foreach(LINE ${config})
-  if(SKIP_HEADER)
-    set(SKIP_HEADER FALSE)
-  else()
-    STRING(REPLACE "," ";" PARAMETERS ${LINE})
-    GENERATE_SHV_KERNEL_TEST(${PARAMETERS})
-  endif()
+    if(SKIP_HEADER)
+        set(SKIP_HEADER FALSE)
+    else()
+        STRING(REPLACE "," ";" PARAMETERS ${LINE})
+        GENERATE_SHV_KERNEL_TEST(${PARAMETERS})
+    endif()
 endforeach()
 
 #message(STATUS " >> Generated TEST code is : \n ${LIST_ACT_TEST_CASES} \n  >> Generated test code END")
@@ -72,76 +66,121 @@ endforeach()
 file(GLOB test_src "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 file(GLOB shv_test_src "${CMAKE_CURRENT_BINARY_DIR}/shave/*.cpp")
 
-add_executable(
-  test_cost_model
-  ${test_src}
-  ${shv_test_src} "dpu_saniter_tests.cpp")
- 
-
-#DPU models
-target_compile_definitions(test_cost_model PRIVATE VPU_2_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_0.vpunn")
-target_compile_definitions(test_cost_model PRIVATE VPU_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn")
-
-
-set(MODEL40_REAL "${CMAKE_SOURCE_DIR}/models/vpu_4_0.vpunn")
-set(MODEL40_MOCK "${CMAKE_SOURCE_DIR}/models/vpu_4_0_cloned_from27.vpunn")
-set(MODEL40 "${MODEL40_REAL}") #select here the model to be used
-target_compile_definitions(test_cost_model PRIVATE VPU_4_0_MODEL_PATH="${MODEL40}")
-
-set(MODEL41_REAL "${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn")
-target_compile_definitions(test_cost_model PRIVATE VPU_4_1_MODEL_PATH="${MODEL41_REAL}")
-
-#DMA models
-target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn")
-target_compile_definitions(test_cost_model PRIVATE VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn")
-target_compile_definitions(test_cost_model PRIVATE VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn")
-
-add_dependencies(test_cost_model cpp_schema)
-target_link_libraries(
-  test_cost_model
-  gtest_main
-  inferenceStatic
-  ${VPUNN_HTTP_CLIENT_LIB}
+add_executable(test_cost_model
+    ${test_src}
+    ${shv_test_src} 
+    "dpu_saniter_tests.cpp"
 )
 
+# Mock model paths
+# Delete when distinct model is available
+
+#DPU models
+target_compile_definitions(test_cost_model 
+    PRIVATE
+        VPU_2_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_0.vpunn"
+        VPU_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn"
+        VPU_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_4_0.vpunn"
+        VPU_4_1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn"
+        # DMA models
+        VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn"
+        VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn"
+        VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn"
+)
+
+# Link libraries 
+target_link_libraries(test_cost_model
+    PRIVATE
+        # Google Test
+        gtest_main
+        # Added for EMBARGO settings from root
+        vpunn_common_settings
+        npu_costmodel
+        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:nlohmann_json::nlohmann_json>
+)
+
+add_dependencies(test_cost_model vpunn_cpp_schema)
+
 include(GoogleTest)
-gtest_discover_tests(test_cost_model DISCOVERY_TIMEOUT 30)
+gtest_discover_tests(test_cost_model 
+    DISCOVERY_TIMEOUT 30
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
-  # Run all tests
-  add_custom_target(run_tests
-    COMMAND ctest --test-dir tests/cpp/
-    DEPENDS test_cost_model
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Run all tests"
-  )
+    # Run all tests
+    add_custom_target(run_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS test_cost_model
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Run all tests"
+    )
 
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(GCOV_BIN "llvm-cov-14 gcov")
-  elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    set(GCOV_BIN "gcov-9")
-  else()
-    message(FATAL_ERROR "-- Building with unrecognised compiler, cannot enable code coverage")
-  endif()
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        find_program(LLVM_COV_PATH llvm-cov-14)
+        if(LLVM_COV_PATH)
+            set(GCOV_BIN "${LLVM_COV_PATH} gcov")
+        else()
+            set(GCOV_BIN "llvm-cov-14 gcov")
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        find_program(GCOV_PATH gcov-9)
+        if(GCOV_PATH)
+            set(GCOV_BIN "${GCOV_PATH}")
+        else()
+            set(GCOV_BIN "gcov-9")
+        endif()
+    else()
+        message(FATAL_ERROR "-- Building with unrecognised compiler, cannot enable code coverage")
+    endif()
 
-  set(COVERAGE_DIR ${CMAKE_BINARY_DIR}/coverage)
-  set(COVERAGE_TITLE "VPUNN Code Coverage")
-  set(COVERAGE_HTML_OPTIONS --html --html-title=${COVERAGE_TITLE})
-  set(GCOV_COMMAND gcovr --gcov-executable ${GCOV_BIN} -s -r .. . ${COVERAGE_HTML_OPTIONS} -e=_deps --gcov-ignore-parse-errors=negative_hits.warn)
+    # Coverage settings
+    set(COVERAGE_DIR ${CMAKE_BINARY_DIR}/coverage)
+    set(COVERAGE_TITLE "VPUNN Code Coverage")
+    set(COVERAGE_HTML_OPTIONS --html --html-title=${COVERAGE_TITLE})
+    set(GCOV_COMMAND gcovr 
+        --gcov-executable ${GCOV_BIN} 
+        -s -r .. . 
+        ${COVERAGE_HTML_OPTIONS} 
+        -e=_deps
+        --gcov-ignore-parse-errors=negative_hits.warn
+    )
 
-  # Generate coverage report for CI (no details)
-  add_custom_target(coverage_ci
-    COMMAND ${GCOV_COMMAND} -o coverage.html
-    DEPENDS run_tests
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Create code coverage"
-  )
+    # Generate coverage report for CI (no details)
+    add_custom_target(coverage_ci
+        COMMAND ${GCOV_COMMAND} -o coverage.html
+        DEPENDS run_tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Create code coverage"
+    )
 
-  # Generate coverage report with extra details
-  add_custom_target(coverage
-    COMMAND mkdir -p ${COVERAGE_DIR} && ${GCOV_COMMAND} --html-details -o ${COVERAGE_DIR}/coverage.html
-    DEPENDS run_tests
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Create code coverage"
-  )
+    # Generate coverage report with extra details
+    add_custom_target(coverage
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${COVERAGE_DIR}
+        COMMAND ${GCOV_COMMAND} --html-details -o ${COVERAGE_DIR}/coverage.html
+        DEPENDS run_tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Create code coverage"
+    )
+endif()
+
+# Additional modern CMake practices
+if(WIN32)
+    # Windows-specific settings
+    set_target_properties(test_cost_model PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+endif()
+
+# Add compiler-specific optimizations for tests
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(test_cost_model PRIVATE
+        $<$<CONFIG:Debug>:-O0 -g1>
+        $<$<CONFIG:Release>:-O2>
+    )
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    target_compile_options(test_cost_model PRIVATE
+        $<$<CONFIG:Debug>:/Od /Zi>
+        $<$<CONFIG:Release>:/O2>
+    )
 endif()

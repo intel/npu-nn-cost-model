@@ -370,7 +370,7 @@ public:
     static VPUDevice mock_replace_devices(const VPUDevice in_device) {
         // device\ RESERVED is not supported for now we are mocking VPU_RESERVED with 4.0. This has to be removed when we have a
         // VPU_RESERVED trained NN
-        const auto device{(((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W) 
+        const auto device{(((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W)  // mock 50 family
                             ) ||
                            (in_device > VPUDevice::NPU_RESERVED_W))
                                   ? VPUDevice::VPU_4_0  // all mocked via 40

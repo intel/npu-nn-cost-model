@@ -7,11 +7,10 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-include_directories(${CMAKE_BINARY_DIR}/include)
-include_directories(${FLATBUFFERS_SRC_DIR}/include)
+# js/
 
 # Set JS binding application properties: set bind, output type, etc. Runs only if Emscripten is enabled.
-if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
+if(JS_BUILD)
     find_package(Git)
 
     if(GIT_FOUND)
@@ -26,16 +25,9 @@ if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
 
     message(STATUS "VPUNN_RELEASE_TAG: ${VPUNN_RELEASE_TAG}")
 
-    # add flatbuffer libraries
-    include(FetchContent)
-    FetchContent_Declare(
-        flatbuffers
-        GIT_REPOSITORY https://github.com/google/flatbuffers.git
-        GIT_TAG v1.12.0
-    )
-    FetchContent_MakeAvailable(flatbuffers)
-
-    set_property(DIRECTORY ${flatbuffers_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+    if (${VPUNN_USING_INTERNAL_FLATBUFFERS})
+        set_property(DIRECTORY ${FLATBUFFERS_SOURCE_DIR} PROPERTY EXCLUDE_FROM_ALL YES)
+    endif()
 
     function(GENERATE_SHV_KERNEL_BINDINGS KERNEL_TYPE KERNEL_NAME)
         string(TOUPPER ${KERNEL_NAME} KERNEL_NAME_UPPER)
@@ -76,7 +68,22 @@ if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
     )
 
     add_executable(vpunn_bind "${CMAKE_CURRENT_BINARY_DIR}/vpunn_bind.cpp")
-    target_link_libraries(vpunn_bind inferenceStatic)
+
+    target_include_directories(vpunn_bind
+        PRIVATE 
+            $<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include>
+            $<BUILD_INTERFACE:${COST_MODEL_BINARY_DIR}/include>
+            $<BUILD_INTERFACE:${FLATBUFFERS_SRC_DIR}/include>
+    )
+
+    target_link_libraries(vpunn_bind
+        PRIVATE
+            vpunn_common_settings
+            vpunn_inference
+            vpunn_vpu
+            vpunn_shave
+            flatbuffers
+    )
 
     set_target_properties(
         vpunn_bind
@@ -86,27 +93,23 @@ if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
 
     set_target_properties(vpunn_bind PROPERTIES LINK_FLAGS "--bind")
 
-    target_link_options(
-        vpunn_bind
+    target_link_options(vpunn_bind
         PUBLIC
-        -v
-        --bind
-        -O3
-        -std=c++17
-        -std=c++1z
-        -sEXCEPTION_DEBUG=1
-        -sDEMANGLE_SUPPORT=1
-        -sNO_DISABLE_EXCEPTION_CATCHING=1
-        -sALLOW_MEMORY_GROWTH=1
+            -v
+            --bind
+            -O3
+            -std=c++17
+            -std=c++1z
+            -sEXCEPTION_DEBUG=1
+            -sDEMANGLE_SUPPORT=1
+            -sNO_DISABLE_EXCEPTION_CATCHING=1
+            -sALLOW_MEMORY_GROWTH=1
 
-        # -sFORCE_FILESYSTEM=1
-        --embed-file ${CMAKE_SOURCE_DIR}/models@models
-        -msimd128
+            --embed-file ${CMAKE_SOURCE_DIR}/models@models
+            -msimd128
 
-        # -sWASM_BIGINT=1
-        # -sMODULARIZE=1
-        # -sEXPORT_ES6=1
-        -sEXPORT_NAME=VPUNN)
+            -sEXPORT_NAME=VPUNN
+    )
 
     add_custom_command(
         TARGET vpunn_bind POST_BUILD
@@ -129,4 +132,4 @@ if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
         DEPENDS vpunn_bind
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/dist
         COMMENT "Generating javascript module")
-endif(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
+endif(JS_BUILD)
