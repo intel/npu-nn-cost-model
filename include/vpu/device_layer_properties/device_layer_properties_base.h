@@ -24,18 +24,27 @@ namespace VPUNN {
 ///
 /// @tparam V A struct or class that provides a static op_to_exec_mode map.
 template <typename V>
+/* coverity[rule_of_five_violation:FALSE] */
 class TilingExecutionMode {
 private:
     inline static const std::unordered_map<Operation, std::vector<ExecutionMode>> op_to_exec_mode{
             V::op_to_exec_mode};  ///< map of operation to valid execution modes
 
 public:
-    // TilingExecutionMode() = default;
+    TilingExecutionMode() = default;
+    TilingExecutionMode(const TilingExecutionMode&) = delete;
+    TilingExecutionMode& operator=(const TilingExecutionMode&) = delete;
+
+    TilingExecutionMode(TilingExecutionMode&&) = delete;
+    TilingExecutionMode& operator=(TilingExecutionMode&&) = delete;
 
     /// @brief Returns the valid execution modes for tiling for a given DPULayer
     /// @param wl The DPULayer
     /// @return A vector of supported ExecutionMode values
     const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const {
+        if (wl.mpe_engine == MPEEngine::DCIM) {
+            return {ExecutionMode::dCIM_32x128};
+        }
         auto it = op_to_exec_mode.find(wl.op);
         if (it != op_to_exec_mode.end()) {
             return it->second;
@@ -53,11 +62,19 @@ public:
 ///
 /// @tparam V A struct or class that provides a static default_execution_mode value.
 template <typename V>
+/* coverity[rule_of_five_violation:FALSE] */
 class DefaultExecutionMode {
     inline static const ExecutionMode default_execution_mode{
             V::default_execution_mode};  ///< default execution mode for layers
 
 public:
+    DefaultExecutionMode() = default;
+    DefaultExecutionMode(const DefaultExecutionMode&) = delete;
+    DefaultExecutionMode& operator=(const DefaultExecutionMode&) = delete;
+
+    DefaultExecutionMode(DefaultExecutionMode&&) = delete;
+    DefaultExecutionMode& operator=(DefaultExecutionMode&&) = delete;
+
     /// @brief Returns the default execution mode for a given tensor
     /// @param tensor The VPUTensor
     /// @return The default ExecutionMode
@@ -74,12 +91,20 @@ public:
 ///
 /// @tparam V A struct or class that provides a static valid_tiling_strategies value.
 template <typename V>
+/* coverity[rule_of_five_violation:FALSE] */
 class TilingStrategies {
 private:
     inline static const std::vector<VPUTilingStrategy> valid_tiling_strategies{
             V::valid_tiling_strategies};  ///< valid tiling strategies for this device
 
 public:
+    TilingStrategies() = default;
+    TilingStrategies(const TilingStrategies&) = delete;
+    TilingStrategies& operator=(const TilingStrategies&) = delete;
+
+    TilingStrategies(TilingStrategies&&) = delete;
+    TilingStrategies& operator=(TilingStrategies&&) = delete;
+
     /// @brief Returns the valid tiling strategies for a certain device
     /// @return A vector of supported VPUTilingStrategy values
     const std::vector<VPUTilingStrategy> getValidTilingStrategies() const {
@@ -103,21 +128,20 @@ class LayerProperties_All_Devices :
         public DefaultExecutionModeX,
         public TilingStrategiesX {
 public:
+    LayerProperties_All_Devices() = default;
     // using DefaultExecutionModeX::getValidDefaultExecutionMode;
     // using TilingExecutionModeX::getValidTilingExecutionMode;
     // using TilingStrategiesX::getValidTilingStrategies;
 
-    ExecutionMode getValidDefaultExecutionMode(const VPUTensor& tensor) const override {
-        return DefaultExecutionModeX::getValidDefaultExecutionMode(tensor);
-    }
-    const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const override {
-        return TilingExecutionModeX::getValidTilingExecutionMode(wl);
-    }
-    const std::vector<VPUTilingStrategy> getValidTilingStrategies() const override {
-        return TilingStrategiesX::getValidTilingStrategies();
-    }
-
-    // LayerProperties_All_Devices() = default;
+   ExecutionMode getValidDefaultExecutionMode(const VPUTensor& tensor) const override {
+       return DefaultExecutionModeX::getValidDefaultExecutionMode(tensor);
+   }
+   const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const override {
+       return TilingExecutionModeX::getValidTilingExecutionMode(wl);
+   }
+   const std::vector<VPUTilingStrategy> getValidTilingStrategies() const override {
+       return TilingStrategiesX::getValidTilingStrategies();
+   }
 };
 
 /// @brief Device-specific layer property implementation for VPU 2.0/2.1.

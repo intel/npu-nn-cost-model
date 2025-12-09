@@ -28,8 +28,7 @@ namespace VPUNN {
 ///   that implement the actual logic and interface for layer property queries.
 /// - The scope of this struct is internal to the layer properties implementation for default/fallback cases.
 struct Default_LayerPropertiesData {
-    inline static const std::vector<VPUTilingStrategy> valid_tiling_strategies{
-            VPUTilingStrategy::NONE,         VPUTilingStrategy::SOH_Overlapped, VPUTilingStrategy::SOK};  ///< list of valid tiling strategies
+    inline static const std::vector<VPUTilingStrategy> valid_tiling_strategies{};  ///< list of valid tiling strategies
 
     inline static const std::unordered_map<Operation, std::vector<ExecutionMode>> op_to_exec_mode{};  ///< map of operation to valid execution modes
 

@@ -26,6 +26,9 @@
 #include "device_valid_valuesVPU2_7.h"
 #include "device_valid_valuesVPU4.h"
 
+#ifdef INTEL_EMBARGO_NPU5
+#include "device_valid_valuesVPU5.h"
+#endif  // INTEL_EMBARGO_NPU5
 
 #include "interface_operations_behavior.h"
 #include "interface_valid_values.h"
@@ -46,6 +49,9 @@ using LayerOperationsBehaviour =
 class VPU_LayerValidator :
         public Behavior_Device_Mapping<LayerOperationsBehaviour,  // operations
                                        VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU4_0_LayerValidValues
+#ifdef INTEL_EMBARGO_NPU5
+                                       , VPU5_0_LayerValidValues                                       
+#endif  // INTEL_EMBARGO_NPU5
                                        > {
 protected:
 public:

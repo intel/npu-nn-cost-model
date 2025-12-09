@@ -253,7 +253,7 @@ struct DMANNWorkload_NPU27 {
 /// DMA descriptor for NPU4.0++
 /// 6D addressing mode
 /* coverity[rule_of_five_violation:FALSE] */
-struct DMANNWorkload_NPU40_RESERVED {
+struct DMANNWorkload_NPU40_50 {
     VPUDevice device;  ///< NPU device,  creation via create_DMANNWorkload_NPUXX functions ensures also proper init,
                        ///< otherwise please init explicitly
 
@@ -352,7 +352,7 @@ struct DMANNWorkload_NPU40_RESERVED {
         return fields;
     }
 
-    DMANNWorkload_NPU40_RESERVED(VPUDevice _device, int _src_width = 0, int _dst_width = 0, int _num_dim = 0,
+    DMANNWorkload_NPU40_50(VPUDevice _device, int _src_width = 0, int _dst_width = 0, int _num_dim = 0,
                            std::array<SizeStride, MaxExtraDimensions> _e_dim =
                                    {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
                            Num_DMA_Engine _num_engine = Num_DMA_Engine::Num_Engine_1,
@@ -367,8 +367,8 @@ struct DMANNWorkload_NPU40_RESERVED {
               loc_name{std::move(_loc_name)} {
     }
 
-    DMANNWorkload_NPU40_RESERVED() = default;
-    DMANNWorkload_NPU40_RESERVED(const DMANNWorkload_NPU40_RESERVED& w) noexcept(false)
+    DMANNWorkload_NPU40_50() = default;
+    DMANNWorkload_NPU40_50(const DMANNWorkload_NPU40_50& w) noexcept(false)
             : device{w.device},
               src_width{w.src_width},
               dst_width{w.dst_width},
@@ -379,10 +379,10 @@ struct DMANNWorkload_NPU40_RESERVED {
               loc_name{w.loc_name} /*_member_map{}*/ {
     }
 
-    // DMANNWorkload_NPU40_RESERVED(DMANNWorkload_NPU40_RESERVED&) noexcept(false) = delete;
-    DMANNWorkload_NPU40_RESERVED& operator=(const DMANNWorkload_NPU40_RESERVED&) = delete;
+    // DMANNWorkload_NPU40_50(DMANNWorkload_NPU40_50&) noexcept(false) = delete;
+    DMANNWorkload_NPU40_50& operator=(const DMANNWorkload_NPU40_50&) = delete;
 
-    DMANNWorkload_NPU40_RESERVED(DMANNWorkload_NPU40_RESERVED&& w) noexcept(false)
+    DMANNWorkload_NPU40_50(DMANNWorkload_NPU40_50&& w) noexcept(false)
             : device{std::move(w.device)},
               src_width{std::move(w.src_width)},
               dst_width{std::move(w.dst_width)},
@@ -392,25 +392,25 @@ struct DMANNWorkload_NPU40_RESERVED {
               transfer_direction{std::move(w.transfer_direction)},
               loc_name{std::move(w.loc_name)} /*_member_map{}*/ {
     }
-    // DMANNWorkload_NPU40_RESERVED(const DMANNWorkload_NPU40_RESERVED&&) /*noexcept(false)*/ = delete;
-    DMANNWorkload_NPU40_RESERVED& operator=(DMANNWorkload_NPU40_RESERVED&&) = delete;
-    virtual ~DMANNWorkload_NPU40_RESERVED() = default;
+    // DMANNWorkload_NPU40_50(const DMANNWorkload_NPU40_50&&) /*noexcept(false)*/ = delete;
+    DMANNWorkload_NPU40_50& operator=(DMANNWorkload_NPU40_50&&) = delete;
+    virtual ~DMANNWorkload_NPU40_50() = default;
 };
 
 /// DMA descriptor aliases
-using DMANNWorkload_NPU40 = DMANNWorkload_NPU40_RESERVED;
-using DMANNWorkload_NPU_RESERVED = DMANNWorkload_NPU40_RESERVED;
+using DMANNWorkload_NPU40 = DMANNWorkload_NPU40_50;
+using DMANNWorkload_NPU50 = DMANNWorkload_NPU40_50;
 
 inline const DMANNWorkload_NPU40 create_DMANNWorkload_NPU40() {
     return DMANNWorkload_NPU40{VPUDevice::VPU_4_0};
 }
 
-inline const DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED() {
-    return DMANNWorkload_NPU_RESERVED{VPUDevice::NPU_RESERVED};
+inline const DMANNWorkload_NPU50 create_DMANNWorkload_NPU50() {
+    return DMANNWorkload_NPU50{VPUDevice::NPU_5_0};
 }
 
-inline const DMANNWorkload_NPU_RESERVED create_DMANNWorkload_NPU_RESERVED_W() {
-    return DMANNWorkload_NPU_RESERVED{VPUDevice::NPU_RESERVED_W};
+inline const DMANNWorkload_NPU50 create_DMANNWorkload_NPU_RESERVED() {
+    return DMANNWorkload_NPU50{VPUDevice::NPU_RESERVED};
 }
 
 /**

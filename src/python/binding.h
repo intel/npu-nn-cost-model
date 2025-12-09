@@ -7,10 +7,9 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-
 #include <vpu_network_cost_model.h>
 #include <vpu/shave/layers.h>  // for SWOperation implementations . SHAVE v1
 #include <vpu_dma_cost_model.h>
 
 template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU27>;  ///< explicit instantiation 
-template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU40_RESERVED>;  ///< explicit instantiation 
+template class VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU40_50>;  ///< explicit instantiation 

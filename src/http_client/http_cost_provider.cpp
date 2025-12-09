@@ -123,6 +123,7 @@ VPUNN::CyclesInterfaceType VPUNN::HttpDPUCostProvider::getCost(const DPUOperatio
     
     payload["params"] = nlohmann::json::object();
     payload["params"]["backend"] = backend;
+
     payload["params"]["name"] = "profiling_request";
     payload["params"]["timeout"] = -1; // Need to wait for the profiling to finish
 
@@ -204,6 +205,8 @@ const nlohmann::json VPUNN::HttpDPUCostProvider::dpuop_as_json(const DPUOperatio
     json_op["in_place_input1"] = static_cast<int>(op.weightless_operation);
     json_op["in_place_output"] = static_cast<int>(op.in_place_output_memory);
     json_op["superdense_output"] = static_cast<int>(op.superdense);
+    json_op["input_autopad"] = static_cast<int>(op.input_autopad);
+    json_op["output_autopad"] = static_cast<int>(op.output_autopad);
     json_op["workload_uid"] = op.hash();
 
     return json_op;

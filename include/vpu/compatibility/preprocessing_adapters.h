@@ -98,7 +98,7 @@ public:
         // device 4.0 is not supported for now we are mocking VPU_4_0 with 2.7. This has to be removed when we have a
         // VPU4.0 trained NN
         const auto device{(in_device == VPUDevice::VPU_4_0)  // mock 4.0
-                                          || ((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W))
+                                          || ((in_device == VPUDevice::NPU_5_0) || (in_device == VPUDevice::NPU_RESERVED))
                                   ? VPUDevice::VPU_2_7  // all mocked via 2.7
                                   : in_device};
 
@@ -368,11 +368,11 @@ public:
 
     /// some devices are replaced to supported ones
     static VPUDevice mock_replace_devices(const VPUDevice in_device) {
-        // device\ RESERVED is not supported for now we are mocking VPU_RESERVED with 4.0. This has to be removed when we have a
-        // VPU_RESERVED trained NN
-        const auto device{(((in_device == VPUDevice::NPU_RESERVED) || (in_device == VPUDevice::NPU_RESERVED_W)  // mock 50 family
+        // device 5.0 is not supported for now we are mocking VPU_5_0 with 4.0. This has to be removed when we have a
+        // VPU5.0 trained NN
+        const auto device{(((in_device == VPUDevice::NPU_5_0) || (in_device == VPUDevice::NPU_RESERVED)  // mock 50 family
                             ) ||
-                           (in_device > VPUDevice::NPU_RESERVED_W))
+                           (in_device > VPUDevice::NPU_RESERVED))
                                   ? VPUDevice::VPU_4_0  // all mocked via 40
                                   : in_device};
 

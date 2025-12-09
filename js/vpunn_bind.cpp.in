@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <vpu/types.h>
 #include <vpu_cost_model.h>
+#include <vpu_shave_cost_model.h>
 
 #define SW_LAYER_ENUMERATIONS @SW_LAYER_ENUMERATIONS@
 #define SW_LAYER_BINDINGS @SW_LAYER_BINDINGS@
@@ -43,6 +44,10 @@ SHAVEWorkload createSHV(const std::string& operation_name, const VPUDevice& devi
 
 std::unique_ptr<VPUCostModel> createVPUCostModel(std::string buff) {
     return std::make_unique<VPUCostModel>(buff);
+}
+
+std::unique_ptr<SHAVECostModel> createSHAVECostModel() {
+    return std::make_unique<SHAVECostModel>();
 }
 
 extern "C" {
@@ -88,8 +93,10 @@ EMSCRIPTEN_BINDINGS(vpunn) {
             .function("DPU", select_overload<unsigned int(DPUWorkload) const>(&VPUCostModel::DPU))
             .function("DMA", select_overload<unsigned int(VPUDevice, const VPUTensor&, const VPUTensor&, MemoryLocation, MemoryLocation, unsigned int) const>(
                                      &VPUCostModel::DMA))
-            .function("SHAVE", select_overload<unsigned int(const SHAVEWorkload&) const>(&VPUCostModel::SHAVE))
             .function("initialized", &VPUCostModel::nn_initialized);
+    class_<SHAVECostModel>("SHAVECostModel")
+            .constructor<>()
+            .function("computeCycles", select_overload<unsigned int(const SHAVEWorkload&) const>(&SHAVECostModel::computeCycles));
 
     // Helper functions
     function("createTensor", &createTensor);
@@ -97,6 +104,7 @@ EMSCRIPTEN_BINDINGS(vpunn) {
     function("createDMA", &createDMA);
     function("createSHV", &createSHV);
     function("createVPUCostModel", &createVPUCostModel);
+    function("createSHAVECostModel", &createSHAVECostModel);
 
     class_<VPUTensor>("VPUTensor")
             .constructor<std::array<unsigned int, 4>, DataType>()

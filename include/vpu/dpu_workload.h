@@ -104,6 +104,17 @@ struct DPUWorkload {
     /// Output autopad - ODU specific
     std::optional<bool> output_autopad{};
 
+    /// hint about what cost provider to use
+    CostSourceHint cost_source_hint{CostSourceHint::AUTO};
+
+    /// hint about what profiling service backend to use
+    ProfilingServiceBackend profiling_service_backend_hint{ProfilingServiceBackend::__size};
+
+    ///< MPE engine to be used, SCL by default -- It's a required field for both l2 and l1 APIs.
+    ///< Controls also what execution order can be used / is valid
+    ///< In case of dCIM, the execution order is set automatically during sanitization, therefore no optimization is allowed at layer level.
+    MPEEngine mpe_engine{MPEEngine::SCL};
+
     std::string get_layer_info() const {
         return layer_info;
     }
@@ -305,7 +316,8 @@ public:
         r = r && (in_place_output_memory == b.in_place_output_memory);  // in_place_output_memory
         r = r && (superdense_memory == b.superdense_memory);            // superdense_memory
         r = r && (input_autopad == b.input_autopad);                    // input_autopad
-        r = r && (output_autopad == b.output_autopad);                  // output_autopad
+        r = r && (output_autopad == b.output_autopad);                  // output_autopads
+        r = r && (mpe_engine == b.mpe_engine);                          // mpe_engine
         return r;
     }
 };
@@ -366,6 +378,7 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& 
                                            : " input_autopad: NA")  //
            << (d.output_autopad.has_value() ? " output_autopad: \t" + std::to_string(d.output_autopad.value())
                                             : " output_autopad: NA")  //
+           << " mpe engine: " << (int)d.mpe_engine << " : " << MPEEngine_ToText.at(static_cast<int>(d.mpe_engine))
            << out_terminator() << "Workload "                         // terminator
             ;
     return stream;

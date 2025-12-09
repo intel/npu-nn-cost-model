@@ -37,8 +37,8 @@
 
 #include "vpu/layer_split_info.h"
 
-#include "vpu/serialization/l2_cost_serialization_wrapper.h"
 #include "vpu/device_layer_properties/device_layer_properties_holder.h"
+#include "vpu/serialization/l2_cost_serialization_wrapper.h"
 
 namespace VPUNN {
 
@@ -134,7 +134,7 @@ public:
             const unsigned int batch_size = 1,             ///< model batch size for DPU
             const std::string& dpu_cache_filename = "",    /// < the name of the preloaded cache file for DPU model
             const std::string& shave_cache_filename = "",  /// < the name of the preloaded cache file for SHAVE
-            bool use_shave_2_api = false,                  /// < Use the Shave2 API 
+            bool use_shave_2_api = false,                  /// < Use the Shave2 API
             bool tryToLoadPairedCache = false              ///< see L1 DPU constructor details for this
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(filename, profile, cache_size, batch_size,
@@ -198,7 +198,7 @@ public:
             bool tryToLoadPairedCache = false              ///< see L1 DPU constructor details for this
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(filename, profile, cache_size, batch_size,
-                                                                            dpu_cache_filename, shave_cache_filename, 
+                                                                            dpu_cache_filename, shave_cache_filename,
                                                                             use_shave_2_api, tryToLoadPairedCache)} {
         initialize_serializers();
     }
@@ -224,8 +224,8 @@ public:
             const char* dpu_cache_data = nullptr,    /// < the content of the preloaded cache file for DPU model
             size_t dpu_cache_data_length = 0,        ///< the size of the dpu_cache_data buffer
             const char* shave_cache_data = nullptr,  ///< the content of the preloaded cache file for SHAVE
-            size_t shave_cache_data_length = 0,       /// < the size of the shave_cache_data buffer
-            bool use_shave_2_api = false               /// < Enable usage of SHAVE2 api
+            size_t shave_cache_data_length = 0,      /// < the size of the shave_cache_data buffer
+            bool use_shave_2_api = false             /// < Enable usage of SHAVE2 api
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(
                       model_data, model_data_length, copy_model_data, profile, cache_size, batch_size, dpu_cache_data,
@@ -408,7 +408,7 @@ public:
 
     /// version without detailed split output parameter and no hash or tiling strategy.
     CyclesInterfaceType LayersPreSplit(const std::vector<SHAVEWorkload>& layers_pre_split, unsigned int nSHV,
-                                               bool input_in_ddr, bool output_in_ddr) {
+                                       bool input_in_ddr, bool output_in_ddr) {
         return layer_pre_split_cycles(internal_dpu_cost_provider, layers_pre_split, nSHV, input_in_ddr, output_in_ddr);
     }
 
@@ -461,9 +461,9 @@ protected:
                             if constexpr (std::is_same_v<WLType, DMANNWorkload_NPU40>)
                                 device_match = true;
                             break;
+                        case VPUDevice::NPU_5_0:
                         case VPUDevice::NPU_RESERVED:
-                        case VPUDevice::NPU_RESERVED_W:
-                            if constexpr (std::is_same_v<WLType, DMANNWorkload_NPU_RESERVED>)
+                            if constexpr (std::is_same_v<WLType, DMANNWorkload_NPU50>)
                                 device_match = true;
                             break;
                         default:
@@ -950,11 +950,10 @@ protected:
         return cost;
     }
 
-    CyclesInterfaceType layer_pre_split_cycles(
-            VPUCostModel& shave_cost_provider, // cost model to be used
-            const std::vector<SHAVEWorkload>& layers_pre_split, unsigned int nSHV = 1, 
-            bool input_in_ddr = false, bool output_in_ddr = false
-    ) const {
+    CyclesInterfaceType layer_pre_split_cycles(VPUCostModel& shave_cost_provider,  // cost model to be used
+                                               const std::vector<SHAVEWorkload>& layers_pre_split,
+                                               unsigned int nSHV = 1, bool input_in_ddr = false,
+                                               bool output_in_ddr = false) const {
         // add missing info by deducing it (not anymore received by params)
         unsigned int nTiles{(unsigned int)layers_pre_split.size()};
         VPUDevice device{nTiles ? layers_pre_split[0].get_device() : VPUDevice::__size};
@@ -966,7 +965,7 @@ protected:
             return Cycles::ERROR_L2_INVALID_PARAMETERS;
         }
 
-        std::vector<CyclesInterfaceType> tiles_cost;          // cost of each tile
+        std::vector<CyclesInterfaceType> tiles_cost;               // cost of each tile
         std::vector<SHAVEWorkload> tiles_layer{layers_pre_split};  //< layers are already split, make a copy
 
         // split the layer section, all splits
@@ -986,7 +985,8 @@ protected:
             for (auto& one_tile_layer : tiles_layer) {
                 try {
                     std::string infoOut{};
-                    const auto cycles =static_cast<CyclesInterfaceType>((float)shave_cost_provider.SHAVE(one_tile_layer, infoOut) / (float)nSHV);
+                    const auto cycles = static_cast<CyclesInterfaceType>(
+                            (float)shave_cost_provider.SHAVE(one_tile_layer, infoOut) / (float)nSHV);
                     tiles_cost.push_back(cycles);
 
                 } catch (const std::exception& e) {
@@ -1012,11 +1012,11 @@ protected:
                 // Add cost of loading input activation from DDR to CMX
                 std::vector<CyclesInterfaceType> dma_costs;
                 for (auto& one_tile_layer : tiles_layer) {
-                    const auto& inTs{one_tile_layer.get_inputs()}; // Multiple inputs possible
+                    const auto& inTs{one_tile_layer.get_inputs()};  // Multiple inputs possible
                     CyclesInterfaceType one_tile_cost{};
-                    for(const auto& inT : inTs)
+                    for (const auto& inT : inTs)
                         one_tile_cost +=
-                            compute_dma_cycles({device, static_cast<int>(inT.size()), MemoryDirection::DDR2CMX});
+                                compute_dma_cycles({device, static_cast<int>(inT.size()), MemoryDirection::DDR2CMX});
                     dma_costs.push_back(one_tile_cost);
                 }
 
@@ -1033,7 +1033,7 @@ protected:
                     CyclesInterfaceType one_tile_cost{};
                     for (const auto& outT : outTs)
                         one_tile_cost +=
-                            compute_dma_cycles({device, static_cast<int>(outT.size()), MemoryDirection::CMX2DDR});
+                                compute_dma_cycles({device, static_cast<int>(outT.size()), MemoryDirection::CMX2DDR});
                     dma_costs.push_back(one_tile_cost);
                 }
 
@@ -1084,17 +1084,6 @@ public:
     // Shave Operations area is next
 
     /**
-     * @brief Compute the optimal cost of a SWOperation
-     *
-     * @param layer the SHV kernel
-     * @param strategy the layer strategy
-     * @return CyclesInterfaceType
-     */
-    CyclesInterfaceType Layer(const SWOperation& layer, const VPULayerStrategy& strategy) const {
-        return Layer(layer, strategy.nSHVs, strategy.nTiles, strategy.input_fetching, strategy.output_spilling);
-    }
-
-    /**
      * @brief Compute the optimal cost of a SHAVEWorkload
      *
      * @param layer the SHV kernel
@@ -1103,44 +1092,6 @@ public:
      */
     CyclesInterfaceType Layer(const SHAVEWorkload& layer, const VPULayerStrategy& strategy) const {
         return Layer(layer, strategy.nSHVs, strategy.nTiles, strategy.input_fetching, strategy.output_spilling);
-    }
-
-
-    /**
-     * @brief Compute the optimal cost of a SHV kernel
-     *
-     * @param layer the SHV kernel
-     * @param nSHV the number of SHV/tile
-     * @param nTiles the number of CMX tiles
-     * @param input_in_ddr enable/disable input in DDR (require extra DMA to fetch data in CMX)
-     * @param output_in_ddr enable/disable output in DDR (require extra DMA to spill data in CMX)
-     * @return CyclesInterfaceType
-     */
-    CyclesInterfaceType Layer(const SWOperation& layer, const unsigned int nSHV = 1, const unsigned int nTiles = 1,
-                              const bool input_in_ddr = false, const bool output_in_ddr = false) const {
-        // For shave layer we use a simplistic model, as we assume the cost can be scale up to 4 tiles
-        const CyclesInterfaceType single_shv_cost = get_SHV_cost_model().SHAVE(layer);
-        CyclesInterfaceType cost = static_cast<CyclesInterfaceType>((float)single_shv_cost / ((float)(nSHV * nTiles)));
-
-        if (input_in_ddr) {
-            // Add cost of loading input activation from DDR to CMX
-            for (auto& inT : layer.inputs) {
-                auto in_ddr_dma =
-                        compute_dma_cycles({layer.device, static_cast<int>(inT.size()), MemoryDirection::DDR2CMX});
-                cost = Cycles::cost_adder(cost, in_ddr_dma);
-            }
-        }
-
-        if (output_in_ddr) {
-            // Add cost of spilling output activation from DDR to CMX
-            for (auto& outT : layer.outputs) {
-                auto out_ddr_dma =
-                        compute_dma_cycles({layer.device, static_cast<int>(outT.size()), MemoryDirection::CMX2DDR});
-                cost = Cycles::cost_adder(cost, out_ddr_dma);
-            }
-        }
-
-        return cost;
     }
 
     /**
@@ -1258,10 +1209,7 @@ public:
      * @return std::vector<VPUTilingStrategy>
      */
     static std::vector<VPUTilingStrategy> getValidTilingStrategies(const VPUDevice& device) {
-        if (device >= VPUDevice::__size)
-            return {};
-        else
-            return LayerPropertiesHolder::get_properties(device).getValidTilingStrategies();
+        return LayerPropertiesHolder::get_properties(device).getValidTilingStrategies();
     }
 };
 

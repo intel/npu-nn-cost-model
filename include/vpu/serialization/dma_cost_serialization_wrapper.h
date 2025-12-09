@@ -34,7 +34,7 @@ private:
         }
     }
 
-    void serialize_workload(const DMANNWorkload_NPU40_RESERVED& wl) {
+    void serialize_workload(const DMANNWorkload_NPU40_50& wl) {
         if (serializer.is_serialization_enabled()) {
             try {
                 serializer.serialize(SerializableField{"src_width", wl.src_width});
@@ -114,6 +114,27 @@ public:
         try {
             if (!serializer.is_write_buffer_clean()) {
                 serializer.serialize(SerializableField<decltype(cycles)>{"cycles", cycles});
+                serializer.end();
+            }
+        } catch (const std::exception& e) {
+            Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+            set_error();  // mark the error, so next operations will know something is not OK
+            serializer.clean_buffers();
+        }
+        serializer.clean_buffers();
+    }
+
+    void serializeCyclesAndCostInfo_closeLine(const CyclesInterfaceType cycles, const std::string cost_source,
+                                              const std::string& info) {
+        if (!is_serialization_enabled() || is_error_present_during_serialization())
+            return;
+
+        try {
+            if (!serializer.is_write_buffer_clean()) {
+                serializer.serialize(SerializableField<decltype(cycles)>{"vpunn_cycles", cycles});
+                serializer.serialize(SerializableField<std::string>{"cost_source", cost_source});
+                auto trimmed_info = trim_csv_str(info);
+                serializer.serialize(SerializableField<std::string>{"error_info", trimmed_info});
                 serializer.end();
             }
         } catch (const std::exception& e) {

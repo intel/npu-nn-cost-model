@@ -89,6 +89,8 @@ public:
 
     static constexpr CyclesInterfaceType ERROR_CACHE_MISS{MaxV - 18};  // used for cache miss
 
+    static constexpr CyclesInterfaceType ERROR_SHAVE_OPERATOR_MISSING{MaxV - 19}; // use it in case that the configuration doesnt have the specified Shave in container
+
     static constexpr CyclesInterfaceType START_ERROR_RANGE{MaxV - 1000};  ///< 1000 position for errors
 
     /// @brief true if v has a value that can be an error code
@@ -146,6 +148,8 @@ public:
             return "ERROR_PROFILING_SERVICE";
         case ERROR_CACHE_MISS:
             return "ERROR_CACHE_MISS";
+        case ERROR_SHAVE_OPERATOR_MISSING:
+            return "ERROR_SHAVE_OPERATOR_MISSING";
         default:
             return "UNKNOWN";
         }

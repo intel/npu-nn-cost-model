@@ -13,33 +13,44 @@
 #include "device_layer_properties_VPU2_0.h"
 #include "device_layer_properties_VPU2_7.h"
 #include "device_layer_properties_VPU4_0.h"
-
-
-
+#ifdef INTEL_EMBARGO_NPU5
+#include "device_layer_properties_VPU5_0.h"
+#endif
 #include "device_layer_properties_default.h"
 #include "interface_device_layer_properties.h"
 #include "vpu/tuple_indexing_helper.h"
 
 namespace VPUNN {
 
+/// @brief Provides access to device-specific layer properties for supported VPU devices.
+/// 
+/// This class offers an interface to retrieve layer property information
+/// (such as valid tiling strategies, execution modes, and other device-dependent characteristics)
+/// for a given VPU device. It internally manages a tuple of device-specific property implementations
+/// and returns the correct properties based on the device type.
+/// 
+/// If the requested device is not supported, a default property implementation is returned and an error is logged.
 class LayerPropertiesHolder {
 protected:
+    /// tuple holding instances of all device-specific layer property classes
+    /// the order of types in this tuple must match the device index mapping used by IndexMap
     using LayerProperties_Tuple = std::tuple<VPU2_0_LayerProperties,  //
                                              VPU2_0_LayerProperties,  //
                                              VPU2_7_LayerProperties,  //
                                              VPU4_0_LayerProperties,  //
+#ifdef INTEL_EMBARGO_NPU5
+                                             VPU5_0_LayerProperties,  //
+#endif
                                              Default_LayerProperties>;
 
     static inline const LayerProperties_Tuple const_layer_properties{};
 
 public:
-    /**
-     * @brief Retrieves the layer properties for a given VPU device.
-     *
-     * @param device The VPU device for which to retrieve properties.
-     * @return Reference to the corresponding ILayerProperties implementation.
-     *         If the device is not supported, returns a default implementation and logs an error
-     */
+    /// @brief Retrieves the layer properties for a given VPU device.
+    /// 
+    /// @param device The VPU device for which to retrieve properties.
+    /// @return Reference to the corresponding ILayerProperties implementation.
+    ///         If the device is not supported, returns a default implementation and logs an error
     static const ILayerProperties& get_properties(VPUDevice device) {
         return IndexMap::extract_tuple_content<const ILayerProperties&, LayerProperties_Tuple>(device,
                                                                                                const_layer_properties);

@@ -41,6 +41,7 @@ option(GENERATE_PYTHON_BINDING "Generate the python bindings code" OFF)
 option(VPUNN_BUILD_HTTP_CLIENT "Build support for cost provider http service" OFF)
 option(VPUNN_OPT_LEGACY_ZTILING "Use legacy ZTiling mechanism" ON)
 option(VPUNN_OPT_LEGACY_DMA_TH_4 "Use legacy Theoretical DMA for Gen4" OFF)
+option(ENABLE_FLATBUFFERS_INSTALLATION "Install flatbuffers and its dependency ProjectConfig" ON)
 
 # Detect JavaScript build env
 if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
@@ -73,6 +74,14 @@ target_sources(vpunn_common_settings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/com
 
 # Apply C++ standard requirement to this target and (optionally) to dependents
 target_compile_features(vpunn_common_settings PUBLIC cxx_std_17)
+
+# Compile definitions (PUBLIC so direct link consumers inherit them; they can choose PRIVATE linkage)
+target_compile_definitions(vpunn_common_settings PUBLIC
+    INTEL_EMBARGO_NPU5    # INTEL_EMBARGO_NPU5_Content
+    INTEL_EMBARGO_NPU5020 # INTEL_EMBARGO_NPU5020_Content
+    INTEL_EMBARGO_NPU6    # INTEL_EMBARGO_NPU6_Content
+    INTEL_EMBARGO_COMMON  # INTEL_EMBARGO_COMMON_Content
+)
 
 if(VPUNN_OPT_LEGACY_DMA_TH_4)
     target_compile_definitions(vpunn_common_settings PUBLIC VPUNN_OPT_LEGACY_DMA_TH_4)

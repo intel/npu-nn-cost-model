@@ -24,9 +24,17 @@ enum class NNVersions : int {
                                   ///< Compatibility mode for intial release (NOv 2024 vs Oct 2023)
     VERSION_11_NPU40 = 4011,      ///< version 11 used for NPU40 trained NNs
     VERSION_11_NPU41 = 4111,      ///< version 11 used for NPU40 trained NNs with swizz0,5 support.
-    VERSION_12_NPU_RESERVED = 5112,      ///< version 12 used for NPU_RESERVED trained NNs
-    VERSION_13_NPU_RESERVED = 5113,      ///< version 13 used for NPU_RESERVED trained NNs
-    VERSION_14_NPU_RESERVED = 5114,      ///< version 13 used for NPU_RESERVED trained NNs
+    VERSION_12_NPU51 = 5112,      ///< version 12 used for NPU51 trained NNs
+    VERSION_13_NPU51 = 5113,      ///< version 13 used for NPU51 trained NNs
+    VERSION_14_NPU51 = 5114,      ///< version 14 used for NPU51 trained NNs
+    VERSION_15_NPU_RESERVED_11 = 6115,      ///< version 15 used for NPU_RESERVED_11 trained NNs
+};
+/// @brief enum for NN descriptor versions (input versions)
+enum class NNVersionsDMA : int {
+    VERSION_00_LATEST_NONE = 0,  ///< no version OR last version
+    VERSION_01_27 = 1,           ///< initial version, first one for 2.7
+    VERSION_02_40 = 2,           ///< 6D dedicated to 4.0+
+    VERSION_03_50_v1 = 3,        ///< 6D dedicated to 5.0 iteration 1 . Probably supports max 2D
 };
 
 }  // namespace VPUNN

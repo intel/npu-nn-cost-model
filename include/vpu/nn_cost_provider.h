@@ -16,8 +16,6 @@
 #include "inference/preprop_factory.h"
 #include "inference/vpunn_runtime.h"
 #include "vpu/cycles_interface_types.h"
-#include "vpu/validation/dpu_operations_sanitizer.h"
-
 #include "core/cache.h"
 
 #include <thread>
@@ -32,7 +30,7 @@ namespace VPUNN {
 
 class NNCostProvider {
 public:
-    NNCostProvider(const DPU_OperationSanitizer& sanitizer, const std::string& filename = "",
+    NNCostProvider(const std::string& filename = "",
                    const unsigned int batch_size = 1, bool profile = false, const unsigned int cache_size = 16384,
                    const std::string& dpu_cache_filename = "", bool tryToLoadPairedCache = false)
             : vpunn_runtime(filename, profile),
@@ -45,7 +43,6 @@ public:
                     (tryToLoadPairedCache ? filename : "")),
               cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
                                             .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE"),
-              sanitizer(sanitizer),
               batch_size(batch_size) {
         if (!is_initialized()) {
             return;
@@ -53,11 +50,11 @@ public:
 
         check_post_config(vpunn_runtime.model_version_info());
         correlate_preprocessor_with_model_inputs();
-        cache_miss_serializer.initialize("cache_misses", FileMode::READ_WRITE, get_names_for_serializer());
+        cache_miss_serializer.initialize(cache_miss_file_naming(), FileMode::READ_WRITE, get_names_for_serializer());
     };
 
     NNCostProvider(const char* model_data, size_t model_data_length, const unsigned int batch_size,
-                   bool copy_model_data, const DPU_OperationSanitizer& sanitizer, bool profile = false,
+                   bool copy_model_data, bool profile = false,
                    const unsigned int cache_size = 16384, const char* dpu_cache_data = nullptr,
                    size_t dpu_cache_data_length = 0)
             : vpunn_runtime(model_data, model_data_length, copy_model_data, profile),
@@ -69,7 +66,6 @@ public:
               cache(cache_size, /* preprocessing.output_size(),*/ dpu_cache_data, dpu_cache_data_length),
               cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
                                             .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE"),
-              sanitizer(sanitizer),
               batch_size(batch_size) {
         if (!is_initialized()) {
             return;
@@ -77,8 +73,12 @@ public:
 
         check_post_config(vpunn_runtime.model_version_info());
         correlate_preprocessor_with_model_inputs();
-        cache_miss_serializer.initialize("cache_misses", FileMode::READ_WRITE, get_names_for_serializer());
+        cache_miss_serializer.initialize(cache_miss_file_naming(), FileMode::READ_WRITE, get_names_for_serializer());
     };
+
+    const std::string cache_miss_file_naming() const {
+        return "cache_misses";
+    }
 
     bool is_initialized() const {
         return vpunn_runtime.initialized();
@@ -96,10 +96,10 @@ public:
 
 protected:
     template <typename WlT>
-    float infer(const WlT& workload) const {
+    float infer_raw_input(const WlT& workload) const {
         auto& ctx = get_execution_context();
 
-        float postProcessed_value{default_NN_output};
+        float raw_value{default_NN_output};
 
         if (!is_initialized()) {
             return default_NN_output;
@@ -114,20 +114,30 @@ protected:
             const auto infered_value{vpunn_runtime.predict<float>(descriptor, ctx.runtime_buffer_data)[0]};
             cache.add(descriptor, infered_value);
 
-            L1CostSerializationWrap serialization_handler(cache_miss_serializer, sanitizer);
+            L1CostSerializationWrap serialization_handler(cache_miss_serializer);
             serialization_handler.serializeInfoAndComputeWorkloadUid(workload, true /*serializer close line*/);
 
-            postProcessed_value = post_processing.process(workload, infered_value);
+            raw_value = infered_value;
         } else {
-            postProcessed_value = post_processing.process(workload, *cached_value);
+            raw_value = cached_value.value();
         }
 
-        return postProcessed_value;
+        return raw_value;
+    }
+
+    template <typename WlT>
+    CyclesInterfaceType infer(const WlT& workload) const {
+        const float raw_value = infer_raw_input(workload);
+
+        if (post_processing.is_NN_value_invalid(raw_value)) {
+            return Cycles::ERROR_INVALID_OUTPUT_RANGE;
+        }
+        return static_cast<CyclesInterfaceType>(std::ceil(post_processing.process(workload, raw_value)));
     }
 
     /// returns a reference that is owned by the executor context, normally thread bounded
     template <typename WlT>
-    const std::vector<float>& infer(const std::vector<WlT>& workloads) const {
+    const std::vector<float>& infer_raw_input(const std::vector<WlT>& workloads) const {
         auto& ctx = get_execution_context();
 
         ctx.workloads_results_buffer.resize(workloads.size());
@@ -167,11 +177,29 @@ protected:
         //\todo: optimization (skip this if no processing required?)
         // post process the value : adapt it to the device and context.
         std::transform(workloads.cbegin(), workloads.cend(), ctx.workloads_results_buffer.cbegin(),
-                       ctx.workloads_results_buffer.begin(), [this](const DPUWorkload& wl, const float nn_wl) {
+                       ctx.workloads_results_buffer.begin(), [this](const WlT& wl, const float nn_wl) {
                            return this->post_processing.process(wl, nn_wl);
                        });
 
         return ctx.workloads_results_buffer;
+    }
+
+    template <typename WlT>
+    std::vector<CyclesInterfaceType> infer(const std::vector<WlT>& workloads) const {
+        const auto number_of_workloads{workloads.size()};  ///< fixed value remembered here, workloads is non const
+        std::vector<CyclesInterfaceType> cycles_vector(number_of_workloads);
+
+        const std::vector<float>& NN_results{infer_raw_input(workloads)};  // reference inside of context
+
+        for (unsigned int idx = 0; idx < workloads.size(); ++idx) {
+            const auto nn_output_cycles = NN_results[idx];
+            if (post_processing.is_NN_value_invalid(nn_output_cycles)) {
+                cycles_vector[idx] = Cycles::ERROR_INVALID_OUTPUT_RANGE;
+            } else {
+                cycles_vector[idx] = static_cast<CyclesInterfaceType>(std::ceil(post_processing.process(workloads[idx], nn_output_cycles)));
+            }
+        }
+        return cycles_vector;  // RVO
     }
 
     /// provides the context or creates a new one in case it does not exist yet
@@ -211,31 +239,16 @@ public:
         if (!is_initialized()) {
             return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
         }
-        const float infered_value{infer(workload)};
+        const CyclesInterfaceType infered_value{infer(workload)};
 
-        if (post_processing.is_NN_value_invalid(infered_value)) {
-            return Cycles::ERROR_INVALID_OUTPUT_RANGE;
-        } else {
-            return static_cast<CyclesInterfaceType>(std::ceil(infered_value));
-        }
+        return infered_value;
     }
-
+    
     std::vector<CyclesInterfaceType> get_cost(const std::vector<DPUWorkload>& workloads) const {
-        const auto number_of_workloads{workloads.size()};  ///< fixed value remembered here, workloads is non const
-        std::vector<CyclesInterfaceType> cycles_vector(number_of_workloads);
-
-        const std::vector<float>& NN_results{infer(workloads)};  // reference inside of context
-
-        for (unsigned int idx = 0; idx < workloads.size(); ++idx) {
-            const auto nn_output_cycles = NN_results[idx];
-            if (post_processing.is_NN_value_invalid(nn_output_cycles)) {
-                cycles_vector[idx] = Cycles::ERROR_INVALID_OUTPUT_RANGE;
-            } else {
-                cycles_vector[idx] = static_cast<CyclesInterfaceType>(std::ceil(nn_output_cycles));
-            }
+        if (!is_initialized()) {
+            return std::vector<CyclesInterfaceType>(workloads.size(), Cycles::ERROR_INFERENCE_NOT_POSSIBLE);
         }
-
-        return cycles_vector;  // RVO
+        return infer(workloads);  // Directly return the result of infer
     }
 
     /// @brief Only used as a WA to share fixed cache outside of nn_cost_provider - will be removed in future.
@@ -249,10 +262,10 @@ public:
         if (!cached_value) {
             return Cycles::ERROR_CACHE_MISS;
         } else {
-            auto postProcessed_value = post_processing.process(workload, *cached_value);
-            if (post_processing.is_NN_value_invalid(postProcessed_value)) {
+            if (post_processing.is_NN_value_invalid(*cached_value)) {
                 return Cycles::ERROR_INVALID_OUTPUT_RANGE;
             } else {
+                auto postProcessed_value = post_processing.process(workload, *cached_value);
                 return static_cast<CyclesInterfaceType>(std::ceil(postProcessed_value));
             }
         }
@@ -274,15 +287,12 @@ public:
         return std::make_tuple(version.get_input_interface_version(), version.get_output_interface_version());
     }
 
-    std::string get_DPU_nickname() const noexcept {
-        return model_nickname;
-    }
-
     /// @brief Provides identifiers for data to be serialized
     // template <bool B = serialization_enabled, typename std::enable_if<B, int>::type = 0>
     static const std::vector<std::string> get_names_for_serializer() {
         auto fields = std::vector<std::string>(DPUOperation::_get_member_names().cbegin(),
                                                DPUOperation::_get_member_names().cend());
+        fields.emplace_back("mpe_engine");
         fields.emplace_back("vpunn_cycles");
         fields.emplace_back("cost_source");
         fields.emplace_back("error_info");
@@ -310,8 +320,7 @@ private:
     mutable LRUCache<std::vector<float>, float>
             cache;  ///< cache for inferred values, used only for single workload, not for batches
     mutable CSVSerializer cache_miss_serializer;            ///< serializer for missed cache
-    const std::string model_nickname{make_DPU_nickname()};  ///< nickname for the model, used for cache and serializer
-    const DPU_OperationSanitizer& sanitizer;  ///< sanitizer for the workload, used to check and sanitize the workload
+    const std::string model_nickname{make_model_nickname()};  ///< nickname for the model, used for cache and serializer
     const float default_NN_output{-1.0F};     ///< this is the value used in no NN output is present (like not loaded).
     const unsigned int batch_size{1};         ///< the batch size used for the inference, set at ctor, used for context
 
@@ -414,7 +423,7 @@ private:
         }
     }
 
-    std::string make_DPU_nickname() const noexcept {
+    std::string make_model_nickname() const noexcept {
         std::string full{vpunn_runtime.model_version_info().get_raw_name()};
         const char delim{'$'};
         const auto first = full.find_first_of(delim);

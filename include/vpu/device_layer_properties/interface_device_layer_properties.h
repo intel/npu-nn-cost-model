@@ -18,13 +18,11 @@
 namespace VPUNN {
 struct DPULayer;  // forward declaration
 
-/**
- * @brief interface for device-specific layer properties
- *
- * This class defines the interface for querying layer property information such as
- * valid tiling strategies and execution modes for a given VPU device. Derived classes
- * implement device-specific logic and data.
- */
+/// @brief interface for device-specific layer properties
+/// 
+/// This class defines the interface for querying layer property information such as
+/// valid tiling strategies and execution modes for a given VPU device. Derived classes
+/// implement device-specific logic and data.
 /* coverity[rule_of_five_violation:FALSE] */
 class ILayerProperties {
 public:
@@ -41,24 +39,18 @@ protected:
   
 
 public:
-    /**
-     * @brief Returns the valid execution modes for tiling for a given DPULayer
-     * @param wl The DPULayer
-     * @return A vector of supported ExecutionMode values
-     */
+    /// @brief Returns the valid execution modes for tiling for a given DPULayer
+    /// @param wl The DPULayer
+    /// @return A vector of supported ExecutionMode values
     virtual const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const=0;
 
-    /**
-     * @brief Returns the default execution mode for a given tensor
-     * @param tensor The VPUTensor
-     * @return The default ExecutionMode
-     */
+    /// @brief Returns the default execution mode for a given tensor
+    /// @param tensor The VPUTensor
+    /// @return The default ExecutionMode
     virtual ExecutionMode getValidDefaultExecutionMode(const VPUTensor&) const = 0;
 
-    /**
-     * @brief Returns the valid tiling strategies for a certain device
-     * @return A vector of supported VPUTilingStrategy values
-     */
+   /// @brief Returns the valid tiling strategies for a certain device
+   /// @return A vector of supported VPUTilingStrategy values
     const virtual std::vector<VPUTilingStrategy> getValidTilingStrategies() const = 0;
 };
 

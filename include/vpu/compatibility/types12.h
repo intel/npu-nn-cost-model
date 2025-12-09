@@ -380,7 +380,7 @@ public:
 //---------------------------------------------------------
 template <class T>
 using Preprocessing_Interface12 =
-        Preprocessing_Interface12_Archetype<T, NN5XInputAdapter, NNVersions::VERSION_12_NPU_RESERVED>;
+        Preprocessing_Interface12_Archetype<T, NN5XInputAdapter, NNVersions::VERSION_12_NPU51>;
 
 }  // namespace VPUNN
 

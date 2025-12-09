@@ -44,7 +44,7 @@ public:
 };
 
 template <>
-class DMAVersionsMap<DMANNWorkload_NPU40_RESERVED> : DMAVersionsMapTypes<DMANNWorkload_NPU40_RESERVED> {
+class DMAVersionsMap<DMANNWorkload_NPU40_50> : DMAVersionsMapTypes<DMANNWorkload_NPU40_50> {
     Preprocessing_Interface02_DMA<float> pp_v02;
     Preprocessing_Interface03_DMA<float> pp_v03;
 

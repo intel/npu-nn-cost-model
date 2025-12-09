@@ -11,12 +11,16 @@
 #define L1_COST_SERIALIZATION_WRAPPER_H
 
 #include "vpu/serialization/serialization_wrapper.h"
+#include "vpu/validation/dpu_operations_validator.h"
 #include "performance_mode.h"
+
 namespace VPUNN {
 
 class L1CostSerializationWrap : public CostSerializationWrap {
 private:
-    const DPU_OperationSanitizer& sanitizer;  ///< sanitizer mechanisms
+    // Has to be static since L1CostSerializationWrap is created at every call to DPU()
+    // and OperationsContext it's too heavy to be created each time
+    static const OperationsContext ops_context;  ///< sanitizer mechanisms
 
 private:
 
@@ -26,26 +30,25 @@ private:
     void swizzling_turn_OFF(DPUWorkload& workload) const {
         if constexpr (false == PerformanceMode::allowLegacySwizzling_G5) {
             // only for some devices
-            if (workload.device >= VPUDevice::NPU_RESERVED) {
+            if (workload.device >= VPUDevice::NPU_5_0) {
                 workload.set_all_swizzlings(Swizzling::KEY_0);
             }
         }
     }
 
     void serialize_info_and_compute_workload_uid(const DPUWorkload& wl) {
-        auto wl_op = DPUOperation(wl, sanitizer.getDeviceConfiguration(wl.device));
+        auto wl_op = DPUOperation(wl, ops_context.get_config(wl.device));
         serializer_operation_uid = wl_op.hash();
         serializer.serialize(wl_op,
                              SerializableField<std::string>{"workload_uid", std::to_string(serializer_operation_uid)},
-                             SerializableField<std::string>{"info", wl.get_layer_info()});
+                             SerializableField<std::string>{"info", wl.get_layer_info()},
+                             SerializableField<std::string>{"mpe_engine", MPEEngine_ToText.at(static_cast<int>(wl_op.mpe_engine))});
     }
 
 public:
-    L1CostSerializationWrap(CSVSerializer& ser, const DPU_OperationSanitizer& sanitizer_, bool inhibit = false,
+    L1CostSerializationWrap(CSVSerializer& ser, bool inhibit = false,
                             size_t the_uid = 0)
-            : CostSerializationWrap(ser, inhibit, the_uid),  // initialize the base class
-              sanitizer(sanitizer_)
-
+            : CostSerializationWrap(ser, inhibit, the_uid) // initialize the base class
     {
     }
 
@@ -101,7 +104,7 @@ public:
             try {
                 swizzling_turn_OFF(serializer_orig_wls[idx]);  // swizz guard sanitization
                 auto wl_op = DPUOperation(serializer_orig_wls[idx],
-                                          sanitizer.getDeviceConfiguration(serializer_orig_wls[idx].device));
+                                          ops_context.get_config(serializer_orig_wls[idx].device));
                 serializer_operation_uid = wl_op.hash();
                 serializer.serialize(wl_op, SerializableField<std::string>{"workload_uid",
                                                                            std::to_string(serializer_operation_uid)});

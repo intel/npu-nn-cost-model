@@ -71,9 +71,12 @@ if(NOT JS_BUILD)
         vpunn_optimization
         vpunn_shave
         vpunn_vpu
-        flatbuffers
-        ProjectConfig # flatbuffers dependency
     )
+
+    if(ENABLE_FLATBUFFERS_INSTALLATION)
+        list(APPEND VPUNN_INSTALL_TARGETS flatbuffers)
+        list(APPEND VPUNN_INSTALL_TARGETS ProjectConfig) # flatbuffers dependency
+    endif()
 
     if(TARGET blas)
         list(APPEND VPUNN_INSTALL_TARGETS blas)

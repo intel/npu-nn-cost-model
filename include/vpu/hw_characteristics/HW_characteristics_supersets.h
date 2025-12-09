@@ -12,6 +12,7 @@
 #include "vpu/hw_characteristics/HW_characteristics_set_base.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_const_repo.h"
 #include "vpu/hw_characteristics/itf_HW_characteristics_set.h"
+#include "vpu/tuple_indexing_helper.h"
 
 namespace VPUNN {
 
@@ -19,14 +20,14 @@ namespace VPUNN {
 class HWCharacteristicsSuperSets {
 public:
     using MainEvo0SetType = Base_HWCharacteristicsSet<DeviceHWCHaracteristicsConstRepo::MainEvo0SetTuple,
-                                                      DeviceHWCHaracteristicsConstRepo::IndexMap>;
+                                                      IndexMap>;
 
     using MainEvo1SetType = Base_HWCharacteristicsSet<DeviceHWCHaracteristicsConstRepo::MainEvo1SetTuple,
-                                                      DeviceHWCHaracteristicsConstRepo::IndexMap>;
+                                                      IndexMap>;
 
     // Legacy configuration tuple type
     using LegacySetType = Base_HWCharacteristicsSet<DeviceHWCHaracteristicsConstRepo::LegacySetTuple,
-                                                    DeviceHWCHaracteristicsConstRepo::IndexMap>;
+                                                    IndexMap>;
 
     // the default one
     static const auto& mainConfiguration() {

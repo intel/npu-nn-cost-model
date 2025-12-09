@@ -49,6 +49,8 @@
 #include "vpu/dma_theoretical_cost_provider.h"
 #include "vpu/serialization/dma_cost_serialization_wrapper.h"
 
+#include "vpu/dmann_cost_provider.h"
+
 #include <typeinfo>
 
 namespace VPUNN {
@@ -108,146 +110,20 @@ protected:
  *
  */
 template <class DMADesc>
-class VPUNN_API DMACostModel :
-        virtual protected VPU_MutexAcces  // for mutex access
-{
+class VPUNN_API DMACostModel {
 protected:
 public:
     using DescType = DMADesc;  ///< Useful for deducing the type of the descriptor
 
 private:
-    const DMARuntimeProcessingFactory<DMADesc> preprocessing_factory;  ///< provides Preprocessing objects
-    const DMAPostProcessingFactory<DMADesc> postprocessing_factory;
-    const Runtime vpunn_runtime;                 ///< the loaded inference model is here, used for FW propagation
-    InferenceExecutionData runtime_buffer_data;  ///< the memory/buffers used for executing a model (in/out and inter
-                                                 ///< layer buffers). It is paired with the model at creation.
+    const DMANNCostProvider<DMADesc> nn_cost_provider; ///< NN cost provider for DMA
 
-    IPreprocessingDMA<float, DMADesc>&
-            preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
-    const DMAPostProcessSupport results_config;
-    const IPostProcessDMA<DMADesc>& post_processing;
-    LRUCache<std::vector<float>, float>
-            cache;  ///< cache for inferred values, used only for single workload, not for batches, raw NN out values
+    // DMA cost providers
+    // No NN or measured DMA cost provider available
+    const DMATheoreticalCostProvider dma_theoretical{};  ///< theoretical cost provider for DMA
+    
     mutable CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
-    mutable CSVSerializer cache_miss_serializer;    ///< serializer for missed cache DMADesc workloads
-
-    /// @brief obtains the actual preprocessing instance from factory. The factory must live longer than the instance
-    /// created. warning: Throws if not possible
-    static IPreprocessingDMA<float, DMADesc>& init_preproc(const DMARuntimeProcessingFactory<DMADesc>& factory,
-                                                           const ModelVersion& version_service,
-                                                           const std::string& filename, const unsigned int batch_size) {
-        // let's initialize the preproc aspects based on input version
-        const int input_version = version_service.get_input_interface_version();
-        //  checking if either we have some preprocess or we have a unsupported version
-        if (factory.exists_preprocessing(input_version)) {
-            auto& preproc = factory.make_preprocessing(input_version);
-            preproc.set_probable_batch(batch_size);
-            return preproc;
-        } else {
-            std::stringstream buffer;
-            buffer << "Cannot create DMA preprocessing (DMA NN descriptor generator ) stage!.Preprocessing (NN model) "
-                      "with "
-                      "version ("
-                   << input_version
-                   << ") is not known/supported by requested DMADescriptor template param: " << typeid(DMADesc).name()
-                   << "\nFilename: " << filename
-                   << " , DMANN file Version info (raw): " << version_service.get_raw_name();
-            std::string details = buffer.str();
-            Logger::error() << details;
-
-            throw std::runtime_error(details);
-        }
-    }
-
-    static const IPostProcessDMA<DMADesc>& init_postproc(const DMAPostProcessingFactory<DMADesc>& factory,
-                                                         const ModelVersion& version_service,
-                                                         std::string_view filename) {
-        const int version = version_service.get_output_interface_version();
-        //  checking if either we have some process or we have a unsupported version
-        if (factory.exists(version)) {
-            auto& proc = factory.make(version);
-            return proc;
-        } else {
-            std::stringstream buffer;
-            buffer << "Cannot create DMA post processing stage!.Post processing with version (" << version
-                   << ") is not known/supported by requested DMADescriptor template param: " << typeid(DMADesc).name()
-                   << "\nFilename: " << filename
-                   << " , DMANN file Version info (raw): " << version_service.get_raw_name();
-            std::string details = buffer.str();
-            Logger::error() << details;
-
-            throw std::runtime_error(details);
-        }
-    }
-
-    static const std::vector<std::string> get_names_for_serializer() {
-        std::vector<std::string> names;
-
-        for (const auto& name : DescType::_get_member_names()) {
-            names.push_back(name);
-        }
-
-        names.push_back("cycles");
-        names.push_back("info");
-
-        return names;
-    }
-
-    /**
-     * @brief check post config will check if we either have an empty model, or the output version is supported
-     *
-     * If we have an empty ideal model or we got the output version supported this function will be exited with
-     * no errors. In case that we got a model with an unsupported output version this function will throw a runtime
-     * error specifying the output version and the full raw name of it.
-     *
-     * @throws std::runtime_error In case that we got a model with an unsupported output version you will get a runtime
-     * error
-     *
-     * @param v is the model version we took info about the full_raw_name in case we have an empty model
-     */
-    void check_post_config(const ModelVersion& v) {
-        const auto raw_name_intf = v.get_raw_name();
-
-        // in case we have an empty ideal model the raw_name is defaulted to none and we should contiune the run
-        if (raw_name_intf == "none") {
-            return;
-        }
-
-        if (!results_config.is_output_supported()) {
-            std::stringstream buffer;
-            buffer << "Cannot load/handle Models output version. The output version: ("
-                   << v.get_output_interface_version()
-                   << ") is not known/supported. Version info (raw):" << v.get_raw_name();
-            std::string details = buffer.str();
-            Logger::error() << details;
-
-            throw std::runtime_error(details);
-        }
-    }
-
-    /// @brief  check and try to make the preprocessing output to be the same as what model expects
-    /// This mechanism is unsafe at this moment and lets you change the preprocessing output to a bigger or smaller size
-    /// The result may be impossibility to run (if smaller) or leaving empty zeros at the end (only partial fill)
-    ///
-    void correlate_preprocessor_with_model_inputs() {
-        const auto model_input_size{(runtime_buffer_data.input_shapes()[0])[1]};
-        const auto preprocessing_output_size = preprocessing.output_size();
-        if (model_input_size != preprocessing_output_size) {
-            Logger::warning() << "Changing preprocessing DMA output size (" << preprocessing_output_size
-                              << ") to the model input size (" << model_input_size << ")";
-            preprocessing.set_size(model_input_size);
-        }
-    }
-
 public:
-    /// @brief provides the value interval where the NN raw outputs are considered valid and will be used to further
-    /// compute information
-    ///
-    /// @returns a pair containing (minimum_valid_value maximum_valid_value)
-    std::pair<float, float> get_NN_Valid_interval() const noexcept {
-        return post_processing.get_NN_Valid_interval();
-    }
-
     /**
      * @brief Construct a new VPUCostModel object
      *
@@ -258,27 +134,14 @@ public:
      */
     explicit DMACostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
                           const unsigned int batch_size = 1, const std::string& cache_filename = "")
-            : vpunn_runtime(filename, profile),
-              runtime_buffer_data(vpunn_runtime.createNewInferenceExecutionData(batch_size)),
-              preprocessing(
-                      init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), filename, batch_size)),
-              results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
-              post_processing(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), "")),
-              cache(cache_size, /* preprocessing.output_size(),*/ cache_filename) {
+            : nn_cost_provider(filename, batch_size, profile, cache_size, cache_filename) {
         Logger::initialize();
 
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
-        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE,
-                                         get_names_for_serializer());
-        check_post_config(vpunn_runtime.model_version_info());
-
-        if (!vpunn_runtime.initialized()) {
+        if (!nn_cost_provider.is_initialized()) {
             return;
         }
-
-        correlate_preprocessor_with_model_inputs();
-        // preprocessing.set_probable_batch(batch_size);
-        //  workloads_results_buffer.reserve(prealloc_results);
+        // is_profiling_service_enabled = init_profiling_service();
+        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, nn_cost_provider.get_names_for_serializer());
     }
     // VPUCostModel(const VPUCostModel&) = delete;
     // VPUCostModel(VPUCostModel&&) = default;
@@ -296,25 +159,33 @@ public:
     explicit DMACostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
                           const char* cache_data = nullptr, size_t cache_data_length = 0)
-            : vpunn_runtime(model_data, model_data_length, copy_model_data, profile),
-              runtime_buffer_data(vpunn_runtime.createNewInferenceExecutionData(batch_size)),
-              preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), "ConstCharInit",
-                                         batch_size)),
-              results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
-              post_processing(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), "")),
-              cache(cache_size, /* preprocessing.output_size(), */ cache_data, cache_data_length) {
+            : nn_cost_provider(model_data, model_data_length, copy_model_data, profile, cache_size,
+                               batch_size, cache_data, cache_data_length) {
         Logger::initialize();
 
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, get_names_for_serializer());
-        cache_miss_serializer.initialize("cache_misses_" + DescType::get_wl_name(), FileMode::READ_WRITE,
-                                         get_names_for_serializer());
-
-        check_post_config(vpunn_runtime.model_version_info());
-
-        if (!vpunn_runtime.initialized()) {
+        if (!nn_cost_provider.is_initialized()) {
             return;
         }
-        correlate_preprocessor_with_model_inputs();
+        // is_profiling_service_enabled = init_profiling_service();
+        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, nn_cost_provider.get_names_for_serializer());
+    }
+
+    /**
+     * @brief Check if the internal VPUNN is initialized
+     *
+     * @return true the VPUNN neural network is initialized
+     * @return false the VPUNN neural network is not initialized
+     */
+    bool nn_initialized() const {
+        return nn_cost_provider.is_initialized();
+    }
+
+    /// @brief provides the value interval where the NN raw outputs are considered valid and will be used to further
+    /// compute information
+    ///
+    /// @returns a pair containing (minimum_valid_value maximum_valid_value)
+    std::pair<float, float> get_NN_Valid_interval() const noexcept {
+        return nn_cost_provider.get_NN_Valid_interval();
     }
 
 protected:
@@ -332,61 +203,6 @@ protected:
     }
 
 public:
-    /**
-     * @brief Compute the NN Output of a specific workload
-     * NO Threadsafe protection planned here. DO NOT USE directly!
-     * takes in consideration the cache
-     * no sanitation is done
-     * no check if network exists
-     *
-     * @param workload a workload
-     * @return float the NN raw output, not filtered
-     */
-    float run_NN(const DMADesc& workload) {
-        const auto& vector = preprocessing.transformSingle(workload);
-        // Check for cache hit
-        const auto cached_value = cache.get(vector);
-        if (!cached_value) {
-            // run the model in case of a cache miss
-            const auto infered_value = vpunn_runtime.predict<float>(vector, runtime_buffer_data)[0];
-            // Add result to the cache
-            cache.add(vector, infered_value);  // raw
-
-            DMACostSerializationWrap<DMADesc> serialization_handler(cache_miss_serializer);
-            serialization_handler.serializeDMAWorkload_closeLine(workload);
-
-            return infered_value;  // raw
-        }
-        return *cached_value;  // raw
-    }
-
-public:
-    /// @brief exposed only for debug purposes, populates the NN descriptor
-    /// Does not run the model, or checks the validity of the workload.
-    ///
-    /// The method is not const because the preprocessing fills an internal buffer with the descriptor
-    ///
-    /// @returns the descriptor of the workload for the scenario that this workload reaches the transform stage.
-    std::vector<float> getDmaDescriptor(DMADesc wl) {
-        return preprocessing.transformSingle(wl);
-    }
-
-    /// @brief provides the input and output versions of the loaded NN (debug purposes)
-    std::tuple<int, int> getNNVersion() const {
-        const auto& version{vpunn_runtime.model_version_info()};
-        return std::make_tuple(version.get_input_interface_version(), version.get_output_interface_version());
-    }
-
-    /**
-     * @brief Check if the internal VPUNN is initialized
-     *
-     * @return true the VPUNN neural network is initialized
-     * @return false the VPUNN neural network is not initialized
-     */
-    bool nn_initialized() const {
-        return vpunn_runtime.initialized();
-    }
-
     /**
      * @brief Return the number of cycles needed to compute a workload
      *
@@ -425,7 +241,6 @@ public:
      *
      */
     CyclesInterfaceType computeCycles(const DMADesc& wl) {
-        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         std::string dummy_info{};
         return computeCycles(wl, dummy_info);
     }
@@ -436,7 +251,6 @@ public:
     /// @param li will collect error info regarding wl checking.
     /* coverity[pass_by_value] */
     std::tuple<CyclesInterfaceType, std::string> computeCyclesMsg(DMADesc wl) {
-        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         std::string dummy_info{};
         auto previous_print_mode{Checker::set_print_tags(false)};
         const auto r{computeCycles(wl, dummy_info)};
@@ -449,79 +263,110 @@ public:
     /// @param wl the workload to infer on
     /// @param info [out] will collect error info regarding wl checking.
     CyclesInterfaceType computeCycles(const DMADesc& wl, std::string& info) {
-        std::lock_guard<std::recursive_mutex> lock(L1_mutex);
         return Execute_and_sanitize(wl, info);
     }
 
     // just for debug purposes
+    /* coverity[pass_by_value] */
     std::tuple<float, std::string> computeBandwidthMsg(DMADesc wl) {
-        std::string dummy_info{};
-        auto previous_print_mode{Checker::set_print_tags(false)};
-
-        float nn_size_div_cycle{0.0f};
-        {
-            const auto is_inference_posible = nn_initialized();
-            if (is_inference_posible) {
-                nn_size_div_cycle = run_NN(wl);
-            } else {
-                nn_size_div_cycle = -1.0f;
-                std::stringstream buffer;
-                buffer << "\nThe NN is not initialized. The inference is not possible"
-                       << ".  Exiting with : " << nn_size_div_cycle << "\n";
-                std::string details = buffer.str();
-                dummy_info = dummy_info + details;
-                Logger::error() << details;
-            }
-        }
-
-        Checker::set_print_tags(previous_print_mode);
-        return std::make_tuple(nn_size_div_cycle, dummy_info);
+        return nn_cost_provider.computeBandwidthMsg(std::move(wl));
     }
 
 private:
     /* @brief Execution
      */
     CyclesInterfaceType Execute_and_sanitize(const DMADesc& wl, std::string& info) {
-        // sanitize and check the input.
-        const auto is_inference_posible = nn_initialized();
-        SanityReport problems{};
-        info = problems.info;
-
         DMACostSerializationWrap<DMADesc> serialization_handler(interogation_serializer);
         serialization_handler.serializeDMAWorkload(wl);
 
+        // sanitize and check the input.
+        SanityReport problems{};
+        //const auto is_inference_relevant = sanitize_workload(wl, problems);
+        info = problems.info;
+
+        std::string cost_source = "unknown";
         CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
-        if (is_inference_posible) {
-            const auto raw_nn_output = run_NN(wl);
-            if (post_processing.is_NN_value_invalid(raw_nn_output)) {
-                cycles = Cycles::ERROR_INVALID_OUTPUT_RANGE;
-                // std::cout << "\n Problematic inf response: "<<nn_output_cycles<<std::endl<<wl<<"\n";
-                {
-                    std::stringstream buffer;
-                    buffer << "The NN returned a value outside of accepted ranges and is considered invalid. "
-                              "NN_returned value :  "
-                           << raw_nn_output << ".  Exiting with : " << Cycles::toErrorText(cycles)
-                           << "\nWorkload DMA: " << wl << "\n";
-                    std::string details = buffer.str();
-                    info = info + details;
-                    Logger::error() << details;
+        
+        //if (is_inference_relevant){
+        cycles = get_cost(wl, info, &cost_source);
+        //}
+
+        serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(cost_source), info);
+
+        return cycles;
+    }
+
+    /**
+     * @brief Wrapper over run_cost_providers for handling situations where a workload cannot be resolved with only one
+     * inference. 
+     *
+     * @param workload is the workload to be inferred
+     * @return the runtime or error
+     */
+    CyclesInterfaceType get_cost(const DMADesc& workload, std::string& info, std::string* cost_source = nullptr) const {
+        // @todo : impact on energy?, CHeck if energy/DPUINfo/Theoretical cycles/ops considers this situation to reduce
+        // energy
+
+        return run_cost_providers(workload, info, cost_source);  // normal wl handling
+    }
+
+    /**
+     * @brief Run the cost providers for a given workload.
+     *
+     * This function checks if the DPU NN cost provider is initialized and retrieves the cost from the cache or
+     * profiling service. If the profiling service is not available, it falls back to the DPU NN cost provider or
+     * theoretical cycles.
+     *
+     * @param workload The DPU workload to be processed.
+     * @param info A string to store additional information about the cost source.
+     * @param cost_source A string to store the source of the cost.
+     * @return The number of cycles required for the workload.
+     */
+    CyclesInterfaceType run_cost_providers(const DMADesc& workload, std::string& info,
+                                           std::string* cost_source = nullptr) const {
+        auto cycles = Cycles::NO_ERROR;
+        const auto is_inference_posible = nn_cost_provider.is_initialized();
+
+        // First look into nn_cost_provider cache.
+        // This has to be redesigned for the fixed cache to be a standalone cost provider.
+        const auto cached_cost{nn_cost_provider.get_cached(workload, cost_source)};
+        if (!Cycles::isErrorCode(cached_cost)) {
+            cycles = cached_cost;
+        } else {
+            // for now let the info be empty
+            info = "";
+            // Will enable on a further step where we have a profiling service available
+//             if (is_profiling_service_enabled) {
+//                 auto dpu_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
+//                 if (cost_source) *cost_source = "profiling_service_" + profiling_backend;
+// #ifdef VPUNN_BUILD_HTTP_CLIENT
+//                 cycles = http_dpu_cost_provider->getCost(dpu_op, info, profiling_backend);
+// #else
+//                 info = "";  // Avoid unreferenced var warning
+// #endif
+//             } else {
+//                 cycles = Cycles::ERROR_PROFILING_SERVICE;
+//             }
+
+            if (Cycles::isErrorCode(cycles) || cycles == Cycles::NO_ERROR) {
+                // if the profiling service is not available, we will use the NN cost provider
+                // if the NN is not available, we will use the theoretical cycles
+                if (is_inference_posible) {
+                    if (cost_source) *cost_source = "nn_" + nn_cost_provider.get_model_nickname();
+                    cycles = nn_cost_provider.get_cost(workload);
+                } else {
+                    if (cost_source) *cost_source = "theoretical";
+                    cycles = dma_theoretical.DMATheoreticalCycles(DMAWorkloadTransformer::create_workload<DMADesc>(workload));
                 }
-            } else {
-                cycles = post_processing.process(raw_nn_output, wl, info);
             }
-        } else {  // NN not available, use theoretical cycles?
-            cycles = Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
-            {
-                std::stringstream buffer;
-                buffer << "\nThe DMA NN is not initialized. The inference is not possible"
-                       << ".  Exiting with : " << Cycles::toErrorText(cycles) << "\n";
-                std::string details = buffer.str();
-                info = info + details;
-                Logger::error() << details;
+
+            // Concerns mainly cycles returned from providers other than NNCostProvider
+            // We need to share NNCostProvider's cache in order to have access to the fixed cache that's stored as part
+            // of the dynamic cache (LRUCache) (will be separated in near future).
+            if (Cycles::isErrorCode(nn_cost_provider.get_cached(workload)) && !Cycles::isErrorCode(cycles)) {
+                nn_cost_provider.add_to_cache(workload, static_cast<float>(cycles));
             }
         }
-
-         serialization_handler.serializeCycles(cycles);
 
         return cycles;
     }

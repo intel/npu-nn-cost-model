@@ -19,9 +19,9 @@
 namespace VPUNN {
 
 /// Variant used to hold any available DMACostModel<> - Currently DMACostModel<DMANNWorkload_NPU27> and
-/// DMACostModel<DMANNWorkload_NPU40_RESERVED> The ownership is not transferred, the client must ensure the lifetime of the
+/// DMACostModel<DMANNWorkload_NPU40_50> The ownership is not transferred, the client must ensure the lifetime of the
 /// model
-using DMACostModelVariant = std::variant<DMACostModel<DMANNWorkload_NPU27>*, DMACostModel<DMANNWorkload_NPU40_RESERVED>*>;
+using DMACostModelVariant = std::variant<DMACostModel<DMANNWorkload_NPU27>*, DMACostModel<DMANNWorkload_NPU40_50>*>;
 
 
 

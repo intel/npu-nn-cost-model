@@ -208,6 +208,132 @@ private:
         }
     };  // PowerVPU40
 
+#ifdef INTEL_EMBARGO_NPU5
+    class PowerVPU50 {
+    protected:
+        static inline const float virus_logical_limit{1.0f};
+        // update with latest: These are for NPU power base
+
+        static inline const AdjustmentAtEnd adjustmentFactors{
+                0.88f,  // for uint8
+                0.88f,  // for fp16
+                0.88f,  // for fp8
+        };
+
+        static inline const lut_t vpu_values_int{
+                {Operation::CONVOLUTION,
+                 {
+                         {6, 0.61f},
+                 }},
+                {Operation::CM_CONVOLUTION,  // CM_Conv is ConvCompressed for VPU2.7
+                 {
+                         {6, 0.61f},  // keep like for ZMCONV?
+                 }},
+                {Operation::DW_CONVOLUTION,
+                 {
+                         {6, 9.63f},
+                 }},
+                {Operation::AVEPOOL,
+                 {
+                         {6, 3.57f},
+                 }},
+                {Operation::MAXPOOL,
+                 {
+                         {6, 3.23f},
+                 }},
+                {Operation::ELTWISE,
+                 {
+                         {8, 29.44f},
+                 }},
+                {Operation::ELTWISE_MUL,
+                 {
+                         {8, 29.87f},
+                 }},
+                {Operation::LAYER_NORM,
+                 {
+                         {8, 5.0f},  // unknown
+                 }},
+
+        };
+        static inline const lut_t vpu_values_fp16{
+                {Operation::CONVOLUTION,
+                 {
+                         {6, 1.0f},  // power virus
+                 }},
+                {Operation::CM_CONVOLUTION,  // C
+                 {
+                         {6, 1.0f},  // keep like for ZMCONV?
+                 }},
+                {Operation::DW_CONVOLUTION,
+                 {
+                         {6, 13.82f},
+                 }},
+                {Operation::AVEPOOL,
+                 {
+                         {6, 3.88f},
+                 }},
+                {Operation::MAXPOOL,
+                 {
+                         {6, 2.91f},
+                 }},
+                {Operation::ELTWISE,
+                 {
+                         {8, 29.12f},
+                 }},
+                {Operation::ELTWISE_MUL,
+                 {
+                         {8, 26.62f},
+                 }},
+                {Operation::LAYER_NORM,
+                 {
+                         {8, 5.0f},  // unknown
+                 }},
+        };
+        static inline const lut_t vpu_values_fp8{
+                {Operation::CONVOLUTION,
+                 {
+                         {6, 0.72f},  // power virus
+                 }},
+                {Operation::CM_CONVOLUTION,  // C
+                 {
+                         {6, 0.72f},  // keep like for ZMCONV?
+                 }},
+                {Operation::DW_CONVOLUTION,
+                 {
+                         {6, 11.51f},
+                 }},
+                {Operation::AVEPOOL,
+                 {
+                         {6, 3.88f},
+                 }},
+                {Operation::MAXPOOL,
+                 {
+                         {6, 2.85f},
+                 }},
+                {Operation::ELTWISE,
+                 {
+                         {8, 39.87f},
+                 }},
+                {Operation::ELTWISE_MUL,
+                 {
+                         {8, 33.30f},
+                 }},
+                {Operation::LAYER_NORM,
+                 {
+                         {8, 5.0f},  // unknown
+                 }},
+        };
+
+    public:
+        static device_lut_t make_lut() {
+            const device_lut_t this_device{VPUDevice::NPU_5_0, virus_logical_limit, adjustmentFactors,
+                                           vpu_values_int,     vpu_values_fp16,     vpu_values_fp8};
+            // clang and gcc does not support to use std::move here, so we need suppression
+            /* coverity[copy_instead_of_move] */
+            return this_device;
+        }
+    };  // PowerVPU50
+#endif  // INTEL_EMBARGO_NPU5
 
     using pf_lut_t = std::vector<device_lut_t>;  ///> device discriminates,
 
@@ -216,6 +342,9 @@ private:
                 {PowerVPU2x::make_lut() /*VPUDevice::VPU_2_0, vpu_2_0_values_int, vpu_2_0_values_fp16*/},
                 {PowerVPU27::make_lut() /*VPUDevice::VPU_2_7, vpu_2_7_values_int, vpu_2_7_values_fp16*/},
                 {PowerVPU40::make_lut() /*VPUDevice::VPU_4_0, vpu_4_0_values_int, vpu_4_0_values_fp16*/},
+#ifdef INTEL_EMBARGO_NPU5
+                {PowerVPU50::make_lut() /*VPUDevice::NPU_5_0, vpu_5_0_values_int, vpu_5_0_values_fp16*/},
+#endif  // INTEL_EMBARGO_NPU5
         };
 
         // clang and gcc does not support to use std::move here, so we need suppression

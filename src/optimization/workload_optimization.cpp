@@ -10,9 +10,9 @@
 #include <memory>
 
 #include "core/profiling.h"
-#include "vpu/dpu_layer_modes.h"
 #include "vpu/optimization/tiler.h"
 #include "vpu/optimization/workload_optimization.h"
+#include "vpu/device_layer_properties/device_layer_properties_holder.h"
 
 namespace VPUNN {
 
@@ -127,7 +127,8 @@ public:
             const DPULayer& layer, const SplitOptions& options,
             std::vector<DPUWorkloadsWithCyclesSplit>* complete_output_splits = nullptr) const override {
         // Get execution modes accepted  (e.g.: ExecutionMode::CUBOID_16x16,.....)
-        auto valid_execution_modes = DPULayerModes::getValidExecutionMode(layer);  // based on operation
+        auto valid_execution_modes =
+                LayerPropertiesHolder::get_properties(layer.device).getValidTilingExecutionMode(layer);  // based on operation
 
         // get all in-tile tiling algorithms. Each algo has a copy of Layer.
         TilingAlgorithmsContainer algorithms{getTilingAlgorithms(layer, options)};

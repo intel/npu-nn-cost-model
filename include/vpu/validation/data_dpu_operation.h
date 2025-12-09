@@ -143,6 +143,15 @@ struct DPUOperation {
 
     bool output_autopad{false};
 
+    /// hint about what cost provider to use
+    CostSourceHint cost_source_hint{CostSourceHint::AUTO};
+
+    /// hint about what profiling service backend to use
+    ProfilingServiceBackend profiling_service_backend_hint{ProfilingServiceBackend::__size};
+
+    ///< MPE engine to be used, SCL by default
+    MPEEngine mpe_engine{MPEEngine::SCL};
+
     using _ref_supported_type =
             std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<Operation>,
                          std::reference_wrapper<DataType>, std::reference_wrapper<Layout>,
@@ -176,7 +185,10 @@ struct DPUOperation {
               in_place_output_memory{w.is_inplace_output_memory()},
               superdense{w.is_superdense()},
               input_autopad{w.input_autopad},
-              output_autopad{w.output_autopad} {
+              output_autopad{w.output_autopad},
+              cost_source_hint{w.cost_source_hint},
+              profiling_service_backend_hint{w.profiling_service_backend_hint},
+              mpe_engine{w.mpe_engine} {
         // from WL to tensors
         input_0.swizzling = w.input_swizzling[0];
         input_0.sparsity = w.act_sparsity;
@@ -214,7 +226,10 @@ struct DPUOperation {
               in_place_output_memory{r.in_place_output_memory},
               superdense{r.superdense},
               input_autopad(r.input_autopad),
-              output_autopad(r.output_autopad) {
+              output_autopad(r.output_autopad),
+              cost_source_hint{r.cost_source_hint},
+              profiling_service_backend_hint{r.profiling_service_backend_hint},
+              mpe_engine{r.mpe_engine} {
     }
 
     DPUOperation(DPUOperation&) = delete;
@@ -276,6 +291,10 @@ struct DPUOperation {
 
         wl.input_autopad = input_autopad;
         wl.output_autopad = output_autopad;
+
+        wl.cost_source_hint = cost_source_hint;
+        wl.profiling_service_backend_hint = profiling_service_backend_hint;
+        wl.mpe_engine = mpe_engine;
 
         return wl;
     }
@@ -777,6 +796,13 @@ inline std::ostream& operator<<(std::ostream& stream, const DPUOperation& d) {
            << " weightless_operation: \t" << std::to_string(d.weightless_operation) << " ;\n"      //
            << " in_place_output_memory: \t" << std::to_string(d.in_place_output_memory) << " ;\n"  //
            << " superdense: \t" << std::to_string(d.superdense) << " ;\n"                          //
+           << " input_autopad: \t" << std::to_string(d.input_autopad) << " ;\n"                    //
+           << " output_autopad: \t" << std::to_string(d.output_autopad) << " ;\n"                  //
+           << " mpe_engine: \t" << (int)d.mpe_engine << " : " << MPEEngine_ToText.at(static_cast<int>(d.mpe_engine))
+           << " ;\n"
+           << " cost source hint: \t" << (int)d.cost_source_hint << " : "
+           << CostSourceHint_ToText.at(static_cast<int>(d.cost_source_hint))
+           << " ;\n"
             ;
     return stream;
 }
