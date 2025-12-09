@@ -28,6 +28,7 @@ target_sources(vpunn_vpu
         validation/data_dpu_operation.cpp
         energy_impl.cpp
         layer.cpp
+        serialization_wrapper.cpp
 )
 
 target_link_libraries(vpunn_vpu
@@ -36,6 +37,7 @@ target_link_libraries(vpunn_vpu
         flatbuffers
         vpunn_inference
         $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
+        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:nlohmann_json::nlohmann_json>
 )
 
 add_dependencies(vpunn_vpu vpunn_cpp_schema)

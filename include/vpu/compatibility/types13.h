@@ -34,7 +34,7 @@
 
 namespace VPUNN {
 
-/** @brief type interface forNPU_RESERVED v2 named 13. This is a convention on what to contain the VPUNN's input
+/** @brief type interface forNPU5 v2 named 13. This is a convention on what to contain the VPUNN's input
  * descriptor in this namespace all the types will be stored exactly like they are required by this interface
  * vs intf12: FLOAT32 added to Dtypes
  */
@@ -287,7 +287,7 @@ public:
 //---------------------------------------------------------
 template <class T>
 using Preprocessing_Interface13 =
-        Preprocessing_Interface13_Archetype<T, NN5XInputAdapter, NNVersions::VERSION_13_NPU_RESERVED>;
+        Preprocessing_Interface13_Archetype<T, NN5XInputAdapter, NNVersions::VERSION_13_NPU51>;
 
 }  // namespace VPUNN
 

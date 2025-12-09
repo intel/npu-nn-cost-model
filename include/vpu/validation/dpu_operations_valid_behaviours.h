@@ -385,6 +385,14 @@ protected:
         }
 
         // checker.check_is_equal(dpu.output_0.sparsity_enabled, false, "output_0 sparsity_enabled  ");
+        
+        // No sparsity for dCIM
+        if (dpu.mpe_engine == MPEEngine::DCIM) {
+            checker.check_is_equal(dpu.input_1.sparsity_enabled, false, "dCIM_32x128: input_1 sparsity_enabled  ");
+            checker.check_is_equal(dpu.input_1.sparsity, 0.0f, "dCIM_32x128: input_1 sparsity  ");
+            checker.check_is_equal(dpu.input_0.sparsity_enabled, false, "dCIM_32x128: input_0 sparsity_enabled  ");
+            checker.check_is_equal(dpu.input_0.sparsity, 0.0f, "dCIM_32x128: input_0 sparsity  ");
+        }
 
         info = checker.findings();
         return checker.is_clean();

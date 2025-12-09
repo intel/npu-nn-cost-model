@@ -20,7 +20,6 @@ test.each(['Sigmoid', 'Swish', 'HardSwish'])('test SHV cost', (op) => {
     const outT = VPUNN.createTensor(56, 56, 64, 1, VPUNN.DataType.UINT8);
 
     const VPUNN_device = VPUNN.VPUDevice.VPU_2_7;
-    const path = `models/vpu_2_7.vpunn`
 
     const wl = VPUNN.createSHV(
         op,
@@ -29,12 +28,11 @@ test.each(['Sigmoid', 'Swish', 'HardSwish'])('test SHV cost', (op) => {
 
     expect(wl).toBeTruthy();
 
-    const model = VPUNN.createVPUCostModel(path);
+    const model = VPUNN.createSHAVECostModel();
 
     expect(model).toBeTruthy();
-    expect(model.initialized()).toBeTruthy();
 
-    const shv_cost = model.SHAVE(wl)
+    const shv_cost = model.computeCycles(wl)
     expect(shv_cost).toBeGreaterThan(0);
 
 })

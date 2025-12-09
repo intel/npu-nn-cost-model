@@ -21,7 +21,7 @@ private:
     const float high_threshold;
 
 public:
-    virtual CyclesInterfaceType process(float, const DMADesc&, std::string&) const = 0;
+    virtual CyclesInterfaceType process(const DMADesc&, float) const = 0;
     virtual ~IPostProcessDMA() = default;
     IPostProcessDMA(float low_threshold_, float high_threshold_)
             : low_threshold(low_threshold_), high_threshold(high_threshold_) {};
@@ -59,8 +59,7 @@ protected:
 
 public:
     ConvertFromSizeDivCycleToDPUCyc(): IPostProcessDMA<DMADesc>(low_threshold, high_threshold) {};
-    CyclesInterfaceType process(float nn_size_div_cycle,  // [0 to 1], 0% to 100% of  device's bytes per cycle
-                                const DMADesc& wl, std::string& info) const override {
+    CyclesInterfaceType process(const DMADesc& wl, float nn_size_div_cycle  /*[0 to 1], 0% to 100% of  device's bytes per cycle*/) const override {
         const auto maxBytesPerCycle{GlobalHarwdwareCharacteristics::get_DMA_DDR_interface_bytes(wl.device)};
         const auto raw_bandwith_BPC{nn_size_div_cycle *
                                     maxBytesPerCycle};  // range 0 to device bytes per cycle (full max speed) .
@@ -85,7 +84,6 @@ public:
                        << ". NN returned: " << nn_size_div_cycle << ". "
                        << ".  Exiting with : " << Cycles::toErrorText(Cycles::ERROR_INVALID_OUTPUT_RANGE) << "\n";
                 std::string details = buffer.str();
-                info = info + details;
             }
             return Cycles::ERROR_INVALID_OUTPUT_RANGE;
         }
@@ -102,8 +100,7 @@ public:
     ConvertFromDirectCycleToDPUCyc(): IPostProcessDMA<DMADesc>(low_threshold, high_threshold) {};
 
     /// NN direct cycles conversion - no bandwidth calculation needed
-    CyclesInterfaceType process(float nn_direct_cycles,  // DPU cycles directly from NN
-                                const DMADesc&, std::string& info) const override {
+    CyclesInterfaceType process(const DMADesc&, float nn_direct_cycles /*DPU cycles directly from NN*/) const override {
         // Validate NN output range (should be positive cycles)
         if (nn_direct_cycles < 0.0f || std::isnan(nn_direct_cycles) || std::isinf(nn_direct_cycles)) {
             std::stringstream buffer;
@@ -111,7 +108,6 @@ public:
                    << ". Expected non-negative finite value."
                    << " Exiting with: " << Cycles::toErrorText(Cycles::ERROR_INVALID_OUTPUT_RANGE) << "\n";
             std::string details = buffer.str();
-            info = info + details;
             return Cycles::ERROR_INVALID_OUTPUT_RANGE;
         }
 
@@ -121,7 +117,6 @@ public:
             buffer << "\nThe DMA NN returned unreasonably large cycles value: " << nn_direct_cycles
                    << ". Clamping to maximum: " << high_threshold << "\n";
             std::string details = buffer.str();
-            info = info + details;
             nn_direct_cycles = high_threshold;
         }
 

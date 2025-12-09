@@ -103,10 +103,10 @@ inline typename std::enable_if<has_mapToText<E>::value, const EnumInverseMap&>::
  * @brief VPU IP generations
  *
  */
-enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_RESERVED, NPU_RESERVED_W, NPU_6_0, __size };
+enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_5_0, NPU_RESERVED, NPU_6_0, __size };
 static const EnumMap VPUDevice_ToText{link(VPUDevice::VPU_2_0, "VPU_2_0"), link(VPUDevice::VPU_2_1, "VPU_2_1"),
                                       link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_4_0, "VPU_4_0"),
-                                      link(VPUDevice::NPU_RESERVED, "NPU_RESERVED"), link(VPUDevice::NPU_RESERVED_W, "NPU_RESERVED_W"),
+                                      link(VPUDevice::NPU_5_0, "NPU_5_0"), link(VPUDevice::NPU_RESERVED, "NPU_RESERVED"),
                                       link(VPUDevice::NPU_6_0, "NPU_6_0")};
 template <>
 inline const EnumMap& mapToText<VPUDevice>() {
@@ -241,13 +241,15 @@ enum class ExecutionMode {
     CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,   50 : NTHW/NTK = 16/2
     CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8     50 : NTHW/NTK = 8/4
     CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16    50 : NTHW/NTK = 4/8
+    dCIM_32x128,   // from 60 :      NTHW/NTK = 
     __size
 };
 static const EnumMap ExecutionMode_ToText{
         link(ExecutionMode::VECTOR, "VECTOR"),           link(ExecutionMode::MATRIX, "MATRIX"),
         link(ExecutionMode::VECTOR_FP16, "VECTOR_FP16"), link(ExecutionMode::CUBOID_16x16, "CUBOID_16x16"),
         link(ExecutionMode::CUBOID_8x16, "CUBOID_8x16"), link(ExecutionMode::CUBOID_4x16, "CUBOID_4x16"),
-};
+        link(ExecutionMode::dCIM_32x128, "dCIM_32x128")};
+
 template <>
 inline const EnumMap& mapToText<ExecutionMode>() {
     return ExecutionMode_ToText;
@@ -326,6 +328,55 @@ inline const EnumMap& mapToText<VPUSubsystem>() {
 template <>
 inline std::string enumName<VPUSubsystem>() {
     return "VPUSubsystem";
+}
+
+// hint to prefer a particular cost source; default AUTO means "no preference"
+enum class CostSourceHint { AUTO, NN, PROFILING_SERVICE, THEORETICAL, __size };
+static const EnumMap CostSourceHint_ToText{
+        link(CostSourceHint::AUTO, "AUTO"),
+        link(CostSourceHint::NN, "NN"),
+        link(CostSourceHint::PROFILING_SERVICE, "PROFILING_SERVICE"),
+        link(CostSourceHint::THEORETICAL, "THEORETICAL"),
+};
+
+template <>
+inline const EnumMap& mapToText<CostSourceHint>() {
+    return CostSourceHint_ToText;
+}
+
+template <>
+inline std::string enumName<CostSourceHint>() {
+    return "CostSourceHint";
+}
+
+enum class ProfilingServiceBackend { SILICON, VPUEM, __size };
+static const EnumMap ProfilingServiceBackend_ToText{
+        link(ProfilingServiceBackend::SILICON, "silicon"),
+        link(ProfilingServiceBackend::VPUEM, "vpuem"),
+};
+template <>
+inline const EnumMap& mapToText<ProfilingServiceBackend>() {
+    return ProfilingServiceBackend_ToText;
+}
+
+template <>
+inline std::string enumName<ProfilingServiceBackend>() {
+    return "ProfilingServiceBackend";
+}
+
+/**
+ * @brief MPE Engine types
+ *
+ */
+enum class MPEEngine { SCL, DCIM, __size };
+static const EnumMap MPEEngine_ToText{link(MPEEngine::SCL, "SCL"), link(MPEEngine::DCIM, "dCIM")};
+template <>
+inline const EnumMap& mapToText<MPEEngine>() {
+    return MPEEngine_ToText;
+}
+template <>
+inline std::string enumName<MPEEngine>() {
+    return "MPEEngine";
 }
 
 inline std::istream& operator>>(std::istream& is, std::string& dt) {

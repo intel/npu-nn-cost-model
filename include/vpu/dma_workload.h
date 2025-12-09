@@ -136,12 +136,48 @@ public:
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
 
+    /// create a DMAWorkload from a DMANNWorkload if possible
+    template <typename DMANNWorkloadType>
+    static inline DMAWorkload create_workload(const DMANNWorkloadType& dma_nn) {
+        // check if memory location is representable
+        MemoryLocation input_location{MemoryLocation::__size};
+        MemoryLocation output_location{MemoryLocation::__size};
+
+        std::tie(input_location, output_location) = create_locations(dma_nn.transfer_direction);
+
+        if (!isMemoryLocationAvailable(dma_nn.device, input_location)) {
+            throw std::runtime_error("Cannot create a DMAWorkload from a DMANNWorkload : input memory location "
+                                     "not available for this device");
+        }
+        if (!isMemoryLocationAvailable(dma_nn.device, output_location)) {
+            throw std::runtime_error("Cannot create a DMAWorkload from a DMANNWorkload : output memory location "
+                                     "not available for this device");
+        }
+
+        const int dim_in_bytes{dma_nn.getAccessedBytes()};
+
+        const DMAWorkload equivalentWorkload{
+                dma_nn.device,  // VPUDevice device  
+
+                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8,
+                          Layout::ZXY),  // VPUTensor input  
+                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8,
+                          Layout::ZXY),  // VPUTensor output
+
+                input_location,   // MemoryLocation input_location
+                output_location,  // MemoryLocation output_location
+
+                1  // output_write_tiles 
+        };
+        return equivalentWorkload;
+    }
+    
     static inline DMANNWorkload_NPU27 create_NPU27_workload(const DMAWorkload& dma) {
         return create_workload(dma);
     }
 
-    /// you can use this function both to create DMANNWorkload_NPU40 and DMANNWorkload_NPU_RESERVED
-    static inline DMANNWorkload_NPU40_RESERVED create_NPU40_RESERVED_workload(const DMAWorkload& dma) {
+    /// you can use this function both to create DMANNWorkload_NPU40 and DMANNWorkload_NPU50
+    static inline DMANNWorkload_NPU40_50 create_NPU40_50_workload(const DMAWorkload& dma) {
         // check if same datatype , layout and  size
 
         const auto& in{dma.input};
@@ -150,21 +186,21 @@ public:
             (in.get_dtype() != out.get_dtype()) ||  // not same datatype
             (in.get_layout() != out.get_layout())   // not same layout
         ) {
-            throw std::runtime_error("Cannot create a DMANNWorkload_NPU40_RESERVED from a DMAWorkload if size or datatype or "
+            throw std::runtime_error("Cannot create a DMANNWorkload_NPU40_50 from a DMAWorkload if size or datatype or "
                                      "layout are changing!");
         }
         // check if memory direction is representable
         const MemoryDirection memory_direction{create_direction(dma.input_location, dma.output_location)};
         if (memory_direction == MemoryDirection::__size) {
             throw std::runtime_error(
-                    "Cannot create a DMANNWorkload_NPU40_RESERVED from a DMAWorkload : unknown memory direction");
+                    "Cannot create a DMANNWorkload_NPU40_50 from a DMAWorkload : unknown memory direction");
         }
 
         // safe to try representation
 
         const int dim_in_bytes{static_cast<int>(dma.input.size())};
 
-        const DMANNWorkload_NPU40_RESERVED equivalentWorkload{
+        const DMANNWorkload_NPU40_50 equivalentWorkload{
                 dma.device,    // VPUDevice device;  ///< NPU device
                 dim_in_bytes,  // int src_width;
                 dim_in_bytes,  // int dst_width;
@@ -179,16 +215,17 @@ public:
     }
 
     static inline DMANNWorkload_NPU40 create_NPU40_workload(const DMAWorkload& dma) {
-        return create_NPU40_RESERVED_workload(dma);
+        return create_NPU40_50_workload(dma);
     }
 
-    static inline DMANNWorkload_NPU_RESERVED create_NPU_RESERVED_workload(const DMAWorkload& dma) {
-        return create_NPU40_RESERVED_workload(dma);
+    static inline DMANNWorkload_NPU50 create_NPU50_workload(const DMAWorkload& dma) {
+        return create_NPU40_50_workload(dma);
     }
 
 public:
     using LocationKey = std::pair<MemoryLocation, MemoryLocation>;  // DRAM, CMX, CSRAM, UPA
     using DirectionMap = std::map<LocationKey, MemoryDirection>;
+    using LocationMap = std::map<MemoryDirection, LocationKey>;
 
     static inline MemoryDirection create_direction(const MemoryLocation& from, const MemoryLocation& to) {
         static const DirectionMap dirMap{
@@ -208,7 +245,30 @@ public:
             return MemoryDirection::__size;  // or throw?
         }
     };
+
+    static inline LocationKey create_locations(const MemoryDirection& direction){
+        static const LocationMap locMap{
+                {MemoryDirection::DDR2DDR, {MemoryLocation::DRAM, MemoryLocation::DRAM}},  //
+                {MemoryDirection::DDR2CMX, {MemoryLocation::DRAM, MemoryLocation::CMX}},   //
+
+                {MemoryDirection::CMX2DDR, {MemoryLocation::CMX, MemoryLocation::DRAM}},  //
+                {MemoryDirection::CMX2CMX, {MemoryLocation::CMX, MemoryLocation::CMX}},   //
+
+        };
+        const auto search = locMap.find(direction);
+        if (search != locMap.cend()) {
+            return search->second;
+        } else {
+            return {MemoryLocation::__size, MemoryLocation::__size};  // or throw?
+        }
+    }
 };
+
+/// Explicit specialization for DMAWorkload
+template <>
+inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload>(const DMAWorkload& dma_nn) {
+    return dma_nn;
+}
 
 /// Specialization for DMANNWorkload_NPU27
 template <>
@@ -242,20 +302,20 @@ public:
     }
 };
 
-/// Specialization for DMANNWorkload_NPU40_RESERVED
+/// Specialization for DMANNWorkload_NPU40_50
 template <>
-class DMANNWorkloadCreator<DMANNWorkload_NPU40_RESERVED> {
+class DMANNWorkloadCreator<DMANNWorkload_NPU40_50> {
 public:
-    static inline DMANNWorkload_NPU40_RESERVED create_workload(const DMATransfer1D& dma) {
+    static inline DMANNWorkload_NPU40_50 create_workload(const DMATransfer1D& dma) {
         // check if memory direction is representable
         if (dma.memory_direction == MemoryDirection::__size) {
             throw std::runtime_error(
-                    "Cannot create a DMANNWorkload_NPU40_RESERVED from a DMAWorkload : unknown memory direction");
+                    "Cannot create a DMANNWorkload_NPU40_50 from a DMAWorkload : unknown memory direction");
         }
 
         // safe to try representation
 
-        DMANNWorkload_NPU40_RESERVED equivalentWorkload{
+        DMANNWorkload_NPU40_50 equivalentWorkload{
                 dma.device,                 // VPUDevice device;  ///< NPU device
                 dma.transfer_length_bytes,  // int src_width;
                 dma.transfer_length_bytes,  // int dst_width;
@@ -289,8 +349,8 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMANNWorkload
     return stream;
 }
 
-inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMANNWorkload_NPU40_RESERVED& d) {
-    stream << "DMANNWorkload_NPU40_RESERVED: \n"                                                                         //
+inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMANNWorkload_NPU40_50& d) {
+    stream << "DMANNWorkload_NPU40_50: \n"                                                                         //
            << "device: \t" << (int)d.device << " : " << VPUDevice_ToText.at(static_cast<int>(d.device)) << " ;\n"  //
            << "src_width: \t" << d.src_width << " ;\n"
            << "dst_width: \t" << d.dst_width << " ;\n"
@@ -310,7 +370,7 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMANNWorkload
            << "\ndirection: \t" << (int)d.transfer_direction << " : "
            << MemoryDirection_ToText.at(static_cast<int>(d.transfer_direction)) << " ;\n"
 
-           << out_terminator() << "DMANNWorkload_NPU40_RESERVED ";  // terminator
+           << out_terminator() << "DMANNWorkload_NPU40_50 ";  // terminator
     return stream;
 }
 

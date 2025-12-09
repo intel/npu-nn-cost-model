@@ -49,12 +49,12 @@
 
 #include "vpu/dpu_dcim_workload.h"
 #include "vpu_dcim_cost_model_interface.h"
+#include "vpu_shave_cost_model.h"
 
 #include "vpu/nn_cost_provider.h"
 
 #include "vpu/dma_theoretical_cost_provider.h"
 #include "vpu/dpu_theoretical_cost_provider.h"
-#include "vpu/shave_theoretical_cost_provider.h"
 
 #include "vpu/serialization/l1_cost_serialization_wrapper.h"
 
@@ -84,20 +84,23 @@ private:
     mutable CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
 
     const HWPerformanceModel performance{};       // performance instance, not used here
-    const IEnergy my_energy{*this, performance};  ///< energy aspects, not used here but instantiated
-
-protected:
+    
+    protected:
     // DPU cost providers
     const NNCostProvider dpu_nn_cost_provider;                      ///< NN cost provider for DPU
     const DPUTheoreticalCostProvider dpu_theoretical{performance};  ///< theoretical cost provider for DPU
-
+    
     // DMA cost providers
     // No NN or measured DMA cost provider available
     const DMATheoreticalCostProvider dma_theoretical{};  ///< theoretical cost provider for DMA
-
+    
     // SHAVE cost providers
-    // No NN or measured SHAVE cost provider available
-    const ShaveTheoreticalCostProvider shave_theoretical{};  ///< theoretical cost provider for SHAVE
+    std::shared_ptr<SHAVECostModel> ptr_internal_shave_cost_model;  ///< shared ownership of SHAVE cost model
+    SHAVECostModel& internal_shave_cost_model{
+            *ptr_internal_shave_cost_model};
+
+    // Energy interface
+    const IEnergy my_energy{*this, internal_shave_cost_model, performance};  ///< energy aspects, not used here but instantiated
 
 #ifdef VPUNN_BUILD_HTTP_CLIENT
     std::unique_ptr<HttpDPUCostProvider> http_dpu_cost_provider;  ///< HTTP cost provider for DPU
@@ -109,7 +112,6 @@ protected:
     bool is_profiling_service_enabled{false};  ///< true if profiling service is enabled
 
     const DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
-    const ShaveConfiguration shave_gen_2;    ///< second generation of shaves
 
 private:
     /**
@@ -196,7 +198,7 @@ public:
     /// @param workload [in, out] that will be changed in case the input is AVGPOOL
     void avgpool_replace_by(DPUWorkload& workload) const {
         if (Operation::AVEPOOL == workload.op) {
-            if (VPUDevice::NPU_RESERVED > workload.device) {
+            if (VPUDevice::NPU_5_0 > workload.device) {
                 Logger::warning() << "Workload with AVEPOOL changed to DW_CONVOLUTION";
                 workload.op = Operation::DW_CONVOLUTION;
             } else {
@@ -226,7 +228,7 @@ public:
     void swizzling_turn_OFF(DPUWorkload& workload) const {
         if constexpr (false == PerformanceMode::allowLegacySwizzling_G5) {
             // only for some devices
-            if (workload.device >= VPUDevice::NPU_RESERVED) {
+            if (workload.device >= VPUDevice::NPU_5_0) {
                 workload.set_all_swizzlings(Swizzling::KEY_0);
             }
         }
@@ -273,9 +275,9 @@ public:
     explicit VPUCostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
                           const unsigned int batch_size = 1, const std::string& dpu_cache_filename = "",
                           const std::string& shave_cache_filename = "", bool use_shave_2_api = false, bool tryToLoadPairedCache = false)
-            : dpu_nn_cost_provider(sanitizer, filename, batch_size, profile, cache_size, dpu_cache_filename,
+            : dpu_nn_cost_provider(filename, batch_size, profile, cache_size, dpu_cache_filename,
                                    tryToLoadPairedCache),
-              shave_gen_2(cache_size, shave_cache_filename, use_shave_2_api) {
+              ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_filename, cache_size, use_shave_2_api)) {
         Logger::initialize();
 
         if (!dpu_nn_cost_provider.is_initialized()) {
@@ -304,9 +306,9 @@ public:
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
                           const char* dpu_cache_data = nullptr, size_t dpu_cache_data_length = 0,
                           const char* shave_cache_data = nullptr, size_t shave_cache_data_length = 0, bool use_shave_2_api = false)
-            : dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, sanitizer, profile,
+            : dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, profile,
                                    cache_size, dpu_cache_data, dpu_cache_data_length),
-              shave_gen_2(cache_size, shave_cache_data, shave_cache_data_length, use_shave_2_api) {
+              ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_data, shave_cache_data_length, cache_size, use_shave_2_api)) {
         Logger::initialize();
 
         if (!dpu_nn_cost_provider.is_initialized()) {
@@ -407,45 +409,86 @@ protected:
      */
     CyclesInterfaceType run_cost_providers(const DPUWorkload& workload, std::string& info,
                                            std::string* cost_source = nullptr) const {
-        auto cycles = Cycles::NO_ERROR;
-        const auto is_inference_posible = dpu_nn_cost_provider.is_initialized();
+        CyclesInterfaceType cycles{Cycles::NO_ERROR};
+        const bool is_inference_possible = dpu_nn_cost_provider.is_initialized();
 
-        // First look into dpu_nn_cost_provider cache.
-        // This has to be redesigned for the fixed cache to be a standalone cost provider.
-        const auto cached_cost{dpu_nn_cost_provider.get_cached(workload, cost_source)};
-        if (!Cycles::isErrorCode(cached_cost)) {
-            cycles = cached_cost;
-        } else {
-            if (is_profiling_service_enabled) {
-                auto dpu_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
-                if (cost_source) *cost_source = "profiling_service_" + profiling_backend;
-#ifdef VPUNN_BUILD_HTTP_CLIENT
-                cycles = http_dpu_cost_provider->getCost(dpu_op, info, profiling_backend);
-#else
-                info = "";  // Avoid unreferenced var warning
-#endif
-            } else {
-                cycles = Cycles::ERROR_PROFILING_SERVICE;
+        const auto try_cache = [&]() -> CyclesInterfaceType {
+            return dpu_nn_cost_provider.get_cached(workload, cost_source);
+        };
+        const auto try_profiling = [&]() -> CyclesInterfaceType {
+            if (!is_profiling_service_enabled) {
+                return Cycles::ERROR_PROFILING_SERVICE;
             }
 
+            auto get_profiling_backend_string = [&](ProfilingServiceBackend backend) -> std::string {
+                if (backend != ProfilingServiceBackend::__size) {
+                    return mapToText<ProfilingServiceBackend>().at(static_cast<int>(backend));
+                }
+                return profiling_backend;
+            };
+
+            if (cost_source) {
+                *cost_source = "profiling_service_" + get_profiling_backend_string(workload.profiling_service_backend_hint);
+            }
+
+            auto dpu_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
+
+#ifdef VPUNN_BUILD_HTTP_CLIENT
+            return http_dpu_cost_provider->getCost(dpu_op, info, get_profiling_backend_string(workload.profiling_service_backend_hint));
+#else
+            (void)dpu_op;
+            (void)info;
+            return Cycles::ERROR_PROFILING_SERVICE;
+#endif
+        };
+        const auto try_nn = [&]() -> CyclesInterfaceType {
+            if (!is_inference_possible) {
+                return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
+            }
+            if (cost_source) {
+                *cost_source = "nn_" + dpu_nn_cost_provider.get_model_nickname();
+            }
+            return dpu_nn_cost_provider.get_cost(workload);
+        };
+        const auto try_theoretical = [&]() -> CyclesInterfaceType {
+            if (cost_source) {
+                *cost_source = "theoretical";
+            }
+            return dpu_theoretical.DPUTheoreticalCycles(workload);
+        };
+
+        if (workload.cost_source_hint == CostSourceHint::AUTO) {
+            // 1. Cache
+            const auto cached = try_cache();
+            if (!Cycles::isErrorCode(cached)) {
+                return cached;
+            }
+
+            // 2. Profiling service
+            cycles = try_profiling();
+
+            // 3. Fallbacks (NN then theoretical)
             if (Cycles::isErrorCode(cycles) || cycles == Cycles::NO_ERROR) {
-                // if the profiling service is not available, we will use the NN cost provider
-                // if the NN is not available, we will use the theoretical cycles
-                if (is_inference_posible) {
-                    if (cost_source) *cost_source = "nn_" + dpu_nn_cost_provider.get_DPU_nickname();
-                    cycles = dpu_nn_cost_provider.get_cost(workload);
-                } else {
-                    if (cost_source) *cost_source = "theoretical";
-                    cycles = dpu_theoretical.DPUTheoreticalCycles(workload);
+                cycles = try_nn();
+                if (Cycles::isErrorCode(cycles)) {
+                    cycles = try_theoretical();
                 }
             }
 
-            // Concerns mainly cycles returned from providers other than NNCostProvider
-            // We need to share NNCostProvider's cache in order to have access to the fixed cache that's stored as part
-            // of the dynamic cache (LRUCache) (will be separated in near future).
+            // Share result with NN cache if needed (only if cache had no valid entry)
             if (Cycles::isErrorCode(dpu_nn_cost_provider.get_cached(workload)) && !Cycles::isErrorCode(cycles)) {
                 dpu_nn_cost_provider.add_to_cache(workload, static_cast<float>(cycles));
             }
+            return cycles;
+
+        } else if (workload.cost_source_hint == CostSourceHint::PROFILING_SERVICE) {
+            cycles = try_profiling();
+
+        } else if (workload.cost_source_hint == CostSourceHint::NN) {
+            cycles = try_nn();
+
+        } else if (workload.cost_source_hint == CostSourceHint::THEORETICAL) {
+            cycles = try_theoretical();
         }
 
         return cycles;
@@ -606,10 +649,10 @@ protected:
     CyclesInterfaceType DPU_and_sanitize(DPUWorkload& wl, std::string& info) const {
         swizzling_turn_OFF(wl);  // swizz guard sanitization
 
-        L1CostSerializationWrap serialization_handler(serializer, sanitizer);
+
+        L1CostSerializationWrap serialization_handler(serializer);
 
         serialization_handler.serializeInfoAndComputeWorkloadUid(wl);  
-      
 
         // sanitize and check the input.
         SanityReport problems{};
@@ -685,8 +728,8 @@ public:
             cycles_vector[idx] = cycles;
         }
 
-        const std::string dpu_nickname{get_NN_cost_provider().get_DPU_nickname()};
-        L1CostSerializationWrap serialization_handler(serializer, sanitizer);
+        const std::string dpu_nickname{get_NN_cost_provider().get_model_nickname()};
+        L1CostSerializationWrap serialization_handler(serializer);
         serialization_handler.serializeCyclesAndComputeWorkloadUid_closeLine(std::move(serializer_orig_wls), cycles_vector, dpu_nickname);
 
         return cycles_vector;
@@ -727,30 +770,17 @@ public:
     /**
      * @brief Return the number of cycles needed to compute a Shave kernel
      *
-     * @param swl a Shave Kernel
-     * @return unsigned int the number of cycles of the Shave kernel
-     * \deprecated
-    **/
-   
-    unsigned int SHAVE(const SWOperation& swl) const {
-        return shave_theoretical.SHAVETheoreticalCycles(swl);
-    }
-
-    /**
-     * @brief Return the number of cycles needed to compute a Shave kernel
-     *
      * @param shave_wl a Shave workload contains: name of kernel, device, in out tensor. PLus optional parameters of the
      * operations
      * @param infoOut  a string that will contain informative error information (in case of error)
      * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
      */
     CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
-        return shave_gen_2.computeCycles(shave_wl, infoOut);
+        return internal_shave_cost_model.computeCycles(shave_wl, infoOut);
     }
 
     CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl) const {
-        std::string infoOut;
-        return shave_gen_2.computeCycles(shave_wl, infoOut);
+        return internal_shave_cost_model.computeCycles(shave_wl);
     }
 
     /**
@@ -762,7 +792,7 @@ public:
      * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
      */
     CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut, bool skipCacheValues) const {
-        return shave_gen_2.computeCycles(shave_wl, infoOut, skipCacheValues);
+        return internal_shave_cost_model.computeCycles(shave_wl, infoOut, skipCacheValues);
     }
 
 
@@ -771,7 +801,7 @@ public:
     /// @param device  for what device?
     /// @returns container with the name of operators
     std::vector<std::string> getShaveSupportedOperations(VPUDevice device) const {
-        return shave_gen_2.getShaveSupportedOperations(device);
+        return internal_shave_cost_model.getShaveSupportedOperations(device);
     };
 
     /// provides a reference to the operator executor specified by name
@@ -782,7 +812,12 @@ public:
     /// @param device name
     /// @returns a ref (no ownership transfered. exists as long as this VPUCostModel instance exists)
     const ShaveOpExecutor& getShaveInstance(std::string name, VPUDevice device) const {
-        return shave_gen_2.getShaveInstance(std::move(name), device);  // may throw
+        const std::string original_name = name;  // Store the name before moving
+        auto result = internal_shave_cost_model.getShaveInstance(std::move(name), device);
+        if (!result.has_value()) {
+            throw std::runtime_error("Shave instance not found for name: " + original_name);
+        }
+        return result.value().get();
     }
 
     /**
@@ -790,7 +825,7 @@ public:
      * @return True if the SHAVE Gen 2 API is used, otherwise false.
      */
     bool isShave2ApiUsed() const {
-        return shave_gen_2.isShave2APIused();
+        return internal_shave_cost_model.isShave2APIused();
     }
 
 public:
@@ -807,20 +842,6 @@ public:
     }
 
 public:
-    /**
-     * @brief Compute the energy of a SHAVE SWOperation.
-     * @details Energy here is a relative metric, but the activity factor of the SWOperation multiplied by
-     *          its cost (number of clock cycles). We assume a constant activity factor of 0.5 for all and a max
-     *          power of 5% of the DPU max power.
-     *
-     * @param swl a SWOperation
-     * @return float the SWOperation energy , in units relative to DPU PowerVirus16
-     * \deprecated
-     */
-    float SHAVEEnergy(const SWOperation& swl) const {
-        return getEnergyInterface().SHAVEEnergy(swl);
-    }
-
     /** @brief Compute the energy of a SHAVE SHAVEWorkload.
      * @details Energy here is a relative metric, but the activity factor of the operation multiplied by
      *          its cost (number of clock cycles). We assume a constant activity factor of 0.5 for all and a max
@@ -866,7 +887,7 @@ public:
     }
 
     const AccessCounter& getPreloadedShaveCacheCounter() const {
-        return shave_gen_2.getPreloadedCacheCounter();
+        return internal_shave_cost_model.getPreloadedCacheCounter();
     }
 };  // class
 }  // namespace VPUNN

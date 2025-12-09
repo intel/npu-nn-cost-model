@@ -115,6 +115,70 @@ public:
         serializer.clean_buffers();
     }
 };
+
+/**
+ * @brief Utility class for SHAVE serialization operations
+ * 
+ * This class provides static utility functions for SHAVE serialization
+ * without requiring object instantiation.
+ */
+class ShaveSerializerUtils {
+public:
+    /**
+     * @brief Get the field names for SHAVE serialization
+     * 
+     * Returns a vector of field names used for SHAVE workload serialization.
+     * This function can be called directly without creating an instance of the class.
+     * 
+     * @param max_num_params Maximum number of parameters to include in the field names (default: 10)
+     * @return std::vector<std::string> Vector containing all field names for SHAVE serialization
+     */
+    static std::vector<std::string> get_names_for_shave_serializer(const int max_num_params = 10) {
+        auto fields = std::vector<std::string>({"device", "operation"});
+        
+        // Input fields for up to 8 inputs
+        for (int i = 0; i < 8; i++) {
+            fields.emplace_back("input_" + std::to_string(i) + "_batch");
+            fields.emplace_back("input_" + std::to_string(i) + "_channels");
+            fields.emplace_back("input_" + std::to_string(i) + "_height");
+            fields.emplace_back("input_" + std::to_string(i) + "_width");
+            fields.emplace_back("input_" + std::to_string(i) + "_sparsity_enabled");
+            fields.emplace_back("input_" + std::to_string(i) + "_datatype");
+            fields.emplace_back("input_" + std::to_string(i) + "_layout");
+        }
+
+        // Output fields (assuming single output)
+        fields.emplace_back("output_0_batch");
+        fields.emplace_back("output_0_channels");
+        fields.emplace_back("output_0_height");
+        fields.emplace_back("output_0_width");
+        fields.emplace_back("output_0_sparsity_enabled");
+        fields.emplace_back("output_0_datatype");
+        fields.emplace_back("output_0_layout");
+
+        // Model and cycles fields
+        fields.emplace_back("shave_model_kind");
+        fields.emplace_back("cycles");
+
+        // Parameter fields
+        for (int i = 0; i <= max_num_params; i++) {
+            fields.emplace_back("param_" + std::to_string(i));
+        }
+
+        // Extra parameter fields
+        for (int i = 0; i <= 8; i++) {
+            fields.emplace_back("extra_param_" + std::to_string(i));
+        }
+
+        // Additional fields
+        fields.emplace_back("loc_name");
+        fields.emplace_back("info");
+        fields.emplace_back("workload_uid");
+
+        return fields;
+    }
+};
+
 }  // namespace VPUNN
 
 #endif  // VPUNN_SERIALIZATION_WRAPPER_H

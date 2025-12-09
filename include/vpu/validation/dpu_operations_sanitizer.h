@@ -51,6 +51,11 @@ public:
 
         const auto& config = get_config(wl.device);
 
+        // force execution mode when dCIM engine is selected
+        if (wl.mpe_engine == MPEEngine::DCIM) {
+            wl.execution_order = ExecutionMode::dCIM_32x128;
+        }
+
         // check ahead
         if (!config.is_valid_operation(wl.op)) {
             result.mark_unknown_operation();

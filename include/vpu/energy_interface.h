@@ -23,11 +23,13 @@ namespace VPUNN {
 
 class VPUCostModel;  // fw declaration, at least for now we depend on the big cost model  as a provider for almost
                      // everything
+class SHAVECostModel; // fw declaration
 
 /// provides energy computation
 class IEnergy {
 private:
     const VPUCostModel& all_service_provider;  ///< service as dpu, dma, performance.. providers
+    const SHAVECostModel& shave_service_provider; ///< service for shave providers
     const HWPerformanceModel& performance;     ///< HW performance model
 
     const VPUPowerFactorLUT
@@ -41,8 +43,10 @@ public:
      *
      * @param performance_ is a reference to the performance model: Used to access the performance provider
      */
-    IEnergy(const VPUCostModel& all_service_provider_, const HWPerformanceModel& performance_)
-            : all_service_provider(all_service_provider_), performance(performance_) {
+    IEnergy(const VPUCostModel& all_service_provider_, const SHAVECostModel& shave_service_provider_, 
+            const HWPerformanceModel& performance_)
+            : all_service_provider(all_service_provider_), shave_service_provider(shave_service_provider_),
+            performance(performance_) {
     }
 
     /**
@@ -62,18 +66,6 @@ public:
         // can be further reduced to power_ideal_cycles * power_factor_value  if no limitation desired
         return calculateEnergyFromIdealCycles(wl, performance.DPU_Power_IdealCycles(wl));
     }
-
-    /**
-     * @brief Compute the energy of a SHAVE SWOperation.
-     * @details Energy here is a relative metric, but the activity factor of the SWOperation multiplied by
-     *          its cost (number of clock cycles). We assume a constant activity factor of 0.5 for all and a max
-     *          power of 5% of the DPU max power.
-     *
-     * @param swl a SWOperation
-     * @return float the SWOperation energy , in units relative to DPU PowerVirus
-     * \deprecated
-     */
-    float SHAVEEnergy(const SWOperation& swl) const;
 
     /** @brief Compute the energy of a SHAVE SHAVEWorkload.
      * @details Energy here is a relative metric, but the activity factor of the operation multiplied by
@@ -276,8 +268,12 @@ private:
         return all_service_provider;
     }
 
-    const VPUCostModel& getSHAVEprovider() const {
+    const VPUCostModel& getOldSHAVEprovider() const {
         return all_service_provider;
+    }
+
+    const SHAVECostModel& getSHAVEprovider() const {
+        return shave_service_provider;
     }
 
 public:

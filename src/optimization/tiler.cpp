@@ -233,7 +233,7 @@ public:
      */
     void tileMultipleWl(std::list<DPUWorkloadsWithCyclesSplit>& splitPool, const ExecutionMode mode,
                         const unsigned int nWorkloads) override {
-        if (layer_on_tile.device < VPUDevice::NPU_RESERVED  //
+        if (layer_on_tile.device < VPUDevice::NPU_5_0  //
             || (force_LegacyZTiling)                   // Every device runs as before
         ) {                                            // Some layers have a max size in Z by specification
             const std::vector<unsigned int> validZTiles{requireMaxZTile(layer_on_tile)

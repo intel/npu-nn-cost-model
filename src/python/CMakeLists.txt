@@ -72,6 +72,7 @@ if (${GENERATE_PYTHON_BINDING})
             -I${COST_MODEL_BINARY_DIR}/include
             -I${pybind11_SOURCE_DIR}/include
             -I${CMAKE_CURRENT_SOURCE_DIR}/../../include
+            -DINTEL_EMBARGO_NPU5
 
             # If therea are issues with chrono in pybydings, then uncomment following lines
             # to replace the bits/chrono.h with chrono.h

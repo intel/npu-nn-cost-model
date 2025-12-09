@@ -137,9 +137,16 @@ public:
         }
     }
 
+    /**
+     * @brief Determines if tensor data type activates power circuits for fp16 or not. Is used for adjustment factors of power modeling
+     * and performance prediction etc.
+     * @todo: make more robust mechanism to check for data types coverage, where each key of DataType have properties that 
+     *        give more insights about the type, like: is_float, is_integer, is_signed, size_in_bytes, is_fp16family,
+     *        is_fp8family, is_i8family
+     */
     bool is_fp16family() const noexcept {
         switch (dtype) {
-        case DataType::FLOAT32:
+        case DataType::FLOAT32:     // not supported, but kept to have all types coverage
         case DataType::FLOAT16:
         case DataType::BFLOAT16:
             return true;
@@ -158,6 +165,10 @@ public:
         }
     }
 
+    /**
+     * @brief Determines if tensor data type activates power circuits for int8 or not. Is used for adjustment factors of power
+     * modeling and performance prediction etc.
+     */
     bool is_i8family() const noexcept {
         switch (dtype) {
         case DataType::UINT8:
@@ -169,6 +180,7 @@ public:
         case DataType::UINT1:
         case DataType::INT1:
 
+        // No support for operations in DPU with these types yet
         case DataType::INT32:
 
         case DataType::UINT16:

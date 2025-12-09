@@ -112,8 +112,8 @@ protected:
                        const int& input_heigth_width_start_factor_SOHW_,                       //
                        const IDeviceValidValues::ValidDatatypes& valid_datatypes,              //
                        const Values<Operation>& valid_operations_,                             //
-                       const int& alignement_size_bytes_ , // page size, NPU specific
-                       const int& out_innermost_dim_alignment_                                  //
+                       const int& alignement_size_bytes_,       // page size, NPU specific
+                       const int& out_innermost_dim_alignment_  //
                        )
             : operations_dynamic_behavior{op_dynamic_constraints},                          //
               valid_execution_order_map{valid_execution_order_},                            //
@@ -143,28 +143,32 @@ public:
 
     // return a SmartRanges that verify if a value matches
     // if lower and upper bound is 1 then batch could be only equal with 1
-    // but if lower bound is 1 and upper is a max value chosen by us then batch could be any value in this interval 
+    // but if lower bound is 1 and upper is a max value chosen by us then batch could be any value in this interval
     // same batch restrictions for input and output tensor batch dimension
-    virtual MultiSmartRanges get_batch_restrictions() const = 0; 
+    virtual MultiSmartRanges get_batch_restrictions() const = 0;
 
     /// false for places where checks regarding properties that are not connected to the abstract operation is not  to
     /// be checked (they do not really exists in that context). e.g. stencil. true: low level checks to be executed
     virtual bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept {
         return true;  // check all by default
-    };
+    }
 
-    const Values<DataType>& get_input_valid_datatypes(const DPUOperation& dpu) const {
-        const auto& ch_map{valid_datatypes_map.input_datatypes};
+    virtual const IDeviceValidValues::ValidDatatypes& get_valid_datatypes_map(const MPEEngine& /*engine*/) const {
+            return valid_datatypes_map;
+    }
+
+    virtual const Values<DataType>& get_input_valid_datatypes(const DPUOperation& dpu) const {
+        const auto& ch_map{get_valid_datatypes_map(dpu.mpe_engine).input_datatypes};
         return ch_map.at(dpu.operation);
     }
 
-    const Values<DataType>& get_output_valid_datatypes(const DPUOperation& dpu) const {
-        const auto& ch_map{valid_datatypes_map.output_datatypes};
+    virtual const Values<DataType>& get_output_valid_datatypes(const DPUOperation& dpu) const {
+        const auto& ch_map{get_valid_datatypes_map(dpu.mpe_engine).output_datatypes};
         return ch_map.at(dpu.operation);
     }
 
-    const Values<DataType>& get_weights_valid_datatypes(const DPUOperation& dpu) const {
-        const auto& ch_map{valid_datatypes_map.weights_datatypes};
+    virtual const Values<DataType>& get_weights_valid_datatypes(const DPUOperation& dpu) const {
+        const auto& ch_map{get_valid_datatypes_map(dpu.mpe_engine).weights_datatypes};
         return ch_map.at(dpu.operation);
     }
 
@@ -288,7 +292,7 @@ public:
         return valid_operations;
     };
 
-    const Values<ExecutionMode>& get_valid_execution_order(const DPUOperation& dpu) const {
+    virtual const Values<ExecutionMode>& get_valid_execution_order(const DPUOperation& dpu) const {
         const auto& ch_map{valid_execution_order_map.execution_modes};
         return ch_map.at(dpu.operation);
     }
@@ -351,7 +355,8 @@ protected:
 
     const int alignement_size_bytes;  // page size, NPU specific
 
-    const int out_innermost_dim_alignment; ///< alignment for innermost dimension (in bytes), used when we compute output_0 tensor's memory 
+    const int out_innermost_dim_alignment;  ///< alignment for innermost dimension (in bytes), used when we compute
+                                            ///< output_0 tensor's memory
 
     // const fixed here
 private:

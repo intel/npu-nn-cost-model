@@ -34,6 +34,7 @@ target_link_libraries(vpunn_optimization
         vpunn_common_settings
         flatbuffers
         $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
+        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:nlohmann_json::nlohmann_json>
 )
 
 add_dependencies(vpunn_optimization vpunn_cpp_schema)
