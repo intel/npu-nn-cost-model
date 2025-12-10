@@ -219,7 +219,6 @@ TEST_F(ExecutionOrderTest, Execution_order_Test_VPU40) {
     check_err(tests, dut);
 }
 
-#ifdef INTEL_EMBARGO_NPU5
 TEST_F(ExecutionOrderTest, Execution_order_Test_NPU50) {
     VPUDevice device = VPUDevice::NPU_5_0;
 
@@ -274,5 +273,4 @@ TEST_F(ExecutionOrderTest, Execution_order_Test_NPU50) {
 
     check_err(tests, dut);
 }
-#endif  // INTEL_EMBARGO_NPU5
 }  // namespace VPUNN_unit_tests

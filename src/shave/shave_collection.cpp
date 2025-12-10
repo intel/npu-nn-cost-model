@@ -9,9 +9,7 @@
 
 #include "vpu/shave/shave_collection.h"
 
-#ifdef INTEL_EMBARGO_NPU5
 #include "vpu/shave/shave_collection_NPU50.h"
-#endif  // INTEL_EMBARGO_NPU5
 #include "vpu/shave/shave_collection_NPU40.h"
 #include "vpu/shave/shave_collection_VPU27.h"
 
@@ -26,16 +24,12 @@
 constexpr float VPU27COSTCURVERATIO = 1.0;
 constexpr float VPU40COSTCURVERATIO = 2.5;
 
-#ifdef INTEL_EMBARGO_NPU5
 constexpr float NPU50COSTCURVERATIO = 2.5;
-#endif  // INTEL_EMBARGO_NPU5
 
 constexpr int VPU27DSPARCH = 128;
 constexpr int VPU40DSPARCH = 512;
 
-#ifdef INTEL_EMBARGO_NPU5
 constexpr int NPU50DSPARCH = 512;
-#endif  // INTEL_EMBARGO_NPU5
 
 constexpr int MAXBLKNUM = 32;
 
@@ -355,7 +349,6 @@ void ShaveInstanceHolder_NPU40::populate() {
     // clang-format on
 }
 
-#ifdef INTEL_EMBARGO_NPU5
 //////////////////////////////////////////////
 
 void ShaveInstanceHolder_NPU50::populate() {
@@ -460,7 +453,6 @@ void ShaveInstanceHolder_NPU50::populate() {
 
     // clang-format on
 }
-#endif  // INTEL_EMBARGO_NPU5
 
 
 

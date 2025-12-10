@@ -21,9 +21,7 @@
 #include "core/cache.h"
 #include "interface_shave_op_executor.h"
 #include "shave_collection_NPU40.h"
-#ifdef INTEL_EMBARGO_NPU5
 #include "shave_collection_NPU50.h"
-#endif  // INTEL_EMBARGO_NPU5
 #include "shave_collection_VPU27.h"
 #include "shave_op_executors.h"
 #include "vpu/serialization/shave_cost_serialization_wrapper.h"
@@ -98,10 +96,8 @@ private:
         const ShaveInstanceHolder_VPU27CLassic old_shave_27{};
         const ShaveInstanceHolder_NPU40CLassic old_shave_40{};
 
-#ifdef INTEL_EMBARGO_NPU5
         const ShaveInstanceHolder_Mock_NPU50 mock_shaves_50{};
         const ShaveInstanceHolder_NPU50CLassic old_shave_50{};
-#endif  // INTEL_EMBARGO_NPU5
 
 
     } collections{};
@@ -116,10 +112,8 @@ private:
     const ShaveSelector selector_old_20{collections.shaves_20_classic};
     const ShaveSelector selector_old_27{collections.old_shave_27};
     const ShaveSelector selector_old_40{collections.old_shave_40};
-#ifdef INTEL_EMBARGO_NPU5
     const ShaveSelector selector_50{collections.mock_shaves_50};
     const ShaveSelector selector_old_50{collections.old_shave_50};
-#endif  // INTEL_EMBARGO_NPU5
 
 public:
     const ShaveSelector& getSelector(VPUDevice desired_device) const {
@@ -134,11 +128,9 @@ public:
         case VPUDevice::VPU_4_0:
             return selector_40;
             break;
-#ifdef INTEL_EMBARGO_NPU5
         case VPUDevice::NPU_5_0:
             return selector_50;
             break;
-#endif  // INTEL_EMBARGO_NPU5
         default:
             static const DeviceShaveContainer empty_shaves{VPUDevice::__size};
             static const ShaveSelector empty_selector{empty_shaves};
@@ -159,11 +151,9 @@ public:
         case VPUDevice::VPU_4_0:
             return selector_old_40;
             break;
-#ifdef INTEL_EMBARGO_NPU5
         case VPUDevice::NPU_5_0:
             return selector_old_50;
             break;
-#endif  // INTEL_EMBARGO_NPU5
         default:
             static const DeviceShaveContainer empty_shaves{VPUDevice::__size};
             static const ShaveSelector empty_selector{empty_shaves};

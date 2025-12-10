@@ -235,12 +235,10 @@ protected:
 
     const size_t size_of_descriptor_INterface11{pp_4011.output_size()};  // same for all 11
 
-#ifdef INTEL_EMBARGO_NPU5
     const std::string cache_file_51{(std::filesystem::path{NPU_5_0_MODEL_PATH}).replace_extension("cachebin").string()};
     const VPUCostModel model_51{NPU_5_0_MODEL_PATH};
     Preprocessing_Interface14<float> pp_5014;  // used interface where we have cache
     const size_t size_of_descriptor_INterface14{pp_5014.output_size()};
-#endif  // INTEL_EMBARGO_NPU5
 
     //////
     const std::string csv_file_OneCache{"c:\\gitwrk\\CM_Profilings\\UTests\\Cache_UT\\"
@@ -479,7 +477,6 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
     // EXPECT_TRUE(false);
 }
 
-#ifdef INTEL_EMBARGO_NPU5
 TEST_F(VPUNNCachePreloadedTest, DISABLED_SearchTimeTest) {
     auto& preprop_now = pp_5014;
     FixedCache the_cache(cache_file_51);
@@ -593,7 +590,6 @@ TEST_F(VPUNNCachePreloadedTest, SparsityLevelsTest) {
 
     ASSERT_NE(wl_1_hash, wl_1_sparse_hash);
 }
-#endif  // INTEL_EMBARGO_NPU5
 
 // Foirethis ro work we need a Good cache file for DPU in the models files
 TEST_F(VPUNNCachePreloadedTest, DISABLED_SmokeSparsityFloatBasicTest_40) {

@@ -103,11 +103,11 @@ inline typename std::enable_if<has_mapToText<E>::value, const EnumInverseMap&>::
  * @brief VPU IP generations
  *
  */
-enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_5_0, NPU_RESERVED, NPU_6_0, __size };
+enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_5_0, NPU_RESERVED, NPU_RESERVED_1, __size };
 static const EnumMap VPUDevice_ToText{link(VPUDevice::VPU_2_0, "VPU_2_0"), link(VPUDevice::VPU_2_1, "VPU_2_1"),
                                       link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_4_0, "VPU_4_0"),
                                       link(VPUDevice::NPU_5_0, "NPU_5_0"), link(VPUDevice::NPU_RESERVED, "NPU_RESERVED"),
-                                      link(VPUDevice::NPU_6_0, "NPU_6_0")};
+                                      link(VPUDevice::NPU_RESERVED_1, "NPU_RESERVED_1")};
 template <>
 inline const EnumMap& mapToText<VPUDevice>() {
     return VPUDevice_ToText;

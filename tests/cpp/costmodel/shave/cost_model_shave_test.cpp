@@ -225,7 +225,6 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
             std::cout << "\n  : " << o;
         }
     }
-#ifdef INTEL_EMBARGO_NPU5
     {
         const auto d{VPUDevice::NPU_5_0};
         auto ops = model_with_new_provider.getShaveSupportedOperations(d);
@@ -238,7 +237,6 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
             std::cout << "\n  : " << o;
         }
     }
-#endif  // INTEL_EMBARGO_NPU5
     {  // special in-existing
         const auto d{VPUDevice::__size};
         auto ops = model_with_new_provider.getShaveSupportedOperations(d);
@@ -299,7 +297,6 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_40) {
         }
     }
 }
-#ifdef INTEL_EMBARGO_NPU5
 TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_5x) {
     {
         const auto d{VPUDevice::NPU_5_0};
@@ -322,6 +319,5 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_5x) {
         }
     }
 }
-#endif  // INTEL_EMBARGO_NPU5
 
 }  // namespace VPUNN_unit_tests

@@ -21,9 +21,7 @@ TEST_F(VPULayerCostModelTest, LayerLoadModels) {
     EXPECT_EQ(layer_models.getModel(VPUDevice::VPU_2_7).get_cost_model().nn_initialized(), true);
     EXPECT_EQ(model_2_7_no_dma.get_cost_model().nn_initialized(), true);
     EXPECT_EQ(layer_models.getModel(VPUDevice::VPU_4_0).get_cost_model().nn_initialized(), true);
-#ifdef INTEL_EMBARGO_NPU5
     EXPECT_EQ(layer_models.getModel(VPUDevice::NPU_5_0).get_cost_model().nn_initialized(), true);
-#endif  // INTEL_EMBARGO_NPU5
 }
 
 /// Test batch values for devices
@@ -85,7 +83,6 @@ TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
                 {{mkLayer(VPUDevice::VPU_4_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1200, 1200 * no_fail + 1000},
                  "Device 4.0, B=2 "},
-#ifdef INTEL_EMBARGO_NPU5
                 {{mkLayer(VPUDevice::NPU_5_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 5.0, B=0 "},
@@ -95,7 +92,6 @@ TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
                 {{mkLayer(VPUDevice::NPU_5_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 5.0, B=2 "},
-#endif  // INTEL_EMBARGO_NPU5
         };
         executeTests(tests);
     }
@@ -105,9 +101,7 @@ TEST_F(VPULayerCostModelTest, Default_MaxWorkloadSPlitAndDetails_Test) {
     std::vector<const VPULayerCostModel*> all_models{
             &layer_models.getModel(VPUDevice::VPU_2_0), &layer_models.getModel(VPUDevice::VPU_2_7), &model_2_7_no_dma,
             &layer_models.getModel(VPUDevice::VPU_4_0),
-#ifdef INTEL_EMBARGO_NPU5
             &layer_models.getModel(VPUDevice::NPU_5_0),
-#endif  // INTEL_EMBARGO_NPU5
     };
 
     for (const auto m : all_models) {

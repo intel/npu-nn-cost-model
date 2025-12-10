@@ -193,10 +193,8 @@ These operators below are not taking any extra parameters, The represent the Act
 -  equal the time is the same despite the size (2952 DPU cycles). The only thing that gives equal a slope was the complementary convert operations before and after the equal operation. Since it is a special case it will be treated as a constant and it will give a constant time. The operations of convert appear in case that we use the ReferenceSW pipeline but in the real case will Convert run on SW or on DMA?
 -  default :special dummy implementation (like in the old shave ) for not profiled operators. It is the first bisector line, return value in DPU cycles is equal to the number of elements in the output tensor.
 
-# INTEL_EMBARGO_NPU5_Begin
 ## NPU5.0 operators (mock)
 Mocked from NPU4.0, speed up factor of 1 for the moment . Will be updated based on measurements.
-# INTEL_EMBARGO_NPU5_End
 
 ## VPUEM Operators Usage
   
@@ -259,7 +257,6 @@ Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
 
 
-# INTEL_EMBARGO_NPU5_Begin
 ## VPUEM Operators NPU5.0
 
 A Piecewise Operation is a simple operation based on a 3 slopes equation. Available Piecewise Operations from VPUEM:
@@ -280,5 +277,3 @@ Available Softmax Operations from VPUEM:
 
 Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
-
-# INTEL_EMBARGO_NPU5_End

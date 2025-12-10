@@ -603,7 +603,6 @@ TEST_F(ShaveCollectionTest, DefaultCaseTestNPU40) {
     }
 }
 
-#ifdef INTEL_EMBARGO_NPU5
 TEST_F(ShaveCollectionTest, DefaultCaseTestNPU50) {
     {
         ShaveInstanceHolder_Mock_NPU50 ih;
@@ -644,7 +643,6 @@ TEST_F(ShaveCollectionTest, DefaultCaseTestNPU50) {
         }
     }
 }
-#endif
 
 
 TEST_F(ShaveCollectionTest, EqualSpecialCase) {
@@ -733,7 +731,6 @@ TEST_F(ShaveCollectionTest, instanceHolder_Smoke_NPU_40) {
     // delete &shaveOp;  // not good
 }
 
-#ifdef INTEL_EMBARGO_NPU5
 TEST_F(ShaveCollectionTest, instanceHolder_Smoke_NPU_50) {
     ShaveInstanceHolder_Mock_NPU50 ih;
     EXPECT_EQ(ih.getDevice(), VPUDevice::NPU_5_0);
@@ -761,7 +758,6 @@ TEST_F(ShaveCollectionTest, instanceHolder_Smoke_NPU_50) {
     EXPECT_GT(cycles, 0);
     // delete &shaveOp;  // not good
 }
-#endif
 
 
 TEST_F(ShaveCollectionTest, instanceHolder_27_40_Smoke) {

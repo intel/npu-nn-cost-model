@@ -60,24 +60,18 @@ protected:
     DMACostModel<DMANNWorkload_NPU27> dma_model_invalid{""};
     DMACostModel<DMANNWorkload_NPU40> dma_model_4_0{VPU_DMA_4_0_MODEL_PATH};
     DMACostModel<DMANNWorkload_NPU27> dma_model_2_7{VPU_DMA_2_7_MODEL_PATH};
-#ifdef INTEL_EMBARGO_NPU5
     DMACostModel<DMANNWorkload_NPU50> dma_model_5_0{NPU_DMA_5_0_MODEL_PATH};
-#endif  // INTEL_EMBARGO_NPU5
 
     ModelMap<VPULayerCostModel> layer_models{&dma_model_invalid, ""};
     VPULayerCostModel model_2_7_no_dma{VPU_2_7_MODEL_PATH};
-#ifdef INTEL_EMBARGO_NPU5
     VPULayerCostModel model_5_0_old_shave{&dma_model_5_0, NPU_5_0_MODEL_PATH};
-    #endif  // INTEL_EMBARGO_NPU5
 
     VPULayerCostModelTest() {
         layer_models.addModel(VPUDevice::VPU_2_0, &dma_model_2_7, VPU_2_0_MODEL_PATH);
         layer_models.addModel(VPUDevice::VPU_2_1, &dma_model_2_7, VPU_2_0_MODEL_PATH);
         layer_models.addModel(VPUDevice::VPU_2_7, &dma_model_2_7, VPU_2_7_MODEL_PATH);
         layer_models.addModel(VPUDevice::VPU_4_0, &dma_model_4_0, VPU_4_0_MODEL_PATH);
-#ifdef INTEL_EMBARGO_NPU5
         layer_models.addModel(VPUDevice::NPU_5_0, &dma_model_5_0, NPU_5_0_MODEL_PATH, false, 16384, 1, "", "", true);
-#endif
     }
     void SetUp() override {
         VPUNN::Logger::clear2ndlog();

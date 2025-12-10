@@ -37,9 +37,7 @@ protected:
             {VPUDevice::VPU_2_1, 16 * 1024},  //
             {VPUDevice::VPU_2_7, 16 * 1024},  //
             {VPUDevice::VPU_4_0, 16 * 1024},  //
-#ifdef INTEL_EMBARGO_NPU5
             {VPUDevice::NPU_5_0, 1},    // 32KB, but no tensor alignment requested
-#endif                                  // INTEL_EMBARGO_NPU5
     };
 
     int get_alignment(const VPUDevice device) const {

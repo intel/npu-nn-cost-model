@@ -19,9 +19,7 @@
 #include "device_valid_valuesVPU2.h"
 #include "device_valid_valuesVPU2_7.h"
 #include "device_valid_valuesVPU4.h"
-#ifdef INTEL_EMBARGO_NPU5
 #include "device_valid_valuesVPU5.h"
-#endif  // INTEL_EMBARGO_NPU5
 #include "dpu_operations_valid_behaviours.h"
 #include "dpu_operations_validator.h"
 #include "vpu_layer_validator.h"
@@ -40,9 +38,7 @@ protected:
     using SplitLayersContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations for workloads
                                                        VPU2_0_LayerOnTileValidValues, VPU2_7_LayerOnTileValidValues,
                                                        VPU4_0_LayerOnTileValidValues
-#ifdef INTEL_EMBARGO_NPU5
                                                        , VPU5_0_LayerOnTileValidValues                                                   
-#endif  // INTEL_EMBARGO_NPU5
                                                        >;
     using DPU_SplitLayersValidator = DPU_ConfigurableOperationValidator<SplitLayersContext>;
     DPU_SplitLayersValidator splitLayer_validator;
