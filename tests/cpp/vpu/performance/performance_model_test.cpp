@@ -43,7 +43,6 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Default) {
                   56 + plus);  // 32 cyc @ 971MHZ => 56.x @1700
     }
 
-#ifdef INTEL_EMBARGO_NPU5
     // 5.0 available
     {
         const int plus = (50 * evoX * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::NPU_5_0)) /
@@ -54,7 +53,6 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Default) {
         EXPECT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_DMA_latency(MemoryLocation::CMX),
                   56 + plus);  // 32 cyc @ 1114MHZ  => 56.x @1950
     }
-#endif  // INTEL_EMBARGO_NPU5
 }
 
 TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Evo0) {
@@ -89,7 +87,6 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Evo0) {
                   56 + plus);  // 32 cyc @ 971MHZ => 56.x @1700
     }
 
-#ifdef INTEL_EMBARGO_NPU5
     // 5.0 available
     {
         const int plus = (0 * (int)hw.device(VPUDevice::NPU_5_0).get_dpu_fclk()) /
@@ -100,7 +97,6 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Evo0) {
         EXPECT_EQ(hw.device(VPUDevice::NPU_5_0).get_DMA_latency(MemoryLocation::CMX),
                   56 + plus);  // 32 cyc @ 1114MHZ  => 56.x @1950
     }
-#endif  // INTEL_EMBARGO_NPU5
 }
 
 TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Evo1) {
@@ -135,7 +131,6 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Evo1) {
                   56 + plus);  // 32 cyc @ 971MHZ => 56.x @1700
     }
 
-#ifdef INTEL_EMBARGO_NPU5
     // 5.0 available
     {
         const int plus = (50 * (int)hw.device(VPUDevice::NPU_5_0).get_dpu_fclk()) /
@@ -146,7 +141,6 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Evo1) {
         EXPECT_EQ(hw.device(VPUDevice::NPU_5_0).get_DMA_latency(MemoryLocation::CMX),
                   56 + plus);  // 32 cyc @ 1114MHZ  => 56.x @1950
     }
-#endif  // INTEL_EMBARGO_NPU5
 }
 
 TEST_F(TestHWPerformanceModel_BASICS, LatencyTestsLegacy) {
@@ -189,13 +183,11 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTestsLegacy) {
     EXPECT_EQ(hw_info_legacy.device(VPUDevice::VPU_4_0).get_DMA_latency(MemoryLocation::CMX),
               27);  // 16 cyc @ 975MHZ => 28.x @1700
 
-#ifdef INTEL_EMBARGO_NPU5
     // 45.0 not yet available
     EXPECT_EQ(hw_info_legacy.device(VPUDevice::NPU_5_0).get_DMA_latency(MemoryLocation::DRAM),
               1864);  // 956ns @1950Mhz
     EXPECT_EQ(hw_info_legacy.device(VPUDevice::NPU_5_0).get_DMA_latency(MemoryLocation::CMX),
               28);  // 16 cyc @ 1114MHZ  => 28.x @1950
-#endif              // INTEL_EMBARGO_NPU5
 }
 
 TEST_F(TestHWPerformanceModel_BASICS, TestGetProfilingClkMHz) {
@@ -203,9 +195,7 @@ TEST_F(TestHWPerformanceModel_BASICS, TestGetProfilingClkMHz) {
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::VPU_2_1).get_profiling_clk_MHz(), 38.4f);
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::VPU_2_7).get_profiling_clk_MHz(), 38.4f);
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::VPU_4_0).get_profiling_clk_MHz(), 38.4f / 2);
-#ifdef INTEL_EMBARGO_NPU5
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_profiling_clk_MHz(), 38.4f / 2);
-#endif  // INTEL_EMBARGO_NPU5
 
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::__size).get_profiling_clk_MHz(),
                     0);  // Test with an unknown device
@@ -218,9 +208,7 @@ TEST_F(TestHWPerformanceModel_BASICS, TestGetProfilingClkHz_default) {
     EXPECT_EQ(hw_info.device(VPUDevice::VPU_2_1).get_profiling_clk_Hz(), 38400000);
     EXPECT_EQ(hw_info.device(VPUDevice::VPU_2_7).get_profiling_clk_Hz(), 38400000);
     EXPECT_EQ(hw_info.device(VPUDevice::VPU_4_0).get_profiling_clk_Hz(), 38400000 / 2);
-#ifdef INTEL_EMBARGO_NPU5
     EXPECT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_profiling_clk_Hz(), 38400000 / 2);
-#endif  // INTEL_EMBARGO_NPU5
 
     EXPECT_EQ(hw_info.device(VPUDevice::__size).get_profiling_clk_Hz(), 0);             // Test with an unknown device
     EXPECT_EQ(hw_info.device(static_cast<VPUDevice>(9999)).get_profiling_clk_Hz(), 0);  // Test with an unknown device

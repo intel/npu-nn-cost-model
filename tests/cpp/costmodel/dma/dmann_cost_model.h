@@ -49,9 +49,7 @@ protected:
     //   VPUNN::DPUWorkload wl_glob_20;
     DMANNWorkload_NPU27 wl_glob_40M{wl_glob_27};
 
-#ifdef INTEL_EMBARGO_NPU5
     DMANNWorkload_NPU27 wl_glob_50M{wl_glob_27};  // wl_glob_27 = wl_glob_40M
-#endif                                            // INTEL_EMBARGO_NPU5
 
     DMACostModel<DMANNWorkload_NPU27> model{};
     // DMACostModel specialEmptyDMAModel;
@@ -71,9 +69,7 @@ protected:
     };
     void SetUp() override {
         wl_glob_40M.device = VPUNN::VPUDevice::VPU_4_0;
-#ifdef INTEL_EMBARGO_NPU5
         wl_glob_50M.device = VPUNN::VPUDevice::NPU_5_0;
-#endif  // INTEL_EMBARGO_NPU5
     }
 
     auto read_a_file(const std::string filename) const {
@@ -157,10 +153,8 @@ protected:
     // DMACostModel specialEmptyDMAModel;
 
     std::vector<VPUDevice> valid_dev_post_LNL{VPUDevice::VPU_4_0
-#ifdef INTEL_EMBARGO_NPU5
                                               ,
                                               VPUDevice::NPU_5_0
-#endif  // INTEL_EMBARGO_NPU5
     };
 
     using ModelDescriptor =

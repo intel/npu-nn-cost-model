@@ -36,12 +36,10 @@ static_assert(false, "VPU_4_0_MODEL_PATH is not defined, please define it in CMa
 static_assert(false, "VPU_4_1_MODEL_PATH is not defined, please define it in CMakeLists.txt");
 #endif
 
-#ifdef INTEL_EMBARGO_NPU5
 #ifndef NPU_5_0_MODEL_PATH
 // #define NPU_5_0_MODEL_PATH VPU_4_0_MODEL_PATH
 static_assert(false, "NPU_5_0_MODEL_PATH is not defined, please define it in CMakeLists.txt");
 #endif
-#endif  // INTEL_EMBARGO_NPU5
 
 // default path to DMA NN Models
 #ifndef VPU_DMA_2_7_MODEL_PATH
@@ -56,7 +54,6 @@ static_assert(false, "NPU_5_0_MODEL_PATH is not defined, please define it in CMa
 #define VPU_DMA_4_0_MODEL_PATH "../../../../models/dma_4_0.vpunn"
 #endif
 
-#ifdef INTEL_EMBARGO_NPU5
 
 #ifndef NPU_DMA_5_0_MODEL_PATH
 // #define NPU_DMA_5_0_MODEL_PATH VPU_DMA_4_0_MODEL_PATH
@@ -68,7 +65,6 @@ static_assert(false, "NPU_DMA_5_0_MODEL_PATH is not defined, please define it in
 static_assert(false, "NPU_DMA_5_0_V1_MODEL_PATH is not defined, please define it in CMakeLists.txt");
 #endif
 
-#endif  // INTEL_EMBARGO_NPU5
 
 namespace VPUNN_unit_tests {
 

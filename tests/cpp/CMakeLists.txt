@@ -92,13 +92,13 @@ target_compile_definitions(test_cost_model
         VPU_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_2_7.vpunn"
         VPU_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_4_0.vpunn"
         VPU_4_1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn"
-        NPU_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_5_1.vpunn"  # INTEL_EMBARGO_NPU5_Content
+        NPU_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_5_1.vpunn" 
         # DMA models
         VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn"
         VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn"
         VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn"
-        NPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn"     # INTEL_EMBARGO_NPU5_Content
-        NPU_DMA_5_0_V1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn"  # INTEL_EMBARGO_NPU5_Content
+        NPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn"     
+        NPU_DMA_5_0_V1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn" 
  
 )
 

@@ -13,7 +13,6 @@
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
-#ifdef INTEL_EMBARGO_NPU5
 TEST_F(TestDMANNCostModel, Create_DMA40_and_DMA50) {
     {
         const std::string model_path = VPU_DMA_4_0_MODEL_PATH;
@@ -36,7 +35,6 @@ TEST_F(TestDMANNCostModel, Create_DMA40_and_DMA50) {
         EXPECT_TRUE(wl_50.device == VPUDevice::NPU_5_0) << wl_50;
     }
 }
-#endif  // INTEL_EMBARGO_NPU5
 
 // Demonstrate some basic assertions.
 TEST_F(TestDMANNCostModel, InitAspects) {
@@ -143,7 +141,6 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
 
-#ifdef INTEL_EMBARGO_NPU5
     {
         std::cout << "\n\n NPU50 \n";
         const VPUDevice device{VPUDevice::NPU_5_0};
@@ -189,7 +186,6 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
             }
         }
     }
-#endif  // INTEL_EMBARGO_NPU5
 
     {
         std::cout << "\n\n NPU40 \n";
@@ -294,7 +290,6 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
 
-#ifdef INTEL_EMBARGO_NPU5
     {
         std::cout << "\n\n NPU50 \n";
         const VPUDevice device{VPUDevice::NPU_5_0};
@@ -317,7 +312,6 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
         EXPECT_EQ(dma_n, 719 + p + 5 * evoX);
         EXPECT_EQ(dma_o, 2131);
     }
-#endif  // INTEL_EMBARGO_NPU5
 
     {
         std::cout << "\n\n NPU40 \n";

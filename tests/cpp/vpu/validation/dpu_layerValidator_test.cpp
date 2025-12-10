@@ -214,7 +214,6 @@ TEST_F(LayersValidationTest, BatchValues_Layer_and_SplitLayer_check_consistency_
             }
         }
     }
-#ifdef INTEL_EMBARGO_NPU5
     {
         /// for VPUDevice::NPU_5_0 we accept only 1 as value for batch
         VPUDevice device{VPUDevice::NPU_5_0};
@@ -249,7 +248,6 @@ TEST_F(LayersValidationTest, BatchValues_Layer_and_SplitLayer_check_consistency_
             check_err_completeLayer(tests);
         }
     }
-#endif  // INTEL_EMBARGO_NPU5
 }
 TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
     VPUNN::LayersValidation dut;
@@ -394,7 +392,6 @@ TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
         check_err_splitLayer(tests);
         check_err_completeLayer(tests);
     }
-#ifdef INTEL_EMBARGO_NPU5
     {
         VPUDevice device = VPUDevice::NPU_5_0;
 
@@ -412,7 +409,6 @@ TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
         check_err_splitLayer(tests);
         check_err_completeLayer(tests);
     }
-#endif  // INTEL_EMBARGO_NPU5
 }
 
 // here we want to see the behavior of check_layer_consistency() function when layer have bigger weight, height or/and
@@ -502,7 +498,6 @@ TEST_F(LayersValidationTest, Check_layer_with_big_shape) {
     lambda(tests);
 }
 
-#ifdef INTEL_EMBARGO_NPU5
 TEST_F(LayersValidationTest, Check_layer_with_autopad) {
     LayersValidation dut;
     SanityReport sane;
@@ -597,6 +592,5 @@ TEST_F(LayersValidationTest, Check_layer_with_autopad) {
             << wl2_layer_autopad;
 
 }
-#endif
 
 }  // namespace VPUNN_unit_tests

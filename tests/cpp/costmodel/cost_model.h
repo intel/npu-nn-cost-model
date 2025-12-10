@@ -42,9 +42,7 @@ protected:
                            ExecutionMode::CUBOID_16x16};
     DPUWorkload wl_glob_20;
     DPUWorkload wl_glob_40;
-#ifdef INTEL_EMBARGO_NPU5
     DPUWorkload wl_glob_50;
-#endif  // INTEL_EMBARGO_NPU5
 
 
     VPUCostModel empty_model{};
@@ -57,19 +55,15 @@ protected:
 
         wl_glob_40 = wl_glob_27;
         wl_glob_40.device = VPUDevice::VPU_4_0;
-#ifdef INTEL_EMBARGO_NPU5
         wl_glob_50 = wl_glob_40;
         wl_glob_50.device = VPUDevice::NPU_5_0;
-#endif  // INTEL_EMBARGO_NPU5
 
 
         cost_models.addModel(VPUDevice::VPU_2_0, VPU_2_0_MODEL_PATH);
         cost_models.addModel(VPUDevice::VPU_2_1, VPU_2_0_MODEL_PATH);
         cost_models.addModel(VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH);
         cost_models.addModel(VPUDevice::VPU_4_0, VPU_4_0_MODEL_PATH);
-#ifdef INTEL_EMBARGO_NPU5
         cost_models.addModel(VPUDevice::NPU_5_0, NPU_5_0_MODEL_PATH);
-#endif
     }
 
     void SetUp() override {

@@ -24,9 +24,7 @@
 #include "device_valid_valuesVPU2.h"
 #include "device_valid_valuesVPU2_7.h"
 #include "device_valid_valuesVPU4.h"
-#ifdef INTEL_EMBARGO_NPU5
 #include "device_valid_valuesVPU5.h"
-#endif  // INTEL_EMBARGO_NPU5
 #include "dpu_operations_valid_behaviours.h"
 #include "interface_valid_values.h"
 #include "memory_calculator.h"
@@ -315,10 +313,8 @@ protected:
 using OperationsContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations
                                                   VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues,
                                                   VPU4_0_WorkloadValidValues
-#ifdef INTEL_EMBARGO_NPU5
                                                   , VPU5_0_WorkloadValidValues
                                                   
-#endif  // INTEL_EMBARGO_NPU5
                                                   >;
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;

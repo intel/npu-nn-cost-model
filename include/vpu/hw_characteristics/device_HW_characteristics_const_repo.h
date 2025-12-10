@@ -18,9 +18,7 @@
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU2_1.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU2_7.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU4.h"
-#ifdef INTEL_EMBARGO_NPU5
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU5.h"
-#endif  // INTEL_EMBARGO_NPU5
 #include "vpu/hw_characteristics/device_HW_characteristics_base.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_default.h"
 
@@ -34,9 +32,7 @@ using DeviceHWCharacteristicsVariant =
         std::variant<VPU2_0_HWCharacteristics, VPU2_1_HWCharacteristics, VPU2_7_HWCharacteristics,
                      VPU2_7_HWCharacteristics_legacy,  // pre VPU4
                      VPU4_0_HWCharacteristics_v0, VPU4_0_HWCharacteristics_v1, VPU4_0_HWCharacteristics_legacy,  //
-#ifdef INTEL_EMBARGO_NPU5
                      VPU5_0_HWCharacteristics_v0, VPU5_0_HWCharacteristics_v1, VPU5_0_HWCharacteristics_legacy,  //
-#endif
                      Default_HWCharacteristics>;
 
 class DeviceHWCHaracteristicsConstRepo {
@@ -52,18 +48,14 @@ private:
                                                          VPU2_1_HWCharacteristics,     //
                                                          VPU2_7_HWCharacteristics,     //
                                                          VPU4_0_HWCharacteristics_v0,  // classic
-#ifdef INTEL_EMBARGO_NPU5
                                                          VPU5_0_HWCharacteristics_v0,  // classic
-#endif
                                                          Default_HWCharacteristics>;
 
     using MainEvo1SetTupleHWCharacteristics = std::tuple<VPU2_0_HWCharacteristics,     //
                                                          VPU2_1_HWCharacteristics,     //
                                                          VPU2_7_HWCharacteristics,     //
                                                          VPU4_0_HWCharacteristics_v1,  // DMA update1
-#ifdef INTEL_EMBARGO_NPU5
                                                          VPU5_0_HWCharacteristics_v1,  // DMA upd1
-#endif // INTEL_EMBARGO_NPU5
                                                          Default_HWCharacteristics>;
 
     // Legacy configuration tuple type
@@ -71,9 +63,7 @@ private:
                                                       VPU2_1_HWCharacteristics,         //
                                                       VPU2_7_HWCharacteristics_legacy,  //
                                                       VPU4_0_HWCharacteristics_legacy,  //
-#ifdef INTEL_EMBARGO_NPU5
                                                       VPU5_0_HWCharacteristics_legacy,  //
-#endif
                                                       Default_HWCharacteristics>;
 
     static_assert(std::tuple_size_v<MainEvo0SetTupleHWCharacteristics> ==

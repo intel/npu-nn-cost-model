@@ -38,12 +38,10 @@ public:
             return index;
         }
         index++;  // 4
-#ifdef INTEL_EMBARGO_NPU5
         if constexpr (device == VPUDevice::NPU_5_0) {
             return index;
         }
         index++;  // 5
-#endif
 
         return index;  // Default
     }
@@ -59,10 +57,8 @@ public:
             return std::get<get_device_index<VPUDevice::VPU_2_7>()>(theTuple);
         case VPUDevice::VPU_4_0:
             return std::get<get_device_index<VPUDevice::VPU_4_0>()>(theTuple);
-#ifdef INTEL_EMBARGO_NPU5
         case VPUDevice::NPU_5_0:
             return std::get<get_device_index<VPUDevice::NPU_5_0>()>(theTuple);
-#endif
         default:
             return std::get<get_device_index<VPUDevice::__size>()>(theTuple);
         }

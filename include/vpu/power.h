@@ -208,7 +208,6 @@ private:
         }
     };  // PowerVPU40
 
-#ifdef INTEL_EMBARGO_NPU5
     class PowerVPU50 {
     protected:
         static inline const float virus_logical_limit{1.0f};
@@ -333,7 +332,6 @@ private:
             return this_device;
         }
     };  // PowerVPU50
-#endif  // INTEL_EMBARGO_NPU5
 
     using pf_lut_t = std::vector<device_lut_t>;  ///> device discriminates,
 
@@ -342,9 +340,7 @@ private:
                 {PowerVPU2x::make_lut() /*VPUDevice::VPU_2_0, vpu_2_0_values_int, vpu_2_0_values_fp16*/},
                 {PowerVPU27::make_lut() /*VPUDevice::VPU_2_7, vpu_2_7_values_int, vpu_2_7_values_fp16*/},
                 {PowerVPU40::make_lut() /*VPUDevice::VPU_4_0, vpu_4_0_values_int, vpu_4_0_values_fp16*/},
-#ifdef INTEL_EMBARGO_NPU5
                 {PowerVPU50::make_lut() /*VPUDevice::NPU_5_0, vpu_5_0_values_int, vpu_5_0_values_fp16*/},
-#endif  // INTEL_EMBARGO_NPU5
         };
 
         // clang and gcc does not support to use std::move here, so we need suppression

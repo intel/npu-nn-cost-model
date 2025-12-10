@@ -608,7 +608,7 @@ void bind_VPUNN_4(std::function< pybind11::module &(std::string const &namespace
 		.value("VPU_4_0", VPUNN::VPUDevice::VPU_4_0)
 		.value("NPU_5_0", VPUNN::VPUDevice::NPU_5_0)
 		.value("NPU_RESERVED", VPUNN::VPUDevice::NPU_RESERVED)
-		.value("NPU_6_0", VPUNN::VPUDevice::NPU_6_0)
+		.value("NPU_RESERVED_1", VPUNN::VPUDevice::NPU_RESERVED_1)
 		.value("__size", VPUNN::VPUDevice::__size);
 
 ;
