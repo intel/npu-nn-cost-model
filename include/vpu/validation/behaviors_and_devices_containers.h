@@ -22,7 +22,9 @@ namespace VPUNN {
 /// @brief basic implementation for IContainer_OperationsDynamicBehavior
 /// maps operations to behaviors (provided as classed that implement IOperationDynamicConstraints interface at least)
 /// the order  matters, the map is fixed to be in the following order:
-/// CONVOLUTION, DW_CONVOLUTION, CM_CONVOLUTION, ELTWISE, MAXPOOL, LAYERNORM, ELTWISE_MUL, AVEPOOL
+/// CONVOLUTION (0), DW_CONVOLUTION (1), CM_CONVOLUTION (2), ELTWISE (3), MAXPOOL (4), LAYERNORM (5), ELTWISE_MUL (6),
+/// AVEPOOL (7) , REDUCE_MS(8), REDUCE_SUMSQUARES(9)
+///    TODO: ADD new ones
 ///
 /// @tparam TOperationsBehavior parameter pack providing the correctly ordered list of behaviors
 template <class... TOperationsBehavior>
@@ -88,6 +90,14 @@ public:
             static_assert((std::tuple_size<OpList>::value) > 7, "check tuple");
             return std::get<7>(op_list);
             break;
+        case Operation::REDUCE_MS:
+            static_assert((std::tuple_size<OpList>::value) > 8, "check tuple");
+            return std::get<8>(op_list);
+            break;
+        case Operation::REDUCE_SUMSQUARES:
+            static_assert((std::tuple_size<OpList>::value) > 9, "check tuple");
+            return std::get<9>(op_list);
+            break;
 
         default: {
             // should throw!
@@ -102,6 +112,10 @@ public:
             std::string details = buffer.str();
             throw std::runtime_error(details);
         }
+            // when you add a new Operation, untill you add its validator/behavior  you can deactivate this so it
+            // compiles (as long as new op is not used)
+            static_assert((std::tuple_size<OpList>::value) >= (int)Operation::__size,
+                          "Not all Operations have a handling!");
         }
     }
 };

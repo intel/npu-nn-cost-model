@@ -14,176 +14,17 @@
 #include "vpu/compatibility/types11.h"
 #include "vpu/compatibility/types12.h"
 #include "vpu/compatibility/types13.h"
+#include "vpu/compatibility/types14.h"
+#include "vpu/compatibility/types15.h"
+#include "vpu/compatibility/types16.h"
 
-#include "vpu_cost_model.h"
+// #include "vpu_cost_model.h"
 
 #include <algorithm>
 #include "common/common_helpers.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
-
-// class TestPreprocessingLatest : public ::testing::Test {
-// public:
-// protected:
-//     void SetUp() override {
-//     }
-//     const DPUWorkload wl = {
-//             VPUDevice::VPU_2_7,
-//             Operation::CONVOLUTION,
-//             {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // input dimensions
-//             {VPUTensor(56, 56, 16, 1, DataType::UINT8)},  // output dimensions
-//             {3, 3},                                       // kernels
-//             {1, 1},                                       // strides
-//             {1, 1},                                       // padding
-//             ExecutionMode::CUBOID_16x16,
-//             ActivationFunction::NONE,  //
-//             0.2F,                      // act sparsity
-//             0.8F,                      // weight_sparsity
-//             {swz_def, swz_def},        // input_swizzling
-//             {swz_def},                 // output_swizzling
-//             1,                         // owtiles
-//             {0, 0, 0, 0},              // offsets,
-//             ISIStrategy::CLUSTERING,   //
-//             false,                     // weight_sparsity_enabled
-//             {
-//                     {1, 2, 3, 4},              // input_0_halo
-//                     {5, 6, 7, 8},              // output_0_halo
-//                     {9, 10, 11, 12},           // output_0_halo_broadcast_cnt
-//                     {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
-//             }                                  // halo
-//     };
-//
-// private:
-// };
-//
-//// Demonstrate some basic assertions.
-// TEST_F(TestPreprocessingLatest, SingleWLTestPreprocessing) {
-//     // Instantiate the preprocessing class
-//     auto pp = PreprocessingLatest<float>();
-//     // Transform a single workload
-//     std::vector<float> result = pp.transform(wl);
-// }
-//
-//// Demonstrate some basic assertions.
-// TEST_F(TestPreprocessingLatest, MultipleWLTestPreprocessing) {
-//     // Instantiate the preprocessing class
-//     auto pp = PreprocessingLatest<float>();
-//     // Transform a batch of them
-//     const std::vector<DPUWorkload> wl_lst = {wl, wl, wl};
-//     std::vector<float> result = pp.transform(wl_lst);
-//
-//     for (unsigned int batch_idx = 0; batch_idx < 3; batch_idx++) {
-//         std::vector<float> batch_result = pp.transform(wl_lst[batch_idx]);
-//
-//         EXPECT_EQ(batch_result.size() * 3, result.size());
-//         for (unsigned int idx = 0; idx < batch_result.size(); idx++) {
-//             EXPECT_EQ(batch_result[idx], result[idx + batch_idx * pp.output_size()]);
-//         }
-//     }
-// }
-//
-//// Demonstrate basic creation and size
-// TEST_F(TestPreprocessingLatest, CreationAndSize) {
-//     const unsigned int expected_descriptor_size =
-//             102 + 2  // NPU device (5.0 & 5.0W)
-//             + 2      // new 2 operations
-//             + ((2 + 6) /*new 2 data types*/ * 3 /*tensors*/) +
-//             (3 * 6 /*3*6 halo info*/ - 9 /* rem Device and isi*/ - 15 /*swizz is 1 now*/);
-//
-//     EXPECT_EQ(expected_descriptor_size, 124);
-//
-//     auto pp{PreprocessingLatest<float>()};
-//     EXPECT_EQ(pp.output_size(), expected_descriptor_size);
-//
-//     size_t data_written = 0;
-//     std::vector<float> result = pp.generate_descriptor(wl, data_written);
-//     EXPECT_EQ(data_written, expected_descriptor_size);
-// }
-//
-//// The latest fast implementation might have also a stable version implementation and their outputs should be the same
-// TEST_F(TestPreprocessingLatest, TestLatestIsEqualToSomeVersion) {
-//     // Instantiate the preprocessing class
-//     auto pp = PreprocessingLatest<float>();
-//
-//     auto pp_equiv = Preprocessing_Interface12<float>();
-//     // auto pp_equiv = PreprocessingLatest<float>();  // not equal to any
-//
-//     EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_00_LATEST_NONE);
-//     EXPECT_EQ(pp.implements_also_interface(), pp_equiv.interface_version());
-//
-//     {
-//         size_t filled = 0;
-//         std::vector<float> resultL = pp.generate_descriptor(wl, filled);
-//         size_t filled_equiv = 0;
-//         std::vector<float> result_equiv = pp_equiv.generate_descriptor(wl, filled_equiv);
-//
-//         ASSERT_EQ(resultL.size(), result_equiv.size());
-//         EXPECT_EQ(filled, filled_equiv) << "Actual filled data must match";
-//
-//         std::cout << "\nLatest    ";
-//         for (const auto x : resultL) {
-//             std::cout << " " << x << "";
-//         }
-//         std::cout << "\nEquivalent";
-//         for (const auto x : result_equiv) {
-//             std::cout << " " << x;
-//         }
-//
-//         for (size_t i = 0; i < resultL.size(); ++i) {
-//             EXPECT_EQ(resultL[i], result_equiv[i]) << "!= at elem : " << i;
-//         }
-//     }
-//     // todo:  test should be done on multiple workloads
-//     {
-//         const DPUWorkload tst_wl = {
-//                 VPUDevice::VPU_2_7,
-//                 Operation::CONVOLUTION,
-//                 {VPUTensor(56, 57, 16, 1, DataType::UINT8, Layout::XYZ, true)},   // input dimensions
-//                 {VPUTensor(56, 57, 16, 1, DataType::UINT8, Layout::XZY, false)},  // output dimensions
-//                 {1, 2},                                                           // kernels
-//                 {3, 4},                                                           // strides
-//                 {5, 6, 7, 8},                                                     // padding
-//                 ExecutionMode::CUBOID_16x16,                                      //
-//                 ActivationFunction::NONE,                                         //
-//                 0.7F,                                                             // act sparsity
-//                 0.3F,                                                             // weight_sparsity
-//                 {Swizzling::KEY_0, Swizzling::KEY_1},                             // swiz in
-//                 {Swizzling::KEY_5},                                               // swiz out
-//                 101,                                                              // owtiles
-//                 {0, 0, 0, 0},                                                     // offsets,
-//                 ISIStrategy::SPLIT_OVER_H,                                        //
-//                 false,                                                            // weight_sparsity_enabled
-//                 {
-//                         {1, 2, 3, 4},              // input_0_halo
-//                         {5, 6, 7, 8},              // output_0_halo
-//                         {9, 10, 11, 12},           // output_0_halo_broadcast_cnt
-//                         {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
-//                 }                                  // halo
-//         };
-//
-//         size_t filled = 0;
-//         std::vector<float> resultL = pp.generate_descriptor(tst_wl, filled);
-//         size_t filled_equiv = 0;
-//         std::vector<float> result_equiv = pp_equiv.generate_descriptor(tst_wl, filled_equiv);
-//
-//         ASSERT_EQ(resultL.size(), result_equiv.size());
-//         EXPECT_EQ(filled, filled_equiv) << "Actual filled data must match";
-//
-//         std::cout << "\nLatest    ";
-//         for (const auto x : resultL) {
-//             std::cout << " " << x << "";
-//         }
-//         std::cout << "\nEquivalent";
-//         for (const auto x : result_equiv) {
-//             std::cout << " " << x;
-//         }
-//
-//         for (size_t i = 0; i < resultL.size(); ++i) {
-//             EXPECT_EQ(resultL[i], result_equiv[i]) << "!= at elem : " << i;
-//         }
-//     }
-// }
 
 class TestPreprocessing_Interface01 : public ::testing::Test {
 public:
@@ -971,7 +812,7 @@ protected:
                     {5, 6, 7, 8, 81, 82},      // output_0_halo
                     {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
                     {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
-            }                                  // halo
+            }  // halo
     };
 
     const int descriptor_expected_size{44};
@@ -1037,7 +878,7 @@ TEST_F(TestPreprocessing_Interface12, DescriptorContentTest) {
                     {7, 8, 9, 10, 11, 12},     // output_0_halo
                     {13, 14, 15, 16, 17, 18},  // output_0_halo_broadcast_cnt
                     {19, 20, 21, 22, 23, 24},  // output_0_inbound_halo
-            }                                  // halo
+            }  // halo
     };
 
     auto pp = Preprocessing_Interface12<float>();
@@ -1114,7 +955,7 @@ TEST_F(TestPreprocessing_Interface12, DescriptorContentTest_FLOAT_INT) {
                             {5, 6, 7, 8, 81, 82},      // output_0_halo
                             {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
                             {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
-                    }                                  // halo
+                    }  // halo
             };
         }
     };
@@ -1334,7 +1175,7 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest) {
                     {7, 8, 9, 10, 11, 12},     // output_0_halo
                     {13, 14, 15, 16, 17, 18},  // output_0_halo_broadcast_cnt
                     {19, 20, 21, 22, 23, 24},  // output_0_inbound_halo
-            }                                  // halo
+            }  // halo
     };
 
     auto pp = Preprocessing_Interface13<float>();
@@ -1522,7 +1363,7 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest_FLOAT_INT) {
                             {5, 6, 7, 8, 81, 82},      // output_0_halo
                             {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
                             {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
-                    }                                  // halo
+                    }  // halo
             };
         }
     };
@@ -1634,6 +1475,7 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest_FLOAT_INT) {
 
 //------------------------------------------------------------------------------------------------
 /// interface 14
+// begin ITF14
 
 class TestPreprocessing_Interface14 : public ::testing::Test {
 public:
@@ -1742,7 +1584,7 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest) {
                     {7, 8, 9, 10, 11, 12},     // output_0_halo
                     {13, 14, 15, 16, 17, 18},  // output_0_halo_broadcast_cnt
                     {19, 20, 21, 22, 23, 24},  // output_0_inbound_halo
-            }                                  // halo
+            }  // halo
     };
 
     auto pp = Preprocessing_Interface14<float>();
@@ -1933,7 +1775,7 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest_FLOAT_INT) {
                             {5, 6, 7, 8, 81, 82},      // output_0_halo
                             {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
                             {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
-                    }                                  // halo
+                    }  // halo
             };
         }
     };
@@ -2108,6 +1950,251 @@ TEST_F(TestPreprocessing_Interface14, EISXW164800_Tensor_CH_padding) {
     EXPECT_EQ(desc_input_autopad[in_0_idx + 2], 16);  // input z dimension must be padded to 16
 }
 
+TEST_F(TestPreprocessing_Interface14, TransformOnlyInsertAutopadding) {
+    auto pp = Preprocessing_Interface14<float>();
+
+    // Test Case 1: Input with channels < 16, should be padded when autopad=true
+    DPUWorkload wl_ref{
+            VPUDevice::NPU_5_0,
+            Operation::ELTWISE,
+            {VPUTensor(28, 9, 8, 1, DataType::FLOAT16)},  // input dimensions - channels = 8 (< 16)
+            {VPUTensor(28, 9, 4, 1, DataType::UINT8)},    // output dimensions - channels = 4 (< 16)
+            {1, 1},                                       // kernels
+            {1, 1},                                       // strides
+            {0, 0, 0, 0},                                 // padding
+            ExecutionMode::CUBOID_8x16,                   // execution mode
+            ActivationFunction::NONE,                     // activation
+            0.0F,                                         // act_sparsity
+            0.0F,                                         // weight_sparsity
+            {swz_def, swz_def},                           // input_swizzling
+            {swz_def},                                    // output_swizzling
+            1,                                            // output_write_tiles
+            {0, 0, 0, 0},                                 // offsets
+            ISIStrategy::CLUSTERING,                      // isi_strategy
+            false,                                        // weight_sparsity_enabled
+    };
+    wl_ref.superdense_memory = true;
+
+    DPUWorkload wl_to_transform{wl_ref};
+
+    // Test 1a: autopad = true, channels < 16 -> should pad to 16
+    wl_to_transform.input_autopad = true;
+    wl_to_transform.output_autopad = true;
+    auto desc_padded = pp.transformSingle(wl_to_transform);
+    EXPECT_EQ(desc_padded[in_0_idx + 2], 16)
+            << "Input should be padded to 16 channels when autopad=true and channels < 16";
+    EXPECT_EQ(desc_padded[out_0_idx + 2], 16)
+            << "Output should be padded to 16 channels when autopad=true and channels < 16";
+
+    // Test 1b: autopad = false, channels < 16 -> should NOT pad
+    wl_to_transform.input_autopad = false;
+    wl_to_transform.output_autopad = false;
+    auto desc_not_padded = pp.transformSingle(wl_to_transform);
+    EXPECT_EQ(desc_not_padded[in_0_idx + 2], 8) << "Input should NOT be padded when autopad=false";
+    EXPECT_EQ(desc_not_padded[out_0_idx + 2], 4) << "Output should NOT be padded when autopad=false";
+
+    // Test 1c: autopad = nullopt, channels < 16 -> should NOT pad
+    wl_to_transform.input_autopad = std::nullopt;
+    wl_to_transform.output_autopad = std::nullopt;
+    auto desc_no_autopad = pp.transformSingle(wl_to_transform);
+    EXPECT_EQ(desc_no_autopad[in_0_idx + 2], 8) << "Input should NOT be padded when autopad is nullopt";
+    EXPECT_EQ(desc_no_autopad[out_0_idx + 2], 4) << "Output should NOT be padded when autopad is nullopt";
+
+    // Test Case 2: Input with channels >= 16, should NOT be padded even when autopad=true
+    DPUWorkload wl_ref_no_pad{
+            VPUDevice::NPU_5_0,
+            Operation::ELTWISE,
+            {VPUTensor(28, 9, 16, 1, DataType::FLOAT16)},  // input dimensions - channels = 16
+            {VPUTensor(28, 9, 32, 1, DataType::UINT8)},    // output dimensions - channels = 32
+            {1, 1},                                        // kernels
+            {1, 1},                                        // strides
+            {0, 0, 0, 0},                                  // padding
+            ExecutionMode::CUBOID_8x16,                    // execution mode
+            ActivationFunction::NONE,                      // activation
+            0.0F,                                          // act_sparsity
+            0.0F,                                          // weight_sparsity
+            {swz_def, swz_def},                            // input_swizzling
+            {swz_def},                                     // output_swizzling
+            1,                                             // output_write_tiles
+            {0, 0, 0, 0},                                  // offsets
+            ISIStrategy::CLUSTERING,                       // isi_strategy
+            false,                                         // weight_sparsity_enabled
+    };
+    wl_ref_no_pad.superdense_memory = true;
+
+    DPUWorkload wl_no_pad{wl_ref_no_pad};
+    wl_no_pad.input_autopad = true;
+    wl_no_pad.output_autopad = true;
+    auto desc_already_16plus = pp.transformSingle(wl_no_pad);
+    EXPECT_EQ(desc_already_16plus[in_0_idx + 2], 16) << "Input with channels=16 should remain 16";
+    EXPECT_EQ(desc_already_16plus[out_0_idx + 2], 32) << "Output with channels=32 should remain 32";
+}
+
 // end ITF14
 
+//------------------------------------------------------------------------------------------------
+/// interface 15
+
+class TestPreprocessing_Interface15 : public ::testing::Test {
+public:
+protected:
+    void SetUp() override {
+    }
+    const DPUWorkload wl = {
+            VPUDevice::NPU_5_0,
+            Operation::CONVOLUTION,
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // input dimensions
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // output dimensions
+            {3, 3},                                                          // kernels
+            {1, 1},                                                          // strides
+            {1, 1},                                                          // padding
+            ExecutionMode::CUBOID_16x16,                                     //
+            ActivationFunction::NONE,                                        //
+            0.7F,                                                            // act sparsity
+            0.3F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // owtiles
+            {0, 0, 0, 0},                                                    // offsets,
+            ISIStrategy::SPLIT_OVER_H,                                       //
+            false,                                                           // weight_sparsity_enabled
+            {
+                    {1, 2, 3, 4, 41, 42},      // input_0_halo
+                    {5, 6, 7, 8, 81, 82},      // output_0_halo
+                    {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
+                    {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
+            },                                 // halo
+            {
+                    // sep
+                    false,             // sep on
+                    {2050, 22, 1, 1},  // sep table,  4 bytes per element
+                    {512, 5, 64, 1},   // actual activator input,  same datatype as compute tensor input
+                    false,
+            }  // sep
+
+    };
+
+    const int descriptor_expected_size{44 + 3 + 3 + 3};
+    const int tensor_Dtype_idx = 4;  // 4D shape
+    const int tensorDescriptorSize = tensor_Dtype_idx + (int)intf_15::DataType::__size;
+
+    const int op_idx = 0;
+    const int in_0_idx{op_idx + (int)intf_12::Operation::__size};
+    const int in_1_dtype_idx{in_0_idx + tensorDescriptorSize};
+    const int out_0_idx{in_1_dtype_idx + (int)intf_15::DataType::__size};
+    const int ksp_idx = out_0_idx + tensorDescriptorSize;
+    const int execution_mode_idx = ksp_idx + 8; /*kernel:2 +strides:2+padding:4*/
+    const int sparsities_idx = execution_mode_idx + (int)intf_12::ExecutionMode::__size;
+    const int owt_idx = sparsities_idx + 2;  /*sparsities:2*/
+    const int odu_permute_idx = owt_idx + 1; /*owt:1*/
+    const int inplace_output_idx = odu_permute_idx + (int)intf_12::Layout::__size;
+    const int inplace_input1_idx = inplace_output_idx + 1;
+    const int superdense_idx = inplace_input1_idx + 1;
+
+    const int first_after_end_idx = superdense_idx + 1;
+};
+
+// Demonstrate some basic assertions.
+TEST_F(TestPreprocessing_Interface15, SingleWLTestPreprocessing) {
+    EXPECT_EQ(first_after_end_idx, descriptor_expected_size);
+    EXPECT_EQ(descriptor_expected_size, 44 + 3 + 3 + 3 + /*new*/ +0);
+    // Instantiate the preprocessing class
+    auto pp = Preprocessing_Interface15<float>();
+    // Transform a single workload
+    std::vector<float> result = pp.transformSingle(wl);
+    EXPECT_EQ(result.size(), descriptor_expected_size);
+}
+// Demonstrate basic creation and size
+TEST_F(TestPreprocessing_Interface15, CreationAndSize) {
+    auto pp = Preprocessing_Interface15<float>();
+    EXPECT_EQ(pp.output_size(), descriptor_expected_size);  //
+
+    EXPECT_EQ(pp.interface_version(), pp.getInterfaceVersion()) << " dynamic and static version must be equal";
+    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_15_NPU_RESERVED_11);
+    size_t data_written = 0;
+    std::vector<float> result = pp.generate_descriptor(wl, data_written);
+    EXPECT_EQ(data_written, descriptor_expected_size);  // this is the actual filled dimension
+
+    EXPECT_EQ(result.size(), data_written);
+}
+
+TEST_F(TestPreprocessing_Interface15, TransformOnlyInsertAutopadding) {
+    auto pp = Preprocessing_Interface15<float>();
+
+    // Test Case 1: Input with channels < 16, should be padded when autopad=true
+    DPUWorkload wl_ref{
+            VPUDevice::NPU_5_0,
+            Operation::ELTWISE,
+            {VPUTensor(28, 9, 8, 1, DataType::FLOAT16)},  // input dimensions - channels = 8 (< 16)
+            {VPUTensor(28, 9, 4, 1, DataType::UINT8)},    // output dimensions - channels = 4 (< 16)
+            {1, 1},                                       // kernels
+            {1, 1},                                       // strides
+            {0, 0, 0, 0},                                 // padding
+            ExecutionMode::CUBOID_8x16,                   // execution mode
+            ActivationFunction::NONE,                     // activation
+            0.0F,                                         // act_sparsity
+            0.0F,                                         // weight_sparsity
+            {swz_def, swz_def},                           // input_swizzling
+            {swz_def},                                    // output_swizzling
+            1,                                            // output_write_tiles
+            {0, 0, 0, 0},                                 // offsets
+            ISIStrategy::CLUSTERING,                      // isi_strategy
+            false,                                        // weight_sparsity_enabled
+    };
+    wl_ref.superdense_memory = true;
+
+    DPUWorkload wl_to_transform{wl_ref};
+
+    // Test 1a: autopad = true, channels < 16 -> should pad to 16
+    wl_to_transform.input_autopad = true;
+    wl_to_transform.output_autopad = true;
+    auto desc_padded = pp.transformSingle(wl_to_transform);
+    EXPECT_EQ(desc_padded[in_0_idx + 2], 16)
+            << "Input should be padded to 16 channels when autopad=true and channels < 16";
+    EXPECT_EQ(desc_padded[out_0_idx + 2], 16)
+            << "Output should be padded to 16 channels when autopad=true and channels < 16";
+
+    // Test 1b: autopad = false, channels < 16 -> should NOT pad
+    wl_to_transform.input_autopad = false;
+    wl_to_transform.output_autopad = false;
+    auto desc_not_padded = pp.transformSingle(wl_to_transform);
+    EXPECT_EQ(desc_not_padded[in_0_idx + 2], 8) << "Input should NOT be padded when autopad=false";
+    EXPECT_EQ(desc_not_padded[out_0_idx + 2], 4) << "Output should NOT be padded when autopad=false";
+
+    // Test 1c: autopad = nullopt, channels < 16 -> should NOT pad
+    wl_to_transform.input_autopad = std::nullopt;
+    wl_to_transform.output_autopad = std::nullopt;
+    auto desc_no_autopad = pp.transformSingle(wl_to_transform);
+    EXPECT_EQ(desc_no_autopad[in_0_idx + 2], 8) << "Input should NOT be padded when autopad is nullopt";
+    EXPECT_EQ(desc_no_autopad[out_0_idx + 2], 4) << "Output should NOT be padded when autopad is nullopt";
+
+    // Test Case 2: Input with channels >= 16, should NOT be padded even when autopad=true
+    DPUWorkload wl_ref_no_pad{
+            VPUDevice::NPU_5_0,
+            Operation::ELTWISE,
+            {VPUTensor(28, 9, 16, 1, DataType::FLOAT16)},  // input dimensions - channels = 16
+            {VPUTensor(28, 9, 32, 1, DataType::UINT8)},    // output dimensions - channels = 32
+            {1, 1},                                        // kernels
+            {1, 1},                                        // strides
+            {0, 0, 0, 0},                                  // padding
+            ExecutionMode::CUBOID_8x16,                    // execution mode
+            ActivationFunction::NONE,                      // activation
+            0.0F,                                          // act_sparsity
+            0.0F,                                          // weight_sparsity
+            {swz_def, swz_def},                            // input_swizzling
+            {swz_def},                                     // output_swizzling
+            1,                                             // output_write_tiles
+            {0, 0, 0, 0},                                  // offsets
+            ISIStrategy::CLUSTERING,                       // isi_strategy
+            false,                                         // weight_sparsity_enabled
+    };
+    wl_ref_no_pad.superdense_memory = true;
+
+    DPUWorkload wl_no_pad{wl_ref_no_pad};
+    wl_no_pad.input_autopad = true;
+    wl_no_pad.output_autopad = true;
+    auto desc_already_16plus = pp.transformSingle(wl_no_pad);
+    EXPECT_EQ(desc_already_16plus[in_0_idx + 2], 16) << "Input with channels=16 should remain 16";
+    EXPECT_EQ(desc_already_16plus[out_0_idx + 2], 32) << "Output with channels=32 should remain 32";
+}
 }  // namespace VPUNN_unit_tests

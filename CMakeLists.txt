@@ -41,20 +41,21 @@ option(GENERATE_PYTHON_BINDING "Generate the python bindings code" OFF)
 option(VPUNN_BUILD_HTTP_CLIENT "Build support for cost provider http service" OFF)
 option(VPUNN_OPT_LEGACY_ZTILING "Use legacy ZTiling mechanism" ON)
 option(VPUNN_OPT_LEGACY_DMA_TH_4 "Use legacy Theoretical DMA for Gen4" OFF)
-option(ENABLE_FLATBUFFERS_INSTALLATION "Install flatbuffers and its dependency ProjectConfig" ON)
 
 # Detect JavaScript build env
 if(DEFINED ENV{EMSDK} AND DEFINED ENV{EMSCRIPTEN})
-    set(JS_BUILD ON)
-else()
-    set(JS_BUILD OFF)
+    message(STATUS "VPUNN -- JavaScript support was removed from Cost Model interface")
 endif()
+set(JS_BUILD OFF) # Explicitly set to OFF since JS build is no longer supported
 
 # Global settings
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(COST_MODEL_ROOT_DIR         ${CMAKE_CURRENT_SOURCE_DIR})
 set(COST_MODEL_BINARY_DIR       ${CMAKE_CURRENT_BINARY_DIR})
 set(EXTERNAL_INSTALL_LOCATION   ${CMAKE_CURRENT_BINARY_DIR}/external)
+
+# Add cmake directory to module path for consistent cmake/<cmake_module> includes
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Output directory setup
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -64,7 +65,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 # Flatbuffers is included in the root because subdirectories
 # and directories of subdirectories needs this target and 
 # certain flatbuffers variables.
-include(cmake/FlatbuffersSetup.cmake)
+include(cmake/FlatbuffersSetup)
 
 # Common settings library
 # Consumer libs should always link this as PRIVATE to avoid transitive propagation.
@@ -74,7 +75,6 @@ target_sources(vpunn_common_settings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/com
 
 # Apply C++ standard requirement to this target and (optionally) to dependents
 target_compile_features(vpunn_common_settings PUBLIC cxx_std_17)
-
 
 if(VPUNN_OPT_LEGACY_DMA_TH_4)
     target_compile_definitions(vpunn_common_settings PUBLIC VPUNN_OPT_LEGACY_DMA_TH_4)
@@ -116,44 +116,42 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
     endif()
 endif()
 
-# Non JS builds
-if(NOT JS_BUILD)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-        # lots of warnings and all warnings as errors
-        message(STATUS "Setting GCC/Clang specific flags for common settings")
-        target_compile_options(vpunn_common_settings PUBLIC
-                -Wall -Wextra -Werror -pedantic -Wdouble-promotion -Wfloat-conversion
-                $<$<CONFIG:Debug>:-g>
-                $<$<CONFIG:Release>:-O3>
-            )
-        elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-            message(STATUS "Setting Visual Studio specific flags for common settings")
-        target_compile_options(vpunn_common_settings PUBLIC
-                # Enable /bigobj for debug build type with MSVC - remove after vpunn headers are cleaned up
-                $<$<CONFIG:Debug>:/bigobj>
-                /W4 /WX
-            )
-        # TODO figure out why it propagates to VPUx even though it is linked as PRIVATE in other libs
-        # and re-enable
-        # target_link_options(vpunn_common_settings PUBLIC
-        #         /WX
-        #     )
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    # lots of warnings and all warnings as errors
+    message(STATUS "Setting GCC/Clang specific flags for common settings")
+    target_compile_options(vpunn_common_settings PUBLIC
+            -Wall -Wextra -Werror -pedantic -Wdouble-promotion -Wfloat-conversion
+            $<$<CONFIG:Debug>:-g>
+            $<$<CONFIG:Release>:-O3>
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        message(STATUS "Setting Visual Studio specific flags for common settings")
+    target_compile_options(vpunn_common_settings PUBLIC
+            # Enable /bigobj for debug build type with MSVC - remove after vpunn headers are cleaned up
+            $<$<CONFIG:Debug>:/bigobj>
+            /W4 /WX
+        )
+    # TODO figure out why it propagates to VPUx even though it is linked as PRIVATE in other libs
+    # and re-enable
+    # target_link_options(vpunn_common_settings PUBLIC
+    #         /WX
+    #     )
 
-        # Disable dll build
-        set(VPUNN_BUILD_SHARED_LIB OFF)
-    else()
-        message(WARNING "-- Building with unrecognised compiler, not setting any specific flags")
-    endif()
+    # Disable dll build
+    set(VPUNN_BUILD_SHARED_LIB OFF)
+else()
+    message(WARNING "-- Building with unrecognised compiler, not setting any specific flags")
 endif()
+
 
 # Add subdirectories
 add_subdirectory(src)
-add_subdirectory(js)
 
 # Optional subdirectories based on build options
 if(VPUNN_BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
+
 
 if(VPUNN_BUILD_APPS)
     add_subdirectory(apps/cache_app)

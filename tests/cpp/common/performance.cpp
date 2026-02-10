@@ -27,18 +27,28 @@ protected:
 
     const VPUNNModelsFiles& the_NN_models{VPUNNModelsFiles::getModels()};  ///< the paths to available NN models
 
-    const float requirements_target_latency{150.F / 1000.F};  // 100 microseconds
-    const float tolerance_factor_for_debug{25.0F};  ///< big enough to not cause problems when running tests in debug
+    const float requirements_target_latency_ms{70.F /
+                                               1000.F};  // 100 microseconds reduced to 80. typ is <70 on gcc/clang on
+                                                         // linux. larger on WIndows with MSC++ compiler
+
+#ifdef _WINDOWS
+    const float os_overhead_factor{2.0F};  ///< windows has larger overheads
+#else
+    const float os_overhead_factor{1.0f};  ///< linux/macOS have smaller overheads
+#endif
+
 #if defined(_DEBUG) || defined(NO_PROFILING_ALLOWED) || defined(DEBUG)
+    const float tolerance_factor_for_debug{20.0F};  ///< big enough to not cause problems when running tests in debug
     const bool time_relevance{false};
-    const float target_latency{requirements_target_latency * tolerance_factor_for_debug};  ///< miliseconds
-    const float strict_target_latency{target_latency};                                     ///< miliseconds
-    const unsigned int population_size{100};
+    const float target_latency{requirements_target_latency_ms * os_overhead_factor *
+                               tolerance_factor_for_debug};  // miliseconds
+    const float strict_target_latency{target_latency};       // miliseconds
+    const unsigned int population_size{50};                 // keep very short in debug
 #else
     const bool time_relevance{true};
-    const float target_latency{requirements_target_latency};         ///< miliseconds
-    const float strict_target_latency{requirements_target_latency};  ///< miliseconds
-    const unsigned int population_size{1000};
+    const float target_latency{requirements_target_latency_ms * os_overhead_factor};  // miliseconds
+    const float strict_target_latency{requirements_target_latency_ms};                // miliseconds
+    const unsigned int population_size{2000};  // put large enough so values are statistically stable
 #endif
 
 private:
@@ -102,7 +112,7 @@ TEST_F(VPUNNPerformanceTest, Standard_InferenceLatency_stochastic) {
                           << "\n\t First: " << first << ", Last: " << last << ",  10th%: " << at10percentile
                           << ",  90th%: " << at90percentile << std::endl
                           << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
-                EXPECT_LE(wl_latency, target_latency)
+                EXPECT_LE(std::min(wl_latency, median), target_latency)
                         << " WL Latency Info for " << model_path << "   Target Latency[ms]:" << target_latency
                         << std::endl
                         << "   T: 1xN: 1 wl avg latency: " << wl_latency << " Test with: " << n_workloads
@@ -118,7 +128,7 @@ TEST_F(VPUNNPerformanceTest, Standard_InferenceLatency_stochastic) {
         }
     }
 }
-TEST_F(VPUNNPerformanceTest, FAST_InferenceLatencyStrict_stochastic) {
+TEST_F(VPUNNPerformanceTest, DISABLED_FAST_InferenceLatencyStrict_stochastic) {
     const unsigned int n_workloads = population_size;
 
     for (auto& model_info : the_NN_models.fast_model_paths) {

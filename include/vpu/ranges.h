@@ -11,13 +11,13 @@
 #define VPUNN_RANGES
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <variant>
 #include <vector>
-#include<limits>
 
 #include "vpu/utils.h"
 
@@ -82,11 +82,12 @@ public:
         return *this;
     }
 
-    ~SmartRanges(){};
+    ~SmartRanges() {};
 
     /// @brief: here we verify if a value respect all the range requirements
     /// @param value: the value we want to verify
-    /// @param text: a string with information when value does not respect all the requirements
+    /// @param text: a string with information when value does not respect all the requirements, will be cleaned up
+    /// initially
     /// @return true if value respect all the requirements, false if not
     bool is_in(int value, std::string& text) const {
         // const bool belongs{(value >= lowerBound) && (value <= upperBound)};
@@ -244,6 +245,7 @@ public:
     static constexpr int max_limit{std::numeric_limits<int>::max()};  ///< max value accepted for a SmartRange bound
 };
 
+/// @brief holds multiple SmartRanges and allows to check if a value respects at least one of them
 class MultiSmartRanges {
 private:
     std::vector<SmartRanges> ranges;
@@ -288,21 +290,28 @@ public:
     ///             - If empty: all ranges are checked (mask is set to all true).
     ///             - If smaller than the number of ranges: mask is extended with false for missing entries.
     ///             - If larger than the number of ranges: extra mask entries are ignored.
-    /// @return true if value respect all the requirements, false if not
+    /// @return true if value respect at least one range, false if not
     bool is_in(int value, std::string& text, std::vector<bool> mask = {}) const {
         if (mask.empty()) {
             mask.resize(ranges.size(), true);  // all ranges are checked
         } else if (mask.size() < ranges.size()) {
             mask.resize(ranges.size(), false);  // missing entries are not checked
         }
+        std::string all_failed_message{""};
+        std::string one_range_message{""};
         for (size_t i = 0; i < ranges.size(); ++i) {
             if (mask[i]) {
-                if (ranges[i].is_in(value, text)) {
-                    return true;
+                if (ranges[i].is_in(value, one_range_message)) {
+                    // at least one match found, no message needed
+                    return true;  // at least one match found,  EXIT
+                } else {
+                    // accumulate messages for all failed ranges
+                    all_failed_message += " Range " + std::to_string(i) + " check failed: " + one_range_message + "\n";
                 }
             }
         }
-        return false;
+        text = std::move(all_failed_message);  // all failed ranges
+        return false;                          // no match found
     }
 
     bool is_in(int value, std::vector<bool> mask = {}) const {

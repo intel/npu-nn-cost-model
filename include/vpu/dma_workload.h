@@ -85,64 +85,64 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMAWorkload& 
 
 /// Transforms from one workload to another
 class DMAWorkloadTransformer {
-public:
-    /// creates a DMANNWorkload from a DMAWorkload if possible.
+private:
+    /**
+     * Helper functions for specific DMA Workloads type conversion.
+     */
+
+    /// Helper: DMAWorkload -> DMANNWorkload_NPU27
+    /// @brief creates a DMANNWorkload from a DMAWorkload if possible.
     /// The DMA workload has to be a simple transfer without datatype change, layout change or size change.
     /// The resulted DMANNWorkload will have all data in one plane!
     /// NN Model was trained only for :  TASK.TYPE=1 , 2D transfer where LEN = *WIDTH = Byte transferred
     ///
     /// @returns created DMANNWorkload with all data in only one plane
     /// @throws  std::runtime_error in case the preconditions are not met for a simple DMA
-    static inline DMANNWorkload_NPU27 create_workload(const DMAWorkload& dma) {
-        // check if same datatype , layout and  size
-
+    static inline DMANNWorkload_NPU27 DMAWorkload_to_NPU27(const DMAWorkload& dma) {
         const auto& in{dma.input};
         const auto& out{dma.output};
-        if ((in.size() != out.size()) ||            // not same size in bytes
-            (in.get_dtype() != out.get_dtype()) ||  // not same datatype
-            (in.get_layout() != out.get_layout())   // not same layout
-        ) {
-            throw std::runtime_error("Cannot create a DMANNWorkload_NPU27 from a DMAWorkload if size or datatype or "
-                                     "layout are changing!");
+        if ((in.size() != out.size()) || (in.get_dtype() != out.get_dtype()) || (in.get_layout() != out.get_layout())) {
+            throw std::runtime_error("Cannot create DMANNWorkload_NPU27: size/datatype/layout changing!");
         }
-        // check if memory direction is representable
+        
         const MemoryDirection memory_direction{create_direction(dma.input_location, dma.output_location)};
         if (memory_direction == MemoryDirection::__size) {
-            throw std::runtime_error(
-                    "Cannot create a DMANNWorkload_NPU27 from a DMAWorkload : unknown memory direction");
+            throw std::runtime_error("Cannot create DMANNWorkload_NPU27: unknown memory direction");
         }
 
-        // safe to try representation
-
         const int dim_in_bytes{static_cast<int>(dma.input.size())};
-
-        const DMANNWorkload_NPU27 equivalentWorkload{
-                dma.device,    // device
-                0,             // num_planes,   one plane
-                dim_in_bytes,  // length , all data is put in one plane
-
-                dim_in_bytes,  //  src_width;
-                dim_in_bytes,  //  dst_width;
-
-                0,                 // src_stride;
-                0,                 // dst_stride;
-                0,                 // src_plane_stride;
-                0,                 // dst_plane_stride;
-                memory_direction,  // transfer_direction
+        return DMANNWorkload_NPU27{
+                dma.device, 0, dim_in_bytes, dim_in_bytes, dim_in_bytes,
+                0, 0, 0, 0, memory_direction
         };
-
-        //clang and gcc does not support to use std::move here, so we need suppression 
-        /* coverity[copy_instead_of_move] */
-        return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
 
-    /// create a DMAWorkload from a DMANNWorkload if possible
+    /// Helper: DMAWorkload -> DMANNWorkload_NPU40_50
+    static inline DMANNWorkload_NPU40_50 DMAWorkload_to_NPU40_50(const DMAWorkload& dma) {
+        const auto& in{dma.input};
+        const auto& out{dma.output};
+        if ((in.size() != out.size()) || (in.get_dtype() != out.get_dtype()) || (in.get_layout() != out.get_layout())) {
+            throw std::runtime_error("Cannot create DMANNWorkload_NPU40_50: size/datatype/layout changing!");
+        }
+        
+        const MemoryDirection memory_direction{create_direction(dma.input_location, dma.output_location)};
+        if (memory_direction == MemoryDirection::__size) {
+            throw std::runtime_error("Cannot create DMANNWorkload_NPU40_50: unknown memory direction");
+        }
+
+        const int dim_in_bytes{static_cast<int>(dma.input.size())};
+        return DMANNWorkload_NPU40_50{
+                dma.device, dim_in_bytes, dim_in_bytes, 0,
+                {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+                Num_DMA_Engine::Num_Engine_1, memory_direction
+        };
+    }
+
+    /// Helper: DMANNWorkload -> DMAWorkload (generic for all DMANN types)
     template <typename DMANNWorkloadType>
-    static inline DMAWorkload create_workload(const DMANNWorkloadType& dma_nn) {
-        // check if memory location is representable
+    static inline DMAWorkload DMANNWorkload_to_DMAWorkload(const DMANNWorkloadType& dma_nn) {
         MemoryLocation input_location{MemoryLocation::__size};
         MemoryLocation output_location{MemoryLocation::__size};
-
         std::tie(input_location, output_location) = create_locations(dma_nn.transfer_direction);
 
         if (!isMemoryLocationAvailable(dma_nn.device, input_location)) {
@@ -155,72 +155,33 @@ public:
         }
 
         const int dim_in_bytes{dma_nn.getAccessedBytes()};
-
-        const DMAWorkload equivalentWorkload{
-                dma_nn.device,  // VPUDevice device  
-
-                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8,
-                          Layout::ZXY),  // VPUTensor input  
-                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8,
-                          Layout::ZXY),  // VPUTensor output
-
-                input_location,   // MemoryLocation input_location
-                output_location,  // MemoryLocation output_location
-
-                1  // output_write_tiles 
+        return DMAWorkload{
+                dma_nn.device,
+                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8, Layout::ZXY),
+                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8, Layout::ZXY),
+                input_location, output_location, 1
         };
-        return equivalentWorkload;
     }
+
+    /// Helper: DMANNWorkload_NPU27 -> DMANNWorkload_NPU40_50
+    /// This type of conversion could be supported in the future
+
+    /// Helper: DMANNWorkload_NPU40_50 -> DMANNWorkload_NPU27
+    /// This type of conversion could be supported in the future
+
+public:
+    /**
+     * Generic create_workload<To, From> - Main conversion interface
+     */
     
-    static inline DMANNWorkload_NPU27 create_NPU27_workload(const DMAWorkload& dma) {
-        return create_workload(dma);
-    }
-
-    /// you can use this function both to create DMANNWorkload_NPU40 and DMANNWorkload_NPU50
-    static inline DMANNWorkload_NPU40_50 create_NPU40_50_workload(const DMAWorkload& dma) {
-        // check if same datatype , layout and  size
-
-        const auto& in{dma.input};
-        const auto& out{dma.output};
-        if ((in.size() != out.size()) ||            // not same size in bytes
-            (in.get_dtype() != out.get_dtype()) ||  // not same datatype
-            (in.get_layout() != out.get_layout())   // not same layout
-        ) {
-            throw std::runtime_error("Cannot create a DMANNWorkload_NPU40_50 from a DMAWorkload if size or datatype or "
-                                     "layout are changing!");
-        }
-        // check if memory direction is representable
-        const MemoryDirection memory_direction{create_direction(dma.input_location, dma.output_location)};
-        if (memory_direction == MemoryDirection::__size) {
-            throw std::runtime_error(
-                    "Cannot create a DMANNWorkload_NPU40_50 from a DMAWorkload : unknown memory direction");
-        }
-
-        // safe to try representation
-
-        const int dim_in_bytes{static_cast<int>(dma.input.size())};
-
-        const DMANNWorkload_NPU40_50 equivalentWorkload{
-                dma.device,    // VPUDevice device;  ///< NPU device
-                dim_in_bytes,  // int src_width;
-                dim_in_bytes,  // int dst_width;
-                0,             // int num_dim;
-                {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
-                Num_DMA_Engine::Num_Engine_1,
-                memory_direction  // MemoryDirection transfer_direction;
-        };
-        // clang and gcc does not support to use std::move here, so we need suppression 
-        /* coverity[copy_instead_of_move] */
-        return equivalentWorkload;  // hoping for ReturnValueOptimisation
-    }
-
-    static inline DMANNWorkload_NPU40 create_NPU40_workload(const DMAWorkload& dma) {
-        return create_NPU40_50_workload(dma);
-    }
-
-    static inline DMANNWorkload_NPU50 create_NPU50_workload(const DMAWorkload& dma) {
-        return create_NPU40_50_workload(dma);
-    }
+    /// Generic conversion from any workload type to any other workload type
+    /// Use like: create_workload<DMAWorkload, DMANNWorkload_NPU27>(workload)
+    /// @tparam To Target workload type
+    /// @tparam From Source workload type (usually deduced from argument)
+    /// @param from Source workload
+    /// @returns Workload of type To
+    template <typename To, typename From>
+    static inline To create_workload(const From& from);
 
 public:
     using LocationKey = std::pair<MemoryLocation, MemoryLocation>;  // DRAM, CMX, CSRAM, UPA
@@ -264,12 +225,6 @@ public:
     }
 };
 
-/// Explicit specialization for DMAWorkload
-template <>
-inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload>(const DMAWorkload& dma_nn) {
-    return dma_nn;
-}
-
 /// Specialization for DMANNWorkload_NPU27
 template <>
 class DMANNWorkloadCreator<DMANNWorkload_NPU27> {
@@ -301,6 +256,51 @@ public:
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
 };
+
+/**
+ * Template specializations for DMAWorkloadTransformer::create_workload<To, From>
+ */
+
+// --- Identity conversions (same type) ---
+
+template <>
+inline DMANNWorkload_NPU27 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27, DMANNWorkload_NPU27>(const DMANNWorkload_NPU27& from) {
+    return from;
+}
+
+template <>
+inline DMANNWorkload_NPU40_50 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU40_50, DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50& from) {
+    return from;
+}
+
+template <>
+inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMAWorkload>(const DMAWorkload& from) {
+    return from;
+}
+
+// --- DMAWorkload -> DMANN conversions ---
+
+template <>
+inline DMANNWorkload_NPU27 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27, DMAWorkload>(const DMAWorkload& from) {
+    return DMAWorkloadTransformer::DMAWorkload_to_NPU27(from);
+}
+
+template <>
+inline DMANNWorkload_NPU40_50 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU40_50, DMAWorkload>(const DMAWorkload& from) {
+    return DMAWorkloadTransformer::DMAWorkload_to_NPU40_50(from);
+}
+
+// --- DMANN -> DMAWorkload conversions ---
+
+template <>
+inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMANNWorkload_NPU27>(const DMANNWorkload_NPU27& from) {
+    return DMAWorkloadTransformer::DMANNWorkload_to_DMAWorkload(from);
+}
+
+template <>
+inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50& from) {
+    return DMAWorkloadTransformer::DMANNWorkload_to_DMAWorkload(from);
+}
 
 /// Specialization for DMANNWorkload_NPU40_50
 template <>

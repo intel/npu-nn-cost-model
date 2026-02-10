@@ -31,7 +31,8 @@ namespace VPUNN {
 struct VPU2_7_LayerPropertiesData {
     inline static const std::vector<VPUTilingStrategy> valid_tiling_strategies{
             VPUTilingStrategy::NONE, VPUTilingStrategy::SOH_Overlapped,
-            VPUTilingStrategy::SOK};  ///< list of valid tiling strategies
+            VPUTilingStrategy::SOK};  ///< list of valid tiling strategies, if here doesn't mean all of them are
+                                      ///< implemented, it just means they are valid for the device
 
     inline static const std::unordered_map<Operation, std::vector<ExecutionMode>> op_to_exec_mode{
             {Operation::CM_CONVOLUTION, {ExecutionMode::CUBOID_16x16}},

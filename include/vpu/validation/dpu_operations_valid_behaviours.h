@@ -385,7 +385,7 @@ protected:
         }
 
         // checker.check_is_equal(dpu.output_0.sparsity_enabled, false, "output_0 sparsity_enabled  ");
-        
+
         // No sparsity for dCIM
         if (dpu.mpe_engine == MPEEngine::DCIM) {
             checker.check_is_equal(dpu.input_1.sparsity_enabled, false, "dCIM_32x128: input_1 sparsity_enabled  ");
@@ -681,6 +681,69 @@ protected:
 
 class LAYERNORM_Constraints : public CONVOLUTION_Constraints {};
 class ELTWISE_MUL_Constraints : public ELTWISE_Constraints {};
+
+class REDUCE_Constraints : public Base_Constraints, public IOperationDynamicGenerator {
+protected:
+    void generate_operation_dependent_tensors(Sampler&, const IDeviceValidValues&, DPUOperation& dpu) const override {
+        dpu.input_1.datatype = dpu.input_0.datatype;
+        dpu.input_1.swizzling = dpu.input_0.swizzling;
+        dpu.input_1.layout = Layout::INVALID;  // INVALID special case for this operation. Post sanitization should
+                                               // not change this
+
+        dpu.output_0.datatype = dpu.input_0.datatype;
+        dpu.output_0.channels = dpu.input_0.channels;
+
+        dpu.input_1.batch = 0;
+        dpu.input_1.channels = 0;
+        dpu.input_1.height = 0;
+        dpu.input_1.width = 0;
+    }
+
+    bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
+                                              std::string& info) const override {
+        Checker checker;
+
+        // reduce will collapse (reduce) the output channels to one value
+        checker.check_is_in_list((int)dpu.output_0.width, {(int)dpu.input_0.width}, "output_0.width == input_0.width");
+        checker.check_is_in_list((int)dpu.output_0.height, {(int)dpu.input_0.height},
+                                 "output_0.height == input_0.height");
+
+        checker.check_is_in_list((int)dpu.output_0.channels, {(int)1}, "output_0.channels == 1");
+
+        checker.check_is_in_list((int)dpu.output_0.batch, {(int)dpu.input_0.batch}, "output_0.batch == input_0.batch");
+
+        // TODO: what happens when a SOK happens, we have only 1 channel!
+
+        info = checker.findings();
+        return checker.is_clean();
+    };
+
+    void generate_sparsity(Sampler&, const IDeviceValidValues&, DPUOperation& dpu) const override {
+        dpu.input_0.sparsity = 0.0F;
+        dpu.input_0.sparsity_enabled = false;
+        dpu.input_1.sparsity = 0.0F;
+        dpu.input_1.sparsity_enabled = false;
+    }
+
+    long long input_1_volume(const TensorInfo&) const noexcept override final {
+        return 0;  // no weights for REDUCE
+    }
+
+    /// no datat and layout invalid!
+    void deduce_input_1_shape_and_layout(const TensorInfo&, const TensorInfo&, const IDeviceValidValues&,
+                                         const KernelInfo&, TensorInfo& w) const noexcept override {
+        w.layout = Layout::INVALID;
+
+        w.batch = 0;
+        w.channels = 0;
+        w.height = 0;
+        w.width = 0;
+    }
+
+    long long get_weight_table_size(const long long) const noexcept override final {
+        return 0;  // no WT for MAXPOOL
+    }
+};
 
 /// IS a DW_CONV without weights. BUt we will replace it at the NN descriptor (so some info has to be present)
 class AVGPOOL_Constraints :

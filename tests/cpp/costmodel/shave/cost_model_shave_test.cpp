@@ -318,6 +318,7 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_5x) {
             EXPECT_GT(shave_instance.toString().length(), 50);
         }
     }
+
 }
 
 }  // namespace VPUNN_unit_tests

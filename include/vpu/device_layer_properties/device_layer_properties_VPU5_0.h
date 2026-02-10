@@ -17,9 +17,9 @@
 
 namespace VPUNN {
 
-/// @brief data holder for VPU 5.0 and VPU 5.0_W layer properties.
+/// @brief data holder for VPU 5.0 and VPU\ RESERVED layer properties.
 ///
-/// This struct encapsulates device-specific static configuration data for VPU 5.0 and VPU 5.0_W.
+/// This struct encapsulates device-specific static configuration data for VPU 5.0 and VPU\ RESERVED.
 /// Its main purpose is to provide a central definition of valid tiling strategies,
 /// operation-to-execution-mode mappings, and the default execution mode for these devices.
 ///
@@ -27,12 +27,13 @@ namespace VPUNN {
 /// - This struct is not intended for direct use by client code.
 /// - It is used as a template parameter for higher-level property classes (such as LayerProperties_All_Devices)
 ///   that implement the actual device-specific logic and interface for layer property queries.
-/// - The scope of this struct is internal to the layer properties implementation for VPU 5.0/5.0_W.
+/// - The scope of this struct is internal to the layer properties implementation for VPU 5.0/RESERVED.
 struct VPU5_0_LayerPropertiesData {
     inline static const std::vector<VPUTilingStrategy> valid_tiling_strategies{
             VPUTilingStrategy::NONE,         VPUTilingStrategy::SOH_Overlapped, VPUTilingStrategy::SOK,
             VPUTilingStrategy::SOW,          VPUTilingStrategy::SOHW,           VPUTilingStrategy::SOHK,
-            VPUTilingStrategy::SOHO_K_SWITCH};  ///< list of valid tiling strategies
+            VPUTilingStrategy::SOHO_K_SWITCH};  ///< list of valid tiling strategies, if here doesn't mean all of them are
+                                                ///< implemented, it just means they are valid for the device
 
     inline static const std::unordered_map<Operation, std::vector<ExecutionMode>> op_to_exec_mode{
             {Operation::CONVOLUTION,

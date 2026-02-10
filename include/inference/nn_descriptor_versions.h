@@ -27,7 +27,9 @@ enum class NNVersions : int {
     VERSION_12_NPU51 = 5112,      ///< version 12 used for NPU51 trained NNs
     VERSION_13_NPU51 = 5113,      ///< version 13 used for NPU51 trained NNs
     VERSION_14_NPU51 = 5114,      ///< version 14 used for NPU51 trained NNs
-    VERSION_15_NPU_RESERVED_11 = 6115,      ///< version 15 used for NPU_RESERVED_11 trained NNs
+    VERSION_15_NPU_RESERVED_11 = 6115,  ///< version 15 used for NPU_RESERVED_11 devices with a NN taken from NPU5 (5114 trained NNs). Its a
+                              ///< intermediate precursor for proper NPU_RESERVED_1
+    VERSION_16_NPU_RESERVED_12 = 6216,  ///< version 16 to be used for NPU_RESERVED_1 trained NNs DRAFT/INCOMPLETE
 };
 /// @brief enum for NN descriptor versions (input versions)
 enum class NNVersionsDMA : int {

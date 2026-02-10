@@ -165,22 +165,30 @@ inline std::string enumName<DataType>() {
  *
  */
 enum class Operation {
-    CONVOLUTION,     //
-    DW_CONVOLUTION,  //
-    ELTWISE,         // ADD + SUB
-    MAXPOOL,         //
-    AVEPOOL,         //
-    CM_CONVOLUTION,  //
-    LAYER_NORM,      // new LayerNorm (Sum of Squares)??
-    ELTWISE_MUL,     // MUL
+    CONVOLUTION,        //
+    DW_CONVOLUTION,     //
+    ELTWISE,            // ADD + SUB
+    MAXPOOL,            //
+    AVEPOOL,            //
+    CM_CONVOLUTION,     //
+    LAYER_NORM,         // new LayerNorm (never used properly)!
+    ELTWISE_MUL,        // MUL
+    REDUCE_MS,          // Reduce mean , reduce sum
+    REDUCE_SUMSQUARES,  // Reduce Sum of Squares (weightless)
     // Other new ops?
     __size
 };
 static const EnumMap Operation_ToText{
-        link(Operation::CONVOLUTION, "CONVOLUTION"), link(Operation::DW_CONVOLUTION, "DW_CONVOLUTION"),
-        link(Operation::ELTWISE, "ELTWISE"),         link(Operation::MAXPOOL, "MAXPOOL"),
-        link(Operation::AVEPOOL, "AVEPOOL"),         link(Operation::CM_CONVOLUTION, "CM_CONVOLUTION"),
-        link(Operation::LAYER_NORM, "LAYER_NORM"),   link(Operation::ELTWISE_MUL, "ELTWISE_MUL"),
+        link(Operation::CONVOLUTION, "CONVOLUTION"),
+        link(Operation::DW_CONVOLUTION, "DW_CONVOLUTION"),
+        link(Operation::ELTWISE, "ELTWISE"),
+        link(Operation::MAXPOOL, "MAXPOOL"),
+        link(Operation::AVEPOOL, "AVEPOOL"),
+        link(Operation::CM_CONVOLUTION, "CM_CONVOLUTION"),
+        link(Operation::LAYER_NORM, "LAYER_NORM"),
+        link(Operation::ELTWISE_MUL, "ELTWISE_MUL"),
+        link(Operation::REDUCE_MS, "REDUCE_MS"),
+        link(Operation::REDUCE_SUMSQUARES, "REDUCE_SUMSQUARES"),
 };
 template <>
 inline const EnumMap& mapToText<Operation>() {
@@ -217,10 +225,9 @@ inline std::string enumName<ActivationFunction>() {
  *
  */
 enum class Swizzling { KEY_0 /*disabled*/, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, __size };
-static const EnumMap Swizzling_ToText{
-        link(Swizzling::KEY_0, "KEY_0"), link(Swizzling::KEY_1, "KEY_1"), link(Swizzling::KEY_2, "KEY_2"),
-        link(Swizzling::KEY_3, "KEY_3"), link(Swizzling::KEY_4, "KEY_4"), link(Swizzling::KEY_5, "KEY_5")
-};
+static const EnumMap Swizzling_ToText{link(Swizzling::KEY_0, "KEY_0"), link(Swizzling::KEY_1, "KEY_1"),
+                                      link(Swizzling::KEY_2, "KEY_2"), link(Swizzling::KEY_3, "KEY_3"),
+                                      link(Swizzling::KEY_4, "KEY_4"), link(Swizzling::KEY_5, "KEY_5")};
 template <>
 inline const EnumMap& mapToText<Swizzling>() {
     return Swizzling_ToText;
@@ -241,7 +248,7 @@ enum class ExecutionMode {
     CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,   50 : NTHW/NTK = 16/2
     CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8     50 : NTHW/NTK = 8/4
     CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16    50 : NTHW/NTK = 4/8
-    dCIM_32x128,   // from 60 :      NTHW/NTK = 
+    dCIM_32x128,   // from 60 :      NTHW/NTK =
     __size
 };
 static const EnumMap ExecutionMode_ToText{
@@ -294,11 +301,17 @@ inline std::string enumName<Layout>() {
 }
 
 /// @brief ISI_Strategy
-enum class ISIStrategy { CLUSTERING, SPLIT_OVER_H, SPLIT_OVER_K, __size };
+enum class ISIStrategy {
+    CLUSTERING,
+    SPLIT_OVER_H,
+    SPLIT_OVER_K, // SOK + output_write_tiles=1 is not supported, SOK forces us to have broadcast
+    SPLIT_OVER_K_nxtHW, __size
+};  // shall we add SPLIT_OVER_K_switchHW ?
 static const EnumMap ISIStrategy_ToText{
         link(ISIStrategy::CLUSTERING, "Clustering"),
         link(ISIStrategy::SPLIT_OVER_H, "SplitOverH"),
         link(ISIStrategy::SPLIT_OVER_K, "SplitOverK"),
+        link(ISIStrategy::SPLIT_OVER_K_nxtHW, "SplitOverK_HWswitch"),
 };
 template <>
 inline const EnumMap& mapToText<ISIStrategy>() {

@@ -13,8 +13,7 @@
 
 # Ensure that the shared library will be created
 # only if VPUNN_BUILD_SHARED_LIB will be set ON
-# and JS_BUILD OFF
-if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+if(VPUNN_BUILD_SHARED_LIB)
     add_library(vpunn_inference SHARED)
 else()
     add_library(vpunn_inference STATIC)

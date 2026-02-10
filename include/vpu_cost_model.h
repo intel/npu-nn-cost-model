@@ -47,13 +47,11 @@
 
 #include "inference/postprocessing_mocks.h"
 
-#include "vpu/dpu_dcim_workload.h"
-#include "vpu_dcim_cost_model_interface.h"
 #include "vpu_shave_cost_model.h"
 
 #include "vpu/nn_cost_provider.h"
 
-#include "vpu/dma_theoretical_cost_provider.h"
+#include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
 #include "vpu/dpu_theoretical_cost_provider.h"
 
 #include "vpu/serialization/l1_cost_serialization_wrapper.h"
@@ -66,8 +64,6 @@
 #include "vpu/vpu_mutex.h"
 
 namespace VPUNN {
-using DCiM_Workload_Interface = DCIMWorkload;  ///< alias for DCIMWorkload
-// using DCiM_Workload_Alias = DPUWorkload;        ///< alias for DCIMWorkload
 
 /**
  * @brief The VPUCostModel class
@@ -77,30 +73,28 @@ using DCiM_Workload_Interface = DCIMWorkload;  ///< alias for DCIMWorkload
  *
  */
 /* coverity[rule_of_three_violation:FALSE] */
-class VPUNN_API VPUCostModel :
-        protected DCiMCostModelInterface<DCiM_Workload_Interface>  // for DCiM CM interface, implementation TBD
-{
+class VPUNN_API VPUCostModel {
 private:
     mutable CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
 
-    const HWPerformanceModel performance{};       // performance instance, not used here
-    
-    protected:
+    const HWPerformanceModel performance{};  // performance instance, not used here
+
+protected:
     // DPU cost providers
     const NNCostProvider dpu_nn_cost_provider;                      ///< NN cost provider for DPU
     const DPUTheoreticalCostProvider dpu_theoretical{performance};  ///< theoretical cost provider for DPU
-    
+
     // DMA cost providers
     // No NN or measured DMA cost provider available
     const DMATheoreticalCostProvider dma_theoretical{};  ///< theoretical cost provider for DMA
-    
+
     // SHAVE cost providers
     std::shared_ptr<SHAVECostModel> ptr_internal_shave_cost_model;  ///< shared ownership of SHAVE cost model
-    SHAVECostModel& internal_shave_cost_model{
-            *ptr_internal_shave_cost_model};
+    SHAVECostModel& internal_shave_cost_model{*ptr_internal_shave_cost_model};
 
     // Energy interface
-    const IEnergy my_energy{*this, internal_shave_cost_model, performance};  ///< energy aspects, not used here but instantiated
+    const IEnergy my_energy{*this, internal_shave_cost_model,
+                            performance};  ///< energy aspects, not used here but instantiated
 
 #ifdef VPUNN_BUILD_HTTP_CLIENT
     std::unique_ptr<HttpDPUCostProvider> http_dpu_cost_provider;  ///< HTTP cost provider for DPU
@@ -254,8 +248,10 @@ public:
      *
      */
     explicit VPUCostModel(const std::string& filename, const std::string& dpu_cache_filename,
-                          const std::string& shave_cache_filename, bool use_shave_2_api = false, bool tryToLoadPairedCache = false)
-            : VPUCostModel(filename, false, 16384, 1, dpu_cache_filename, shave_cache_filename, use_shave_2_api, tryToLoadPairedCache) {
+                          const std::string& shave_cache_filename, bool use_shave_2_api = false,
+                          bool tryToLoadPairedCache = false)
+            : VPUCostModel(filename, false, 16384, 1, dpu_cache_filename, shave_cache_filename, use_shave_2_api,
+                           tryToLoadPairedCache) {
         /* coverity[uninit_member] */
     }
 
@@ -274,10 +270,11 @@ public:
      */
     explicit VPUCostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
                           const unsigned int batch_size = 1, const std::string& dpu_cache_filename = "",
-                          const std::string& shave_cache_filename = "", bool use_shave_2_api = false, bool tryToLoadPairedCache = false)
-            : dpu_nn_cost_provider(filename, batch_size, profile, cache_size, dpu_cache_filename,
-                                   tryToLoadPairedCache),
-              ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_filename, cache_size, use_shave_2_api)) {
+                          const std::string& shave_cache_filename = "", bool use_shave_2_api = false,
+                          bool tryToLoadPairedCache = false)
+            : dpu_nn_cost_provider(filename, batch_size, profile, cache_size, dpu_cache_filename, tryToLoadPairedCache),
+              ptr_internal_shave_cost_model(
+                      std::make_shared<SHAVECostModel>(shave_cache_filename, cache_size, use_shave_2_api)) {
         Logger::initialize();
 
         if (!dpu_nn_cost_provider.is_initialized()) {
@@ -305,10 +302,12 @@ public:
     explicit VPUCostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
                           const char* dpu_cache_data = nullptr, size_t dpu_cache_data_length = 0,
-                          const char* shave_cache_data = nullptr, size_t shave_cache_data_length = 0, bool use_shave_2_api = false)
-            : dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, profile,
-                                   cache_size, dpu_cache_data, dpu_cache_data_length),
-              ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_data, shave_cache_data_length, cache_size, use_shave_2_api)) {
+                          const char* shave_cache_data = nullptr, size_t shave_cache_data_length = 0,
+                          bool use_shave_2_api = false)
+            : dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, profile, cache_size,
+                                   dpu_cache_data, dpu_cache_data_length),
+              ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_data, shave_cache_data_length,
+                                                                             cache_size, use_shave_2_api)) {
         Logger::initialize();
 
         if (!dpu_nn_cost_provider.is_initialized()) {
@@ -383,7 +382,8 @@ protected:
      * @param workload is the workload to be inferred
      * @return the runtime or error
      */
-    CyclesInterfaceType get_cost(const DPUWorkload& workload, std::string& info, std::string* cost_source = nullptr) const {
+    CyclesInterfaceType get_cost(const DPUWorkload& workload, std::string& info,
+                                 std::string* cost_source = nullptr) const {
         // @todo : impact on energy?, CHeck if energy/DPUINfo/Theoretical cycles/ops considers this situation to reduce
         // energy
 
@@ -428,13 +428,15 @@ protected:
             };
 
             if (cost_source) {
-                *cost_source = "profiling_service_" + get_profiling_backend_string(workload.profiling_service_backend_hint);
+                *cost_source =
+                        "profiling_service_" + get_profiling_backend_string(workload.profiling_service_backend_hint);
             }
 
             auto dpu_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
 
 #ifdef VPUNN_BUILD_HTTP_CLIENT
-            return http_dpu_cost_provider->getCost(dpu_op, info, get_profiling_backend_string(workload.profiling_service_backend_hint));
+            return http_dpu_cost_provider->getCost(
+                    dpu_op, info, get_profiling_backend_string(workload.profiling_service_backend_hint));
 #else
             (void)dpu_op;
             (void)info;
@@ -652,7 +654,7 @@ protected:
 
         L1CostSerializationWrap serialization_handler(serializer);
 
-        serialization_handler.serializeInfoAndComputeWorkloadUid(wl);  
+        serialization_handler.serializeInfoAndComputeWorkloadUid(wl);
 
         // sanitize and check the input.
         SanityReport problems{};
@@ -666,7 +668,7 @@ protected:
             cycles = get_cost(wl, info, &cost_source);
         }
 
-       serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(cost_source), info);
+        serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(cost_source), info);
 
         return cycles;
     }
@@ -730,7 +732,8 @@ public:
 
         const std::string dpu_nickname{get_NN_cost_provider().get_model_nickname()};
         L1CostSerializationWrap serialization_handler(serializer);
-        serialization_handler.serializeCyclesAndComputeWorkloadUid_closeLine(std::move(serializer_orig_wls), cycles_vector, dpu_nickname);
+        serialization_handler.serializeCyclesAndComputeWorkloadUid_closeLine(std::move(serializer_orig_wls),
+                                                                             cycles_vector, dpu_nickname);
 
         return cycles_vector;
     }
@@ -752,8 +755,7 @@ public:
                      MemoryLocation input_location = MemoryLocation::DRAM,
                      MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
         // Call the helper function. TO DO Adjust theoretical based on some measured data!
-        return dma_theoretical.DMATheoreticalCycles(
-                {device, input, output, input_location, output_location, output_write_tiles});
+        return dma_theoretical.get_cost({device, input, output, input_location, output_location, output_write_tiles});
     }
 
     /**
@@ -794,7 +796,6 @@ public:
     CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut, bool skipCacheValues) const {
         return internal_shave_cost_model.computeCycles(shave_wl, infoOut, skipCacheValues);
     }
-
 
     /// gets the list of names of supported operators on a specified device. Each device has own operators
     ///
@@ -877,10 +878,10 @@ public:
 
     /////// Section for dCIM interfaces
 public:
-    // provides the interface that has methods for DCiM
-    const DCiMCostModelInterface<DCiM_Workload_Interface>& getDCiM_interface() const {
-        return *this;
-    }
+    //// provides the interface that has methods for DCiM
+    // const DCiMCostModelInterface<DCiM_Workload_Interface>& getDCiM_interface() const {
+    //     return *this;
+    // }
 
     const AccessCounter& getPreloadedCacheCounter() const {
         return dpu_nn_cost_provider.getPreloadedCacheCounter();

@@ -16,6 +16,7 @@
 #include "inference/dma_preprop_factory.h"
 #include "inference/vpunn_runtime.h"
 #include "vpu/cycles_interface_types.h"
+#include "dma_cost_provider_interface.h"
 #include "core/cache.h"
 
 #include <thread>
@@ -28,7 +29,7 @@
 
 namespace VPUNN {
 template <typename WlT>
-class DMANNCostProvider {
+class DMANNCostProvider : public IDMACostProvider<WlT> {
 public:
     DMANNCostProvider(const std::string& filename = "",
                    const unsigned int batch_size = 1, bool profile = false, const unsigned int cache_size = 16384,
@@ -81,7 +82,9 @@ public:
         return "cache_misses_" + WlT::get_wl_name();
     }
 
-    bool is_initialized() const {
+    // override of IDMACostProvider defined only for DMANNCostProvider class
+    // because only this class handles a model that can be initialized or not
+    bool is_initialized() const override {
         return vpunn_runtime.initialized();
     }
 
@@ -258,11 +261,15 @@ public:
     }
 
 public:
-    CyclesInterfaceType get_cost(const WlT& workload) const {
+    CyclesInterfaceType get_cost(const WlT& workload, std::string* cost_source = nullptr) const override {
         if (!is_initialized()) {
             return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
         }
         const CyclesInterfaceType infered_value{infer(workload)};
+
+        if(cost_source) {
+            *cost_source = "nn_" + get_model_nickname();
+        }
 
         return infered_value;
     }

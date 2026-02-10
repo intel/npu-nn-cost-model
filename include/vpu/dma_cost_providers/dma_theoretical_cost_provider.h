@@ -15,6 +15,7 @@
 
 #include "vpu/hw_characteristics/HW_characteristics_supersets.h"  // for HWCharacteristicsSet
 #include "vpu/hw_characteristics/itf_HW_characteristics_set.h"    // for IHWCharacteristicsSet
+#include "dma_cost_provider_interface.h"                          // for IDMACostProvider
 
 namespace VPUNN {
 /**
@@ -257,7 +258,7 @@ public:
 };
 
 /**
- * @class DMATheoreticalCostProvider
+ * @class BaseDMATheoreticalCostProvider
  * @brief Provides theoretical cycles for DMA workloads.
  *
  * This class estimates the number of execution cycles required for DMA operations on VPU hardware.
@@ -268,13 +269,18 @@ public:
  * An example of usage can be seen in class VPUCostModel where we either need just theoretical cost or
  * we use this as a fallback when NN cost not available
  */
-class DMATheoreticalCostProvider {
+template <typename WlT = DMAWorkload>
+class BaseDMATheoreticalCostProvider : public IDMACostProvider<WlT> {
 public:
-    unsigned long int DMATheoreticalCycles(const DMAWorkload& wl) const {
+    CyclesInterfaceType get_cost(const WlT& wl, std::string* cost_source = nullptr) const override {
         DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_LNL;  // legacy one
         DMATheoreticalCostProvider_PTL dma_theoretical_PTL(
                 HWCharacteristicsSuperSets::get_mainConfigurationRef());  // new one, default config
-
+        
+        if (cost_source) {
+            *cost_source = "theoretical";
+        }
+        
         if (wl.device < VPUDevice::VPU_4_0) {
             return dma_theoretical_LNL.DMATheoreticalCyclesLegacyLNL(wl);
         } else {  // VPU 4.0 and newer
@@ -287,6 +293,10 @@ public:
         }
     }
 };
+
+// name alias used because there is only one workload type that theoretical dma cost provider supports
+// and also for backward compatibility
+using DMATheoreticalCostProvider = BaseDMATheoreticalCostProvider<>;
 
 }  // namespace VPUNN
 

@@ -7,12 +7,10 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-
-from skbuild import setup
 import subprocess
 import shutil
 import os
-
+from setuptools import setup
 
 def get_version():
 
@@ -34,22 +32,11 @@ with open("README.md", "r", encoding="utf-8") as fh:
 with open("requirements.txt") as fh:
     requirements = fh.readlines()
 
-build_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_skbuild")
-if os.path.isdir(build_dir):
-    print(f"Clean {build_dir}")
-    shutil.rmtree(build_dir)
-
 setup(
     name="vpunn_cost_model",
     version=get_version(),
     description="VPUNN cost model",
     license="Apache License 2.0",
-    cmake_install_target="vpunn-install-bindings",
-    cmake_args=[
-        "-DVPUNN_BUILD_EXAMPLES=OFF",
-        "-DVPUNN_BUILD_TESTS=OFF",
-        "-DVPUNN_BUILD_SHARED_LIB=OFF",
-    ],
     long_description=long_description,
     long_description_content_type="text/markdown",
  
@@ -62,14 +49,6 @@ setup(
     ],
     package_dir={"vpunn": "python"},
     packages=["vpunn"],
-    entry_points={
-        "console_scripts": [
-            "vpunn_to_json=vpunn.to_json:main",
-            "vpunn_builder=vpunn.builder:main",
-            "vpu_cost_model=vpunn.cost:main",
-            "vpu_layer_cost_model=vpunn.layer:main",
-        ],
-    },
     python_requires=">=3.6",
     install_requires=requirements,
 )

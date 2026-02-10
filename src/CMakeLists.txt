@@ -53,7 +53,7 @@ target_link_libraries(npu_costmodel
 # Alias for consistent naming
 add_library(VPUNN::npu_costmodel ALIAS npu_costmodel)
 
-if(NOT JS_BUILD)
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR) # Only configure installation for VPUNN standalone build
     include(GNUInstallDirs)
     include(CMakePackageConfigHelpers)
 
@@ -71,12 +71,9 @@ if(NOT JS_BUILD)
         vpunn_optimization
         vpunn_shave
         vpunn_vpu
+        flatbuffers # flatbuffers is required by vpunn libs in the installation
+        ProjectConfig # flatbuffers dependency
     )
-
-    if(ENABLE_FLATBUFFERS_INSTALLATION)
-        list(APPEND VPUNN_INSTALL_TARGETS flatbuffers)
-        list(APPEND VPUNN_INSTALL_TARGETS ProjectConfig) # flatbuffers dependency
-    endif()
 
     if(TARGET blas)
         list(APPEND VPUNN_INSTALL_TARGETS blas)

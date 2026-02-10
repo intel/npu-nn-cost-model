@@ -99,6 +99,9 @@ private:
         const ShaveInstanceHolder_Mock_NPU50 mock_shaves_50{};
         const ShaveInstanceHolder_NPU50CLassic old_shave_50{};
 
+        const ShaveInstanceHolder_NPU50_WithFactors
+                shave_50_with_factors{};  // generated class that populates the factors map
+
 
     } collections{};
 
@@ -114,6 +117,9 @@ private:
     const ShaveSelector selector_old_40{collections.old_shave_40};
     const ShaveSelector selector_50{collections.mock_shaves_50};
     const ShaveSelector selector_old_50{collections.old_shave_50};
+
+    const ShaveSelector selector_50_with_factors{collections.shave_50_with_factors};
+
 
 public:
     const ShaveSelector& getSelector(VPUDevice desired_device) const {
@@ -152,6 +158,7 @@ public:
             return selector_old_40;
             break;
         case VPUDevice::NPU_5_0:
+        case VPUDevice::NPU_RESERVED:
             return selector_old_50;
             break;
         default:
@@ -159,6 +166,18 @@ public:
             static const ShaveSelector empty_selector{empty_shaves};
             return empty_selector;
             break;
+        }
+    }
+
+    const ShaveSelector& getSelectorWithFactors(VPUDevice desired_device) const {
+        switch (desired_device) {
+            case VPUDevice::NPU_5_0:
+                return selector_50_with_factors;
+                break;
+            default:
+                // if there is no factors map for the device, return the regular selector
+                return getSelector(desired_device);
+                break;
         }
     }
 

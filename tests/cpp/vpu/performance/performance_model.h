@@ -14,7 +14,7 @@
 #include "common/common_helpers.h"
 #include "vpu/types.h"
 
-#include "vpu/dma_theoretical_cost_provider.h"  // added to test get_bandwidth_cycles_per_bytesLegacy
+#include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"  // added to test get_bandwidth_cycles_per_bytesLegacy
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {

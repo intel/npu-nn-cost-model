@@ -100,6 +100,9 @@ public:
     bool operator==(const WHCBTensorShape& b) const {
         return (shape == b.shape);
     }
+    bool operator<(const WHCBTensorShape& b) const {
+        return (shape < b.shape);
+    }
 };
 
 class SEPModeInfo {
@@ -121,6 +124,13 @@ public:
         r = r && (actual_activators_input == b.actual_activators_input);
         r = r && (no_sparse_map == b.no_sparse_map);
         return r;
+    }
+    bool operator<(const SEPModeInfo& b) const {
+        if (!(sep_activators == b.sep_activators)) return sep_activators < b.sep_activators;
+        if (!(storage_elements_pointers == b.storage_elements_pointers)) return storage_elements_pointers < b.storage_elements_pointers;
+        if (!(actual_activators_input == b.actual_activators_input)) return actual_activators_input < b.actual_activators_input;
+        if (!(no_sparse_map == b.no_sparse_map)) return no_sparse_map < b.no_sparse_map;
+        return false;
     }
 };
 

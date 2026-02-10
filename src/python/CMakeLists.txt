@@ -32,60 +32,6 @@ endif()
 
 set(PYTHON_BINDING_CPP ${CMAKE_CURRENT_SOURCE_DIR}/VPUNN.cpp)
 
-if (${GENERATE_PYTHON_BINDING})
-    include(ExternalProject)
-    message(STATUS "Generating Python bindings source ${PYTHON_BINDING_CPP}")
-
-    # We use binder to generate the python bindings for VPUNN
-    ExternalProject_Add(binder
-        GIT_REPOSITORY https://github.com/RosettaCommons/binder.git
-        GIT_TAG v1.3.0
-        SOURCE_DIR ${EXTERNAL_INSTALL_LOCATION}/binder/src
-        BINARY_DIR ${EXTERNAL_INSTALL_LOCATION}/binder/build
-        INSTALL_DIR ${EXTERNAL_INSTALL_LOCATION}/binder/install
-        CMAKE_ARGS
-        -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
-        -DBINDER_ENABLE_TEST=OFF)
-
-    add_custom_command(
-	    OUTPUT ${PYTHON_BINDING_CPP}
-            DEPENDS
-            binder vpunn_inference vpunn_optimization
-            ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/binding.cfg # We also want to rebuild the bindings if we change the config file
-            COMMAND ${EXTERNAL_INSTALL_LOCATION}/binder/install/bin/binder
-            --annotate-includes
-            --bind=VPUNN
-            -p ${EXTERNAL_INSTALL_LOCATION}
-            --prefix=${CMAKE_CURRENT_SOURCE_DIR}
-            --flat
-            --single-file
-            --root-module=VPUNN
-            --include-pybind11-stl
-            --config ${CMAKE_CURRENT_SOURCE_DIR}/binding.cfg
-            ${CMAKE_CURRENT_SOURCE_DIR}/binding.h
-            --
-            -x c++
-            -std=c++17
-            -I${CMAKE_CURRENT_SOURCE_DIR}
-            -I${FLATBUFFERS_SRC_DIR}/include
-            -I${COST_MODEL_BINARY_DIR}/include
-            -I${pybind11_SOURCE_DIR}/include
-            -I${CMAKE_CURRENT_SOURCE_DIR}/../../include
-
-            # If therea are issues with chrono in pybydings, then uncomment following lines
-            # to replace the bits/chrono.h with chrono.h
-            # Generating pybindings will take longer, because of this workaround
-            # COMMAND perl -i -pe "s|#include <bits/chrono.h>|#include <chrono>|g" ${PYTHON_BINDING_CPP}
-            # COMMENT "Fixing chrono include in generated bindings"
-            # VERBATIM
-    )
-
-    add_custom_target(generated-bindings-code EXCLUDE_FROM_ALL
-        DEPENDS ${PYTHON_BINDING_CPP}
-    )
-endif()
-
 pybind11_add_module(vpunn_python_bindings MODULE
     ${PYTHON_BINDING_CPP}
     binding.h
@@ -118,7 +64,7 @@ set_target_properties(vpunn_python_bindings
 )
 
 add_custom_target(vpunn_python_create_init_file ALL
-    COMMAND echo "from .VPUNN import VPUNN as bindings; del VPUNN" > ${COST_MODEL_BINARY_DIR}/lib/__init__.py
+    COMMAND echo "from .VPUNN import DPUWorkload, VPUCostModel, DMAWorkload, DMACostModel_NPU27, DMACostModel_NPU40_50, DMANNWorkload_NPU27, DMANNWorkload_NPU40_50, VPUTensor; VPUNN_lib  = VPUNN" > ${COST_MODEL_BINARY_DIR}/lib/__init__.py
     VERBATIM
 )
 

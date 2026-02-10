@@ -218,7 +218,7 @@ protected:
 
         auto insert_autopadded = [&](const VPUTensor& tensor, size_t offset,
                                      const std::optional<bool> autopad) -> size_t {
-            if (autopad && tensor.channels() < 16) {
+            if (autopad.has_value() && autopad.value() == true && tensor.channels() < 16) {
                 const auto padded_tensor{VPUTensor({tensor.width(), tensor.height(), 16, tensor.batches()}, tensor)};
                 offset = ins.template insert<only_simulate>(padded_tensor, offset);
             } else {

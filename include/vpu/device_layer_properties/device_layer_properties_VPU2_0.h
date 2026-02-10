@@ -30,7 +30,8 @@ namespace VPUNN {
 struct VPU2_0_LayerPropertiesData {
     inline static const std::vector<VPUTilingStrategy> valid_tiling_strategies{
             VPUTilingStrategy::NONE, VPUTilingStrategy::SOH_Overlapped,
-            VPUTilingStrategy::SOK};  ///< list of valid tiling strategies
+            VPUTilingStrategy::SOK};  ///< list of valid tiling strategies, if here doesn't mean all of them are
+                                      ///< implemented, it just means they are valid for the device
 };
 
 /// Used by LayerPropertiesHolder to get the proper layer properties for a certain device

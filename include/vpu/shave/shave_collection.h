@@ -23,6 +23,7 @@
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
 #include "vpu/shave/VPUEM_cost_function.h"
+#include "vpu/shave/shave_factors_mapping.h"
 
 namespace VPUNN {
 

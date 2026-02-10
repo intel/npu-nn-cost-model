@@ -129,7 +129,7 @@ TEST_F(TestDMANNCostModelNPU4x, SweepGT_DMATime_40) {
                 out_loc,                                       // dst
                 1,                                             // owt
         };
-        const DMANNWorkload_NPU40 dmaNN = DMAWorkloadTransformer::create_NPU40_workload(dmaOld_);
+        const DMANNWorkload_NPU40 dmaNN = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU40>(dmaOld_);
         // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return dmaNN;

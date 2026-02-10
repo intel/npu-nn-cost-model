@@ -26,8 +26,12 @@ enum class VPUTilingStrategy {
     SOH_HaloRead,      // SOH with input Halo for 2.7 (only) . (4.0 has only Overlapped)
     SOHO_K_SWITCH,     // HK switch with H = SOHO, + broadcast
     SOH_K_SWITCH,      // HK switch with H = SOH (possible in 2.7 only)
-    SOK_NO_BROADCAST,  // K split , bu no broadcast. Smaller output memory
+    SOK_NO_BROADCAST,  // K split , but no broadcast. Smaller output memory
     UNKNOWN,           // not known, or not communicated (is not receiver decision to implement/apply)
+    SOK_H_SWITCH,  // K split with H switch, due to next H the SOK will keep locally only its H slice of input, rest is
+                   // broadcast
+    SOK_W_SWITCH,  // K split with W switch, due to next W the SOK will keep locally only its W slice of input, rest is
+                   // broadcast
     __size
 };
 inline static const EnumMap VPUTilingStrategy_ToText{
@@ -42,6 +46,8 @@ inline static const EnumMap VPUTilingStrategy_ToText{
         link(VPUTilingStrategy::SOH_K_SWITCH, "SOH_K_SWITCH"),
         link(VPUTilingStrategy::SOK_NO_BROADCAST, "SOK_NO_BROADCAST"),
         link(VPUTilingStrategy::UNKNOWN, "UNKNOWN"),
+        link(VPUTilingStrategy::SOK_H_SWITCH, "SOK_SOH_SWITCH"),
+        link(VPUTilingStrategy::SOK_W_SWITCH, "SOK_SOW_SWITCH"),
 };
 
 template <>

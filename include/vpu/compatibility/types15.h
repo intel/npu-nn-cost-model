@@ -31,13 +31,14 @@
 #include "vpu/validation/dpu_operations_validator.h"
 
 #include "types12.h"  //based on 12
-// #include "types13.h"  //based on 13 maybe
 
 namespace VPUNN {
 
 /** @brief type interface forNPU_RESERVED_1 v3 named 15. This is a convention on what to contain the VPUNN's input
  * descriptor in this namespace all the types will be stored exactly like they are required by this interface
  * vs intf14: UINT16 added to Dtypes, dCIM execution mode
+ * vs intf14: This a bridge interface  between 14 and next one. It handles new types added to global types but keeps the
+ * NN descriptor the same
  */
 namespace intf_15 {
 
@@ -77,8 +78,8 @@ static const EnumMap DataType_ToText{
         link(DataType::FLOAT16, "FLOAT16"),  //
         link(DataType::HF8, "HF8"),          //
         link(DataType::FLOAT32, "FLOAT32"),  //
-        link(DataType::UINT4, "UINT4"),      // 
-        // link(DataType::UINT16, "UINT16"),    // disabled until trained NNs exist
+        link(DataType::UINT4, "UINT4"),      //<
+        // link(DataType::UINT16, "UINT16"),    ///< disabled until trained NNs exist
 };
 template <>
 inline const EnumMap& mapToText<DataType>() {
@@ -100,12 +101,53 @@ static const EnumTextLogicalMap dtype_logical_map{
         link_logical("INT1", "UINT8"),        // not supported
         link_logical("FLOAT32", "FLOAT32"),   // same
         link_logical("INT32", "FLOAT16"),     // not supported
-        link_logical("UINT16", "FLOAT16"),     // mapped // until trained NNs exist
-        link_logical("INT16", "FLOAT16"),      // mapped // until trained NNs exist
+        link_logical("UINT16", "FLOAT16"),    // mapped // until trained NNs exist
+        link_logical("INT16", "FLOAT16"),     // mapped // until trained NNs exist
 };
 template <>
 inline const EnumTextLogicalMap& mapToLogicalText<DataType>() {
     return dtype_logical_map;
+}
+
+/**
+ * @brief HW operations, same as intf12, but new ops added in logical mapping
+ *
+ */
+enum class Operation {
+    CONVOLUTION,     //
+    DW_CONVOLUTION,  //
+    ELTWISE,         // ADD + SUB
+    ELTWISE_MUL,     // MUL
+    MAXPOOL,         //
+    CM_CONVOLUTION,  //
+    LAYER_NORM,      // new LayerNorm (Sum of Squares)??
+    // Other new ops?
+    __size
+};
+static const EnumMap Operation_ToText{
+        link(Operation::CONVOLUTION, "CONVOLUTION"), link(Operation::DW_CONVOLUTION, "DW_CONVOLUTION"),
+        link(Operation::ELTWISE_MUL, "ELTWISE_MUL"), link(Operation::ELTWISE, "ELTWISE"),
+        link(Operation::MAXPOOL, "MAXPOOL"),         link(Operation::CM_CONVOLUTION, "CM_CONVOLUTION"),
+        link(Operation::LAYER_NORM, "LAYER_NORM")};
+template <>
+inline const EnumMap& mapToText<Operation>() {
+    return Operation_ToText;
+}
+static const EnumTextLogicalMap op_logical_map{
+        link_logical("CONVOLUTION", "CONVOLUTION"),        //
+        link_logical("DW_CONVOLUTION", "DW_CONVOLUTION"),  //
+        link_logical("ELTWISE", "ELTWISE"),                //
+        link_logical("MAXPOOL", "MAXPOOL"),                //
+        link_logical("AVEPOOL", "DW_CONVOLUTION"),         //
+        link_logical("CM_CONVOLUTION", "CM_CONVOLUTION"),  //
+        link_logical("LAYER_NORM", "LAYER_NORM"),          //  will not be used
+        link_logical("ELTWISE_MUL", "ELTWISE_MUL"),        // runtime same as ADD/SUB observed
+        link_logical("REDUCE_MS", "CONVOLUTION"),          // new but unsupported by NN
+        link_logical("REDUCE_SUMSQUARES", "CONVOLUTION"),  // new but unsupported by NN
+};
+template <>
+inline const EnumTextLogicalMap& mapToLogicalText<Operation>() {
+    return op_logical_map;
 }
 
 /**
@@ -115,13 +157,12 @@ enum class ExecutionMode {
     CUBOID_16x16,  // from 27, 40 :  NTHW/NTK = 16/4,   50 : NTHW/NTK = 16/2
     CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8     50 : NTHW/NTK = 8/4
     CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16    50 : NTHW/NTK = 4/8
-    // dCIM_32x128,   // from 60 :      NTHW/NTK = 
+    // dCIM_32x128,   // :      NTHW/NTK =
     __size
 };
 
 static const EnumMap ExecutionMode_ToText{
-        link(ExecutionMode::CUBOID_16x16, "CUBOID_16x16"),
-        link(ExecutionMode::CUBOID_8x16, "CUBOID_8x16"),
+        link(ExecutionMode::CUBOID_16x16, "CUBOID_16x16"), link(ExecutionMode::CUBOID_8x16, "CUBOID_8x16"),
         link(ExecutionMode::CUBOID_4x16, "CUBOID_4x16"),
         // link(ExecutionMode::dCIM_32x128, "dCIM_32x128"),
 };
@@ -129,10 +170,11 @@ template <>
 inline const EnumMap& mapToText<ExecutionMode>() {
     return ExecutionMode_ToText;
 }
-static const EnumTextLogicalMap exec_logical_map{link_logical("CUBOID_16x16", "CUBOID_16x16"),
-                                                 link_logical("CUBOID_8x16", "CUBOID_8x16"),
-                                                 link_logical("CUBOID_4x16", "CUBOID_4x16"),
-                                                 link_logical("dCIM_32x128", "CUBOID_16x16")}; // until trained NNs exist
+static const EnumTextLogicalMap exec_logical_map{
+        link_logical("CUBOID_16x16", "CUBOID_16x16"),  //
+        link_logical("CUBOID_8x16", "CUBOID_8x16"),    //
+        link_logical("CUBOID_4x16", "CUBOID_4x16"),    //
+        link_logical("dCIM_32x128", "CUBOID_16x16")};  // until trained NNs exist
 template <>
 inline const EnumTextLogicalMap& mapToLogicalText<ExecutionMode>() {
     return exec_logical_map;
@@ -247,12 +289,12 @@ protected:
 
         {
             const auto operation{DeviceAdapter::mock_replace_operations(workload.op)};
-            offset = ins.template insert<only_simulate>(intf_12::convert<intf_12::Operation>(operation), offset);
+            offset = ins.template insert<only_simulate>(intf_15::convert<intf_15::Operation>(operation), offset);
         }
 
         auto insert_autopadded = [&](const VPUTensor& tensor, size_t offset,
                                      const std::optional<bool> autopad) -> size_t {
-            if (autopad && tensor.channels() < 16) {
+            if (autopad.has_value() && autopad.value() == true && tensor.channels() < 16) {
                 const auto padded_tensor{VPUTensor({tensor.width(), tensor.height(), 16, tensor.batches()}, tensor)};
                 offset = ins.template insert<only_simulate>(padded_tensor, offset);
             } else {
@@ -261,14 +303,18 @@ protected:
             return offset;
         };
 
-        offset = insert_autopadded(workload.inputs[0], offset, workload.input_autopad);
+        offset = insert_autopadded(workload.inputs[0], offset,
+                                   workload.input_autopad);  // not to adjust based on input_autopad
 
         // input 1 _type has special source
         offset = ins.template insert<only_simulate>(
                 intf_15::convert<intf_15::DataType>(workload.weight_type.value_or(workload.inputs[0].get_dtype())),
                 offset);
 
-        offset = insert_autopadded(workload.outputs[0], offset, workload.output_autopad);
+        offset = insert_autopadded(workload.outputs[0], offset,
+                                   workload.output_autopad);  // not to adjust based on output_autopad
+        // also the training space should have data where channels are not padded (because they will be autopadded in
+        // DPU in HW)
 
         offset = ins.template insert<only_simulate>(workload.kernels[0], offset);
         offset = ins.template insert<only_simulate>(workload.kernels[1], offset);

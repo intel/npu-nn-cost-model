@@ -203,8 +203,8 @@ public:
                     tHalo.setVerticalNoHalo();
                     if (tile.output_write_tiles > 1)  // we assume here that we want broadcast for all tiles
                     {
-                        tHalo.setInboudHaloVerticalForBradcastAll(output_size, remaining_output_to_split,
-                                                                  output_tile_dim);
+                        tHalo.setInboundHaloVerticalForBroadcastAll(output_size, remaining_output_to_split,
+                                                                    output_tile_dim);
                     }
 
                     {  // set SEP for this tile, reduce according to tile dim vs layer dim
@@ -360,7 +360,7 @@ public:
                     tHalo.setHorizontalNoHalo();
                     if (tile.output_write_tiles > 1)  // we assume here that we want broadcast for all tiles
                     {
-                        tHalo.setInboudHaloHorizontalForBradcastAll(output_size, remaining_output_to_split,
+                        tHalo.setInboundHaloHorizontalForBroadcastAll(output_size, remaining_output_to_split,
                                                                     output_tile_dim);
                     }
 
@@ -652,8 +652,8 @@ public:
                     tHalo.input_0_halo.bottom = input_halo_bottom;
                     if (tile.output_write_tiles > 1)  // we assume here that we want broadcast for all tiles
                     {
-                        tHalo.setInboudHaloVerticalForBradcastAll(output_size, remaining_output_to_split,
-                                                                  output_tile_dim);
+                        tHalo.setInboundHaloVerticalForBroadcastAll(output_size, remaining_output_to_split,
+                                                                    output_tile_dim);
                     }
                 }
                 {  // todo: handle SEP aspects like in SOHO
@@ -773,6 +773,8 @@ public:
         case VPUTilingStrategy::SOW: {  // same as SOH_Overlapped, but for W dimension
             return SOW_overlapped_inputs(nTiles, false);
         }
+        case VPUTilingStrategy::SOK_H_SWITCH:
+        case VPUTilingStrategy::SOK_W_SWITCH:
         case VPUTilingStrategy::SOHW:
         case VPUTilingStrategy::SOHK:
         // case VPUTilingStrategy::SOHO_K_SWITCH:  // not handled for now, SOH_Overlapped + Output full broadcast @TODO

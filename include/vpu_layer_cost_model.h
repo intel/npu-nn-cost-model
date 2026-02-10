@@ -416,7 +416,7 @@ protected:
     /**
      * @brief Check if the DMACostModelVariant holds a valid DMACostModel
      *
-     * @return true if a DMACostModel is initialized, false otherwise
+     * @return true if a DMACostModels priority list has nn dma initialized, false otherwise
      */
     bool is_dma_model_variant() const {
         return std::visit(

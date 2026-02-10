@@ -32,19 +32,17 @@
 
 namespace VPUNN {
 
-// todo: review 5 and add 6
-
 /// @brief specific NPU 5.0 configuration possibilities for workload, not layer
 /* coverity[rule_of_five_violation:FALSE] */
-class VPU5_0_WorkloadValidValues : public IDeviceValidValues {
+class VPURESERVEDorkloadValidValues : public IDeviceValidValues {
 public:
-    VPU5_0_WorkloadValidValues(const VPU5_0_WorkloadValidValues&) noexcept(false) = default;
-    VPU5_0_WorkloadValidValues& operator=(const VPU5_0_WorkloadValidValues&) = delete;
+    VPURESERVEDorkloadValidValues(const VPURESERVEDorkloadValidValues&) noexcept(false) = default;
+    VPURESERVEDorkloadValidValues& operator=(const VPURESERVEDorkloadValidValues&) = delete;
 
-    VPU5_0_WorkloadValidValues(VPU5_0_WorkloadValidValues&&) noexcept(false) = default;
-    VPU5_0_WorkloadValidValues& operator=(VPU5_0_WorkloadValidValues&&) = delete;
+    VPURESERVEDorkloadValidValues(VPURESERVEDorkloadValidValues&&) noexcept(false) = default;
+    VPURESERVEDorkloadValidValues& operator=(VPURESERVEDorkloadValidValues&&) = delete;
 
-    ~VPU5_0_WorkloadValidValues() = default;
+    ~VPURESERVEDorkloadValidValues() = default;
 
 private:
     inline static const Values<ExecutionMode> valid_execution_order_all{
@@ -189,7 +187,7 @@ private:
 
 public:
     /// constructor with link to operations dynamic behavior
-    VPU5_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
+    VPURESERVEDorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
             : IDeviceValidValues(op_dynamic_constraints,
                                  valid_execution_order_map_default,  //
                                  valid_swizzlings_def,               //
@@ -206,7 +204,7 @@ public:
                                  out_innermost_dim_alignment_def) {};
   
     /// constructor with link to operations dynamic behavior and input channels rules and restrictions
-    VPU5_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
+    VPURESERVEDorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
                                const std::unordered_map<Operation, SmartRanges>& input_channels_restrictions_,
                                const SmartRanges& batch_restrictions_)
             : IDeviceValidValues(op_dynamic_constraints,
@@ -227,7 +225,7 @@ public:
               batch_restrictions{{batch_restrictions_}} {};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden,and input channels rules
-    VPU5_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
+    VPURESERVEDorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
                                const int& input_heigth_start_factor_SOH_,
                                const std::unordered_map<Operation, SmartRanges>& input_channels_restrictions_,
                                const SmartRanges& batch_restrictions_)
@@ -327,7 +325,7 @@ protected:  // only const attributes can be visible in derived
 
 //////// LAYER UNSPLIT situation
 /// @brief specific VPU 4.0 configuration possibilities for  layer
-class VPU5_0_LayerValidValues : public VPU5_0_WorkloadValidValues {
+class VPU5_0_LayerValidValues : public VPURESERVEDorkloadValidValues {
 private:
     inline static const int input_heigth_start_factor_SOH_def{2};
 
@@ -347,13 +345,13 @@ private:
 public:
     /// constructor with link to operations dynamic behavior
     VPU5_0_LayerValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
-            : VPU5_0_WorkloadValidValues(op_dynamic_constraints, input_heigth_start_factor_SOH_def,
+            : VPURESERVEDorkloadValidValues(op_dynamic_constraints, input_heigth_start_factor_SOH_def,
                                          input_channels_restrictions_layer, batch_restrictions_layer) {
         // at layer level we are not limited like for workload level
     }
 
     MultiSmartRanges get_output_channels_restriction(const DPUOperation& dpu) const override {
-        auto restrictions = VPU5_0_WorkloadValidValues::get_output_channels_restriction(dpu);
+        auto restrictions = VPURESERVEDorkloadValidValues::get_output_channels_restriction(dpu);
 
         return (dpu.isi_strategy == ISIStrategy::SPLIT_OVER_K)
                        ? restrictions.multiply_lower(2)  // split over K => output channels must be aligned to 32
@@ -378,7 +376,7 @@ protected:
 
 /// @brief specific VPU 5.0 configuration possibilities for  layer already split on tile.
 /// channels restrictions are less strict vs workload, since a further split is expected
-class VPU5_0_LayerOnTileValidValues : public VPU5_0_WorkloadValidValues {
+class VPU5_0_LayerOnTileValidValues : public VPURESERVEDorkloadValidValues {
 private:
     inline static const std::unordered_map<Operation, SmartRanges> input_channels_restrictions_layersplit{
             {Operation::CONVOLUTION, SmartRanges(16, input_spatial_dim_max, 16)},
@@ -395,7 +393,7 @@ private:
 public:
     /// constructor with link to operations dynamic behavior
     VPU5_0_LayerOnTileValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints)
-            : VPU5_0_WorkloadValidValues(op_dynamic_constraints, input_channels_restrictions_layersplit,
+            : VPURESERVEDorkloadValidValues(op_dynamic_constraints, input_channels_restrictions_layersplit,
                                          batch_restrictions_layersplit) {
         // at layer level we are not limited like for workload level
     }

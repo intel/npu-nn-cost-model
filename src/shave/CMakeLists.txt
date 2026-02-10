@@ -9,23 +9,7 @@
 
 # src/shave/
 
-function(vpu_cost_model_safe_file_write file content)
-    # tracking of rewrite is required to avoid rebuild of the whole project
-    # in case of cmake rerun. Need to rebuild only if content of content is changed
-    set(rewrite_file ON)
-    if(EXISTS ${file})
-        file(READ ${file} current_content)
-        string(SHA256 current_hash "${current_content}")
-        string(SHA256 new_hash "${content}")
-        if(current_hash STREQUAL new_hash)
-            set(rewrite_file OFF)
-        endif()
-    endif()
-
-    if(rewrite_file)
-        file(WRITE ${file} "${content}")
-    endif()
-endfunction()
+include(cmake/FileProcessing)
 
 set (LIST_LEGACY_CSV "")
 
@@ -67,7 +51,7 @@ struct ${KERNEL_NAME} : public ${KERNEL_TYPE}<int(${KERNEL_EFFICIENCY} * 1000), 
 \}
 
 ")
-    vpu_cost_model_safe_file_write("${GEN_HEADER_FULL_FILE}" ${content})
+    vpu_cost_model_safe_file_write("${GEN_HEADER_FULL_FILE}" ${content} WRITE)
 
     set(ADD_LINE "Add<${KERNEL_NAME}, int(${KERNEL_EFFICIENCY}F * 1000), ${KERNEL_LATENCY}>(\"${K_NAME_csv}\")\;  //${K_TYPE_csv}")
     #message(STATUS " >                  ${ADD_LINE}")
@@ -93,7 +77,7 @@ foreach(LINE IN LISTS config)
     endif()
 endforeach()
 
-vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/layers.h" ${GLOBAL_INCLUDE_FILE})
+vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/layers.h" ${GLOBAL_INCLUDE_FILE} WRITE)
 
 #place inl file for legacy
 #message(STATUS " >> Generated code for Shave Legacy is : \n ${LIST_LEGACY_CSV} \n  >> Generated code END")
@@ -101,7 +85,7 @@ set (SHAVE_ADD_LIST "${LIST_LEGACY_CSV}")
 
 #message(STATUS " >> Generated Collection initializer for Shave Legacy is : \n ${SHAVE_ADD_LIST} \n  >> Generated code END")
 
-vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/SHAVE_V27_Linear.inl" ${SHAVE_ADD_LIST})
+vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/SHAVE_V27_Linear.inl" ${SHAVE_ADD_LIST} WRITE)
 
 #NEW SHAVE modeling.  v27 CSV import
 
@@ -195,7 +179,7 @@ function(PARSE_CSV csv_file  inl_out_file  info)
     #place inl file for legacy
     set(SHAVE_ADD_LIST "${LIST_INITIALIZER_FROM_CSV}")
     #message(STATUS " >> Generated Collection initializer for ${info} is : \n ${SHAVE_ADD_LIST} \n  >> Generated code END (${info}) \n")
-    vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/${inl_out_file}" ${SHAVE_ADD_LIST})  #file is implicitly without prev content
+    vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/${inl_out_file}" ${SHAVE_ADD_LIST} WRITE)  #file is implicitly without prev content
 endfunction()
 
 
@@ -214,7 +198,7 @@ PARSE_CSV( ${P1} ${P2} "Shave NPU40 WIP")
 # ####################################################################################################
 
 # shave library for new cpps
-if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+if(VPUNN_BUILD_SHARED_LIB)
     add_library(vpunn_shave SHARED)
 else()
     add_library(vpunn_shave STATIC)
@@ -237,4 +221,38 @@ target_link_libraries(vpunn_shave
     PRIVATE 
         vpunn_common_settings
         flatbuffers
+)
+
+# === Generate Shave Factors Mapping from CSV === #
+
+# Function to generate header file with populate class
+# @Params:
+#   CSV_FILE - path to the csv file containing factors
+#   CLASS_NAME - name of the class to generate content for, which will have prefix: `PopulatedFactorsLUT<CLASS_NAME>`
+#   output_file - path to the output header file to generate
+# @Returns:
+#   Generates header file with populate class
+function(GEN_HEADER_FILE_FOR_FACTORS_POPULATE CSV_FILE CLASS_NAME output_file)
+    # set POPULATE_INFO for the file header
+    set(POPULATE_INFO "// This file is auto-generated. Do not edit directly.\n")
+    string(TIMESTAMP current_time "%Y-%m-%d %H:%M:%S")
+    string(APPEND POPULATE_INFO "// Generated at: ${current_time}\n")
+
+    GEN_CONTENT_FROM_CSV(
+        "${CSV_FILE}"
+        POPULATE_CONTENT
+        "            add(\"{0}\", {1}f);\n" # {0} = shave op name, {1} = float factor
+        DESCRIPTION "Shave Speedup Factor Functions content generation"
+    )
+
+    configure_file(ShaveFactorsPopulation.h.in ${output_file})
+    message(STATUS " >> Generated Shave Factors Population Header File: ${output_file} for class PopulatedFactorsLUT${CLASS_NAME} \n  >> Generated code END")
+endfunction()
+
+# --- This section should be changed in dependence of the files containing factors and the output format --- #
+
+GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
+    "${CMAKE_CURRENT_SOURCE_DIR}/shave_factors_npu5.csv"
+    "_NPU5"         # the class name will be PopulatedFactorsLUT_NPU5
+    "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_factors_population_npu5.h"
 )

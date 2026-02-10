@@ -31,6 +31,19 @@ public:
 protected:
     void SetUp() override {
     }
+    std::string streamH(const std::vector<int>& histo) const {
+        std::stringstream buffer;
+
+        for (const auto& elem : histo) {
+            buffer << "\n generated " << std::setw(4) << elem << " times";
+        }
+        buffer << "\n";
+        const std::string details = buffer.str();
+        return details;
+    }
+    void printH(const std::vector<int>& histo) const {
+        std::cout << streamH(histo);
+    }
 
 private:
 };
@@ -76,37 +89,31 @@ TEST_F(SamplerTest, DecreasingDistributionTest) {
     const int samples{1000};
 
     std::vector<int> genout;
+    genout.reserve(samples);
     for (int n = 0; n < samples; ++n) {
         auto g = sampler.sample_list_decrease_prob(src);
         genout.push_back(g);
     }
 
     // lets count them
-
     std::vector<int> histo;
     for (auto item : src) {
         const int num_items = static_cast<int>(std::count(genout.cbegin(), genout.cend(), item));
         histo.push_back(num_items);
     }
-
-    // std::cout << "\n Seed: " << sampler.get_seed();
-    //  for (const auto& elem : histo) {
-    //      std::cout << "\n generated " << std::setw(4) << elem << " times";
-    //  }
-    //  std::cout << "\n";
-
     // expect decreasing probability
-    EXPECT_GT(histo[0], histo[1]) << " Seed: " << sampler.get_seed();
-    EXPECT_GT(histo[1], histo[2]) << " Seed: " << sampler.get_seed();
-    EXPECT_GT(histo[2], *(histo.cend() - 1)) << " Seed: " << sampler.get_seed();
+    EXPECT_GT(histo[0], histo[1]) << " Seed: " << sampler.get_seed() << streamH(histo);
+    EXPECT_GT(histo[0], histo[2]) << " Seed: " << sampler.get_seed() << streamH(histo);
+    EXPECT_GT(histo[2], *(histo.cend() - 1)) << " Seed: " << sampler.get_seed() << streamH(histo);
 }
 
 TEST_F(SamplerTest, SmartRanges_DecreasingDistributionTest) {
     VPUNN::Sampler sampler;
-    SmartRanges range{16, 8192, 16};
+    SmartRanges range{16, 8192 / 16, 16};
     const int samples{1000};
 
     std::vector<int> genout;
+    genout.reserve(samples);
     for (int n = 0; n < samples; ++n) {
         auto g = sampler.sample_list_decrease_prob(range);
         genout.push_back(g);
@@ -123,9 +130,9 @@ TEST_F(SamplerTest, SmartRanges_DecreasingDistributionTest) {
         }
     }
 
-    EXPECT_GT(histo[0], histo[1]) << " Seed: " << sampler.get_seed();
-    EXPECT_GT(histo[1], histo[2]) << " Seed: " << sampler.get_seed();
-    EXPECT_GT(histo[2], *(histo.cend() - 1)) << " Seed: " << sampler.get_seed();
+    EXPECT_GT(histo[0], histo[1]) << " Seed: " << sampler.get_seed() << streamH(histo);
+    EXPECT_GT(histo[0], histo[2]) << " Seed: " << sampler.get_seed() << streamH(histo);
+    EXPECT_GT(histo[2], *(histo.cend() - 1)) << " Seed: " << sampler.get_seed() << streamH(histo);
 }
 
 class DPU_OperationCreatorTest : public ::testing::Test {

@@ -59,7 +59,7 @@ public:
      * @param port The port number to connect to.
      */
     HTTPClient(const std::string host, int port)
-            : _host(host), _port(port), _client(_host, _port) {
+            : _host(host), _port(port), _client(_host, _port), _debug(false) {
               };
 
     /**
@@ -70,10 +70,17 @@ public:
      */
     nlohmann::json sendJsonRequest(const nlohmann::json& payload, const std::string& path);
 
+    /**
+     * @brief Enable or disable debug output.
+     * @param enable True to enable debug output, false to disable.
+     */
+    void setDebug(bool enable) { _debug = enable; }
+
 protected:
     const std::string _host;        ///< The hostname or IP address.
     const int _port;                ///< The port number.
     httplib::Client _client;        ///< The HTTP client instance.
+    bool _debug;                    ///< Debug flag for verbose output.
 };
 
 /**
@@ -105,7 +112,7 @@ public:
  */
 class HttpDPUCostProvider {
 public:
-    HttpDPUCostProvider(const std::string host = "irlccggpu04.ir.intel.com", const int port = 5000): _client(host, port) {};
+    HttpDPUCostProvider(const std::string host = "irlccggpu04.ir.intel.com", const int port = 5000): _client(host, port), _debug(false) {};
     
     /**
      * @brief Retrieves the cost associated with a given DPU operation.
@@ -120,8 +127,18 @@ public:
         return _client.is_available(check_backend);
     }
 
+    /**
+     * @brief Enable or disable debug output.
+     * @param enable True to enable debug output, false to disable.
+     */
+    void setDebug(bool enable) { 
+        _debug = enable; 
+        _client.setDebug(enable);
+    }
+
 private:
     HTTPProfilingClient _client; ///< The HTTPProfilingClient instance.
+    bool _debug;                 ///< Debug flag for verbose output.
     
     // TODO -- extend serializer to output json serialized dpu ops.
     /**
