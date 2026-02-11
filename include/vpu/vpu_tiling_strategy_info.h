@@ -32,6 +32,8 @@ public:
         case VPUTilingStrategy::SOK:
         case VPUTilingStrategy::SOH_K_SWITCH:
         case VPUTilingStrategy::SOK_NO_BROADCAST:
+        case VPUTilingStrategy::SOK_H_SWITCH:
+        case VPUTilingStrategy::SOK_W_SWITCH:
         default:
             return false;
         }
@@ -52,6 +54,8 @@ public:
         case VPUTilingStrategy::SOK:
         case VPUTilingStrategy::SOH_K_SWITCH:
         case VPUTilingStrategy::SOK_NO_BROADCAST:
+        case VPUTilingStrategy::SOK_H_SWITCH:
+        case VPUTilingStrategy::SOK_W_SWITCH:
         default:
             return false;
         }

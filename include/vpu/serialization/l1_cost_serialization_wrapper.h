@@ -38,7 +38,7 @@ private:
 
     void serialize_info_and_compute_workload_uid(const DPUWorkload& wl) {
         auto wl_op = DPUOperation(wl, ops_context.get_config(wl.device));
-        serializer_operation_uid = wl_op.hash();
+        serializer_operation_uid = wl.hash();
         serializer.serialize(wl_op,
                              SerializableField<std::string>{"workload_uid", std::to_string(serializer_operation_uid)},
                              SerializableField<std::string>{"info", wl.get_layer_info()},

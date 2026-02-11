@@ -12,6 +12,7 @@
 
 #include <list>
 #include <map>
+#include <unordered_map>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -113,10 +114,37 @@ public:
     }
 };
 
+// Custom hasher for std::vector<float> using FNV-1a
+struct VectorFloatHasher {
+    std::size_t operator()(const std::vector<float>& vec) const noexcept {
+        return static_cast<std::size_t>(fnv1a_hash(vec));
+    }
+};
+
+// Type trait to select appropriate map type based on key
+// Default: use std::map for types without custom hasher (O(log n) lookup)
+// Specialize this template in the header where your key type is defined
+// to use std::unordered_map with a custom hasher for O(1) lookup
+template<typename K>
+struct MapTypeSelector {
+    template<typename V>
+    using type = std::map<K, V>;
+};
+
+// Specialization for std::vector<float>: use std::unordered_map
+template<>
+struct MapTypeSelector<std::vector<float>> {
+    template<typename V>
+    using type = std::unordered_map<std::vector<float>, V, VectorFloatHasher>;
+};
+
 /**
  * @brief a workload cache using LRU (least recent used) replacement policy
  * @tparam K is the Key type
  * @tparam V is the Value type
+ * 
+ * Uses std::unordered_map for O(1) average lookup when specialized (e.g., DPUWorkload, std::vector<float>)
+ * Falls back to std::map for other types (O(log n) lookup)
  */
 template <typename K, typename V>
 class LRUCache : public FixedCacheAddON<K, V> {
@@ -124,7 +152,10 @@ private:
     typedef std::list<std::pair<K, V>> List;
     typedef typename List::const_iterator List_Iter_cnst;
 
-    typedef std::map<K, List_Iter_cnst> Map;
+    // Select map type based on key type
+    // Uses unordered_map with custom hasher when MapTypeSelector is specialized (O(1) lookup)
+    // Falls back to std::map for other types (O(log n) lookup)
+    typedef typename MapTypeSelector<K>::template type<List_Iter_cnst> Map;
     typedef typename Map::const_iterator Map_Iter_cnst;
 
     mutable List workloads;  ///< list with first being the most recently used key.

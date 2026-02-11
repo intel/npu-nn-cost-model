@@ -23,17 +23,62 @@ static DPUWorkload createIncompleteTile(const DPULayer& layer, const std::array<
     return split;
 }
 
- DPUWorkload createTileHW(const DPULayer& layer, const unsigned int width, const unsigned int height,
-                                const unsigned int offset_width, const unsigned int offset_height, HaloWorkload halo) {
+DPUWorkload createTileHW(const DPULayer& layer, const unsigned int width, const unsigned int height,
+                         const unsigned int offset_width, const unsigned int offset_height, HaloWorkload halo) {
     DPUWorkload wl{
             createIncompleteTile(layer, {width, height, layer.outputs[0].z(), 1}, {offset_width, offset_height, 0, 0})};
+
+    const HaloWorkload& tileHalo{layer.halo};
+
+    ///////////////////////////// HALO for Height /////////////////////////////
+    
+    // @offset_height: represent the number of rows that was produced by previous intra-tiles (before current
+    // one)
+    halo.output_0_inbound_halo.top = tileHalo.output_0_inbound_halo.top + offset_height;
+
+    // @height: is the number of rows produced by this intra-tile
+    // @layer.outputs[0].height(): is the number of rows of this entire tile
+    const int remaining_rows_to_be_produced_after_current_tile = layer.outputs[0].height() - height - offset_height;
+    halo.output_0_inbound_halo.bottom =
+            tileHalo.output_0_inbound_halo.bottom + remaining_rows_to_be_produced_after_current_tile;
+
+
+    ///////////////////////////// HALO for Width /////////////////////////////
+    // @offset_width: represent the number of columns that was produced by previous intra-tiles (before current
+    // one)
+    halo.output_0_inbound_halo.left = tileHalo.output_0_inbound_halo.left + offset_width;
+
+    // @width: is the number of columns produced by this intra-tile
+    // @layer.outputs[0].width(): is the number of columns of this entire tile
+    const int remaining_columns_to_be_produced_after_current_tile = layer.outputs[0].width() - width - offset_width;
+    halo.output_0_inbound_halo.right =
+            tileHalo.output_0_inbound_halo.right + remaining_columns_to_be_produced_after_current_tile;
+
     wl.halo = halo;
+
     return wl;
 }
 
- DPUWorkload createTileZ(const DPULayer& layer, const unsigned int channels, const unsigned int offset_channels) {
-    return createIncompleteTile(layer, {layer.outputs[0].x(), layer.outputs[0].y(), channels, 1},
-                                {0, 0, offset_channels, 0});
+DPUWorkload createTileZ(const DPULayer& layer, const unsigned int channels, const unsigned int offset_channels) {
+    DPUWorkload wl{createIncompleteTile(layer, {layer.outputs[0].x(), layer.outputs[0].y(), channels, 1},
+                                        {0, 0, offset_channels, 0})};
+    // handle halo for intra-tiles. OWT is ignored here, in case some OWT broadcast exists, will override this info?
+    // what happens in case of owt?
+    {
+        const HaloWorkload& tileHalo{layer.halo};
+        // @offset_channels: represent the number of channels that was produced by previous intra-tiles (before current
+        // one)
+        wl.halo.output_0_inbound_halo.front = tileHalo.output_0_inbound_halo.front + offset_channels;
+
+        // @channels: is the number of channels produced by this intra-tile
+        // @layer.outputs[0].channels(): is the number of channels of this entire tile
+        const int remaining_channels_to_be_produced_after_current_tile =
+                layer.outputs[0].channels() - channels - offset_channels;
+
+        wl.halo.output_0_inbound_halo.back =
+                tileHalo.output_0_inbound_halo.back + remaining_channels_to_be_produced_after_current_tile;
+    }
+    return wl;
 }
 
 static bool isValidZ(unsigned int channels, const std::vector<unsigned int>& validZTiles) {

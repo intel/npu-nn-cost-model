@@ -16,7 +16,7 @@
 #include "common/common_helpers.h"
 #include "vpu/compatibility/types01.h"
 #include "vpu/cycles_interface_types.h"
-#include "vpu/dma_theoretical_cost_provider.h"
+#include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
 #include "vpu/sample_generator/random_task_generator.h"
 #include "vpu/validation/interface_valid_values.h"
 #include "vpu_cost_model.h"

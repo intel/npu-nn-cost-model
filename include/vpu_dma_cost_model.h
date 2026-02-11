@@ -46,10 +46,12 @@
 #include "core/serializer.h"
 #include "vpu/vpu_mutex.h"
 
-#include "vpu/dma_theoretical_cost_provider.h"
+#include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
 #include "vpu/serialization/dma_cost_serialization_wrapper.h"
 
-#include "vpu/dmann_cost_provider.h"
+#include "vpu/dma_cost_providers/dmann_cost_provider.h"
+#include "vpu/dma_cost_providers/priority_dma_cost_provider.h"
+#include "vpu/dma_cost_providers/dma_cost_provider_bundles.h"
 
 #include <typeinfo>
 
@@ -86,7 +88,7 @@ protected:
                      MemoryLocation input_location = MemoryLocation::DRAM,
                      MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
         // Call the helper function
-        return dma_theoretical.DMATheoreticalCycles(
+        return dma_theoretical.get_cost(
                 {device, input, output, input_location, output_location, output_write_tiles});
     }
 
@@ -98,7 +100,7 @@ protected:
      */
     unsigned int DMA(const DMAWorkload& wl) const {
         // Call the helper function
-        return dma_theoretical.DMATheoreticalCycles(wl);
+        return dma_theoretical.get_cost(wl);
     }
 };
 
@@ -116,38 +118,43 @@ public:
     using DescType = DMADesc;  ///< Useful for deducing the type of the descriptor
 
 private:
-    const DMANNCostProvider<DMADesc> nn_cost_provider; ///< NN cost provider for DMA
-
-    // DMA cost providers
-    // No NN or measured DMA cost provider available
-    const DMATheoreticalCostProvider dma_theoretical{};  ///< theoretical cost provider for DMA
+    std::shared_ptr<IDMACostProvider<DMADesc>> ptr_internal_dma_cost_provider;  ///< shared ownership of DMA cost provider
+                                                                                        ///< bundle with priority fallback mechanism
     
+    IDMACostProvider<DMADesc>& dma_cost_provider{
+        *ptr_internal_dma_cost_provider
+    };  ///< provides cycles through priority-based provider selection
+    
+    mutable LRUCache<DMADesc, float> cache;  ///< all devices cache/LUT for DMA ops
+                                             ///< this is a preloaded cache that features also a dynamic one
+
     mutable CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
+    
 public:
     /**
-     * @brief Construct a new VPUCostModel object
+     * @brief Construct a new DMACostModel object
      *
      * @param filename the name of the .vpunn model
      * @param profile enable/disable profiling
      * @param cache_size the size of the LRUCache
      * @param batch_size model batch size
+     * @param cache_filename filename for cache persistence
      */
     explicit DMACostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
                           const unsigned int batch_size = 1, const std::string& cache_filename = "")
-            : nn_cost_provider(filename, batch_size, profile, cache_size, cache_filename) {
+            : ptr_internal_dma_cost_provider(std::make_shared<PriorityDMACostProvider<DMADesc>>(
+                  DMACostProviderBundles::createDefaultDMACostProviders<DMADesc>(filename, batch_size, profile))),
+              cache(cache_size, cache_filename) {
         Logger::initialize();
 
-        if (!nn_cost_provider.is_initialized()) {
-            return;
-        }
         // is_profiling_service_enabled = init_profiling_service();
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, nn_cost_provider.get_names_for_serializer());
+        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, DMANNCostProvider<DMADesc>::get_names_for_serializer());
     }
     // VPUCostModel(const VPUCostModel&) = delete;
     // VPUCostModel(VPUCostModel&&) = default;
 
     /**
-     * @brief Construct a new VPUCostModel object
+     * @brief Construct a new DMACostModel object
      *
      * @param model_data a buffer containing a .vpunn model
      * @param model_data_length the size of the model_data buffer
@@ -155,37 +162,45 @@ public:
      * @param profile enable/disable profiling
      * @param cache_size the size of the LRUCache
      * @param batch_size model batch size
+     * @param cache_data buffer containing cache data
+     * @param cache_data_length size of cache data buffer
      */
     explicit DMACostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
                           const char* cache_data = nullptr, size_t cache_data_length = 0)
-            : nn_cost_provider(model_data, model_data_length, copy_model_data, profile, cache_size,
-                               batch_size, cache_data, cache_data_length) {
+            : ptr_internal_dma_cost_provider(std::make_shared<PriorityDMACostProvider<DMADesc>>(
+                  DMACostProviderBundles::createDefaultDMACostProviders<DMADesc>(
+                      model_data, model_data_length, batch_size, copy_model_data, profile))),
+              cache(cache_size, cache_data, cache_data_length) {
         Logger::initialize();
 
-        if (!nn_cost_provider.is_initialized()) {
-            return;
-        }
         // is_profiling_service_enabled = init_profiling_service();
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, nn_cost_provider.get_names_for_serializer());
+        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, DMANNCostProvider<DMADesc>::get_names_for_serializer());
     }
 
+public:
     /**
      * @brief Check if the internal VPUNN is initialized
      *
-     * @return true the VPUNN neural network is initialized
-     * @return false the VPUNN neural network is not initialized
+     * @return true the VPUNN network is initialized
+     * @return false the VPUNN network is not initialized
      */
     bool nn_initialized() const {
-        return nn_cost_provider.is_initialized();
+        // Cast to PriorityDMACostProvider to access has_nn_initialized()
+        auto priority_provider = std::dynamic_pointer_cast<const PriorityDMACostProvider<DMADesc>>(ptr_internal_dma_cost_provider);
+        if (priority_provider) {
+            return priority_provider->has_nn_initialized();
+        }
+        return false;
     }
-
-    /// @brief provides the value interval where the NN raw outputs are considered valid and will be used to further
-    /// compute information
-    ///
-    /// @returns a pair containing (minimum_valid_value maximum_valid_value)
-    std::pair<float, float> get_NN_Valid_interval() const noexcept {
-        return nn_cost_provider.get_NN_Valid_interval();
+    
+    /**
+     * @brief Get access to the preloaded cache counter for statistics
+     * 
+     * @return const AccessCounter& Reference to the cache counter
+     */
+    const AccessCounter& getPreloadedCacheCounter() const {
+        return cache.getPreloadedCacheCounter();
     }
 
 protected:
@@ -266,12 +281,6 @@ public:
         return Execute_and_sanitize(wl, info);
     }
 
-    // just for debug purposes
-    /* coverity[pass_by_value] */
-    std::tuple<float, std::string> computeBandwidthMsg(DMADesc wl) {
-        return nn_cost_provider.computeBandwidthMsg(std::move(wl));
-    }
-
 private:
     /* @brief Execution
      */
@@ -313,11 +322,10 @@ private:
     /**
      * @brief Run the cost providers for a given workload.
      *
-     * This function checks if the DPU NN cost provider is initialized and retrieves the cost from the cache or
-     * profiling service. If the profiling service is not available, it falls back to the DPU NN cost provider or
-     * theoretical cycles.
+     * This function retrieves the cost from the cache or from the priority-based cost provider chain.
+     * The cache is checked first for performance. If not found, the priority provider is used (NN -> theoretical).
      *
-     * @param workload The DPU workload to be processed.
+     * @param workload The DMA workload to be processed.
      * @param info A string to store additional information about the cost source.
      * @param cost_source A string to store the source of the cost.
      * @return The number of cycles required for the workload.
@@ -325,13 +333,12 @@ private:
     CyclesInterfaceType run_cost_providers(const DMADesc& workload, std::string& info,
                                            std::string* cost_source = nullptr) const {
         auto cycles = Cycles::NO_ERROR;
-        const auto is_inference_posible = nn_cost_provider.is_initialized();
 
-        // First look into nn_cost_provider cache.
-        // This has to be redesigned for the fixed cache to be a standalone cost provider.
-        const auto cached_cost{nn_cost_provider.get_cached(workload, cost_source)};
-        if (!Cycles::isErrorCode(cached_cost)) {
-            cycles = cached_cost;
+        // First look into cache (similar to SHAVE model approach)
+        const auto cached_cost{cache.get(workload, cost_source)};
+        if (cached_cost) {
+            cycles = static_cast<CyclesInterfaceType>(std::floor(*cached_cost));
+            return cycles;
         } else {
             // for now let the info be empty
             info = "";
@@ -348,23 +355,13 @@ private:
 //                 cycles = Cycles::ERROR_PROFILING_SERVICE;
 //             }
 
-            if (Cycles::isErrorCode(cycles) || cycles == Cycles::NO_ERROR) {
-                // if the profiling service is not available, we will use the NN cost provider
-                // if the NN is not available, we will use the theoretical cycles
-                if (is_inference_posible) {
-                    if (cost_source) *cost_source = "nn_" + nn_cost_provider.get_model_nickname();
-                    cycles = nn_cost_provider.get_cost(workload);
-                } else {
-                    if (cost_source) *cost_source = "theoretical";
-                    cycles = dma_theoretical.DMATheoreticalCycles(DMAWorkloadTransformer::create_workload<DMADesc>(workload));
-                }
-            }
 
-            // Concerns mainly cycles returned from providers other than NNCostProvider
-            // We need to share NNCostProvider's cache in order to have access to the fixed cache that's stored as part
-            // of the dynamic cache (LRUCache) (will be separated in near future).
-            if (Cycles::isErrorCode(nn_cost_provider.get_cached(workload)) && !Cycles::isErrorCode(cycles)) {
-                nn_cost_provider.add_to_cache(workload, static_cast<float>(cycles));
+            // Use priority-based provider (NN with fallback to theoretical)
+            cycles = dma_cost_provider.get_cost(workload, cost_source);
+    
+            // Add valid cycles to cache for future lookups
+            if (!Cycles::isErrorCode(cycles)) {
+                cache.add(workload, static_cast<float>(cycles));
             }
         }
 

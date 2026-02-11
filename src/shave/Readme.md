@@ -36,6 +36,22 @@ Line format:
 - DPU_frequency
 - SHV_frequency
 
+## NPU5.0 Speed-up factors
+### CSV Information
+In the [CSV](shave_factors_npu5.csv) are speed up factors used for a specific Shave operation.
+
+Line format:
+
+- operation
+- speedup_factor
+
+### Notes
+For speed-up factors there is a generation flow that needs to be taken into consideration. 
+1. The appropriate CSV with factors is specified.
+2. In the `shave/CMakeLists.txt` function `GEN_HEADER_FILE_FOR_FACTORS_POPULATE` is called, where input path to CSV file, sufix class name, and path to output class are specified.
+3. In the output path, during build time, `PopulatedFactorsLUT_<specified suffix name>` class is generated based on `ShaveFactorsPopulation.h.in` CMake template file.
+4. This class populates the factors of `FactorsLookUpTable` that can be letter be used.
+
 # Shave current operators
 
 #### Here is all the information about the current profiled operators. **In case that your shave operator does not exist in this list, you can use the default shave operator.** The **default operator** will return the number of DPUCycles equal to the number of elements in the tensor.
@@ -192,6 +208,7 @@ These operators below are not taking any extra parameters, The represent the Act
 -  tanh
 -  equal the time is the same despite the size (2952 DPU cycles). The only thing that gives equal a slope was the complementary convert operations before and after the equal operation. Since it is a special case it will be treated as a constant and it will give a constant time. The operations of convert appear in case that we use the ReferenceSW pipeline but in the real case will Convert run on SW or on DMA?
 -  default :special dummy implementation (like in the old shave ) for not profiled operators. It is the first bisector line, return value in DPU cycles is equal to the number of elements in the output tensor.
+
 
 ## NPU5.0 operators (mock)
 Mocked from NPU4.0, speed up factor of 1 for the moment . Will be updated based on measurements.

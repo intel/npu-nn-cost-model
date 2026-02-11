@@ -10,7 +10,7 @@
 # src/kernels/
 
 # Blas setup is needed for this target
-include(${COST_MODEL_ROOT_DIR}/cmake/BlasSetup.cmake)
+include(cmake/BlasSetup)
 
 add_library(vpunn_kernels STATIC)
 
@@ -80,16 +80,15 @@ elseif(CBLAS_LIB STREQUAL "internal")
 
     # vector instructions are required for fast code
     if(VPUNN_ENABLE_VECTOR_INSTRUCTIONS)
-        if(NOT JS_BUILD AND NOT MSVC) #NA for WASM compiler
+        if(NOT MSVC) 
             message(STATUS "BLAS: -msse -msse2 -msse3 -msse4 -msse4.2 set")
             set(BLAS_VECTOR_FLAGS -msse -msse2 -msse3 -msse4 -msse4.2)
             target_compile_options(blas PRIVATE ${BLAS_VECTOR_FLAGS})
-        elseif(MSVC AND NOT JS_BUILD)
+        else()
             #for Win/MSVC also SIMD specific code can be enabled
             message(STATUS "BLAS: USE_SIMD ON manually: msvc")
             target_compile_definitions(blas PRIVATE USE_SIMD)
-        else()
-             message(STATUS "BLAS: no USE_SIMD change (MSVC) ")
+
         endif()
     else()
         message(STATUS "BLAS: no vector optimization set (linux)")

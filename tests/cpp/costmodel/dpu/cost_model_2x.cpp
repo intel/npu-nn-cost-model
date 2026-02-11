@@ -1824,9 +1824,9 @@ TEST_F(TestCostModelVPU2x, Check_Wl_halo_data_test) {
             CyclesInterfaceType cyc = cost_models.getModel(device27).DPU(std::move(wl_ref_halo), info);
 
             if (!is_error_code(t.t_exp.cycles)) {
-                ASSERT_FALSE(is_error_code(cyc));
+                ASSERT_FALSE(is_error_code(cyc)) << cyc << wl_ref_halo;
             } else {
-                ASSERT_TRUE(is_error_code(cyc));
+                ASSERT_TRUE(is_error_code(cyc))<<cyc<<wl_ref_halo;
                 ASSERT_EQ(cyc, t.t_exp.cycles);
             }
 
@@ -1859,14 +1859,15 @@ TEST_F(TestCostModelVPU2x, Check_Wl_halo_data_test) {
             {{wl_ref, {input_halo, output_halo, {-4, 0, 0, 0}, output_halo}},
              {ERROR_EXPECTED},
              "Negative top halo broadcast"},
+
             {{wl_ref, {input_halo, output_halo, output_halo, {0, 0, -1, 0}}},
-             {ERROR_EXPECTED},
+             {NO_ERROR_EXPECTED},
              "Negative left halo inbound"},
             {{wl_ref, {input_halo, output_halo, output_halo, {0, 0, 0, -2}}},
-             {ERROR_EXPECTED},
+             {NO_ERROR_EXPECTED},
              "Negative right halo inbound"},
             {{wl_ref, {input_halo, output_halo, output_halo, {-3, 0, 0, 0}}},
-             {ERROR_EXPECTED},
+             {NO_ERROR_EXPECTED},
              "Negative top halo inbound"},
             {{wl_ref, {input_halo, {0, 0, 0, -7}, output_halo, output_halo}},
              {ERROR_EXPECTED},

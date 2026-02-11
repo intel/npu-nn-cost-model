@@ -335,7 +335,7 @@ TEST_F(TestResnet50_3Layers, DMA_ResNet50F3_EISXW_91782) {
             CyclesInterfaceType cycles = test_model.DMA(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
 
-            const auto dmawl{DMAWorkloadTransformer::create_workload(wl.second)};
+            const auto dmawl{DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(wl.second)};
             CyclesInterfaceType cycles_dmann = dma_model_2_7.computeCycles(dmawl);
             EXPECT_FALSE(Cycles::isErrorCode(cycles_dmann)) << cycles_dmann;
 
@@ -357,7 +357,7 @@ TEST_F(TestResnet50_3Layers, DMA_ResNet50F3_EISXW_91782) {
             CyclesInterfaceType cycles = test_model.DMA(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
 
-            const auto dmawl{DMAWorkloadTransformer::create_workload(wl.second)};
+            const auto dmawl{DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(wl.second)};
             CyclesInterfaceType cycles_dmann = dma_model_2_7.computeCycles(dmawl);
             EXPECT_FALSE(Cycles::isErrorCode(cycles_dmann)) << cycles_dmann;
 

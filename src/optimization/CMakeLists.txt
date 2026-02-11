@@ -9,7 +9,7 @@
 
 # src/optimization/
 
-if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+if(VPUNN_BUILD_SHARED_LIB )
     add_library(vpunn_optimization SHARED)
 else()
     add_library(vpunn_optimization STATIC)

@@ -48,6 +48,8 @@ TEST_F(TestDMANNCostModelNPU5x, SmokeTestDMA_50) {
 
         EXPECT_EQ(dma_cycles, 1129 /*@1700MHz*/) << wl_50 << Cycles::toErrorText(dma_cycles);
     }
+
+
 }
 
 TEST_F(TestDMANNCostModelNPU5x, SmokeTestDMA_50_V1) {

@@ -72,6 +72,13 @@ struct TensorInfo {
         VPUTensor t{shape, datatype, layout, sparsity_enabled};
         return t.size();
     }
+
+    /// @brief Convert to VPUTensor
+    VPUTensor toVPUTensor() const {
+        return VPUTensor({static_cast<unsigned int>(width), static_cast<unsigned int>(height),
+                          static_cast<unsigned int>(channels), static_cast<unsigned int>(batch)},
+                         datatype, layout, sparsity_enabled);
+    }
 };
 
 /// @brief kernel related informations, including stride and padding
@@ -152,14 +159,17 @@ struct DPUOperation {
     ///< MPE engine to be used, SCL by default
     MPEEngine mpe_engine{MPEEngine::SCL};
 
+    /// this flag indicates if current operation does also the reduce min/max along with the main operation
+    bool reduce_minmax_op{false};
+
     using _ref_supported_type =
             std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<Operation>,
                          std::reference_wrapper<DataType>, std::reference_wrapper<Layout>,
                          std::reference_wrapper<Swizzling>, std::reference_wrapper<ActivationFunction>,
                          std::reference_wrapper<ExecutionMode>, std::reference_wrapper<ISIStrategy>,
                          std::reference_wrapper<DimType>, std::reference_wrapper<long long>,
-                         std::reference_wrapper<int>, std::reference_wrapper<float>, std::reference_wrapper<bool>,
-                         VPUNN::SetGet_MemberMapValues>;
+                         std::reference_wrapper<MPEEngine>, std::reference_wrapper<int>, std::reference_wrapper<float>,
+                         std::reference_wrapper<bool>, VPUNN::SetGet_MemberMapValues>;
 
     void set_intended_split(ISIStrategy strategy, unsigned int nTiles) {
         isi_strategy = strategy;
@@ -188,7 +198,8 @@ struct DPUOperation {
               output_autopad{w.output_autopad},
               cost_source_hint{w.cost_source_hint},
               profiling_service_backend_hint{w.profiling_service_backend_hint},
-              mpe_engine{w.mpe_engine} {
+              mpe_engine{w.mpe_engine},
+              reduce_minmax_op{w.reduce_minmax_op} {
         // from WL to tensors
         input_0.swizzling = w.input_swizzling[0];
         input_0.sparsity = w.act_sparsity;
@@ -229,7 +240,8 @@ struct DPUOperation {
               output_autopad(r.output_autopad),
               cost_source_hint{r.cost_source_hint},
               profiling_service_backend_hint{r.profiling_service_backend_hint},
-              mpe_engine{r.mpe_engine} {
+              mpe_engine{r.mpe_engine},
+              reduce_minmax_op{r.reduce_minmax_op} {
     }
 
     DPUOperation(DPUOperation&) = delete;
@@ -249,12 +261,8 @@ struct DPUOperation {
         DPUWorkload wl{
                 device,
                 operation,
-                {VPUTensor({static_cast<unsigned int>(in.width), static_cast<unsigned int>(in.height),
-                            static_cast<unsigned int>(in.channels), static_cast<unsigned int>(in.batch)},
-                           in.datatype, in.layout, in.sparsity_enabled)},  // input dimensions
-                {VPUTensor({static_cast<unsigned int>(out.width), static_cast<unsigned int>(out.height),
-                            static_cast<unsigned int>(out.channels), static_cast<unsigned int>(out.batch)},
-                           out.datatype, out.layout, out.sparsity_enabled)},  // output dimensions
+                {in.toVPUTensor()},   // input dimensions
+                {out.toVPUTensor()},  // output dimensions
                 {static_cast<unsigned int>(kernel.width), static_cast<unsigned int>(kernel.height)},  // kernels
                 {static_cast<unsigned int>(kernel.stride_width),
                  static_cast<unsigned int>(kernel.stride_height)},  // strides
@@ -296,6 +304,8 @@ struct DPUOperation {
         wl.profiling_service_backend_hint = profiling_service_backend_hint;
         wl.mpe_engine = mpe_engine;
 
+        wl.reduce_minmax_op = reduce_minmax_op;
+
         return wl;
     }
     /// knowing input compute tensor and halo will calculate the input memory tensor, without considering sparsity
@@ -325,20 +335,47 @@ struct DPUOperation {
 
     /// knowing output compute tensor and halo will calculate the output memory tensor, without considering sparsity
     /// or other indirection
+    /// COnsiders also negative inbound halo = forget halo
     static TensorInfo compute_dense_output_memory_tensor(const TensorInfo& compute_t, const HaloWorkload& halo) {
         TensorInfo t{compute_t};  // same as compute tensor first
-        const auto& inbopund_halo{halo.output_0_inbound_halo};
+        const auto& inbound_halo{halo.output_0_inbound_halo};
         //  extension can be only positive = how many elements the other tiles are writing here
         //  more)
 
-        auto newDimensionWithInbound = [](const long long crtDimension, const int oneEndHalo, const int otherEndHalo) {
-            const long long newDim = crtDimension + (oneEndHalo + otherEndHalo);
-            return newDim;
+        auto newDimensionWithInbound = [](const long long crtDimension, int oneEndHalo, int otherEndHalo) {
+            // if halo is negative means we write less here, so memory dim is smaller, but we cannot have
+            // negative dim if both negative , cannot overlap a negative one cannot forget more than existing
+            // dim finally the new Dim has to be >=0
+            if (oneEndHalo < 0) {
+                if (-oneEndHalo >= crtDimension) {
+                    oneEndHalo = -static_cast<int>(crtDimension);  // limit to max forget
+                }
+            }
+            if (otherEndHalo < 0) {
+                if (-otherEndHalo >= crtDimension) {
+                    otherEndHalo = -static_cast<int>(crtDimension);  // limit to max forget
+                }
+            }
+            // if both negative , cannot overlap
+
+            // if both negative, their sum cannot "forget" more than the current dimension
+            if (oneEndHalo < 0 && otherEndHalo < 0) {
+                int total_forget = -oneEndHalo + -otherEndHalo;
+                if (total_forget >= crtDimension) {
+                    // limit so that we do not go below zero
+                    oneEndHalo = -static_cast<int>(crtDimension);
+                    otherEndHalo = 0;
+                }
+            }
+
+            const long long newDim = crtDimension + oneEndHalo + otherEndHalo;
+
+            return newDim >= 0 ? newDim : 0;  // can be zero? but should not be!
         };
 
-        t.height = newDimensionWithInbound(t.height, inbopund_halo.top, inbopund_halo.bottom);
-        t.width = newDimensionWithInbound(t.width, inbopund_halo.left, inbopund_halo.right);
-        t.channels = newDimensionWithInbound(t.channels, inbopund_halo.front, inbopund_halo.back);
+        t.height = newDimensionWithInbound(t.height, inbound_halo.top, inbound_halo.bottom);
+        t.width = newDimensionWithInbound(t.width, inbound_halo.left, inbound_halo.right);
+        t.channels = newDimensionWithInbound(t.channels, inbound_halo.front, inbound_halo.back);
 
         return t;
     }
@@ -430,9 +467,9 @@ struct DPUOperation {
 
             {"sep_enabled", std::ref(sep_activators.sep_activators)},
             {"sep_w",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.storage_elements_pointers.set_width(value);
                      }
@@ -440,9 +477,9 @@ struct DPUOperation {
                  return sep_activators.storage_elements_pointers.width();
              }},
             {"sep_h",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.storage_elements_pointers.set_height(value);
                      }
@@ -450,9 +487,9 @@ struct DPUOperation {
                  return sep_activators.storage_elements_pointers.height();
              }},
             {"sep_c",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.storage_elements_pointers.set_channels(value);
                      }
@@ -460,9 +497,9 @@ struct DPUOperation {
                  return sep_activators.storage_elements_pointers.channels();
              }},
             {"sep_b",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.storage_elements_pointers.set_batches(value);
                      }
@@ -470,9 +507,9 @@ struct DPUOperation {
                  return sep_activators.storage_elements_pointers.batches();
              }},
             {"sep_act_w",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.actual_activators_input.set_width(value);
                      }
@@ -480,9 +517,9 @@ struct DPUOperation {
                  return sep_activators.actual_activators_input.width();
              }},
             {"sep_act_h",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.actual_activators_input.set_height(value);
                      }
@@ -490,9 +527,9 @@ struct DPUOperation {
                  return sep_activators.actual_activators_input.height();
              }},
             {"sep_act_c",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.actual_activators_input.set_channels(value);
                      }
@@ -500,9 +537,9 @@ struct DPUOperation {
                  return sep_activators.actual_activators_input.channels();
              }},
             {"sep_act_b",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
-                     VPUNN::DimType value;
+                     DimType value;
                      if (is_unsigned_int(s, value)) {
                          sep_activators.actual_activators_input.set_batches(value);
                      }
@@ -511,14 +548,14 @@ struct DPUOperation {
              }},
             {"sep_no_sparse_map", std::ref(sep_activators.no_sparse_map)},
             {"in_place_input1",  // weightless_operation
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
                      setWeightlessOperation(s);
                  }
                  return weightless_operation;
              }},
             {"in_place_output",
-             [this](bool set_mode, std::string s) -> VPUNN::DimType {
+             [this](bool set_mode, std::string s) -> DimType {
                  if (set_mode) {
                      setInPlaceOutputMemory(s);
                  }
@@ -527,10 +564,12 @@ struct DPUOperation {
             {"superdense_output", std::ref(superdense)},
             {"input_autopad", std::ref(input_autopad)},
             {"output_autopad", std::ref(output_autopad)},
+            {"mpe_engine", std::ref(mpe_engine)},
+            {"reduce_minmax_op", std::ref(reduce_minmax_op)},
     };
 
     static const std::vector<std::string>& _get_member_names() {
-        static std::vector<std::string> names = std::vector<std::string>{
+        static const std::vector<std::string> names{
                 "device",
                 "operation",
                 "input_0_batch",
@@ -610,6 +649,8 @@ struct DPUOperation {
                 "superdense_output",  // not the same name as the attribute superdense
                 "input_autopad",
                 "output_autopad",
+                "mpe_engine",
+                "reduce_minmax_op",
         };
 
         return names;
@@ -661,8 +702,8 @@ protected:
             if (value < 0)
                 return false;
 
-        } catch (const std::invalid_argument&) {  // s is not a valid number, can contain characters that are not digits
-                                                  // or number sign
+        } catch (const std::invalid_argument&) {  // s is not a valid number, can contain characters that are not
+                                                  // digits or number sign
             return false;
         } catch (const std::out_of_range&) {
             return false;
@@ -702,8 +743,8 @@ protected:
         }
     }
 
-    /// @brief checks if the memory for input and output have the preconditions to be 1-1 in order to support in place
-    /// does not look at operation specific fields, like kernels, etc
+    /// @brief checks if the memory for input and output have the preconditions to be 1-1 in order to support in
+    /// place does not look at operation specific fields, like kernels, etc
     ///
     /// @param w is the workload for which the memory to be computed
     /// @returns true if the preconditions are met, this does not imply that is possible
@@ -728,8 +769,8 @@ protected:
         const TensorInfo& in{input_0};
         const TensorInfo& out{output_0};
 
-        // this is a temporary speculative(contextual) implementation. The final solution will have a explicit field in
-        // the workload specifying that the weights are not present
+        // this is a temporary speculative(contextual) implementation. The final solution will have a explicit field
+        // in the workload specifying that the weights are not present
 
         if ((in.layout != out.layout)  // layout change
             || (!is_same_datatype_footprint(in.datatype,
@@ -800,10 +841,9 @@ inline std::ostream& operator<<(std::ostream& stream, const DPUOperation& d) {
            << " output_autopad: \t" << std::to_string(d.output_autopad) << " ;\n"                  //
            << " mpe_engine: \t" << (int)d.mpe_engine << " : " << MPEEngine_ToText.at(static_cast<int>(d.mpe_engine))
            << " ;\n"
+           << " reduce_minmax_op: \t" << (d.reduce_minmax_op ? "true" : "false") << " ;\n"  //
            << " cost source hint: \t" << (int)d.cost_source_hint << " : "
-           << CostSourceHint_ToText.at(static_cast<int>(d.cost_source_hint))
-           << " ;\n"
-            ;
+           << CostSourceHint_ToText.at(static_cast<int>(d.cost_source_hint)) << " ;\n";
     return stream;
 }
 }  // namespace VPUNN

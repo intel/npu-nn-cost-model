@@ -124,7 +124,7 @@ static const EnumTextLogicalMap op_logical_map{
         link_logical("MAXPOOL", "MAXPOOL"),                //
         link_logical("AVEPOOL", "DW_CONVOLUTION"),         //
         link_logical("CM_CONVOLUTION", "CM_CONVOLUTION"),  //
-        link_logical("LAYER_NORM", "LAYER_NORM"),          //
+        link_logical("LAYER_NORM", "LAYER_NORM"),          // maybe it has to be put back to CONV
         link_logical("ELTWISE_MUL", "ELTWISE_MUL"),        //
 };
 template <>

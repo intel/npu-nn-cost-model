@@ -71,7 +71,6 @@ TEST_F(TestDMANNCostModel, InitAspects) {
         EXPECT_NO_THROW(DMACostModel<DMANNWorkload_NPU27> x(file_content.data(), file_content.size(), false));
         DMACostModel<DMANNWorkload_NPU27> vpunn_model_buf_copy(file_content.data(), file_content.size(), false);
         EXPECT_FALSE(vpunn_model_buf_copy.nn_initialized());
-
         auto cycles_27 = vpunn_model_buf.computeCycles(wl_glob_27);
 
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_27));

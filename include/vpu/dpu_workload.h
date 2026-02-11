@@ -110,10 +110,19 @@ struct DPUWorkload {
     /// hint about what profiling service backend to use
     ProfilingServiceBackend profiling_service_backend_hint{ProfilingServiceBackend::__size};
 
-    ///< MPE engine to be used, SCL by default -- It's a required field for both l2 and l1 APIs.
-    ///< Controls also what execution order can be used / is valid
-    ///< In case of dCIM, the execution order is set automatically during sanitization, therefore no optimization is allowed at layer level.
+    /// MPE engine to be used, SCL by default -- It's a required field for both l2 and l1 APIs.
+    /// Controls also what execution order can be used / is valid
+    /// In case of dCIM, the execution order is set automatically during sanitization, therefore no optimization is
+    /// allowed at layer level.
     MPEEngine mpe_engine{MPEEngine::SCL};
+
+    /// this flag indicates if current operation does also the reduce min/max along with the main operation
+    /// to do: output can be a extra 1 element (practically not impacting the memory footprint), or (future) can be a
+    /// WxHX1 tensor if the reduce is channel based.
+    bool reduce_minmax_op{false};
+
+    // note: the above field is the last one that belongs to DPUWorkload::hash() computation, if you add more than
+    // please update the hash, and remember it will invalidate previous hash caches
 
     std::string get_layer_info() const {
         return layer_info;
@@ -142,11 +151,8 @@ struct DPUWorkload {
 
     bool is_inplace_output_memory() const {
         if (is_elementwise_like_operation()) {  // only for elementwise
-            if (in_place_output_memory.has_value()) {
-                return in_place_output_memory.value();
-            } else {  // optional not set. using older/initial mechanism
-                return is_preconditions_for_inplace_output();
-            }
+                                                // optional not set. using older/initial mechanism
+            return in_place_output_memory.value_or(is_preconditions_for_inplace_output());
         }
         return false;  // not elemntwise
     }
@@ -157,11 +163,8 @@ struct DPUWorkload {
 
     bool is_weightless_operation() const {
         if (is_elementwise_like_operation()) {  // only for elementwise
-            if (weightless_operation.has_value()) {
-                return weightless_operation.value();
-            } else {  // optional not set. using older/initial mechanism
-                return is_special_No_weights_situation();
-            }
+                                                // optional not set. using older/initial mechanism
+            return weightless_operation.value_or(is_special_No_weights_situation());
         }
         return false;  // not elemntwise
     }
@@ -183,29 +186,18 @@ struct DPUWorkload {
     }
     /// superdense getter
     bool is_superdense() const {
-        if (superdense_memory.has_value()) {
-            return superdense_memory.value();
-        } else {  // optional not set. using older/initial mechanism
-            return false;
-        }
+        // optional not set. using older/initial mechanism
+        return superdense_memory.value_or(false);
     }
 
     /// in autopad getter
     bool is_input_autopad() const {
-        if (input_autopad.has_value()) {
-            return input_autopad.value();
-        } else {
-            return false;
-        }
+        return input_autopad.value_or(false);
     }
 
     /// out autopad getter
     bool is_output_autopad() const {
-        if (output_autopad.has_value()) {
-            return output_autopad.value();
-        } else {
-            return false;
-        }
+        return output_autopad.value_or(false);
     }
 
     /// in autopad setter
@@ -218,6 +210,16 @@ struct DPUWorkload {
         output_autopad = autopad;
     }
 
+    /// reduce minmax operation setter
+    void set_reduce_minmax_op(bool reduce_minmax) {
+        reduce_minmax_op = reduce_minmax;
+    }
+
+    /// reduce minmax operation getter
+    bool is_reduce_minmax_op() const {
+        return reduce_minmax_op;
+    }
+
     void set_all_swizzlings(Swizzling toSet) {
         input_swizzling[0] = toSet;
         input_swizzling[1] = toSet;
@@ -225,12 +227,8 @@ struct DPUWorkload {
     }
     /// gets the type of the weight tensor, considering also input type in case not set
     DataType get_weight_type() const {
-        if (weight_type.has_value()) {
-            return weight_type.value();
-        } else {
-            // if not set, we assume the same type as input_0
-            return inputs[0].get_dtype();
-        }
+        // if not set, we assume the same type as input_0
+        return weight_type.value_or(inputs[0].get_dtype());
     }
 
 protected:
@@ -318,9 +316,99 @@ public:
         r = r && (input_autopad == b.input_autopad);                    // input_autopad
         r = r && (output_autopad == b.output_autopad);                  // output_autopads
         r = r && (mpe_engine == b.mpe_engine);                          // mpe_engine
+        r = r && (reduce_minmax_op == b.reduce_minmax_op);              // reduce_minmax_op
         return r;
     }
+
+    /// less than operator for std::map compatibility
+    bool operator<(const DPUWorkload& b) const {
+        // Compare fields in order to establish a total ordering
+        if (!(device == b.device))
+            return device < b.device;
+        if (!(op == b.op))
+            return op < b.op;
+        if (!(inputs == b.inputs))
+            return inputs < b.inputs;
+        if (!(outputs == b.outputs))
+            return outputs < b.outputs;
+        if (!(kernels == b.kernels))
+            return kernels < b.kernels;
+        if (!(strides == b.strides))
+            return strides < b.strides;
+        if (!(padding == b.padding))
+            return padding < b.padding;
+        if (!(execution_order == b.execution_order))
+            return execution_order < b.execution_order;
+        if (!(activation_function == b.activation_function))
+            return activation_function < b.activation_function;
+        if (!(act_sparsity == b.act_sparsity))
+            return act_sparsity < b.act_sparsity;
+        if (!(weight_sparsity == b.weight_sparsity))
+            return weight_sparsity < b.weight_sparsity;
+        if (!(input_swizzling == b.input_swizzling))
+            return input_swizzling < b.input_swizzling;
+        if (!(output_swizzling == b.output_swizzling))
+            return output_swizzling < b.output_swizzling;
+        if (!(output_write_tiles == b.output_write_tiles))
+            return output_write_tiles < b.output_write_tiles;
+        if (!(isi_strategy == b.isi_strategy))
+            return isi_strategy < b.isi_strategy;
+        if (!(weight_sparsity_enabled == b.weight_sparsity_enabled))
+            return weight_sparsity_enabled < b.weight_sparsity_enabled;
+        if (!(halo == b.halo))
+            return halo < b.halo;
+        if (!(sep_activators == b.sep_activators))
+            return sep_activators < b.sep_activators;
+        if (!(weight_type == b.weight_type))
+            return weight_type < b.weight_type;
+        // layer_info excluded from comparison for cache purposes
+        if (!(weightless_operation == b.weightless_operation))
+            return weightless_operation < b.weightless_operation;
+        if (!(in_place_output_memory == b.in_place_output_memory))
+            return in_place_output_memory < b.in_place_output_memory;
+        if (!(superdense_memory == b.superdense_memory))
+            return superdense_memory < b.superdense_memory;
+        if (!(input_autopad == b.input_autopad))
+            return input_autopad < b.input_autopad;
+        if (!(output_autopad == b.output_autopad))
+            return output_autopad < b.output_autopad;
+        if (!(mpe_engine == b.mpe_engine))
+            return mpe_engine < b.mpe_engine;
+        if (!(reduce_minmax_op == b.reduce_minmax_op))
+            return reduce_minmax_op < b.reduce_minmax_op;
+        return false;  // All fields are equal
+    }
+
+    /// compute hash for cache key usage, directly from DPUWorkload fields
+    /// Uses the same fnv1a_hash function as NNDescriptor, but without preprocessing
+    uint32_t hash() const;
 };
+
+// Custom hasher for DPUWorkload using the hash() method
+// This enables std::unordered_map to use DPUWorkload as a key with O(1) lookup
+struct DPUWorkloadHasher {
+    std::size_t operator()(const DPUWorkload& wl) const noexcept {
+        return static_cast<std::size_t>(wl.hash());
+    }
+};
+
+}  // namespace VPUNN
+
+// Template specialization for MapTypeSelector (defined in cache.h)
+// This must be in global namespace after VPUNN namespace closes
+namespace VPUNN {
+template <typename K>
+struct MapTypeSelector;  // Forward declaration
+
+// Specialization for DPUWorkload: use std::unordered_map with custom hasher
+template <>
+struct MapTypeSelector<DPUWorkload> {
+    template <typename V>
+    using type = std::unordered_map<DPUWorkload, V, DPUWorkloadHasher>;
+};
+}  // namespace VPUNN
+
+namespace VPUNN {
 
 inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& d) {
     stream << "Workload: \n"                                                                                        //
@@ -375,11 +463,15 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& 
            << " superdense_memory: \t"
            << (d.superdense_memory.has_value() ? std::to_string(d.superdense_memory.value()) : "NA") << " ;\n"  //
            << (d.input_autopad.has_value() ? " input_autopad: \t" + std::to_string(d.input_autopad.value())
-                                           : " input_autopad: NA")  //
+                                           : " input_autopad: NA")
+           << " ;\n"  //
            << (d.output_autopad.has_value() ? " output_autopad: \t" + std::to_string(d.output_autopad.value())
-                                            : " output_autopad: NA")  //
+                                            : " output_autopad: NA")
+           << " ;\n"  //
            << " mpe engine: " << (int)d.mpe_engine << " : " << MPEEngine_ToText.at(static_cast<int>(d.mpe_engine))
-           << out_terminator() << "Workload "                         // terminator
+           << " ;\n"                                                                        //
+           << " reduce_minmax_op: \t" << (d.reduce_minmax_op ? "true" : "false") << " ;\n"  //
+           << out_terminator() << "Workload "                                               // terminator
             ;
     return stream;
 }

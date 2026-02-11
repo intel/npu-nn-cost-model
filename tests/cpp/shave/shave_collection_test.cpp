@@ -7,8 +7,9 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 #include "vpu/shave/shave_op_executors.h"
-
+#include "vpu/shave/shave_instance_holder_factors.h"
 #include <gtest/gtest.h>
+
 #include "common/common_helpers.h"
 #include "vpu/shave/shave_collection.h"
 #include "vpu/shave/shave_devices.h"
@@ -16,6 +17,9 @@
 #include "vpu_cost_model.h"
 #include "vpu_shave_cost_model.h"
 #include "vpu/shave/shave_cost_providers/shave_cost_providers.h"
+
+// include generated factors population
+#include "vpu/shave/generated_shave_factors_population_npu5.h"
 
 #include <fstream>
 #include <iostream>
@@ -644,6 +648,253 @@ TEST_F(ShaveCollectionTest, DefaultCaseTestNPU50) {
     }
 }
 
+
+TEST_F(ShaveCollectionTest, InstanceHolderWithFloatFactors) {
+    // Thread-local storage for test factors (to avoid static member issues in local class)
+    thread_local std::unordered_map<std::string, ShaveSpeedUpFactorType> g_test_factors;
+    
+    // Define a custom PopulatedFactorsLUT class for testing with specific factors
+    class CustomTestPopulatedFactorsLUT : public FactorsLookUpTable {
+    public:
+        CustomTestPopulatedFactorsLUT() {
+            populate();
+        }
+    private:        
+        void populate() {
+            // Populate with the thread-local test factors
+            for (const auto& [name, factor] : g_test_factors) {
+                add(name, factor);
+            }
+        }
+    };
+
+    ShaveInstanceHolder_Mock_NPU50 ih;
+    const DeviceShaveContainer& list_without_factors = ih.getContainer();
+    // add a set of functions to test
+    const std::vector<std::string> functions = {
+        "add", "sub", "sigmoid", "abs", "clamp", "cos", "cumsum", 
+        "hsigmoid", "elu", "mish", "floor", "erf", "exp", "sqrt", "ceiling",
+        "logicalnot", "log", "acos", "acosh", "asin", "asinh", "atan", "atanh"
+    };
+
+    //filter functions that actually exist (just in case)
+    std::vector<std::string> existing_functions;
+    for (const auto& fn : functions) {
+        if (list_without_factors.existsShave(fn)) {
+            existing_functions.push_back(fn);
+        }
+    }
+
+    ASSERT_GT(existing_functions.size(), 0) << "No test functions found in the container";
+
+    size_t nr_functions_with_factors = functions.size() / 2;
+    const float speedup = 2.0f;
+    
+    // Set up the test factors
+    g_test_factors.clear();
+    for (size_t i = 0; i < nr_functions_with_factors; i++) {
+        g_test_factors.emplace(functions[i], speedup);
+    }
+    
+    // use ShaveInstanceHolderWithFactors with the custom populate class
+    ShaveInstanceHolderWithFactors<CustomTestPopulatedFactorsLUT, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0> fih;
+    const DeviceShaveContainer& list_with_factors = fih.getContainer();
+
+    for (const std::string& fn : existing_functions) {
+        EXPECT_TRUE(list_with_factors.existsShave(fn))
+                << "Function: " << fn << " does not exist in the list with factors";
+
+        const auto& factor_shaveOp = list_with_factors.getShaveExecutor(fn);
+        const auto& shaveOp = list_without_factors.getShaveExecutor(fn);
+
+        SHAVEWorkload swl(fn, VPUDevice::NPU_5_0, {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                          {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)});
+
+        CyclesInterfaceType cycles = 0;
+        CyclesInterfaceType factor_cycles = 0;
+
+        ASSERT_NO_THROW(cycles = shaveOp.dpuCycles(swl)) << "Failed to get cycles for function: " << fn;
+        ASSERT_NO_THROW(factor_cycles = factor_shaveOp.dpuCycles(swl))
+                << "Failed to get factor cycles for function: " << fn;
+        
+        // Check if this function should have speedup applied
+        auto end_of_list_with_factors = existing_functions.begin() + nr_functions_with_factors; // iterator to the end of the functions with factors
+        // check if fn is in the boundaries of list with factors
+        bool should_have_speedup = std::find(existing_functions.begin(), end_of_list_with_factors, fn) != end_of_list_with_factors;
+        
+        // For functions with speedup factor, expect reduced cycles
+        if (should_have_speedup) {
+            // This function should have speedup applied
+            EXPECT_LT(factor_cycles, cycles) << "Function " << fn << " should have reduced cycles";
+            float expected_factor_cycles = cycles / speedup;
+            EXPECT_NEAR(factor_cycles, expected_factor_cycles, 1.0f)
+                    << "Function " << fn << " speedup not applied correctly. Expected: " << expected_factor_cycles
+                    << ", Got: " << factor_cycles;
+        } else {
+            // This function should have default factor (1.0f) so cycles should be the same
+            EXPECT_EQ(cycles, factor_cycles) << "Function " << fn << " should have same cycles";
+        }
+    }
+}
+
+TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
+    // Test that CMake factors are properly extracted and ShaveInstanceHolderWithFactors is populated
+
+    // Create instance holders with factors to test CMake integration
+    using ShaveInstanceHolder_NPU40_WithFactors =
+            ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_NPU40, VPUDevice::VPU_4_0>;
+    using ShaveInstanceHolder_NPU50_WithFactors =
+            ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0>;
+
+    // Test NPU 4.0 with factors - check which functions have non-default factors
+    {
+        ShaveInstanceHolder_NPU40_WithFactors ih_with_factors;
+        const DeviceShaveContainer& list_with_factors = ih_with_factors.getContainer();
+
+        // Also create baseline for comparison
+        ShaveInstanceHolder_NPU40 ih_baseline;
+
+        // Verify device is correctly set
+        EXPECT_EQ(list_with_factors.getDevice(), VPUDevice::VPU_4_0);
+
+        // Check that the container is populated with functions
+        std::vector<std::string> available_functions = list_with_factors.getShaveList();
+        EXPECT_GT(available_functions.size(), 0) << "ShaveInstanceHolderWithFactors should be populated with functions";
+
+        std::cout << "NPU 4.0 ShaveInstanceHolderWithFactors populated with " << available_functions.size()
+                  << " functions" << std::endl;
+
+        // Test the FactorsLookUpTable directly to see what factors are defined
+        PopulatedFactorsLUT_NPU5 test_lut;
+
+        size_t functions_with_non_default_factors = 0;
+        std::cout << "Functions with non-default factors:" << std::endl;
+
+        for (const auto& fn : available_functions) {
+            auto factor = test_lut.getOperatorFactor(fn);
+
+            // Check for different factor than default one
+            if (factor != 1.0f) {
+                functions_with_non_default_factors++;
+                std::cout << "  " << fn << " -> " << factor << std::endl;
+            }
+        }
+
+        std::cout << "Total functions with non-default factors: " << functions_with_non_default_factors << std::endl;
+        std::cout << "Functions with default factors (1.0f): "
+                  << (available_functions.size() - functions_with_non_default_factors) << std::endl;
+    }
+
+    // Test NPU 5.0 with factors - only check if populated
+    {
+        ShaveInstanceHolder_NPU50_WithFactors ih_with_factors;
+        const DeviceShaveContainer& list_with_factors = ih_with_factors.getContainer();
+
+        // Verify device is correctly set
+        EXPECT_EQ(list_with_factors.getDevice(), VPUDevice::NPU_5_0);
+
+        // Check that the container is populated with functions
+        std::vector<std::string> available_functions = list_with_factors.getShaveList();
+        EXPECT_GT(available_functions.size(), 0) << "ShaveInstanceHolderWithFactors should be populated with functions";
+
+        std::cout << "NPU 5.0 ShaveInstanceHolderWithFactors populated with " << available_functions.size()
+                  << " functions" << std::endl;
+    }
+
+    // Verify that the FactorsLookUpTable populate() method works
+    {
+        PopulatedFactorsLUT_NPU5 test_lut;
+        EXPECT_TRUE(test_lut.is_populated()) << "PopulatedFactorsLUT_NPU5 should have been populated";
+
+        // Test that we can retrieve factors (should return default 1.0f if none defined)
+        auto factor = test_lut.getOperatorFactor("test_function");
+
+        // Default factor should be 1.0f for non-existent functions
+        EXPECT_FLOAT_EQ(factor, 1.0f) << "Default factor should be 1.0f";
+    }
+
+    // Test that ShaveInstanceHolderWithFactors constructor doesn't throw
+    {
+        using TestHolderType = ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_NPU50, VPUDevice::NPU_5_0>; // avoid treating template comma as macro arguments
+        EXPECT_NO_THROW(TestHolderType test_holder = TestHolderType{})
+                << "ShaveInstanceHolderWithFactors constructor should not throw";
+    }
+}
+
+TEST_F(ShaveCollectionTest, NPU5FactorsEquivalentToGetSelector) {
+    // Test that for PTL (PopulatedFactorsLUT_NPU5), the ShaveInstanceHolderWithFactors
+    // produces the same results as getSelector since all factors are 1.0f (mocked)
+    
+    // Get the two selectors from ShaveConfiguration
+    ShaveConfiguration shave_config;
+    
+    // selector_50 uses mock_shaves_50 (all factors implicitly 1.0f)
+    const ShaveSelector& selector_no_factors = shave_config.getSelector(VPUDevice::NPU_5_0);
+    
+    // selector_50_with_factors uses ShaveInstanceHolder_NPU50_WithFactors (PTL with all factors = 1.0f)
+    const ShaveSelector& selector_with_factors = shave_config.getSelectorWithFactors(VPUDevice::NPU_5_0);
+    
+    // Get list of available functions from the selector without factors
+    std::vector<std::string> available_functions = selector_no_factors.getShaveList();
+    ASSERT_GT(available_functions.size(), 0) << "No shave functions available for NPU_5_0";
+    
+    std::cout << "Testing " << available_functions.size() << " functions for PTL factor equivalence" << std::endl;
+    
+    // Test a variety of workloads for each function
+    std::vector<SHAVEWorkload> test_workloads;
+    
+    // Create diverse test workloads with different tensor shapes
+    const std::vector<std::tuple<int, int, int, int>> test_shapes = {
+        {10, 100, 5, 1},
+        {1, 1, 5, 1},
+        {100, 100, 50, 1},
+        {7, 29, 3, 1},
+        {344, 1, 250, 1},
+        {36, 1, 25, 1}
+    };
+    
+    size_t tests_passed = 0;
+    size_t tests_total = 0;
+    
+    for (const auto& fn : available_functions) {        
+        const auto& shave_op_no_factors = selector_no_factors.getShaveFuntion(fn);
+        const auto& shave_op_with_factors = selector_with_factors.getShaveFuntion(fn);
+        
+        for (const auto& [w, h, c, b] : test_shapes) {
+            SHAVEWorkload swl(fn, VPUDevice::NPU_5_0, 
+                            {VPUTensor(w, h, c, b, DataType::FLOAT16)},
+                            {VPUTensor(w, h, c, b, DataType::FLOAT16)});
+            
+            CyclesInterfaceType cycles_no_factors = 0;
+            CyclesInterfaceType cycles_with_factors = 0;
+            
+            try {
+                cycles_no_factors = shave_op_no_factors.dpuCycles(swl);
+                cycles_with_factors = shave_op_with_factors.dpuCycles(swl);
+                
+                tests_total++;
+                
+                // Since all PTL factors are 1.0f (mocked), results should be identical
+                EXPECT_EQ(cycles_no_factors, cycles_with_factors)
+                    << "Function: " << fn 
+                    << ", Shape: [" << w << ", " << h << ", " << c << ", " << b << "]"
+                    << ", cycles_no_factors: " << cycles_no_factors
+                    << ", cycles_with_factors: " << cycles_with_factors;
+                
+                if (cycles_no_factors == cycles_with_factors) {
+                    tests_passed++;
+                }
+            } catch (const std::exception&) {
+                // Some workloads might not be valid for certain operations, skip them
+                continue;
+            }
+        }
+    }
+    
+    std::cout << "PTL Factor Equivalence Test Results: " << tests_passed << "/" << tests_total << " tests passed" << std::endl;
+    EXPECT_GT(tests_passed, 0) << "No valid tests were executed";
+    EXPECT_EQ(tests_passed, tests_total) << "Some tests failed the equivalence check";
+}
 
 TEST_F(ShaveCollectionTest, EqualSpecialCase) {
     {

@@ -59,6 +59,13 @@ public:
             r = r && (right == b.right);
             return r;
         }
+        bool operator<(const HaloInfoHW& b) const {
+            if (!(top == b.top)) return top < b.top;
+            if (!(bottom == b.bottom)) return bottom < b.bottom;
+            if (!(left == b.left)) return left < b.left;
+            if (!(right == b.right)) return right < b.right;
+            return false;
+        }
         void setVerticalNoHalo() noexcept {
             // H halo must be forced to zero
             top = 0;
@@ -102,6 +109,16 @@ public:
             return r;
         }
 
+        bool operator<(const HaloInfoHWC& b) const {
+            // Compare base first
+            if (!((HaloInfoHW)(*this) == (HaloInfoHW)b)) {
+                return (HaloInfoHW)(*this) < (HaloInfoHW)b;
+            }
+            if (!(front == b.front)) return front < b.front;
+            if (!(back == b.back)) return back < b.back;
+            return false;
+        }
+
         /// this function checks if all the halo data is positive (TBLRFB)
         bool isAllPositive() const {
             if ((top < 0) || (bottom < 0) || (left < 0) || (right < 0) || (back < 0) || (front < 0)) {
@@ -139,9 +156,18 @@ public:
     /// precondition: value>=0
     HaloInfoHWC output_0_halo_broadcast_cnt{};
 
-    /// @brief Inbound halo, elements written by other tiles in extension of our compute output tensor!
-    // these inbound halo are for computation of memory tensor.
-    // They do not affect runtime and should not be part of NN descriptor
+    /// @brief (if value >0) Inbound halo, elements written by other tiles in extension of our compute output tensor!
+    /// these inbound halo are for computation of memory tensor.
+    /// They do not affect runtime and should not be part of NN descriptor
+    /// preconditions: value>=0
+    ///
+    /// @brief if values<0 :  elements produced by compute that are not stored in local memory (forgotten/subtracted
+    /// halo)
+    /// these forgotten halo do not affect how many elements are computed most probably they are broadcast to
+    /// other tiles (this must be reflected in \output_0_halo ) another way to see the local memory tensor is: only what
+    /// is not forgotten remains locally affects the size of memory tensor; runtime influence is expected to be small or
+    /// none
+    /// preconditions: value>=0 (zero means nothing is forgotten)
     HaloInfoHWC output_0_inbound_halo{};
 
 public:
@@ -152,6 +178,14 @@ public:
         r = r && (output_0_halo_broadcast_cnt == b.output_0_halo_broadcast_cnt);
         r = r && (output_0_inbound_halo == b.output_0_inbound_halo);
         return r;
+    }
+
+    bool operator<(const HaloWorkload& b) const {
+        if (!(input_0_halo == b.input_0_halo)) return input_0_halo < b.input_0_halo;
+        if (!(output_0_halo == b.output_0_halo)) return output_0_halo < b.output_0_halo;
+        if (!(output_0_halo_broadcast_cnt == b.output_0_halo_broadcast_cnt)) return output_0_halo_broadcast_cnt < b.output_0_halo_broadcast_cnt;
+        if (!(output_0_inbound_halo == b.output_0_inbound_halo)) return output_0_inbound_halo < b.output_0_inbound_halo;
+        return false;
     }
 
     void setVerticalNoHalo() noexcept {
@@ -172,9 +206,9 @@ public:
         output_0_inbound_halo.setHorizontalNoHalo();
     }
 
-    void setInboudHaloVerticalForBradcastAll(const unsigned int full_output_size,
-                                             const unsigned int output_remaining_to_process,
-                                             const unsigned output_tile_dim) {
+    void setInboundHaloVerticalForBroadcastAll(const unsigned int full_output_size,
+                                               const unsigned int output_remaining_to_process,
+                                               const unsigned output_tile_dim) {
         // we assume here that we want broadcast for all tiles
 
         // if OWT is >1 , it means that we want to broadcast the split to all other tiles
@@ -192,9 +226,9 @@ public:
         // +(remaining_output_to_split -output_tile_dim) = output_size , constant for all tiles
     }
 
-    void setInboudHaloHorizontalForBradcastAll(const unsigned int full_output_size,
-                                             const unsigned int output_remaining_to_process,
-                                             const unsigned output_tile_dim) {
+    void setInboundHaloHorizontalForBroadcastAll(const unsigned int full_output_size,
+                                                 const unsigned int output_remaining_to_process,
+                                                 const unsigned output_tile_dim) {
         // we assume here that we want broadcast for all tiles
 
         // if OWT is >1 , it means that we want to broadcast the split to all other tiles

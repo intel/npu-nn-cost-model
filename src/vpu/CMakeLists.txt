@@ -9,7 +9,7 @@
 
 # src/vpu/
 
-if(VPUNN_BUILD_SHARED_LIB AND NOT JS_BUILD)
+if(VPUNN_BUILD_SHARED_LIB)
     add_library(vpunn_vpu SHARED)
 else()
     add_library(vpunn_vpu STATIC)
@@ -28,7 +28,9 @@ target_sources(vpunn_vpu
         validation/data_dpu_operation.cpp
         energy_impl.cpp
         layer.cpp
+        dpu_workload.cpp
         serialization_wrapper.cpp
+        dma_workload.cpp
 )
 
 target_link_libraries(vpunn_vpu

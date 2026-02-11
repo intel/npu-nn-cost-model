@@ -34,9 +34,11 @@ namespace VPUNN {
 
 /// @brief reunites the dynamic behaviors for known operations
 /// workload level operations dynamic behavior
+/// order of operations constraints is strictly defined in Behaviours template comment!
 using OperationsBehaviour =
         Behaviours<CONVOLUTION_Constraints, DW_CONVOLUTION_Constraints, CM_CONVOLUTION_Constraints, ELTWISE_Constraints,
-                   MAXPOOL_Constraints, LAYERNORM_Constraints, ELTWISE_MUL_Constraints, AVGPOOL_Constraints>;
+                   MAXPOOL_Constraints, LAYERNORM_Constraints, ELTWISE_MUL_Constraints, AVGPOOL_Constraints,
+                   REDUCE_Constraints, REDUCE_Constraints>;
 
 template <class BehaviorsContext>
 class ContextualMemoryCalculator {
@@ -209,7 +211,8 @@ public:
                         (int)w.output_0.channels, config.get_output_channels_restriction(w),
                         "output_0.channels");  // we check out ch here especially for CONV and CM_CONV
 
-                checker.check_is_in_requirements((int)w.output_0.batch, config.get_batch_restrictions(), "output_0.batch");
+                checker.check_is_in_requirements((int)w.output_0.batch, config.get_batch_restrictions(),
+                                                 "output_0.batch");
 
                 //
                 {  // layout and types for output_0
@@ -274,32 +277,39 @@ public:
     static bool check_halo(const DPUOperation& dpu, std::string& info) {
         // input padding and halo are incompatible
         Checker checker;
-        const auto& inHalo{dpu.halo.input_0_halo};
-        const KernelInfo& k{dpu.kernel};
+        {
+            const auto& inHalo{dpu.halo.input_0_halo};
+            const KernelInfo& k{dpu.kernel};
 
-        if ((k.pad_top > 0) && (inHalo.top > 0)) {
-            checker.add_check_failed("Incompatible: Padding top >0 and input halo.top >0 ");
-        }
-        if ((k.pad_bottom > 0) && (inHalo.bottom > 0)) {
-            checker.add_check_failed("Incompatible: Padding bottom >0 and input halo.bottom >0 ");
-        }
-        if ((k.pad_left > 0) && (inHalo.left > 0)) {
-            checker.add_check_failed("Incompatible: Padding left >0 and input halo.left >0 ");
-        }
-        if ((k.pad_right > 0) && (inHalo.right > 0)) {
-            checker.add_check_failed("Incompatible: Padding right >0 and input halo.right >0 ");
+            if ((k.pad_top > 0) && (inHalo.top > 0)) {
+                checker.add_check_failed("Incompatible: Padding top >0 and input halo.top >0 ");
+            }
+            if ((k.pad_bottom > 0) && (inHalo.bottom > 0)) {
+                checker.add_check_failed("Incompatible: Padding bottom >0 and input halo.bottom >0 ");
+            }
+            if ((k.pad_left > 0) && (inHalo.left > 0)) {
+                checker.add_check_failed("Incompatible: Padding left >0 and input halo.left >0 ");
+            }
+            if ((k.pad_right > 0) && (inHalo.right > 0)) {
+                checker.add_check_failed("Incompatible: Padding right >0 and input halo.right >0 ");
+            }
+            // padding is only spatial TBLR, so no checkof padding versus halo channels (front/back)
         }
 
-        // padding is only spatial TBLR, so no checkof padding versus halo channels (front/back)
+        {
+            // output halo should be >0
+            const auto& outHalo{dpu.halo.output_0_halo};
+            const auto& broadcastHalo{dpu.halo.output_0_halo_broadcast_cnt};
+            // const auto& inboundHalo{dpu.halo.output_0_inbound_halo};
 
-        // output halo should be >0
-        const auto& outHalo{dpu.halo.output_0_halo};
-        const auto& broadcastHalo{dpu.halo.output_0_halo_broadcast_cnt};
-        const auto& inboundHalo{dpu.halo.output_0_inbound_halo};
-
-        if ((outHalo.isAllPositive() == false) || (broadcastHalo.isAllPositive() == false) ||
-            (inboundHalo.isAllPositive() == false)) {
-            checker.add_check_failed("Incompatible: Halo values <0");
+            if ((outHalo.isAllPositive() ==
+                 false)  //  to be more complex, like avoiding broadcasting more than available
+                || (broadcastHalo.isAllPositive() == false)  //
+                //|| (inboundHalo.isAllPositive() == false) /*to be changed to a more complex check , like avoiding
+                // forgetting more than you have , can be also negative*/
+            ) {
+                checker.add_check_failed("Incompatible: Halo values <0");
+            }
         }
 
         info = checker.findings();
@@ -310,12 +320,13 @@ protected:
 };
 
 /// configuration bundle for Workloads at the most atomic level. workloads that are to be subjected to DPU
-using OperationsContext = Behavior_Device_Mapping<OperationsBehaviour,  // operations
-                                                  VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues,
-                                                  VPU4_0_WorkloadValidValues
-                                                  , VPU5_0_WorkloadValidValues
-                                                  
-                                                  >;
+using OperationsContext =
+        Behavior_Device_Mapping<OperationsBehaviour,  // operations
+                                VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues, VPU4_0_WorkloadValidValues
+                                ,
+                                VPURESERVEDorkloadValidValues
+
+                                >;
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;
 

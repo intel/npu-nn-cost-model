@@ -38,16 +38,19 @@
 namespace VPUNN {
 
 /// layer level operations dynamic behavior
+/// order of operations constraints is strictly defined in Behaviours template comment!
 using LayerOperationsBehaviour =
         Behaviours<CONVOLUTION_Constraints_Layer, DW_CONVOLUTION_Constraints_Layer, CM_CONVOLUTION_Constraints_Layer,
                    ELTWISE_Constraints_Layer, MAXPOOL_Constraints_Layer, LAYERNORM_Constraints_Layer,
-                   ELTWISE_MUL_Constraints_Layer, AVGPOOL_Constraints_Layer>;
+                   ELTWISE_MUL_Constraints_Layer, AVGPOOL_Constraints_Layer, REDUCE_Constraints_Layer,
+                   REDUCE_Constraints_Layer>;
 
 /// @brief services for Layer validation
 class VPU_LayerValidator :
         public Behavior_Device_Mapping<LayerOperationsBehaviour,  // operations
                                        VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU4_0_LayerValidValues
-                                       , VPU5_0_LayerValidValues                                       
+                                       ,
+                                       VPU5_0_LayerValidValues
                                        > {
 protected:
 public:
@@ -88,6 +91,8 @@ public:
             case VPUTilingStrategy::SOH_K_SWITCH:
                 return {1, nTiles, 1, 1};
             case VPUTilingStrategy::SOK_NO_BROADCAST:
+            case VPUTilingStrategy::SOK_H_SWITCH:
+            case VPUTilingStrategy::SOK_W_SWITCH:
                 return {1, 1, nTiles, 1};
             default:
                 return {1, 1, 1, 1};

@@ -53,20 +53,21 @@ TEST_F(TestDMANNCostModelVPU2x, LoadModels_BasicAssertions) {
 TEST_F(TestDMANNCostModelVPU2x, LoadModels_NN_Valid_Interval) {
     float down_exp = -0.1F;
     float up_exp = 1.1F;
-
+    
+    
     {  // empty models
-
-        ASSERT_FALSE(model.nn_initialized());
-        auto minmax = model.get_NN_Valid_interval();
+        DMANNCostProvider<DMANNWorkload_NPU27> empty_model{};
+        ASSERT_FALSE(empty_model.is_initialized());
+        auto minmax = empty_model.get_NN_Valid_interval();
         ASSERT_FLOAT_EQ(down_exp, minmax.first);
         ASSERT_FLOAT_EQ(up_exp, minmax.second);
     }
 
     {  // 2_7
         const std::string model_path = the_NN_models.all_DMA_model_paths[index_DMA_path_27].first;
+        DMANNCostProvider<DMANNWorkload_NPU27> vpunn_model{model_path};
         EXPECT_NO_THROW(DMACostModel<DMANNWorkload_NPU27> x{model_path});
-        DMACostModel<DMANNWorkload_NPU27> vpunn_model{model_path};
-        ASSERT_TRUE(vpunn_model.nn_initialized());
+        ASSERT_TRUE(vpunn_model.is_initialized());
 
         auto minmax = vpunn_model.get_NN_Valid_interval();
         ASSERT_FLOAT_EQ(down_exp, minmax.first);
@@ -124,9 +125,9 @@ TEST_F(TestDMANNCostModelVPU2x, SmokeTestDMA_RAWNN) {
     DMANNWorkload_NPU27 wl = wl_glob_27;
 
     const std::string model_path = VPU_DMA_2_7_MODEL_PATH;
-    DMACostModel<DMANNWorkload_NPU27> dma_model(model_path);
+    DMANNCostProvider<DMANNWorkload_NPU27> dma_model(model_path);
 
-    ASSERT_TRUE(dma_model.nn_initialized());
+    ASSERT_TRUE(dma_model.is_initialized());
 
    auto dma_raw = dma_model.computeBandwidthMsg(wl);
 
@@ -171,10 +172,10 @@ TEST_F(TestDMANNCostModelVPU2x, DISABLED_SweepDMATime_27) {
         dmaOld_DD.input_location = MemoryLocation::DRAM;
         dmaOld_DD.output_location = MemoryLocation::DRAM;
 
-        const DMANNWorkload_NPU27 dmaNN_DC = DMAWorkloadTransformer::create_workload(dmaOld_DC);
-        const DMANNWorkload_NPU27 dmaNN_CD = DMAWorkloadTransformer::create_workload(dmaOld_CD);
-        const DMANNWorkload_NPU27 dmaNN_CC = DMAWorkloadTransformer::create_workload(dmaOld_CC);
-        const DMANNWorkload_NPU27 dmaNN_DD = DMAWorkloadTransformer::create_workload(dmaOld_DD);
+        const DMANNWorkload_NPU27 dmaNN_DC = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_DC);
+        const DMANNWorkload_NPU27 dmaNN_CD = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_CD);
+        const DMANNWorkload_NPU27 dmaNN_CC = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_CC);
+        const DMANNWorkload_NPU27 dmaNN_DD = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_DD);
 
         // std::cout << "\n--------------------------------------------------------------------------------------";
         // std::cout << dmaNN_DC << std::endl << dmaNN_CD << std::endl << dmaNN_CC << std::endl << dmaNN_DD;
@@ -245,7 +246,7 @@ TEST_F(TestDMANNCostModelVPU2x, SweepGT_DMATime_27) {
                 out_loc,                                       // dst
                 1,                                             // owt
         };
-        const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload(dmaOld_);
+        const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_);
         // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return dmaNN;
@@ -407,7 +408,7 @@ TEST_F(TestDMANNCostModelVPU2x, SweepGT_DMATime_27_GEAR4) {
                 out_loc,                                       // dst
                 1,                                             // owt
         };
-        const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload(dmaOld_);
+        const DMANNWorkload_NPU27 dmaNN = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_);
         // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return dmaNN;

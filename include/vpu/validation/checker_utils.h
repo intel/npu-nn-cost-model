@@ -97,7 +97,7 @@ public:
 
     /// checks if the item belongs to a container. If not present it will record an error/finding
     template <class T>
-    bool check_is_in_list(const T& item, const Values<T>& container, const std::string& what)  {
+    bool check_is_in_list(const T& item, const Values<T>& container, const std::string& what) {
         const auto found = std::find(container.begin(), container.end(), item) != container.end();
 
         if (!found) {
@@ -114,7 +114,7 @@ public:
 
     /// checks if the item belongs to a closed interval. If not present it will record an error/finding
     template <class T>
-    bool check_is_in_interval(const T& item, const std::pair<T, T>& interval, const std::string& what)  {
+    bool check_is_in_interval(const T& item, const std::pair<T, T>& interval, const std::string& what) {
         const bool belongs{(item >= interval.first) && (item <= interval.second)};
 
         if (!belongs) {
@@ -132,7 +132,7 @@ public:
     /// checks if the item respects all the rules of a smart range. If not it will record an error/finding
     bool check_is_in_requirements(const int item, const MultiSmartRanges& range, const std::string& what) {
         std::string message{""};
-        bool result{range.is_in(item)};
+        bool result{range.is_in(item, message)};
 
         if (!result) {
             std::stringstream buffer;

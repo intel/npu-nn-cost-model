@@ -25,14 +25,14 @@
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
-class DPU_OperationSanitizerTestNPU5x : public ::testing::Test {
-public:
-protected:
-    void SetUp() override {
-    }
-
-private:
-};
+//class DPU_OperationSanitizerTestNPU5x : public ::testing::Test {
+//public:
+//protected:
+//    void SetUp() override {
+//    }
+//
+//private:
+//};
 
 class DPU_WorkloadValidatorTestNPU5x : public ::testing::Test {
 public:

@@ -21,6 +21,8 @@
 #include <vector>
 #include <string>
 
+#include "vpu/shave/shave_factors_mapping.h"
+
 constexpr float VPU27COSTCURVERATIO = 1.0;
 constexpr float VPU40COSTCURVERATIO = 2.5;
 
@@ -453,8 +455,5 @@ void ShaveInstanceHolder_NPU50::populate() {
 
     // clang-format on
 }
-
-
-
 
 }  // namespace VPUNN

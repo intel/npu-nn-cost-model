@@ -11,6 +11,7 @@
 #define DMA_POSTPROCESSING_MOCKS_H
 
 #include "dma_post_process.h"
+#include "vpu/performance.h" // for GlobalHarwdwareCharacteristics
 
 namespace VPUNN {
 

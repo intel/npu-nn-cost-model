@@ -124,6 +124,34 @@ struct DMAWorkload {
     MemoryLocation output_location;  ///<  Output memory location
 
     unsigned int output_write_tiles = 1;  ///< number of CMX tiles to broadcast. NOT USED!
+
+    // -- Serialization --
+
+    static const std::string get_wl_name() {
+        return "dma_workload_";
+    }
+
+    using _ref_supported_type = std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<VPUTensor>,
+                                             std::reference_wrapper<MemoryLocation>, std::reference_wrapper<unsigned int>>;
+
+    const std::unordered_map<std::string, _ref_supported_type> _member_map{
+            {"device", std::ref(device)},
+            {"input", std::ref(input)},
+            {"output", std::ref(output)},
+            {"input_location", std::ref(input_location)},
+            {"output_location", std::ref(output_location)},
+            {"output_write_tiles", std::ref(output_write_tiles)}
+    };
+
+    static const std::vector<std::string> _get_member_names() {
+        return {"device",
+                "input",
+                "output",
+                "input_location",
+                "output_location",
+                "output_write_tiles"
+        };
+    }
 };
 
 /**
@@ -190,7 +218,7 @@ struct DMANNWorkload_NPU27 {
                 "num_planes",
                 "length",
                 "src_width",
-                "dst_width"
+                "dst_width",
                 "src_stride",
                 "dst_stride",
                 "src_plane_stride",
@@ -247,6 +275,33 @@ struct DMANNWorkload_NPU27 {
     }
     DMANNWorkload_NPU27& operator=(DMANNWorkload_NPU27&&) = delete;
     virtual ~DMANNWorkload_NPU27() = default;
+
+    /// equality test operator
+    bool operator==(const DMANNWorkload_NPU27& b) const {
+        return device == b.device &&
+               num_planes == b.num_planes &&
+               length == b.length &&
+               src_width == b.src_width &&
+               dst_width == b.dst_width &&
+               src_stride == b.src_stride &&
+               dst_stride == b.dst_stride &&
+               src_plane_stride == b.src_plane_stride &&
+               dst_plane_stride == b.dst_plane_stride &&
+               transfer_direction == b.transfer_direction &&
+               loc_name == b.loc_name;
+    }
+    /// less than operator for std::map compatibility
+    bool operator<(const DMANNWorkload_NPU27& b) const {
+        return std::tie(device, num_planes, length, src_width, dst_width, src_stride, dst_stride,
+                         src_plane_stride, dst_plane_stride, transfer_direction, loc_name) <
+               std::tie(b.device, b.num_planes, b.length, b.src_width, b.dst_width, b.src_stride,
+                         b.dst_stride, b.src_plane_stride, b.dst_plane_stride, b.transfer_direction,
+                         b.loc_name);
+    }
+
+    /// @brief Compute FNV-1a hash for cache lookups
+    /// @return 32-bit hash value for this workload
+    uint32_t hash() const;
 };
 
 /// placeholder/reserved name
@@ -274,6 +329,12 @@ struct DMANNWorkload_NPU40_50 {
         int src_dim_size{0};  ///> Number of times (-1) the dimension is repeated. How many elements (zero = 1 element)
                               /// in this dimension.  Min value is zero!
         int dst_dim_size{0};
+
+        // Add comparison operator for std::array comparison
+        bool operator<(const SizeStride& other) const {
+            return std::tie(src_stride, dst_stride, src_dim_size, dst_dim_size) <
+                   std::tie(other.src_stride, other.dst_stride, other.src_dim_size, other.dst_dim_size);
+        }
     };
     // 5 extra dimensions
     std::array<SizeStride, MaxExtraDimensions> e_dim{};
@@ -395,6 +456,54 @@ struct DMANNWorkload_NPU40_50 {
     // DMANNWorkload_NPU40_50(const DMANNWorkload_NPU40_50&&) /*noexcept(false)*/ = delete;
     DMANNWorkload_NPU40_50& operator=(DMANNWorkload_NPU40_50&&) = delete;
     virtual ~DMANNWorkload_NPU40_50() = default;
+
+    bool operator==(const DMANNWorkload_NPU40_50& b) const {
+        // Compare device, widths, num_dim, and num_engine
+        if (device != b.device ||
+            src_width != b.src_width ||
+            dst_width != b.dst_width ||
+            num_dim != b.num_dim ||
+            num_engine != b.num_engine ||
+            transfer_direction != b.transfer_direction) {
+            return false;
+        }
+
+        // Compare all extra dimensions up to num_dim
+        for (int i = 0; i < num_dim; i++) {
+            if (e_dim[i].src_stride != b.e_dim[i].src_stride ||
+                e_dim[i].dst_stride != b.e_dim[i].dst_stride ||
+                e_dim[i].src_dim_size != b.e_dim[i].src_dim_size ||
+                e_dim[i].dst_dim_size != b.e_dim[i].dst_dim_size) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool operator<(const DMANNWorkload_NPU40_50& b) const {
+        return std::tie(device, src_width, dst_width, num_dim, e_dim, num_engine, transfer_direction, loc_name) <
+               std::tie(b.device, b.src_width, b.dst_width, b.num_dim, b.e_dim, b.num_engine, b.transfer_direction,
+                         b.loc_name);
+    }
+
+    /// @brief Compute FNV-1a hash for cache lookups
+    /// @return 32-bit hash value for this workload
+    uint32_t hash() const;
+};
+
+// Custom hasher for DMAWorkload_NPU27 using the hash() method
+struct DMANNWorkload_NPU27Hasher {
+    std::size_t operator()(const DMANNWorkload_NPU27& wl) const noexcept {
+        return static_cast<std::size_t>(wl.hash());
+    }
+};
+
+// Custom hasher for DMANNWorkload_NPU40_50 using the hash() method
+struct DMANNWorkload_NPU40_50Hasher {
+    std::size_t operator()(const DMANNWorkload_NPU40_50& wl) const noexcept {
+        return static_cast<std::size_t>(wl.hash());
+    }
 };
 
 /// DMA descriptor aliases
@@ -431,6 +540,28 @@ class DMANNWorkloadCreator;
 
 // when making a new interface version, Stop copying here
 
+}  // namespace VPUNN
+
+
+// Template specialization for MapTypeSelector (defined in cache.h)
+// This must be in global namespace after VPUNN namespace closes
+namespace VPUNN {
+template <typename K>
+struct MapTypeSelector;  // Forward declaration
+
+// Specialization for DMANNWorkload_NPU27: use std::unordered_map with custom hasher
+template <>
+struct MapTypeSelector<DMANNWorkload_NPU27> {
+    template <typename V>
+    using type = std::unordered_map<DMANNWorkload_NPU27, V, DMANNWorkload_NPU27Hasher>;
+};
+
+// Specialization for DMANNWorkload_NPU40_50: use std::unordered_map with custom hasher
+template <>
+struct MapTypeSelector<DMANNWorkload_NPU40_50> {
+    template <typename V>
+    using type = std::unordered_map<DMANNWorkload_NPU40_50, V, DMANNWorkload_NPU40_50Hasher>;
+};
 }  // namespace VPUNN
 
 #endif  // VPUNN_TYPES_H

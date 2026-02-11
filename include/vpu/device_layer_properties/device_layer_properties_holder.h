@@ -37,6 +37,7 @@ protected:
                                              VPU2_7_LayerProperties,  //
                                              VPU4_0_LayerProperties,  //
                                              VPU5_0_LayerProperties,  //
+                                             VPU5_0_LayerProperties,  //
                                              Default_LayerProperties>;
 
     static inline const LayerProperties_Tuple const_layer_properties{};

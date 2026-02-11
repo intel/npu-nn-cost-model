@@ -1,0 +1,30 @@
+#ifndef GEN_SHAVE_FACTORS_POPULATION_@CLASS_NAME@_H
+#define GEN_SHAVE_FACTORS_POPULATION_@CLASS_NAME@_H
+
+@POPULATE_INFO@
+
+#include "vpu/shave/shave_factors_mapping.h"
+
+namespace VPUNN {
+/**
+ * @brief Generated class that populates the speed-up factors lookup table for SHAVE operations.
+ * This class inherits from FactorsLookUpTable, to have access to its 
+ * methods and implements the populate method
+ * to fill the table with operation factors extracted from a CSV file.
+ * The content of `populate()` is generated based on the template given in the CMake macro.
+ */
+class PopulatedFactorsLUT@CLASS_NAME@ : public FactorsLookUpTable {
+public:
+    PopulatedFactorsLUT@CLASS_NAME@() {
+        populate();
+    }
+
+private:
+    void populate() {
+@POPULATE_CONTENT@
+    }
+};
+
+} // namespace VPUNN
+
+#endif  // GEN_SHAVE_FACTORS_POPULATION_@CLASS_NAME@_H
