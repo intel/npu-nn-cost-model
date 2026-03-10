@@ -31,6 +31,9 @@ target_sources(vpunn_vpu
         dpu_workload.cpp
         serialization_wrapper.cpp
         dma_workload.cpp
+        shave_workload.cpp
+        http_cost_provider_factory.cpp
+        http_cost_provider_intf.cpp
 )
 
 target_link_libraries(vpunn_vpu
@@ -39,7 +42,6 @@ target_link_libraries(vpunn_vpu
         flatbuffers
         vpunn_inference
         $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
-        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:nlohmann_json::nlohmann_json>
 )
 
 add_dependencies(vpunn_vpu vpunn_cpp_schema)

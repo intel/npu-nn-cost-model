@@ -10,7 +10,7 @@
 import subprocess
 import shutil
 import os
-from setuptools import setup
+from skbuild import setup
 
 def get_version():
 

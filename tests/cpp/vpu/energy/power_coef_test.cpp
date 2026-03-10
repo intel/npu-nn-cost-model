@@ -113,7 +113,7 @@ private:
             if (test.t_in.wts_type)
                 wl.weight_type = test.t_in.wts_type.value();
 
-            ret_wls.push_back(wl);
+            ret_wls.push_back(std::move(wl));
         }
         return ret_wls;
     }

@@ -1975,7 +1975,7 @@ TEST_F(TestPreprocessing_Interface14, TransformOnlyInsertAutopadding) {
     };
     wl_ref.superdense_memory = true;
 
-    DPUWorkload wl_to_transform{wl_ref};
+    DPUWorkload wl_to_transform{std::move(wl_ref)};
 
     // Test 1a: autopad = true, channels < 16 -> should pad to 16
     wl_to_transform.input_autopad = true;
@@ -2022,7 +2022,7 @@ TEST_F(TestPreprocessing_Interface14, TransformOnlyInsertAutopadding) {
     };
     wl_ref_no_pad.superdense_memory = true;
 
-    DPUWorkload wl_no_pad{wl_ref_no_pad};
+    DPUWorkload wl_no_pad{std::move(wl_ref_no_pad)};
     wl_no_pad.input_autopad = true;
     wl_no_pad.output_autopad = true;
     auto desc_already_16plus = pp.transformSingle(wl_no_pad);
@@ -2143,7 +2143,7 @@ TEST_F(TestPreprocessing_Interface15, TransformOnlyInsertAutopadding) {
     };
     wl_ref.superdense_memory = true;
 
-    DPUWorkload wl_to_transform{wl_ref};
+    DPUWorkload wl_to_transform{std::move(wl_ref)};
 
     // Test 1a: autopad = true, channels < 16 -> should pad to 16
     wl_to_transform.input_autopad = true;
@@ -2190,11 +2190,115 @@ TEST_F(TestPreprocessing_Interface15, TransformOnlyInsertAutopadding) {
     };
     wl_ref_no_pad.superdense_memory = true;
 
-    DPUWorkload wl_no_pad{wl_ref_no_pad};
+    DPUWorkload wl_no_pad{std::move(wl_ref_no_pad)};
     wl_no_pad.input_autopad = true;
     wl_no_pad.output_autopad = true;
     auto desc_already_16plus = pp.transformSingle(wl_no_pad);
     EXPECT_EQ(desc_already_16plus[in_0_idx + 2], 16) << "Input with channels=16 should remain 16";
     EXPECT_EQ(desc_already_16plus[out_0_idx + 2], 32) << "Output with channels=32 should remain 32";
 }
+
+
+// end ITF15
+
+//------------------------------------------------------------------------------------------------
+/// interface 16
+// begin ITF16
+
+class TestPreprocessing_Interface16 : public ::testing::Test {
+public:
+protected:
+    void SetUp() override {
+    }
+    const DPUWorkload wl = {
+            VPUDevice::NPU_RESERVED_1,
+            Operation::CONVOLUTION,
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // input dimensions
+            {VPUTensor(56, 56, 16, 1, DataType::UINT8, Layout::XYZ, true)},  // output dimensions
+            {3, 3},                                                          // kernels
+            {1, 1},                                                          // strides
+            {1, 1},                                                          // padding
+            ExecutionMode::CUBOID_16x16,                                     //
+            ActivationFunction::NONE,                                        //
+            0.7F,                                                            // act sparsity
+            0.3F,                                                            // weight_sparsity
+            {swz_def, swz_def},                                              // input_swizzling
+            {swz_def},                                                       // output_swizzling
+            1,                                                               // owtiles
+            {0, 0, 0, 0},                                                    // offsets,
+            ISIStrategy::SPLIT_OVER_H,                                       //
+            false,                                                           // weight_sparsity_enabled
+            {
+                    {1, 2, 3, 4, 41, 42},      // input_0_halo
+                    {5, 6, 7, 8, 81, 82},      // output_0_halo
+                    {9, 10, 11, 12, 91, 92},   // output_0_halo_broadcast_cnt
+                    {13, 14, 15, 16, 17, 18},  // output_0_inbound_halo
+            },                                 // halo
+            {
+                    // sep
+                    false,             // sep on
+                    {2050, 22, 1, 1},  // sep table,  4 bytes per element
+                    {512, 5, 64, 1},   // actual activator input,  same datatype as compute tensor input
+                    false,
+            }  // sep
+
+    };
+
+    const int prev_descr_size{44 + 3 + 3 + 3};  // interface 14 size
+    const int descriptor_expected_size{
+            prev_descr_size  // add new fields next
+            + 1 * 3          // new datatype, 3 times (input0, input1, output0)
+            + 0              // operations -2 and +2 new fields
+            + 1              // execution mode new field dcim
+            + 1              // reduce minmax mode
+    };
+    const int tensor_Dtype_idx = 4;  // 4D shape
+    const int tensorDescriptorSize = tensor_Dtype_idx + (int)intf_16::DataType::__size;
+
+    const int op_idx = 0;
+    const int in_0_idx{op_idx + (int)intf_16::Operation::__size};
+    const int in_1_dtype_idx{in_0_idx + tensorDescriptorSize};
+    const int out_0_idx{in_1_dtype_idx + (int)intf_16::DataType::__size};
+    const int ksp_idx = out_0_idx + tensorDescriptorSize;
+    const int execution_mode_idx = ksp_idx + 8; /*kernel:2 +strides:2+padding:4*/
+    const int sparsities_idx = execution_mode_idx + (int)intf_16::ExecutionMode::__size;
+    const int owt_idx = sparsities_idx + 2;  /*sparsities:2*/
+    const int odu_permute_idx = owt_idx + 1; /*owt:1*/
+    const int inplace_output_idx = odu_permute_idx + (int)intf_12::Layout::__size;
+    const int inplace_input1_idx = inplace_output_idx + 1;
+    const int superdense_idx = inplace_input1_idx + 1;
+    const int reduce_minmax_mode_idx = superdense_idx + 1;
+
+    const int first_after_end_idx = reduce_minmax_mode_idx + 1;
+};
+
+// put tests for itf16
+
+// Demonstrate some basic assertions.
+TEST_F(TestPreprocessing_Interface16, SingleWLTestPreprocessing) {
+    EXPECT_EQ(first_after_end_idx, descriptor_expected_size);
+    EXPECT_EQ(descriptor_expected_size, 44 + 3 + 3 + 3 + /*new*/ +3 + 0 + 1 + 1);
+    // Instantiate the preprocessing class
+    auto pp = Preprocessing_Interface16<float>();
+    // Transform a single workload
+    std::vector<float> result = pp.transformSingle(wl);
+    EXPECT_EQ(result.size(), descriptor_expected_size);
+}
+// Demonstrate basic creation and size
+TEST_F(TestPreprocessing_Interface16, CreationAndSize) {
+    auto pp = Preprocessing_Interface16<float>();
+    EXPECT_EQ(pp.output_size(), descriptor_expected_size);  //
+
+    EXPECT_EQ(pp.interface_version(), pp.getInterfaceVersion()) << " dynamic and static version must be equal";
+    EXPECT_EQ(pp.interface_version(), (int)NNVersions::VERSION_16_NPU_RESERVED_12);
+    size_t data_written = 0;
+    std::vector<float> result = pp.generate_descriptor(wl, data_written);
+    EXPECT_EQ(data_written, descriptor_expected_size);  // this is the actual filled dimension
+
+    EXPECT_EQ(result.size(), data_written);
+}
+
+
+// end ITF16
+
 }  // namespace VPUNN_unit_tests

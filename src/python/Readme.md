@@ -1,18 +1,24 @@
-# Update new python bindings
+# Python Bindings
 
-In order to update new python bindings you need to run the following commands
+The Python bindings for VPUNN are implemented using `pybind11` and are located in `src/python/VPUNN.cpp`.
+
+## Installation
+
+To install the package with bindings, run the following command from the root of the repository:
 
 ```bash
-cmake -DENABLE_PYTHON_BINDING=ON -DGENERATE_PYTHON_BINDING=ON ..
-make vpunn_python_bindings -j
+pip install .
 ```
 
-This will use Binder and pybind11 to build python bindings for the library
+This will use `scikit-build` to compile the C++ extension and install the Python package.
 
-Other approach is to do in the root folder: 
+## Development
 
-```
-cmake -H. -Bbuild -DENABLE_PYTHON_BINDING=ON -DGENERATE_PYTHON_BINDING=ON 
-cmake --build build --target vpunn_python_bindings
-```
+If you need to modify the bindings:
+
+1.  Edit `src/python/VPUNN.cpp` or `src/python/binding.h`.
+2.  Reinstall the package to rebuild the extension:
+    ```bash
+    pip install .
+    ```
 

@@ -14,7 +14,6 @@
 #include <iostream>
 #include <map>
 #include <optional>
-#include <sstream>  //
 #include <string>
 
 #include "dpu_defaults.h"
@@ -22,6 +21,7 @@
 #include "dpu_types.h"
 #include "sep_mode.h"
 #include "vpu_tensor.h"
+#include "profiling_service.h"
 
 namespace VPUNN {
 
@@ -108,6 +108,8 @@ struct DPUWorkload {
     CostSourceHint cost_source_hint{CostSourceHint::AUTO};
 
     /// hint about what profiling service backend to use
+    /// Hints should not be included in the hash computation or the cout operator, 
+    /// as they do not define the workload itself and are highly likely to change without affecting the actual workload.
     ProfilingServiceBackend profiling_service_backend_hint{ProfilingServiceBackend::__size};
 
     /// MPE engine to be used, SCL by default -- It's a required field for both l2 and l1 APIs.
@@ -127,6 +129,7 @@ struct DPUWorkload {
     std::string get_layer_info() const {
         return layer_info;
     }
+
     void set_layer_info(const std::string& layer_info_name) {
         layer_info = layer_info_name;
     }
@@ -151,7 +154,7 @@ struct DPUWorkload {
 
     bool is_inplace_output_memory() const {
         if (is_elementwise_like_operation()) {  // only for elementwise
-                                                // optional not set. using older/initial mechanism
+            // optional not set. using older/initial mechanism, if set use the value
             return in_place_output_memory.value_or(is_preconditions_for_inplace_output());
         }
         return false;  // not elemntwise
@@ -163,7 +166,7 @@ struct DPUWorkload {
 
     bool is_weightless_operation() const {
         if (is_elementwise_like_operation()) {  // only for elementwise
-                                                // optional not set. using older/initial mechanism
+            // optional not set. using older/initial mechanism, if set use the value
             return weightless_operation.value_or(is_special_No_weights_situation());
         }
         return false;  // not elemntwise
@@ -226,7 +229,7 @@ struct DPUWorkload {
         output_swizzling[0] = toSet;
     }
     /// gets the type of the weight tensor, considering also input type in case not set
-    DataType get_weight_type() const {
+    DataType get_weight_type() const noexcept {
         // if not set, we assume the same type as input_0
         return weight_type.value_or(inputs[0].get_dtype());
     }
@@ -274,207 +277,28 @@ protected:
     // operations/methods
 public:
     /// equality test operator
-    bool operator==(const DPUWorkload& b) const {
-        bool r{true};
-        r = r && (device == b.device);
-        r = r && (op == b.op);
-        r = r && (inputs == b.inputs);
-        r = r && (outputs == b.outputs);
-
-        r = r && (kernels == b.kernels);
-        r = r && (strides == b.strides);
-        r = r && (padding == b.padding);
-
-        r = r && (execution_order == b.execution_order);
-        r = r && (activation_function == b.activation_function);
-
-        const float EPSILON{0.00001f};
-        auto is_equal = [&EPSILON](float a, float b) {
-            return (std::fabs(a - b) < EPSILON);  // very simple since vals around zero
-        };
-        r = r && (is_equal(act_sparsity, b.act_sparsity));
-        r = r && (is_equal(weight_sparsity, b.weight_sparsity));
-
-        r = r && (input_swizzling == b.input_swizzling);
-        r = r && (output_swizzling == b.output_swizzling);
-
-        r = r && (output_write_tiles == b.output_write_tiles);
-        r = r && (isi_strategy == b.isi_strategy);
-        r = r && (weight_sparsity_enabled == b.weight_sparsity_enabled);
-
-        // new halo
-        r = r && (halo == b.halo);
-        r = r && (sep_activators == b.sep_activators);  // sep
-
-        r = r && (weight_type == b.weight_type);  // weight type
-
-        r = r && (layer_info == b.layer_info);  // layer_info
-
-        r = r && (weightless_operation == b.weightless_operation);      // weightless_operation
-        r = r && (in_place_output_memory == b.in_place_output_memory);  // in_place_output_memory
-        r = r && (superdense_memory == b.superdense_memory);            // superdense_memory
-        r = r && (input_autopad == b.input_autopad);                    // input_autopad
-        r = r && (output_autopad == b.output_autopad);                  // output_autopads
-        r = r && (mpe_engine == b.mpe_engine);                          // mpe_engine
-        r = r && (reduce_minmax_op == b.reduce_minmax_op);              // reduce_minmax_op
-        return r;
-    }
+    bool operator==(const DPUWorkload& b) const;
 
     /// less than operator for std::map compatibility
-    bool operator<(const DPUWorkload& b) const {
-        // Compare fields in order to establish a total ordering
-        if (!(device == b.device))
-            return device < b.device;
-        if (!(op == b.op))
-            return op < b.op;
-        if (!(inputs == b.inputs))
-            return inputs < b.inputs;
-        if (!(outputs == b.outputs))
-            return outputs < b.outputs;
-        if (!(kernels == b.kernels))
-            return kernels < b.kernels;
-        if (!(strides == b.strides))
-            return strides < b.strides;
-        if (!(padding == b.padding))
-            return padding < b.padding;
-        if (!(execution_order == b.execution_order))
-            return execution_order < b.execution_order;
-        if (!(activation_function == b.activation_function))
-            return activation_function < b.activation_function;
-        if (!(act_sparsity == b.act_sparsity))
-            return act_sparsity < b.act_sparsity;
-        if (!(weight_sparsity == b.weight_sparsity))
-            return weight_sparsity < b.weight_sparsity;
-        if (!(input_swizzling == b.input_swizzling))
-            return input_swizzling < b.input_swizzling;
-        if (!(output_swizzling == b.output_swizzling))
-            return output_swizzling < b.output_swizzling;
-        if (!(output_write_tiles == b.output_write_tiles))
-            return output_write_tiles < b.output_write_tiles;
-        if (!(isi_strategy == b.isi_strategy))
-            return isi_strategy < b.isi_strategy;
-        if (!(weight_sparsity_enabled == b.weight_sparsity_enabled))
-            return weight_sparsity_enabled < b.weight_sparsity_enabled;
-        if (!(halo == b.halo))
-            return halo < b.halo;
-        if (!(sep_activators == b.sep_activators))
-            return sep_activators < b.sep_activators;
-        if (!(weight_type == b.weight_type))
-            return weight_type < b.weight_type;
-        // layer_info excluded from comparison for cache purposes
-        if (!(weightless_operation == b.weightless_operation))
-            return weightless_operation < b.weightless_operation;
-        if (!(in_place_output_memory == b.in_place_output_memory))
-            return in_place_output_memory < b.in_place_output_memory;
-        if (!(superdense_memory == b.superdense_memory))
-            return superdense_memory < b.superdense_memory;
-        if (!(input_autopad == b.input_autopad))
-            return input_autopad < b.input_autopad;
-        if (!(output_autopad == b.output_autopad))
-            return output_autopad < b.output_autopad;
-        if (!(mpe_engine == b.mpe_engine))
-            return mpe_engine < b.mpe_engine;
-        if (!(reduce_minmax_op == b.reduce_minmax_op))
-            return reduce_minmax_op < b.reduce_minmax_op;
-        return false;  // All fields are equal
-    }
+    bool operator<(const DPUWorkload& b) const;
 
     /// compute hash for cache key usage, directly from DPUWorkload fields
     /// Uses the same fnv1a_hash function as NNDescriptor, but without preprocessing
-    uint32_t hash() const;
-};
+    uint32_t hash() const noexcept;
 
-// Custom hasher for DPUWorkload using the hash() method
-// This enables std::unordered_map to use DPUWorkload as a key with O(1) lookup
-struct DPUWorkloadHasher {
-    std::size_t operator()(const DPUWorkload& wl) const noexcept {
-        return static_cast<std::size_t>(wl.hash());
-    }
+    DPUWorkload(const DPUWorkload&) = default;
+    DPUWorkload& operator=(const DPUWorkload&) = default;
+    DPUWorkload() = default;
+    /// default destructor explicit stated here for gcov problems.
+    ~DPUWorkload() = default;
 };
 
 }  // namespace VPUNN
 
-// Template specialization for MapTypeSelector (defined in cache.h)
-// This must be in global namespace after VPUNN namespace closes
-namespace VPUNN {
-template <typename K>
-struct MapTypeSelector;  // Forward declaration
-
-// Specialization for DPUWorkload: use std::unordered_map with custom hasher
-template <>
-struct MapTypeSelector<DPUWorkload> {
-    template <typename V>
-    using type = std::unordered_map<DPUWorkload, V, DPUWorkloadHasher>;
-};
-}  // namespace VPUNN
-
 namespace VPUNN {
 
-inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& d) {
-    stream << "Workload: \n"                                                                                        //
-           << " device: \t" << (int)d.device << " : " << VPUDevice_ToText.at(static_cast<int>(d.device)) << " ;\n"  //
-           << " Operation: \t" << (int)d.op << " : " << Operation_ToText.at(static_cast<int>(d.op))
-           << " ;\n"  //
-
-           // inputs and oytputs tensors
-           << " input: \t{\n"
-           << d.inputs[0] << " } ;\n"  //
-           << " output: \t{\n"
-           << d.outputs[0] << " } ;\n"  //
-
-           << " kernels: [W,H]  \t{" << d.kernels[Dim::Grid::W] << "," << d.kernels[Dim::Grid::H] << "} ;\n"  //
-           << " strides: [W,H]  \t{" << d.strides[Dim::Grid::W] << "," << d.strides[Dim::Grid::H] << "} ;\n"  //
-           << " padding: [TBLR] \t{" << d.padding[Dim::TOP] << "," << d.padding[Dim::BOTTOM] << ","           //
-           << d.padding[Dim::LEFT] << "," << d.padding[Dim::RIGHT] << "} ;\n"                                 //
-
-           << " execution_order: \t" << (int)d.execution_order << " : "
-           << ExecutionMode_ToText.at(static_cast<int>(d.execution_order)) << " ;\n"  //
-           << " activation_function: \t" << (int)d.activation_function << " : "
-           << ActivationFunction_ToText.at(static_cast<int>(d.activation_function)) << " ;\n"  //
-
-           << " act_sparsity: \t" << d.act_sparsity << " ;\n"        //
-           << " weight_sparsity: \t" << d.weight_sparsity << " ;\n"  //
-
-           << " input_swizzling: \t{" << (int)d.input_swizzling[0] << "," << (int)d.input_swizzling[1] << "}"
-           << " :  {" << Swizzling_ToText.at(static_cast<int>(d.input_swizzling[0])) << ","
-           << Swizzling_ToText.at(static_cast<int>(d.input_swizzling[1])) << "} ;\n"  //
-
-           << " output_swizzling: \t{" << (int)d.output_swizzling[0] << "}"
-           << " :  {" << Swizzling_ToText.at(static_cast<int>(d.output_swizzling[0])) << "} ;\n"  //
-
-           << " output_write_tiles: \t" << d.output_write_tiles << " ;\n"    //
-           << " offsets: \t{" << d.offsets[0] << "," << d.offsets[1] << ","  //
-           << d.offsets[2] << "," << d.offsets[3] << "} ;\n"                 //
-           << " isi_strategy: \t" << (int)d.isi_strategy << " : "
-           << ISIStrategy_ToText.at(static_cast<int>(d.isi_strategy)) << " ;\n"  //
-           << " weight_sparsity_enabled: \t" << (int)d.weight_sparsity_enabled << " : "
-           << (d.weight_sparsity_enabled ? "true" : "false") << " ;\n"  //
-           << d.halo            //<< " ;\n"                                          //
-           << d.sep_activators  //<< " ;\n"                                          //
-           << " weight_type: \t"
-           << (d.weight_type.has_value() ? DataType_ToText.at(static_cast<int>(d.weight_type.value())) : "Same")
-           << " ;\n"  //
-           //<< "layer_info:" << d.layer_info << " ;\n" //  keep out since affects layer hash (until layer is more
-           // decoupled)
-           << " weightless_operation/in_place_input1: \t"
-           << (d.weightless_operation.has_value() ? std::to_string(d.weightless_operation.value()) : "NA") << " ;\n"  //
-           << " in_place_output_memory: \t"
-           << (d.in_place_output_memory.has_value() ? std::to_string(d.in_place_output_memory.value()) : "NA") << " ;\n"
-           << " superdense_memory: \t"
-           << (d.superdense_memory.has_value() ? std::to_string(d.superdense_memory.value()) : "NA") << " ;\n"  //
-           << (d.input_autopad.has_value() ? " input_autopad: \t" + std::to_string(d.input_autopad.value())
-                                           : " input_autopad: NA")
-           << " ;\n"  //
-           << (d.output_autopad.has_value() ? " output_autopad: \t" + std::to_string(d.output_autopad.value())
-                                            : " output_autopad: NA")
-           << " ;\n"  //
-           << " mpe engine: " << (int)d.mpe_engine << " : " << MPEEngine_ToText.at(static_cast<int>(d.mpe_engine))
-           << " ;\n"                                                                        //
-           << " reduce_minmax_op: \t" << (d.reduce_minmax_op ? "true" : "false") << " ;\n"  //
-           << out_terminator() << "Workload "                                               // terminator
-            ;
-    return stream;
-}
+/// Stream output operator for DPUWorkload
+std::ostream& operator<<(std::ostream& stream, const VPUNN::DPUWorkload& d);
 
 }  // namespace VPUNN
 

@@ -73,11 +73,6 @@ protected:
 
 class Base_Constraints : public IOperationDynamicConstraints {
 public:
-protected:
-    virtual long long get_weight_table_size(const long long out_0_channels) const noexcept {
-        return out_0_channels * 16;
-    }
-
 public:
     /// @brief this specialization checks sparsity is turned off for inputs, any state for output
     bool check_sparsity_rules(const IDeviceValidValues&, const DPUOperation& dpu, std::string& info) const override {
@@ -102,186 +97,142 @@ public:
     /// @brief computes the aligned size in bytes for weights
     long long input_1_aligned_size_bytes(const IDeviceValidValues& config,
                                          const DPUOperation& dpu) const noexcept override final {
-        const auto size_nonaligned{Base_Constraints::input_1_contiguous_size_bytes(config, dpu)};  // non polymorphic
+        const auto size_nonaligned{input_1_contiguous_size_bytes(config, dpu)};
         return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
-    }
-
-    /// @brief computes the non CMX aligned/contiguous  size in bytes for the weights
-    long long input_1_contiguous_size_bytes(const IDeviceValidValues& config,
-                                            const DPUOperation& dpu) const noexcept override final {
-        const TensorInfo t{dpu.input_1};
-        auto in_1_size = static_cast<long long>(t.tensor_size_B());  // in bytes
-
-        if (dpu.input_1.sparsity_enabled) {
-            // reducing according to sparsity
-            in_1_size -= static_cast<decltype(in_1_size)>(std::floor((in_1_size * dpu.input_1.sparsity)));
-
-            // adding sparsity map
-            const auto one_output_sparse_bit_map{
-                    config.align_to((dpu.input_0.channels * dpu.kernel.height * dpu.kernel.width) / 8, 16)};
-            in_1_size += (dpu.output_0.channels * one_output_sparse_bit_map);
-        }
-
-        in_1_size += get_weight_table_size(dpu.output_0.channels);
-
-        return in_1_size;
     }
 
     long long input_0_volume(const TensorInfo& w) const noexcept override {
         return w.height * w.width * w.channels * w.batch;
-    };
+    }
 
     /// @brief computes the aligned size in bytes for activators of a workload. the actual memory occupied considering
     /// SEP or sparsity.
     long long input_0_aligned_size_bytes(const IDeviceValidValues& config,
-                                         const DPUOperation& dpu) const override final {
+                                         const DPUOperation& dpu) const noexcept override final {
         const auto size_nonaligned{Base_Constraints::input_0_contiguous_size_bytes(config, dpu)};  // non polymorphic
         return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
     }
 
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the activators
+    /// if dtype is INT1, INT2, INT4 will throw because these dtypes are not supported for input0 at this moment
+    /// this implementation should have the same behavior as function input_1_contiguous_size_bytes from class
+    /// ELTWISE_Constrains
     long long input_0_contiguous_size_bytes(const IDeviceValidValues& config,
-                                            const DPUOperation& dpu) const override final {
-        if (dtype_to_bits(dpu.input_0.datatype) < 8) {
-            throw std::runtime_error("Data Types that are smaller than INT8/UINT8 are not supported here, we do not "
-                                     "have support to compute memory in this case!");
-        } else {
-            // has halo
-            const long long default_compute_tensor_samples{input_0_volume(dpu.input_0)};
+                                            const DPUOperation& dpu) const noexcept override final {
+        // has halo
+        const long long default_compute_tensor_samples{input_0_volume(dpu.input_0)};
 
-            TensorInfo t{dpu.input_0_memory_dense};
+        TensorInfo t{dpu.input_0_memory_dense};
 
-            // long long data_memory_samples{default_compute_memeory_samples};  //  actual values
-            long long sparsity_map_bytes{0};              // sparsity map is in general zero
-            long long storage_elements_table_samples{0};  // SEP table is in general not present
+        // long long data_memory_samples{default_compute_memeory_samples};  //  actual values
+        long long sparsity_map_bytes{0};              // sparsity map is in general zero
+        long long storage_elements_table_samples{0};  // SEP table is in general not present
 
-            // has SEP
-            const SEPModeInfo& sep{dpu.sep_activators};
-            if (sep.isEnabled()) {
-                t.width = sep.actual_activators_input.width();
-                t.height = sep.actual_activators_input.height();
-                t.channels = sep.actual_activators_input.channels();
-                t.batch = sep.actual_activators_input.batches();
+        // has SEP
+        const SEPModeInfo& sep{dpu.sep_activators};
+        if (sep.isEnabled()) {
+            t.width = sep.actual_activators_input.width();
+            t.height = sep.actual_activators_input.height();
+            t.channels = sep.actual_activators_input.channels();
+            t.batch = sep.actual_activators_input.batches();
 
-                storage_elements_table_samples = sep.storage_elements_pointers.numberOfElements();
-                if (false == sep.no_sparse_map) {  // sparse map is present
-                    sparsity_map_bytes = config.align_to(default_compute_tensor_samples / 8,
-                                                         16);  // one bit per all!!! compute samples, 16 bytes aligned
-
-                    // second option would be on compute tensor minus all halo read from others, and NOT adding extra
-                    // memory that ins not used (neg halo)!
-
-                    // third would be on memory dense input representation (all unpacked input memory , used and unused,
-                    // without halo read from others)
-
-                    // Case B , SEP with actual Memory  larger than compute tensor (sampling inside the big memory
-                    // tensor): OK use compute samples (maybe  option 2 minus halo read ones)
-
-                    // is it really possible to have SEP and halo for  extending memory? Rather the extension is part of
-                    // SEP's actual_activators_input
-                }  // SM
-            }  // SEP
-
-            // has sparsity,  can be also with SEP or HALO
-            if (dpu.input_0.sparsity_enabled) {
-                // actual memory data should be reduced with sparsity factor  (all of it, even the unused one!!?)
-                // reducing according to sparsity? A(yes); B(no) because the input data is not packed at runtime
-                /* data_memory_samples -= static_cast<decltype(data_memory_samples)>(
-                         std::floor((data_memory_samples * dpu.input_0.sparsity)));*/
-
-                // storage_elements_table remains as for HALO(0) or SEP, not used in sparsity
-
+            storage_elements_table_samples = sep.storage_elements_pointers.numberOfElements();
+            if (false == sep.no_sparse_map) {  // sparse map is present
                 sparsity_map_bytes = config.align_to(default_compute_tensor_samples / 8,
                                                      16);  // one bit per all!!! compute samples, 16 bytes aligned
-            }
 
-            const auto tensor_size_B{t.tensor_size_B()};  // tensor size in bytes
+                // second option would be on compute tensor minus all halo read from others, and NOT adding extra
+                // memory that ins not used (neg halo)!
 
-            // let's sum in bytes'
-            const long long size_nonaligned{tensor_size_B + sparsity_map_bytes +
-                                            storage_elements_table_samples * pointer_size};
+                // third would be on memory dense input representation (all unpacked input memory , used and unused,
+                // without halo read from others)
 
-            return size_nonaligned;
+                // Case B , SEP with actual Memory  larger than compute tensor (sampling inside the big memory
+                // tensor): OK use compute samples (maybe  option 2 minus halo read ones)
+
+                // is it really possible to have SEP and halo for  extending memory? Rather the extension is part of
+                // SEP's actual_activators_input
+            }  // SM
+        }  // SEP
+
+        // has sparsity,  can be also with SEP or HALO
+        if (dpu.input_0.sparsity_enabled) {
+            // actual memory data should be reduced with sparsity factor  (all of it, even the unused one!!?)
+            // reducing according to sparsity? A(yes); B(no) because the input data is not packed at runtime
+            /* data_memory_samples -= static_cast<decltype(data_memory_samples)>(
+                     std::floor((data_memory_samples * dpu.input_0.sparsity)));*/
+
+            // storage_elements_table remains as for HALO(0) or SEP, not used in sparsity
+
+            sparsity_map_bytes = config.align_to(default_compute_tensor_samples / 8,
+                                                 16);  // one bit per all!!! compute samples, 16 bytes aligned
         }
+
+        const long long innermost_dim_size_B{t.get_tensor_innermost_dim_B()};
+        const long long number_of_elem_excluding_innermost_dim{t.numberOfElementsExcludingInnermost()};
+        const auto tensor_size_B{
+                innermost_dim_size_B *  // not aligning the innermost dim for input0 for 16/32 cmx alignment
+                number_of_elem_excluding_innermost_dim};  // tensor size in bytes
+
+        // let's sum in bytes'
+        const long long size_nonaligned{tensor_size_B + sparsity_map_bytes +
+                                        storage_elements_table_samples * pointer_size};
+
+        return size_nonaligned;
     }
 
     /// @brief computes the aligned size in bytes for  output activators of a workload. the actual memory occupied
     /// considering sparsity.
     long long output_0_aligned_size_bytes(const IDeviceValidValues& config,
-                                          const DPUOperation& dpu) const override final {
+                                          const DPUOperation& dpu) const noexcept override final {
         const auto size_nonaligned{Base_Constraints::output_0_contiguous_size_bytes(config, dpu)};  // non polymorphic
         return config.align_to(size_nonaligned, config.get_page_alignment());  // # align to 16KB chunks
     }
 
     /// @brief computes the non CMX aligned/contiguous  size in bytes for the output. the actual memory occupied
     /// considering sparsity map
+    /// if dtype is INT1, INT2, INT4 will throw because these dtypes are not supported for output0 at this moment
     long long output_0_contiguous_size_bytes(const IDeviceValidValues& config,
-                                             const DPUOperation& dpu) const override final {
-        /// @brief aligns the innermost dimension of a tensor shape
-        /// @param dim_size the size of the dimension to be aligned
-        /// @param is_innermost_dim true if the dimension to be aligned is the innermost one, if false, no alignment is
-        /// done
-        ///
-        /// @returns the aligned dimension size if innermost, or the original size if not innermost
-        auto align_if_innermost_dim = [&config, &dpu](long long dim_size_B) -> long long {
-            if (dpu.superdense)
-                return dim_size_B;  // no alignment in superdense mode
+                                             const DPUOperation& dpu) const noexcept override final {
+        TensorInfo t{dpu.output_0_memory_dense};
 
-            return config.align_to(
-                    dim_size_B,
-                    config.get_specific_out_innermost_dim_alignment());  // if innermost dimension, will be aligned
+        const long long innermost_dim_size_B{t.get_tensor_innermost_dim_B()};  // innermost dimension size in bytes
+        const long long number_of_elem_excluding_innermost_dim{
+                t.numberOfElementsExcludingInnermost()};  // number of elements excluding innermost dim
+        const long long aligned_innermost_dim_size_B{
+                dpu.superdense                  // innermost dim is aligned to specific alignment only if not superdense
+                        ? innermost_dim_size_B  // if superdense. no alignment
+                        : config.align_to(innermost_dim_size_B,
+                                          config.get_specific_out_innermost_dim_alignment_B())  // needs alignment
         };
 
-        const auto innermost_dim{layout_to_order(dpu.output_0.layout)[0]};  // innermost dimension
-        const int dtype_size_B{dtype_to_bytes(dpu.output_0.datatype)};      // datatype size in bytes
+        const auto tensor_size_B{aligned_innermost_dim_size_B *
+                                 number_of_elem_excluding_innermost_dim};  // tensor size in bytes
 
-        if (dtype_to_bits(dpu.output_0.datatype) < 8) {
-            throw std::runtime_error("Data Types that are smaller than INT8/UINT8 are not supported here, we do not "
-                                     "have support to compute memory in this case!");
-        } else {
-            TensorInfo t{dpu.output_0_memory_dense};
-
-            // alignment is done always in bytes, so we multiply each dim by dtype size, but then we return the number
-            // of elements, so we divide by dtype size at the end
-            switch (innermost_dim) {
-            case Dim::Act::X:
-                t.width = align_if_innermost_dim(t.width * dtype_size_B) / dtype_size_B;
-                break;
-            case Dim::Act::Y:
-                t.height = align_if_innermost_dim(t.height * dtype_size_B) / dtype_size_B;
-                break;
-            case Dim::Act::Z:
-                t.channels = align_if_innermost_dim(t.channels * dtype_size_B) / dtype_size_B;
-                break;
-            case Dim::Act::B:
-                t.batch = align_if_innermost_dim(t.batch * dtype_size_B) / dtype_size_B;
-                break;
-            default:
-                break;  // nothing
-            }
-
-            // has sparsity
-            long long sparsity_map_bytes{0};  // sparsity map is in general zero
+        // has sparsity
+        long long sparsity_map_bytes{0};  // sparsity map is in general zero
+        if (dpu.output_0.sparsity_enabled) {
             const long long default_compute_memeory_samples{
                     dpu.output_0_memory_dense
                             .numberOfElements()};  // computation was made on real elements, no alignment here
-
-            if (dpu.output_0.sparsity_enabled) {
-                // no reduction of size due to sparsity
-                sparsity_map_bytes = config.align_to(default_compute_memeory_samples / 8,
-                                                     16);  // one bit per all!!! compute samples, 16 bytes aligned
-            }
-
-            const auto tensor_size_B{t.tensor_size_B()};  // tensor size in bytes
-            const long long size_nonaligned{tensor_size_B + sparsity_map_bytes};
-            // let's sum in bytes'
-            return size_nonaligned;
+            // no reduction of size due to sparsity
+            sparsity_map_bytes = config.align_to(default_compute_memeory_samples / 8,
+                                                 16);  // one bit per all!!! compute samples, 16 bytes aligned
         }
+
+        const long long size_nonaligned{tensor_size_B + sparsity_map_bytes};
+        // let's sum in bytes'
+        return size_nonaligned;
     }
 };
 
 class GenericConvolution_Constraints : public Base_Constraints, public IOperationDynamicGenerator {
 public:
+protected:
+    virtual long long get_weight_table_size(const long long out_0_channels) const noexcept {
+        return out_0_channels * 16;
+    }
+
 protected:
     /// @brief sets initial input_1 content,
     void set_input_1_props_from_input_0(DPUOperation& dpu) const {
@@ -323,6 +274,44 @@ public:
         info = checker.findings();
         return checker.is_clean();
     }
+
+    long long input_1_contiguous_size_bytes(const IDeviceValidValues& config,
+                                            const DPUOperation& dpu) const noexcept override {
+        // we assume for all types of CONVS that height and width dimensions are equal with 1, channels dimension is
+        // mask size and also considered innermost dimension. In this way layout is considered implicitly channel
+        // innermost (ZXY)
+        assert(dpu.input_1.width == 1 && dpu.input_1.height == 1);
+
+        // size in bytes
+        auto in_1_size = [&] {
+            const TensorInfo t{dpu.input_1};
+
+            // we compute the correct number of bytes occupied by just one mask depending on datatype we have
+            const auto size_B_of_one_single_mask{t.get_tensor_innermost_dim_B()};  // in bytes
+
+            // we align the mask (which represents innermost dimension for inpu1 tensor) to the correct alignment
+            // depending on a specific device . In bytes
+            const auto aligned_size_B_of_one_single_mask =
+                    config.is_legacy_samples_alignment_weights()
+                            ? size_B_of_one_single_mask  // alignment was done in samples. no alignement here in bytes
+                            : config.align_to(size_B_of_one_single_mask, config.get_specific_weights_alignment_B());
+            return aligned_size_B_of_one_single_mask * dpu.input_1.batch;  // in bytes
+        }();
+
+        if (dpu.input_1.sparsity_enabled) {
+            // here we calculate how much of the input size is "sparse"(can be skipped/reduced according to sparsity)
+            // and subtracts that from the total size
+            in_1_size -= static_cast<decltype(in_1_size)>(std::floor((in_1_size * dpu.input_1.sparsity)));
+
+            // adding sparsity map
+            const auto one_output_sparse_bit_map{config.align_to(dpu.input_1.channels / 8, 16)};
+            in_1_size += (dpu.input_1.batch * one_output_sparse_bit_map);
+        }
+
+        in_1_size += get_weight_table_size(dpu.output_0.channels);
+
+        return in_1_size;
+    }
 };
 
 class CONVOLUTION_Constraints : public GenericConvolution_Constraints {
@@ -355,7 +344,7 @@ protected:
         Checker checker;
         info = checker.findings();
         return checker.is_clean();
-    };
+    }
 
     void generate_sparsity(Sampler& sampler, const IDeviceValidValues& config, DPUOperation& dpu) const override {
         dpu.input_1.sparsity_enabled = sampler.sample_list(config.get_boolean_datatypes());  // uniform true/false
@@ -398,19 +387,32 @@ protected:
         return checker.is_clean();
     }
 
+    /// we assume for all types of CONVS that height and width dimensions are equal with 1, channels dimension is
+    /// mask size and also considered innermost dimension and batch dimension represent the number of masks. In this way
+    /// layout is considered implicitly channel innermost (ZXY)
     void deduce_input_1_shape_and_layout(const TensorInfo& in_0, const TensorInfo& out_0,
                                          const IDeviceValidValues& config, const KernelInfo& kernel,
                                          TensorInfo& w) const noexcept override {
-        w.layout = in_0.layout;
+        const bool is_samples_alignment_on = config.is_legacy_samples_alignment_weights();
+
+        // if legacy alignment flag is on, we keep the old implementation due to regressions
+        w.layout = is_samples_alignment_on ? in_0.layout : Layout::ZXY;  // input 1 is an array of masks, innermost
+                                                                         // dimension should be channels ( the mask)
         w.height = 1;
         w.width = 1;
-        {
-            // this rule is here only for Fathom compliance, must be clarified in the future what's actually required
-            const int multiple{(w.sparsity_enabled || (dtype_to_bytes(w.datatype) > 1))
-                                       ? 16
-                                       : config.get_specific_weigths_alignment()};
-            w.channels = config.align_to(in_0.channels * kernel.height * kernel.width, multiple);
-        }
+
+        const int multiple = [&] {
+            return (is_samples_alignment_on)
+                           // legacy alignment on samples
+                           ? ((w.sparsity_enabled || (dtype_to_bytes(w.datatype) > 1))          // if multibyte
+                                      ? 16                                                      // 16 samples(eg fp16)
+                                      : config.get_specific_legacy_weights_alignment_Samples()  // specific alignment in
+                                                                                                // samples
+                              )
+                           : 1;  // 1 means no alignment is done
+        }();
+
+        w.channels = config.align_to(in_0.channels * kernel.height * kernel.width, multiple);
         w.batch = out_0.channels;
     }
 };
@@ -446,20 +448,36 @@ protected:
 
         info = checker.findings();
         return checker.is_clean();
-    };
+    }
 
+    /// we assume for all types of CONVs that height and width dimensions are equal with 1, channels dimension is
+    /// mask size and also considered innermost dimension and batch dimension represent the number of masks. In this way
+    /// layout is considered implicitly channel innermost (ZXY)
     void deduce_input_1_shape_and_layout(const TensorInfo& in_0, const TensorInfo& out_0,
                                          const IDeviceValidValues& config, const KernelInfo& kernel,
                                          TensorInfo& w) const noexcept override {
-        w.layout = in_0.layout;
+        const bool is_samples_alignment_on =
+                config.is_legacy_samples_alignment_weights();  // legacy alignment on/off flag
+
+        // if legacy alignment flag is on, we keep the old implementation due to regressions
+        w.layout = is_samples_alignment_on ? in_0.layout : Layout::ZXY;  // input 1 is an array of masks, innermost
+                                                                         // dimension should be channels ( the mask)
         w.height = 1;
         w.width = 1;
-        {
-            // this rule is here only for Fathom compliance, must be clarified in the future what's actually required
-            const int multiple{dtype_to_bytes(w.datatype) > 1 ? 16 : config.get_specific_weigths_alignment()};
-            w.channels = config.align_to(static_cast<long long>(kernel.height) * static_cast<long long>(kernel.width),
-                                         multiple);
-        }
+
+        const int multiple = [&] {
+            return (is_samples_alignment_on)
+                           // legacy alignment on samples
+                           ? ((dtype_to_bytes(w.datatype) > 1)                                  // if multibyte types
+                                      ? 16                                                      // 16 samples(eg fp16)
+                                      : config.get_specific_legacy_weights_alignment_Samples()  // specific alignment in
+                                                                                                // samples
+                              )
+                           : 1;  // 1 means no alignment is done
+        }();
+
+        w.channels =
+                config.align_to(static_cast<long long>(kernel.height) * static_cast<long long>(kernel.width), multiple);
         w.batch = out_0.channels;
     }
     friend class AVGPOOL_Constraints;
@@ -482,7 +500,7 @@ protected:
 
         dpu.output_0.channels = sampler.sample_list_decrease_prob(out_channels_range);  //  non uniform
 
-        const int multiple{wts_mask_alignement(dpu.input_1.datatype)};
+        const int multiple{wts_mask_alignment_samples(dpu.input_1.datatype)};
         dpu.input_1.channels = config.align_to(dpu.input_0.channels * dpu.kernel.height * dpu.kernel.width, multiple);
 
         dpu.input_1.batch = dpu.output_0.channels;
@@ -493,32 +511,42 @@ protected:
         Checker checker;
         info = checker.findings();
         return checker.is_clean();
-    };
+    }
 
     /// CM has special handling , only 4 or 16 channels possible/ WHY we have this affecting memory: UNKNOWN cause
     long long input_0_volume(const TensorInfo& w) const noexcept override {
         long long channels_lim{(w.channels < 5) ? 4 : 16};
         return w.height * w.width * channels_lim * w.batch;
-    };
+    }
 
+    /// we assume for all types of CONVS that height and width dimensions are equal with 1, channels dimension is
+    /// mask size and also considered innermost dimension and batch dimension represent the number of masks. In this way
+    /// layout is considered implicitly channel innermost (ZXY)
     void deduce_input_1_shape_and_layout(const TensorInfo& in_0, const TensorInfo& out_0,
                                          const IDeviceValidValues& config, const KernelInfo& kernel,
                                          TensorInfo& w) const noexcept override {
-        w.layout = in_0.layout;
+        const bool is_samples_alignment_on =
+                config.is_legacy_samples_alignment_weights();  // legacy alignment on/off flag
+
+        // if legacy alignment flag is on, we keep the old implementation due to regressions
+        w.layout = is_samples_alignment_on ? in_0.layout : Layout::ZXY;  // input 1 is an array of masks, innermost
+                                                                         // dimension should be channels ( the mask)
         w.height = 1;
         w.width = 1;
-        {
-            // this rule might be arbitrary,  see also: // this rule is here only for Fathom compliance, must be
-            // clarified in the future what's actually required
-            const int multiple{wts_mask_alignement(w.datatype)};
-            w.channels = config.align_to(in_0.channels * kernel.height * kernel.width, multiple);
-        }
+
+        // if legacy alignment flag is active the mask will be aligned in samples
+        const int multiple{
+                (is_samples_alignment_on)
+                        ? wts_mask_alignment_samples(
+                                  w.datatype)  // if alignment is required, force the alignment to be at least 16 bytes
+                        : 1 /* 1 means no alignment is done */};
+        w.channels = config.align_to(in_0.channels * kernel.height * kernel.width, multiple);  // samples
         w.batch = out_0.channels;
     }
 
     ///@brief wts masks must be aligned to minimum 16 bytes!
     /// @returns the alignment in elements
-    int wts_mask_alignement(const DataType dtype) const noexcept {
+    int wts_mask_alignment_samples(const DataType dtype) const noexcept {
         if (dtype_to_bytes(dtype) > 1) {
             return 8;  // 8 elmnts alignment, => at least 16 bytes alignment
         } else {
@@ -563,7 +591,7 @@ protected:
     }
 
     long long input_1_volume(const TensorInfo& w) const noexcept override final {
-        return w.height * w.width * w.channels;
+        return w.height * w.width * w.channels;  // batch is expected to be 1
     }
 
     bool check_sparsity_rules(const IDeviceValidValues&, const DPUOperation& dpu, std::string& info) const override {
@@ -584,14 +612,32 @@ protected:
         return checker.is_clean();
     }
 
-    void deduce_input_1_shape_and_layout(const TensorInfo& in_0, const TensorInfo&, const IDeviceValidValues&,
+    void deduce_input_1_shape_and_layout(const TensorInfo& in_0, const TensorInfo&, const IDeviceValidValues& config,
                                          const KernelInfo&, TensorInfo& w) const noexcept override {
         w.layout = in_0.layout;
 
+        const auto& devices = config.get_devices();  // devices supported by the configuration
+
+        // check if all devices are older than PTL
+        bool is_device_older_than_PTL = std::all_of(devices.begin(), devices.end(), [](const VPUDevice dev) {
+            return dev < VPUDevice::NPU_5_0;
+        });
+
         w.batch = in_0.batch;
-        w.channels = in_0.width;
-        w.height = in_0.channels;
-        w.width = in_0.height;
+
+        if (is_device_older_than_PTL) {
+            // this permutation is caused by some particular approach in older NN Descriptors
+            // that contained the input1 shape and had to match the training set  approach
+            // descriptors for NPU5 and newer devices do not contain input1 shape anymore 
+            w.channels = in_0.width;
+            w.height = in_0.channels;
+            w.width = in_0.height;
+        } else {
+            // for NPU5 and newer devices the permutation does not apply anymore
+            w.channels = in_0.channels;
+            w.height = in_0.height;
+            w.width = in_0.width;
+        }
     }
 
     Values<ISIStrategy> filter_ISI_Strategy_Options(const Values<ISIStrategy>& strategies) const override {
@@ -619,8 +665,17 @@ protected:
         return v;
     }
 
-    long long get_weight_table_size(const long long) const noexcept override final {
-        return 0;
+    /// @brief computes the non CMX aligned/contiguous  size in bytes for the activators
+    /// for ELTWISE memory for input1 is the same as input0
+    /// this implementation should have the same behavior as Base_Constraints::input_0_contiguous_size_bytes
+    long long input_1_contiguous_size_bytes(const IDeviceValidValues& /* config*/,
+                                            const DPUOperation& dpu) const noexcept override final {
+        const TensorInfo t{dpu.input_1};
+        const long long innermost_dim_size_B{t.get_tensor_innermost_dim_B()};
+        const long long number_of_elem_excluding_innermost_dim{t.numberOfElementsExcludingInnermost()};
+        const long long size_nonaligned{innermost_dim_size_B * number_of_elem_excluding_innermost_dim};
+
+        return size_nonaligned;
     }
 };
 class MAXPOOL_Constraints : public Base_Constraints, public IOperationDynamicGenerator {
@@ -651,7 +706,7 @@ protected:
 
         info = checker.findings();
         return checker.is_clean();
-    };
+    }
 
     void generate_sparsity(Sampler&, const IDeviceValidValues&, DPUOperation& dpu) const override {
         dpu.input_0.sparsity = 0.0F;
@@ -674,8 +729,10 @@ protected:
         w.width = 0;
     }
 
-    long long get_weight_table_size(const long long) const noexcept override final {
-        return 0;  // no WT for MAXPOOL
+    /// Maxpool op does not have weights
+    long long input_1_contiguous_size_bytes(const IDeviceValidValues& /*config*/,
+                                            const DPUOperation& /*dpu*/) const noexcept override final {
+        return 0;
     }
 };
 
@@ -740,8 +797,10 @@ protected:
         w.width = 0;
     }
 
-    long long get_weight_table_size(const long long) const noexcept override final {
-        return 0;  // no WT for MAXPOOL
+    /// no weights
+    long long input_1_contiguous_size_bytes(const IDeviceValidValues& /*config*/,
+                                            const DPUOperation& /*dpu*/) const noexcept override final {
+        return 0;
     }
 };
 
@@ -749,6 +808,7 @@ protected:
 class AVGPOOL_Constraints :
         public GenericConvolution_Constraints /*, public Base_Constraints,
          public IOperationDynamicGenerator*/
+
 {
 protected:
     void generate_operation_dependent_tensors(Sampler& sampler, const IDeviceValidValues& config,
@@ -777,7 +837,10 @@ protected:
         return 0;
         // like MAXPOOL , no input_1 wts
     }
-    long long get_weight_table_size(const long long) const noexcept override final {
+
+    /// no weights
+    long long input_1_contiguous_size_bytes(const IDeviceValidValues& /*config*/,
+                                            const DPUOperation& /*dpu*/) const noexcept override final {
         return 0;
     }
 };

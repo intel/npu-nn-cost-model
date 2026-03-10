@@ -61,7 +61,8 @@ protected:
 public:
     using Preprocessing<T>::transformSingle;  ///< exposes the non virtual transform for  workloads vector
 
-    PreprocessingInserter(size_t size_of_descriptor): Preprocessing<T>(size_of_descriptor) {};
+    PreprocessingInserter(size_t size_of_descriptor, const std::set<std::string>& nn_capabilities = {})
+            : Preprocessing<T>(size_of_descriptor, nn_capabilities) {};
     virtual ~PreprocessingInserter() = default;
 
     int interface_version() const override {

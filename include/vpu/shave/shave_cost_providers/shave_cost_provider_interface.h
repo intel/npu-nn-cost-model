@@ -9,12 +9,14 @@
 #ifndef SHAVE_COST_PROVIDER_INTERFACE_H
 #define SHAVE_COST_PROVIDER_INTERFACE_H
 
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
 #include "vpu/shave_workload.h"
 #include "vpu/cycles_interface_types.h"
-#include <optional>
-#include <functional>
-#include <vector>
-#include <string>
 #include "vpu/shave/shave_op_executors.h"
 
 
@@ -73,6 +75,14 @@ public:
     virtual std::optional<std::reference_wrapper<const ShaveOpExecutor>> get_shave_instance(const std::string& name, VPUDevice& device) const = 0;
 
 };
+
+/**
+ * @brief Type alias for a list of SHAVE cost providers.
+ * Currently we keep it as a shared_ptr to allow co-ownership in future.
+ * If we are going to add a different way to composite the Providers we can
+ * simply share the references.
+ */
+using ShaveCostProviderList = std::vector<std::shared_ptr<IShaveCostProvider>>;
 
 }  // namespace VPUNN
 #endif  // SHAVE_COST_PROVIDER_INTERFACE_H

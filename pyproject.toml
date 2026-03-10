@@ -2,4 +2,8 @@
 requires = [
     "wheel",
     "setuptools>=40",
+    "scikit-build",
+    "cmake",
+    "ninja"
 ]
+build-backend = "setuptools.build_meta"

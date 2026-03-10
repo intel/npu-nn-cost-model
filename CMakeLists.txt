@@ -58,8 +58,10 @@ set(EXTERNAL_INSTALL_LOCATION   ${CMAKE_CURRENT_BINARY_DIR}/external)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Output directory setup
+# Set base output directories that work consistently across build systems
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 # Required packages
 # Flatbuffers is included in the root because subdirectories
@@ -75,6 +77,7 @@ target_sources(vpunn_common_settings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/com
 
 # Apply C++ standard requirement to this target and (optionally) to dependents
 target_compile_features(vpunn_common_settings PUBLIC cxx_std_17)
+
 
 if(VPUNN_OPT_LEGACY_DMA_TH_4)
     target_compile_definitions(vpunn_common_settings PUBLIC VPUNN_OPT_LEGACY_DMA_TH_4)
@@ -124,12 +127,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
             $<$<CONFIG:Debug>:-g>
             $<$<CONFIG:Release>:-O3>
         )
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
         message(STATUS "Setting Visual Studio specific flags for common settings")
     target_compile_options(vpunn_common_settings PUBLIC
             # Enable /bigobj for debug build type with MSVC - remove after vpunn headers are cleaned up
             $<$<CONFIG:Debug>:/bigobj>
-            /W4 /WX
+            /W4 /WX /MP
         )
     # TODO figure out why it propagates to VPUx even though it is linked as PRIVATE in other libs
     # and re-enable
@@ -143,44 +146,21 @@ else()
     message(WARNING "-- Building with unrecognised compiler, not setting any specific flags")
 endif()
 
-
 # Add subdirectories
 add_subdirectory(src)
+
+# Build cost_model_cli by default (not tied to VPUNN_BUILD_APPS)
 
 # Optional subdirectories based on build options
 if(VPUNN_BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
 
-
 if(VPUNN_BUILD_APPS)
     add_subdirectory(apps/cache_app)
+    add_subdirectory(apps/profiler)
 endif()
 
 if(VPUNN_BUILD_TESTS)
     add_subdirectory(tests/cpp)
 endif()
-
-# Model file validation function
-# Ensures that all .vpunn model files in the models/ directory 
-# have been properly downloaded via Git LFS
-function(validate_model_files)
-    file(GLOB MODEL_FILES ${PROJECT_SOURCE_DIR}/models/*.vpunn)
-
-    foreach(FILENAME ${MODEL_FILES})
-        FILE(READ "${FILENAME}" FILE_CONTENT HEX)
-        STRING(LENGTH "${FILE_CONTENT}" CONTENT_LENGTH)
-        MATH(EXPR MODEL_SIZE "${CONTENT_LENGTH} / 2")
-
-        message(STATUS "VPUNN model ${FILENAME} size ${MODEL_SIZE} bytes")
-
-        if(${MODEL_SIZE} LESS 200)
-            message(FATAL_ERROR 
-                "model ${FILENAME} hasn't been expanded with Git LFS (size = ${MODEL_SIZE}). "
-                "Please fetch the file using `git lfs pull`")
-        endif()
-    endforeach()
-endfunction()
-
-# Validate model files
-validate_model_files()

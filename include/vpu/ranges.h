@@ -242,6 +242,22 @@ public:
         return this->lowerBound;
     }
 
+    /// @brief Generate a vector containing all valid values within this range
+    /// @tparam T The type to cast the values to (default: int)
+    /// @return std::vector<T> containing all values that satisfy the range constraints, cast to type T
+    template <typename T = int>
+    std::vector<T> transformSmartRangetoVector() const {
+        std::vector<T> result;
+        
+        for (int value = lowerBound; value <= upperBound; ++value) {
+            if (is_in(value)) {
+                result.push_back(static_cast<T>(value));
+            }
+        }
+        
+        return result;
+    }
+
     static constexpr int max_limit{std::numeric_limits<int>::max()};  ///< max value accepted for a SmartRange bound
 };
 

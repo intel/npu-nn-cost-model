@@ -12,7 +12,7 @@
 
 #include <functional>
 #include <iostream>
-#include <optional>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -23,6 +23,7 @@
 #include "vpu/dpu_defaults.h"
 #include "vpu/dpu_types.h"
 #include "vpu/dpu_workload.h"
+#include "vpu/profiling_service.h"
 #include "vpu/serializer_utils.h"
 
 namespace VPUNN {
@@ -71,6 +72,58 @@ struct TensorInfo {
                                                 static_cast<unsigned int>(channels), static_cast<unsigned int>(batch)};
         VPUTensor t{shape, datatype, layout, sparsity_enabled};
         return t.size();
+    }
+
+    /// @brief This function compute the size in bytes of the innermost dimension of a given tensor by using the
+    /// function tensor_size_B() which takes into account datatype size and the way memory is packed (packmode)
+    /// @return size in bytes of the innermost dimension
+    long long get_tensor_innermost_dim_B() const noexcept {
+        const auto innermost_dim{layout_to_order(layout)[0]};  // innermost dimension
+
+        // create a TensorInfo that contains only the innermost dimension
+        TensorInfo t_inner_dim_algn{*this};
+        t_inner_dim_algn.width = 1;
+        t_inner_dim_algn.height = 1;
+        t_inner_dim_algn.channels = 1;
+        t_inner_dim_algn.batch = 1;
+
+        switch (innermost_dim) {
+        case Dim::Act::X:
+            t_inner_dim_algn.width = width;
+            break;
+        case Dim::Act::Y:
+            t_inner_dim_algn.height = height;
+            break;
+        case Dim::Act::Z:
+            t_inner_dim_algn.channels = channels;
+            break;
+        case Dim::Act::B:
+            t_inner_dim_algn.batch = batch;
+            break;
+        default:
+            break;  // nothing
+        }
+
+        const auto innermost_dim_B{t_inner_dim_algn.tensor_size_B()};
+
+        return innermost_dim_B;
+    }
+
+    /// @brief Product of all shape dimensions except the innermost one (element count, not bytes)
+    long long numberOfElementsExcludingInnermost() const noexcept {
+        const auto innermost_dim{layout_to_order(layout)[0]};  // innermost dimension
+        switch (innermost_dim) {
+        case Dim::Act::X:  // exclude width
+            return height * channels * batch;
+        case Dim::Act::Y:  // exclude height
+            return width * channels * batch;
+        case Dim::Act::Z:  // exclude channels
+            return width * height * batch;
+        case Dim::Act::B:  // exclude batch
+            return width * height * channels;
+        default:
+            return width * height * channels * batch;  // fallback: all dims
+        }
     }
 
     /// @brief Convert to VPUTensor
@@ -194,8 +247,8 @@ struct DPUOperation {
               weightless_operation{w.is_weightless_operation()},
               in_place_output_memory{w.is_inplace_output_memory()},
               superdense{w.is_superdense()},
-              input_autopad{w.input_autopad},
-              output_autopad{w.output_autopad},
+              input_autopad{w.is_input_autopad()},
+              output_autopad{w.is_output_autopad()},
               cost_source_hint{w.cost_source_hint},
               profiling_service_backend_hint{w.profiling_service_backend_hint},
               mpe_engine{w.mpe_engine},
@@ -292,13 +345,13 @@ struct DPUOperation {
 
         wl.weight_type = input_1.datatype;  // this will make the optional as existing!
 
-        wl.weightless_operation = weightless_operation;
+        wl.weightless_operation = weightless_operation;  // the optional will be set as existing with the value
         wl.set_inplace_output_memory(in_place_output_memory);
 
         wl.set_superdense(superdense);
 
-        wl.input_autopad = input_autopad;
-        wl.output_autopad = output_autopad;
+        wl.input_autopad = input_autopad;    // the optional will be set as existing with the value
+        wl.output_autopad = output_autopad;  // the optional will be set as existing with the value
 
         wl.cost_source_hint = cost_source_hint;
         wl.profiling_service_backend_hint = profiling_service_backend_hint;
@@ -395,179 +448,208 @@ struct DPUOperation {
 
     friend std::ostream& operator<<(std::ostream& stream, const DPUOperation& d);
 
-    const std::unordered_map<std::string, _ref_supported_type> _member_map{
-            {"device", std::ref(device)},
-            {"operation", std::ref(operation)},
-            {"input_0_batch", std::ref(input_0.batch)},
-            {"input_0_channels", std::ref(input_0.channels)},
-            {"input_0_height", std::ref(input_0.height)},
-            {"input_0_width", std::ref(input_0.width)},
-            {"input_1_batch", std::ref(input_1.batch)},
-            {"input_1_channels", std::ref(input_1.channels)},
-            {"input_1_height", std::ref(input_1.height)},
-            {"input_1_width", std::ref(input_1.width)},
-            {"input_sparsity_enabled", std::ref(input_0.sparsity_enabled)},
-            {"weight_sparsity_enabled", std::ref(input_1.sparsity_enabled)},
-            {"input_sparsity_rate", std::ref(input_0.sparsity)},
-            {"weight_sparsity_rate", std::ref(input_1.sparsity)},
-            {"execution_order", std::ref(execution_order)},
-            {"activation_function", std::ref(activation_function)},
-            {"kernel_height", std::ref(kernel.height)},
-            {"kernel_width", std::ref(kernel.width)},
-            {"kernel_pad_bottom", std::ref(kernel.pad_bottom)},
-            {"kernel_pad_left", std::ref(kernel.pad_left)},
-            {"kernel_pad_right", std::ref(kernel.pad_right)},
-            {"kernel_pad_top", std::ref(kernel.pad_top)},
-            {"kernel_stride_height", std::ref(kernel.stride_height)},
-            {"kernel_stride_width", std::ref(kernel.stride_width)},
-            {"output_0_batch", std::ref(output_0.batch)},
-            {"output_0_channels", std::ref(output_0.channels)},
-            {"output_0_height", std::ref(output_0.height)},
-            {"output_0_width", std::ref(output_0.width)},
-            {"input_0_datatype", std::ref(input_0.datatype)},
-            {"input_0_layout", std::ref(input_0.layout)},
-            {"input_0_swizzling", std::ref(input_0.swizzling)},
-            {"input_1_datatype", std::ref(input_1.datatype)},
-            {"input_1_layout", std::ref(input_1.layout)},
-            {"input_1_swizzling", std::ref(input_1.swizzling)},
-            {"output_0_datatype", std::ref(output_0.datatype)},
-            {"output_0_layout", std::ref(output_0.layout)},
-            {"output_0_swizzling", std::ref(output_0.swizzling)},
-            {"output_sparsity_enabled", std::ref(output_0.sparsity_enabled)},
-            {"isi_strategy", std::ref(isi_strategy)},
-            {"output_write_tiles", std::ref(output_write_tiles)},
+    using MemberMapType = std::unordered_map<std::string, _ref_supported_type>;
 
-            {"input_0_halo_top", std::ref(halo.input_0_halo.top)},
-            {"input_0_halo_bottom", std::ref(halo.input_0_halo.bottom)},
-            {"input_0_halo_left", std::ref(halo.input_0_halo.left)},
-            {"input_0_halo_right", std::ref(halo.input_0_halo.right)},
-            {"input_0_halo_front", std::ref(halo.input_0_halo.front)},
-            {"input_0_halo_back", std::ref(halo.input_0_halo.back)},
+    const MemberMapType& get_member_map() const {
+        ensure_member_map();
+        return _member_map;
+    }
+    MemberMapType& get_member_map() {
+        ensure_member_map();
+        return _member_map;
+    }
 
-            {"output_0_halo_top", std::ref(halo.output_0_halo.top)},
-            {"output_0_halo_bottom", std::ref(halo.output_0_halo.bottom)},
-            {"output_0_halo_left", std::ref(halo.output_0_halo.left)},
-            {"output_0_halo_right", std::ref(halo.output_0_halo.right)},
-            {"output_0_halo_front", std::ref(halo.output_0_halo.front)},
-            {"output_0_halo_back", std::ref(halo.output_0_halo.back)},
+private:
+    mutable MemberMapType _member_map{};
+    /// non const member map population
+    void populate_member_map() {
+        _member_map = MemberMapType{
+                {"device", std::ref(device)},
+                {"operation", std::ref(operation)},
+                {"input_0_batch", std::ref(input_0.batch)},
+                {"input_0_channels", std::ref(input_0.channels)},
+                {"input_0_height", std::ref(input_0.height)},
+                {"input_0_width", std::ref(input_0.width)},
+                {"input_1_batch", std::ref(input_1.batch)},
+                {"input_1_channels", std::ref(input_1.channels)},
+                {"input_1_height", std::ref(input_1.height)},
+                {"input_1_width", std::ref(input_1.width)},
+                {"input_sparsity_enabled", std::ref(input_0.sparsity_enabled)},
+                {"weight_sparsity_enabled", std::ref(input_1.sparsity_enabled)},
+                {"input_sparsity_rate", std::ref(input_0.sparsity)},
+                {"weight_sparsity_rate", std::ref(input_1.sparsity)},
+                {"execution_order", std::ref(execution_order)},
+                {"activation_function", std::ref(activation_function)},
+                {"kernel_height", std::ref(kernel.height)},
+                {"kernel_width", std::ref(kernel.width)},
+                {"kernel_pad_bottom", std::ref(kernel.pad_bottom)},
+                {"kernel_pad_left", std::ref(kernel.pad_left)},
+                {"kernel_pad_right", std::ref(kernel.pad_right)},
+                {"kernel_pad_top", std::ref(kernel.pad_top)},
+                {"kernel_stride_height", std::ref(kernel.stride_height)},
+                {"kernel_stride_width", std::ref(kernel.stride_width)},
+                {"output_0_batch", std::ref(output_0.batch)},
+                {"output_0_channels", std::ref(output_0.channels)},
+                {"output_0_height", std::ref(output_0.height)},
+                {"output_0_width", std::ref(output_0.width)},
+                {"input_0_datatype", std::ref(input_0.datatype)},
+                {"input_0_layout", std::ref(input_0.layout)},
+                {"input_0_swizzling", std::ref(input_0.swizzling)},
+                {"input_1_datatype", std::ref(input_1.datatype)},
+                {"input_1_layout", std::ref(input_1.layout)},
+                {"input_1_swizzling", std::ref(input_1.swizzling)},
+                {"output_0_datatype", std::ref(output_0.datatype)},
+                {"output_0_layout", std::ref(output_0.layout)},
+                {"output_0_swizzling", std::ref(output_0.swizzling)},
+                {"output_sparsity_enabled", std::ref(output_0.sparsity_enabled)},
+                {"isi_strategy", std::ref(isi_strategy)},
+                {"output_write_tiles", std::ref(output_write_tiles)},
 
-            {"output_0_halo_broadcast_top", std::ref(halo.output_0_halo_broadcast_cnt.top)},
-            {"output_0_halo_broadcast_bottom", std::ref(halo.output_0_halo_broadcast_cnt.bottom)},
-            {"output_0_halo_broadcast_left", std::ref(halo.output_0_halo_broadcast_cnt.left)},
-            {"output_0_halo_broadcast_right", std::ref(halo.output_0_halo_broadcast_cnt.right)},
-            {"output_0_halo_broadcast_front", std::ref(halo.output_0_halo_broadcast_cnt.front)},
-            {"output_0_halo_broadcast_back", std::ref(halo.output_0_halo_broadcast_cnt.back)},
+                {"input_0_halo_top", std::ref(halo.input_0_halo.top)},
+                {"input_0_halo_bottom", std::ref(halo.input_0_halo.bottom)},
+                {"input_0_halo_left", std::ref(halo.input_0_halo.left)},
+                {"input_0_halo_right", std::ref(halo.input_0_halo.right)},
+                {"input_0_halo_front", std::ref(halo.input_0_halo.front)},
+                {"input_0_halo_back", std::ref(halo.input_0_halo.back)},
 
-            {"output_0_halo_inbound_top", std::ref(halo.output_0_inbound_halo.top)},
-            {"output_0_halo_inbound_bottom", std::ref(halo.output_0_inbound_halo.bottom)},
-            {"output_0_halo_inbound_left", std::ref(halo.output_0_inbound_halo.left)},
-            {"output_0_halo_inbound_right", std::ref(halo.output_0_inbound_halo.right)},
-            {"output_0_halo_inbound_front", std::ref(halo.output_0_inbound_halo.front)},
-            {"output_0_halo_inbound_back", std::ref(halo.output_0_inbound_halo.back)},
+                {"output_0_halo_top", std::ref(halo.output_0_halo.top)},
+                {"output_0_halo_bottom", std::ref(halo.output_0_halo.bottom)},
+                {"output_0_halo_left", std::ref(halo.output_0_halo.left)},
+                {"output_0_halo_right", std::ref(halo.output_0_halo.right)},
+                {"output_0_halo_front", std::ref(halo.output_0_halo.front)},
+                {"output_0_halo_back", std::ref(halo.output_0_halo.back)},
 
-            {"sep_enabled", std::ref(sep_activators.sep_activators)},
-            {"sep_w",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.storage_elements_pointers.set_width(value);
-                     }
-                 }
-                 return sep_activators.storage_elements_pointers.width();
-             }},
-            {"sep_h",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.storage_elements_pointers.set_height(value);
-                     }
-                 }
-                 return sep_activators.storage_elements_pointers.height();
-             }},
-            {"sep_c",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.storage_elements_pointers.set_channels(value);
-                     }
-                 }
-                 return sep_activators.storage_elements_pointers.channels();
-             }},
-            {"sep_b",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.storage_elements_pointers.set_batches(value);
-                     }
-                 }
-                 return sep_activators.storage_elements_pointers.batches();
-             }},
-            {"sep_act_w",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.actual_activators_input.set_width(value);
-                     }
-                 }
-                 return sep_activators.actual_activators_input.width();
-             }},
-            {"sep_act_h",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.actual_activators_input.set_height(value);
-                     }
-                 }
-                 return sep_activators.actual_activators_input.height();
-             }},
-            {"sep_act_c",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.actual_activators_input.set_channels(value);
-                     }
-                 }
-                 return sep_activators.actual_activators_input.channels();
-             }},
-            {"sep_act_b",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     DimType value;
-                     if (is_unsigned_int(s, value)) {
-                         sep_activators.actual_activators_input.set_batches(value);
-                     }
-                 }
-                 return sep_activators.actual_activators_input.batches();
-             }},
-            {"sep_no_sparse_map", std::ref(sep_activators.no_sparse_map)},
-            {"in_place_input1",  // weightless_operation
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     setWeightlessOperation(s);
-                 }
-                 return weightless_operation;
-             }},
-            {"in_place_output",
-             [this](bool set_mode, std::string s) -> DimType {
-                 if (set_mode) {
-                     setInPlaceOutputMemory(s);
-                 }
-                 return in_place_output_memory;
-             }},
-            {"superdense_output", std::ref(superdense)},
-            {"input_autopad", std::ref(input_autopad)},
-            {"output_autopad", std::ref(output_autopad)},
-            {"mpe_engine", std::ref(mpe_engine)},
-            {"reduce_minmax_op", std::ref(reduce_minmax_op)},
-    };
+                {"output_0_halo_broadcast_top", std::ref(halo.output_0_halo_broadcast_cnt.top)},
+                {"output_0_halo_broadcast_bottom", std::ref(halo.output_0_halo_broadcast_cnt.bottom)},
+                {"output_0_halo_broadcast_left", std::ref(halo.output_0_halo_broadcast_cnt.left)},
+                {"output_0_halo_broadcast_right", std::ref(halo.output_0_halo_broadcast_cnt.right)},
+                {"output_0_halo_broadcast_front", std::ref(halo.output_0_halo_broadcast_cnt.front)},
+                {"output_0_halo_broadcast_back", std::ref(halo.output_0_halo_broadcast_cnt.back)},
 
+                {"output_0_halo_inbound_top", std::ref(halo.output_0_inbound_halo.top)},
+                {"output_0_halo_inbound_bottom", std::ref(halo.output_0_inbound_halo.bottom)},
+                {"output_0_halo_inbound_left", std::ref(halo.output_0_inbound_halo.left)},
+                {"output_0_halo_inbound_right", std::ref(halo.output_0_inbound_halo.right)},
+                {"output_0_halo_inbound_front", std::ref(halo.output_0_inbound_halo.front)},
+                {"output_0_halo_inbound_back", std::ref(halo.output_0_inbound_halo.back)},
+
+                {"sep_enabled", std::ref(sep_activators.sep_activators)},
+                {"sep_w",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.storage_elements_pointers.set_width(value);
+                         }
+                     }
+                     return sep_activators.storage_elements_pointers.width();
+                 }},
+                {"sep_h",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.storage_elements_pointers.set_height(value);
+                         }
+                     }
+                     return sep_activators.storage_elements_pointers.height();
+                 }},
+                {"sep_c",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.storage_elements_pointers.set_channels(value);
+                         }
+                     }
+                     return sep_activators.storage_elements_pointers.channels();
+                 }},
+                {"sep_b",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.storage_elements_pointers.set_batches(value);
+                         }
+                     }
+                     return sep_activators.storage_elements_pointers.batches();
+                 }},
+                {"sep_act_w",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.actual_activators_input.set_width(value);
+                         }
+                     }
+                     return sep_activators.actual_activators_input.width();
+                 }},
+                {"sep_act_h",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.actual_activators_input.set_height(value);
+                         }
+                     }
+                     return sep_activators.actual_activators_input.height();
+                 }},
+                {"sep_act_c",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.actual_activators_input.set_channels(value);
+                         }
+                     }
+                     return sep_activators.actual_activators_input.channels();
+                 }},
+                {"sep_act_b",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         DimType value;
+                         if (is_unsigned_int(s, value)) {
+                             sep_activators.actual_activators_input.set_batches(value);
+                         }
+                     }
+                     return sep_activators.actual_activators_input.batches();
+                 }},
+                {"sep_no_sparse_map", std::ref(sep_activators.no_sparse_map)},
+                {"in_place_input1",  // weightless_operation
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         setWeightlessOperation(s);
+                     }
+                     return weightless_operation;
+                 }},
+                {"in_place_output",
+                 [this](bool set_mode, std::string s) -> DimType {
+                     if (set_mode) {
+                         setInPlaceOutputMemory(s);
+                     }
+                     return in_place_output_memory;
+                 }},
+                {"superdense_output", std::ref(superdense)},
+                {"input_autopad", std::ref(input_autopad)},
+                {"output_autopad", std::ref(output_autopad)},
+                {"mpe_engine", std::ref(mpe_engine)},
+                {"reduce_minmax_op", std::ref(reduce_minmax_op)},
+        };
+    }
+
+    mutable std::mutex _member_map_mutex{};
+    void ensure_member_map() const {
+        std::lock_guard<std::mutex> lock(_member_map_mutex);
+        if (is_member_map_initialized()) {
+            return;
+        }
+        (const_cast<DPUOperation*>(this))->populate_member_map();
+    }
+    bool is_member_map_initialized() const {
+        return !_member_map.empty();  // NOT empty
+    }
+
+public:
     static const std::vector<std::string>& _get_member_names() {
         static const std::vector<std::string> names{
                 "device",
@@ -658,7 +740,7 @@ struct DPUOperation {
 
     size_t hash() const {
         std::size_t combined_hash = 0;
-        for (const auto& [key, value] : _member_map) {
+        for (const auto& [key, value] : get_member_map()) {
             std::visit(
                     [&combined_hash](auto&& arg) {
                         if constexpr (std::is_same_v<std::decay_t<std::remove_reference_t<decltype(arg)>>,

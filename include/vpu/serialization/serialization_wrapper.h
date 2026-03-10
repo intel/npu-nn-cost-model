@@ -45,7 +45,7 @@ protected:
         return !inhibit && active_serializer.is_serialization_enabled();
     }
 
-    /// will be set when we catch an error, so teh next operations to know something is not OK
+    /// will be set when we catch an error, so the next operations to know something is not OK
     bool error_present{false};
 
     /// function that ensures that no error occurred during serialization

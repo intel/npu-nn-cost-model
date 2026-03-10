@@ -372,5 +372,4 @@ TEST_F(TestDMA_TH_CostModel, DMATheoreticalPTL_ON_function_Test) {
         }
     }
 }
-
 }  // namespace VPUNN_unit_tests

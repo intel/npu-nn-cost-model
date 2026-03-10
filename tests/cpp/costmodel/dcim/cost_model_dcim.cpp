@@ -52,18 +52,4 @@ protected:
     }
 };
 
-TEST_F(TestDCIMCostModel, DISABLED_Interface_acces_smoke) {
-    //ASSERT_NO_THROW(model.getDCiM_interface());
-    //auto& dcimCM = model.getDCiM_interface();
-
-    //DCIMWorkload workload{};
-    //const DCIMWorkload& workload_ref{workload};
-    //std::string info{};
-
-    //const CyclesInterfaceType cycles{dcimCM.dCiM(workload_ref, info)};
-
-    //ASSERT_EQ(cycles, Cycles::ERROR_INVALID_INPUT_CONFIGURATION);
-    //ASSERT_EQ(info, "");
-}
-
 }  // namespace VPUNN_unit_tests

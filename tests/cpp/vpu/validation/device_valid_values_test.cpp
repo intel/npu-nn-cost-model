@@ -25,6 +25,9 @@ using namespace VPUNN;
 
 class IntfDeviceValidValuesTest : public ::testing::Test {
 public:
+    // dummy class to differentiate constructor
+    class WeightsAlignment_class {};
+
 protected:
     void SetUp() override {
     }
@@ -43,13 +46,13 @@ protected:
                                             cmx_KB_sizes_def,                   //
                                             output_write_tile_options_def,      //
                                             isi_stategy_options_def,            //
-                                            weigths_alignment_def,              //
+                                            weigths_alignment_B_def,            //
                                             input_heigth_start_factor_SOH_,     // special
-
-                                            valid_datatypes_map_default,  //
-                                            valid_operations_default,     //
-                                            alignement_size_bytes_def,//
-                                            out_innermost_dim_alignment_def) {
+                                            valid_datatypes_map_default,        //
+                                            valid_operations_default,           //
+                                            alignement_size_bytes_def,          //
+                                            out_innermost_dim_alignment_def,    //
+                                            legacy_samples_alignment_weights_def) {
         }
         DeviceValidValuesMock()
                 : VPUNN::IDeviceValidValues(specific_behaviours,
@@ -60,13 +63,34 @@ protected:
                                             cmx_KB_sizes_def,                   //
                                             output_write_tile_options_def,      //
                                             isi_stategy_options_def,            //
-                                            weigths_alignment_def,              //
+                                            weigths_alignment_B_def,            //
                                             input_heigth_start_factor_SOH_def,  // special
+                                            valid_datatypes_map_default,        //
+                                            valid_operations_default,           //
+                                            alignement_size_bytes_def,          //
+                                            out_innermost_dim_alignment_def,    //
+                                            legacy_samples_alignment_weights_def) {
+        }
 
-                                            valid_datatypes_map_default,  //
-                                            valid_operations_default,     //
-                                            alignement_size_bytes_def, //
-                                            out_innermost_dim_alignment_def) {
+        /// constructor that helps to test memory behavior for different  weights alignment
+        /// @param weigths_alignment_B_ the weights alignment to be used
+        /// @param WeightsAlignment_class& just to differentiate from other constructors
+        DeviceValidValuesMock(const int weights_alignment_B_, const WeightsAlignment_class&)
+                : VPUNN::IDeviceValidValues(specific_behaviours,
+                                            valid_execution_order_map_default,  //
+                                            valid_swizzlings_def,               //
+                                            valid_layouts_def,                  //
+                                            devices_def,                        //
+                                            cmx_KB_sizes_def,                   //
+                                            output_write_tile_options_def,      //
+                                            isi_stategy_options_def,            //
+                                            weights_alignment_B_,               //
+                                            input_heigth_start_factor_SOH_def,  // special
+                                            valid_datatypes_map_default,        //
+                                            valid_operations_default,           //
+                                            alignement_size_bytes_def,          //
+                                            out_innermost_dim_alignment_def,    //
+                                            legacy_samples_alignment_weights_def) {
         }
 
         // const VPUNN::Channels& get_output_channels_range(const VPUNN::DPUOperation&) const override {
@@ -150,8 +174,9 @@ protected:
                 ISIStrategy::SPLIT_OVER_K,
         };
 
-        inline static const int weigths_alignment_def{16};
-        inline static const int out_innermost_dim_alignment_def{1}; // bytes
+        inline static const int weigths_alignment_B_def{16};
+        inline static const bool legacy_samples_alignment_weights_def{false};  // no alignment (samples)
+        inline static const int out_innermost_dim_alignment_def{1};  // bytes
         inline static const int input_heigth_start_factor_SOH_def{1};
 
         inline static const int alignement_size_bytes_def{16 * 1024};
@@ -204,6 +229,206 @@ protected:
 
 private:
 };
+
+TEST_F(IntfDeviceValidValuesTest, Input1_memory_computation_test) {
+    auto mk_wl = [](const Operation op, const DataType dtype, const unsigned int ch_in, const unsigned int ch_out,
+                    const unsigned int k_w, const unsigned int k_h, bool weights_sparsity = false) -> DPUWorkload {
+        const HaloWorkload zeroHalo;
+        const SEPModeInfo sepInfo{};
+
+        // this test doesn't depend on device, any device can be used here
+        return VPUNN::DPUWorkload{
+                VPUDevice::VPU_2_7,
+                op,
+                {VPUNN::VPUTensor(27, 18, ch_in, 1, DataType::UINT8)},   // input dimensions
+                {VPUNN::VPUTensor(27, 18, ch_out, 1, DataType::UINT8)},  // output dimensions
+                {k_w, k_h},                                              // kernels
+                {1, 1},                                                  // strides
+                {0, 0, 0, 0},                                            // padding
+                VPUNN::ExecutionMode::CUBOID_16x16,                      // execution mode
+                VPUNN::ActivationFunction::NONE,                         // activation
+                0.0F,                                                    // act_sparsity
+                0.0F,                                                    // weight_sparsity
+                {swz_def, swz_def},                                      // input_swizzling
+                {swz_def},                                               // output_swizzling
+                1,                                                       // output_write_tiles
+                {0, 0, 0, 0},                                            // offsets
+                VPUNN::ISIStrategy::CLUSTERING,                          // isi_strategy
+                weights_sparsity,                                        // weight_sparsity_enabled
+                zeroHalo,                                                // halo
+                sepInfo,                                                 // sep
+                dtype                                                    // datatype for weights
+        };
+    };
+
+    struct TestInput {
+        VPUNN::DPUWorkload wl;  // the wl for which we compute memory
+        int weights_alignment;  // weights alignment for this test
+    };
+
+    struct TestExpectation {
+        long long in1_mem_size_exp;  // memory expected; it depends on test input
+        bool expect_throw = false;  // whether we expect an exception or not, exemple: if operation is ELTWISE and dtype
+                                    // is INT1, INT2, INT4 will throw because these dtypes are not supported for input0
+                                    // and input1 is just a copy of input0
+    };
+
+    struct TestCase {
+        TestInput t_in;
+        TestExpectation t_exp;
+    };
+
+    using TestsVector = std::vector<TestCase>;
+
+    auto test_info = [](const DPUWorkload& wl) -> std::string {
+        std::string info =
+                " device: \t" + VPUDevice_ToText.at(static_cast<int>(wl.device)) + " Operation: \t" +
+                Operation_ToText.at(static_cast<int>(wl.op)) + " input1 dtype: \t" +
+                (wl.weight_type.has_value() ? DataType_ToText.at(static_cast<int>(wl.weight_type.value())) : "Same") +
+                " channels: \t" + std::to_string(wl.inputs[0].z()) + " weight_sparsity_enabled: \t" +
+                (wl.weight_sparsity_enabled ? "true" : "false");
+        return info;
+    };
+
+    // this lambda function verify if the input1 memory is computed correctly for different workloads
+    auto verify_input1_memory = [&test_info](const TestsVector& tests) {
+        int i = 1;  // index of test cases
+        for (const auto& t : tests) {
+            VPUNN::DPUWorkload wl_ref{t.t_in.wl};
+            std::cout << "Test case "
+                      << " " << i << ": " << test_info(wl_ref) << "\n";
+
+            {
+                long long mem = 0;
+                auto wl{wl_ref};
+
+                DeviceValidValuesMock config{t.t_in.weights_alignment, WeightsAlignment_class()};
+                const DPUOperation op(wl, config);
+                const IOperationDynamicConstraints& operation_behaviour{config.get_specific_behaviour(op.operation)};
+                if (t.t_exp.expect_throw) {
+                    EXPECT_THROW(mem = operation_behaviour.input_1_contiguous_size_bytes(config, op),
+                                 std::runtime_error)
+                            << "Test : " << i << " ," << wl << std::endl;
+                    i++;
+                } else {
+                    EXPECT_NO_THROW(mem = operation_behaviour.input_1_contiguous_size_bytes(config, op))
+                            << "Test : " << i << " ," << wl << std::endl;
+                    EXPECT_EQ(mem, t.t_exp.in1_mem_size_exp)
+                            << "Test case "
+                            << " " << i << ": " << test_info(std::move(wl_ref))
+                            << " weights alignment: " << t.t_in.weights_alignment << "\n";
+                }
+            }
+            i++;
+        }
+    };
+
+    {
+        const TestsVector tests_dw_conv = {
+                // clang-format off
+            /************************************************ TABLE HEADER ********************************************************/  
+            /*  ||                 workload              || weights alignment || input1 memory expected ||    */
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 1, 3, 3), 1},{18}}, //1*1*(3*3)*1   /* 9ch and UINT1 => 2B for channels should be aligned to 1B => 2B*/ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 2, 3, 3), 1},{36}}, //1*1*(3*3)*2   /* 9ch and UINT1 => 2B for channels should be aligned to 1B => 2B*/ + 2*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 1, 3, 1), 1},{17}}, //1*1*(3*1)*1   /* 3ch and UINT1 => 1B for channels should be aligned to 1B => 1B*/ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 2, 3, 1), 1},{34}}, //1*1*(3*1)*2   /* 3ch and UINT1 => 1B for channels should be aligned to 1B => 1B*/ + 2*16 /*weights table*/
+
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 1, 3, 3), 9},{25}}, //1*1*(3*3)*1   /* 9ch and UINT1  => 2B for channels  should be aligned to 9B => 9B  */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 2, 3, 3), 9},{50}}, //1*1*(3*3)*2   /* 9ch and UINT1  => 2B for channels  should be aligned to 9B => 9B  */ + 2*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT2,  1, 1, 3, 3), 9},{25}}, //1*1*(3*3)*1   /* 9ch and UINT2  => 3B for channels  should be aligned to 9B => 9B  */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT4,  1, 1, 3, 3), 9},{25}}, //1*1*(3*3)*1   /* 9ch and UINT4  => 5B for channels  should be aligned to 9B => 9B  */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT4,  1, 1, 3, 3), 8},{24}}, //1*1*(3*3)*1   /* 9ch and UINT4  => 5B for channels  should be aligned to 8B => 8B  */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT8,  1, 1, 3, 3), 9},{25}}, //1*1*(3*3)*1   /* 9ch and UINT8  => 9B for channels  should be aligned to 9B => 9B  */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT16, 1, 1, 3, 3), 9},{34}}, //1*1*(3*3)*1*2 /* 9ch and UINT16 => 18B for channels should be aligned to 9B => 18B */ + 1*16 /*weights table*/
+
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 1, 3, 3), 5},{21}}, //1*1*(3*3)*1   /* 9ch and UINT1  => 2B for channels  should be aligned to 5B => 5B */  + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT2,  1, 1, 3, 3), 5},{21}}, //1*1*(3*3)*1   /* 9ch and UINT2  => 3B for channels  should be aligned to 5B => 5B */  + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT4,  1, 1, 3, 3), 5},{21}}, //1*1*(3*3)*1   /* 9ch and UINT4  => 5B for channels  should be aligned to 5B => 5B */  + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT8,  1, 1, 3, 3), 5},{26}}, //1*1*(3*3)*1   /* 9ch and UINT8  => 9B for channels  should be aligned to 5B => 10B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT16, 1, 1, 3, 3), 5},{36}}, //1*1*(3*3)*1*2 /* 9ch and UINT16 => 18B for channels should be aligned to 5B => 20B */ + 1*16 /*weights table*/
+            
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 1, 1, 3), 7},{23}}, //1*1*(1*3)*1   /* 3ch and UINT1  => 1B for channels should be aligned to 7B => 7B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT2,  1, 1, 1, 3), 7},{23}}, //1*1*(1*3)*1   /* 3ch and UINT2  => 1B for channels should be aligned to 7B => 7B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT4,  1, 1, 1, 3), 7},{23}}, //1*1*(1*3)*1   /* 3ch and UINT4  => 2B for channels should be aligned to 7B => 7B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT8,  1, 1, 1, 3), 7},{23}}, //1*1*(1*3)*1   /* 3ch and UINT8  => 3B for channels should be aligned to 7B => 7B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT16, 1, 1, 1, 3), 7},{23}}, //1*1*(1*3)*1*2 /* 3ch and UINT16 => 6B for channels should be aligned to 7B => 7B */ + 1*16 /*weights table*/
+            
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT1,  1, 1, 5, 5), 12},{28}}, //1*1*(5*5)*1   /* 25ch and UINT1  => 4B  for channels should be aligned to 12B => 12B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT2,  1, 1, 5, 5), 12},{28}}, //1*1*(5*5)*1   /* 25ch and UINT2  => 7B  for channels should be aligned to 12B => 12B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT4,  1, 1, 5, 5), 12},{40}}, //1*1*(5*5)*1   /* 25ch and UINT4  => 13B for channels should be aligned to 12B => 24B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT8,  1, 1, 5, 5), 12},{52}}, //1*1*(5*5)*1   /* 25ch and UINT8  => 25B for channels should be aligned to 12B => 36B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::DW_CONVOLUTION, DataType::UINT16, 1, 1, 5, 5), 12},{76}}, //1*1*(5*5)*1*2 /* 25ch and UINT16 => 50B for channels should be aligned to 12B => 60B */ + 1*16 /*weights table*/
+                // clang-format on
+        };
+
+        verify_input1_memory(tests_dw_conv);
+    }
+
+    {
+        const TestsVector tests_conv = {
+                // clang-format off
+            /************************************************ TABLE HEADER ********************************************************/
+            /*  || workload || input1 memory expected ||    */
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT1,  1, 1, 3, 3), 5},{21}}, //1*1*(3*3*1)*1   /* 9ch and UINT1  => 2B  for channels should be aligned to 5B => 5B */  + 1*16  /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT2,  1, 1, 3, 3), 5},{21}}, //1*1*(3*3*1)*1   /* 9ch and UINT2  => 3B  for channels should be aligned to 5B => 5B */  + 1*16  /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT4,  1, 1, 3, 3), 5},{21}}, //1*1*(3*3*1)*1   /* 9ch and UINT4  => 5B  for channels should be aligned to 5B => 5B */  + 1*16  /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT8,  1, 1, 3, 3), 5},{26}}, //1*1*(3*3*1)*1   /* 9ch and UINT8  => 9B  for channels should be aligned to 5B => 10B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT16, 1, 1, 3, 3), 5},{36}}, //1*1*(3*3*1)*1*2 /* 9ch and UINT16 => 18B for channels should be aligned to 5B => 20B */ + 1*16 /*weights table*/
+                                                              
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT1,  1, 1, 1, 3), 2},{18}}, //1*1*(1*3*1)*1   /* 3ch and UINT1  => 1B for channels should be aligned to 2B => 2B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT2,  1, 1, 1, 3), 2},{18}}, //1*1*(1*3*1)*1   /* 3ch and UINT2  => 1B for channels should be aligned to 2B => 2B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT4,  1, 1, 1, 3), 2},{18}}, //1*1*(1*3*1)*1   /* 3ch and UINT4  => 2B for channels should be aligned to 2B => 2B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT8,  1, 1, 1, 3), 2},{20}}, //1*1*(1*3*1)*1   /* 3ch and UINT8  => 3B for channels should be aligned to 2B => 4B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT16, 1, 1, 1, 3), 2},{22}}, //1*1*(1*3*1)*1*2 /* 3ch and UINT16 => 6B for channels should be aligned to 2B => 6B */ + 1*16 /*weights table*/
+                                                            
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT1,  1, 1, 5, 3), 17},{33}}, //1*1*(5*3*1)*1   /* 15ch and UINT1  => 2B  for channels should be aligned to 17B => 17B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT2,  1, 1, 5, 3), 17},{33}}, //1*1*(5*3*1)*1   /* 15ch and UINT2  => 4B  for channels should be aligned to 17B => 17B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT4,  1, 1, 5, 3), 17},{33}}, //1*1*(5*3*1)*1   /* 15ch and UINT4  => 8B  for channels should be aligned to 17B => 17B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT8,  1, 1, 5, 3), 17},{33}}, //1*1*(5*3*1)*1   /* 15ch and UINT8  => 15B for channels should be aligned to 17B => 17B */ + 1*16 /*weights table*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT16, 1, 1, 5, 3), 17},{50}}, //1*1*(5*3*1)*1*2 /* 15ch and UINT16 => 30B for channels should be aligned to 17B => 34B */ + 1*16 /*weights table*/
+                                                           
+            //WEIGHT SPARSITY = TRUE                     
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT1,  1, 1, 7, 4, true), 13},{45}}, //1*1*(7*4*1)*1   /* 28ch and UINT1  => 4B  for channels should be aligned to 13B => 13B */ + 1*16 /*weights table*/  + 16*1 /*sparsity map*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT2,  1, 1, 7, 4, true), 13},{45}}, //1*1*(7*4*1)*1   /* 28ch and UINT2  => 7B  for channels should be aligned to 13B => 13B */ + 1*16 /*weights table*/  + 16*1 /*sparsity map*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT4,  1, 1, 7, 4, true), 13},{58}}, //1*1*(7*4*1)*1   /* 28ch and UINT4  => 14B for channels should be aligned to 13B => 26B */ + 1*16 /*weights table*/  + 16*1 /*sparsity map*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT8,  1, 1, 7, 4, true), 13},{71}}, //1*1*(7*4*1)*1   /* 28ch and UINT8  => 28B for channels should be aligned to 13B => 39B */ + 1*16 /*weights table*/  + 16*1 /*sparsity map*/
+            {{mk_wl(Operation::CONVOLUTION, DataType::UINT16, 1, 1, 7, 4, true), 13},{97}}, //1*1*(7*4*1)*1*2 /* 28ch and UINT16 => 56B for channels should be aligned to 13B => 65B */ + 1*16 /*weights table*/  + 16*1 /*sparsity map*/
+
+                // clang-format on
+        };
+
+        verify_input1_memory(tests_conv);
+    }
+
+    {
+        const TestsVector tests_cm_conv = {
+                // clang-format off
+            /************************************************ TABLE HEADER ********************************************************/
+            /*  || workload || input1 memory expected ||    */
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT1,  10, 1, 3, 3), 11},{38}}, //1*1*(3*3*10)*1 /* 90ch and dtype UINT1  => 12B  for channels should be aligned to 11B =>22B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT2,  10, 1, 3, 3), 11},{49}}, //1*1*(3*3*10)*1 /* 90ch and dtype UINT2  => 23B  for channels should be aligned to 11B =>33B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT4,  10, 1, 3, 3), 11},{71}}, //1*1*(3*3*10)*1 /* 90ch and dtype UINT4  => 45B  for channels should be aligned to 11B =>55B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT8,  10, 1, 3, 3), 11},{115}},//1*1*(3*3*10)*1 /* 90ch and dtype UINT8  => 90B  for channels should be aligned to 11B =>99B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT16, 10, 1, 3, 3), 11},{203}},//1*1*(3*3*10)*1 /* 90ch and dtype UINT16 => 180B for channels should be aligned to 11B =>187B */ + 16*1 /*weights table*/
+
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT1,  1, 1, 1, 3), 5},{21}}, //1*1*(1*3*1)*1 /* 3ch and dtype UINT1  => 1B for channels should be aligned to 5B =>5B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT2,  1, 1, 1, 3), 5},{21}}, //1*1*(1*3*1)*1 /* 3ch and dtype UINT2  => 1B for channels should be aligned to 5B =>5B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT4,  1, 1, 1, 3), 5},{21}}, //1*1*(1*3*1)*1 /* 3ch and dtype UINT4  => 2B for channels should be aligned to 5B =>5B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT8,  1, 1, 1, 3), 5},{21}}, //1*1*(1*3*1)*1 /* 3ch and dtype UINT8  => 3B for channels should be aligned to 5B =>5B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT16, 1, 1, 1, 3), 5},{26}}, //1*1*(1*3*1)*1 /* 3ch and dtype UINT16 => 6B for channels should be aligned to 5B =>10B */ + 16*1 /*weights table*/
+
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT1,  1, 1, 7, 7), 9},{25}}, //1*1*(1*7*7)*1 /* 49ch and dtype UINT1  => 7B  for channels should be aligned to 9B =>9B  */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT2,  1, 1, 7, 7), 9},{34}}, //1*1*(1*7*7)*1 /* 49ch and dtype UINT2  => 13B for channels should be aligned to 9B =>18B */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT4,  1, 1, 7, 7), 9},{43}}, //1*1*(1*7*7)*1 /* 49ch and dtype UINT4  => 25B for channels should be aligned to 9B =>27B */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT8,  1, 1, 7, 7), 9},{70}}, //1*1*(1*7*7)*1 /* 49ch and dtype UINT8  => 49B for channels should be aligned to 9B =>54B */ + 16*1 /*weights table*/
+            {{mk_wl(Operation::CM_CONVOLUTION, DataType::UINT16, 1, 1, 7, 7), 9},{115}},//1*1*(1*7*7)*1 /* 49ch and dtype UINT16 => 98B for channels should be aligned to 9B =>99B */ + 16*1 /*weights table*/
+
+                // clang-format on
+        };
+
+        verify_input1_memory(tests_cm_conv);
+    }
+}
 
 /// Test make list method
 TEST_F(IntfDeviceValidValuesTest, makeListTest) {

@@ -140,5 +140,33 @@ class OldShaveCostProvider : public MathematicalShaveCostProviderBase<OldShaveCo
     static constexpr std::string_view cost_source_name = "shave_1";
 };
 
+/**
+ * @brief SHAVE cost provider using heuristic models for certain operations
+ * 
+ * This class provides cost estimation for SHAVE workloads using simple heuristic models,
+ * particularly for operations that are inherently non-vectorizable. It leverages
+ * predefined heuristic models to estimate execution costs.
+ */
+class HeuristicCostProvider : public MathematicalShaveCostProviderBase<HeuristicCostProvider> {
+    friend class MathematicalShaveCostProviderBase<HeuristicCostProvider>;
+
+    const ShaveSelector& getSelectorImpl(VPUDevice& device) const {
+        return getShaveConfigurator().getHeuristicSelector(device);
+    }
+
+    static constexpr std::string_view cost_source_name = "shave_heuristic";
+};
+
+
+class HeuristicCostProviderWithFactors : public MathematicalShaveCostProviderBase<HeuristicCostProviderWithFactors> {
+    friend class MathematicalShaveCostProviderBase<HeuristicCostProviderWithFactors>;
+
+    const ShaveSelector& getSelectorImpl(VPUDevice& device) const {
+        return getShaveConfigurator().getHeuristicSelectorWithFactors(device);
+    }
+
+    static constexpr std::string_view cost_source_name = "shave_heuristic_with_factors";
+};
+
 } // namespace VPUNN
 #endif //SHAVE_COST_PROVIDERS_H

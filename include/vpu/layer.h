@@ -523,7 +523,7 @@ public:
      * elements from original in tensor) the input tensor that you need in order to produce that output. For 2
      * consecutive split compute tensors calculate the overlap region and distribute this overlap to memory and halo
      * regions of the adjacent tensors.
-     * E.g.: if overlap is 4, tensors will take 2 in their memory, teh remaining 2 will treat as halo regions T1: takes
+     * E.g.: if overlap is 4, tensors will take 2 in their memory, the remaining 2 will treat as halo regions T1: takes
      * 2 in memory + 2 as halo (from T2)
      *
      * Internal slices (tiles>2), have 2 borders and may produce more than outside slices.

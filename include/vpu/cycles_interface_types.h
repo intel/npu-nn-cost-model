@@ -46,7 +46,7 @@ namespace VPUNN {
 /// parameters were not passed!
 /// ERROR_SHAVE_LAYOUT                  UINT_MAX - 14:0 - 15:Problems with SHAVE layout.
 /// ERROR_SHAVE_INVALID_INPUT           UINT_MAX - 15:0 - 16:Problems with SHAVE workload input.
-/// ERROR_L2_INVALID_PARAMETERS         UINT_MAX - 16:0 - 17:Invalid parameters at L2 API 
+/// ERROR_L2_INVALID_PARAMETERS         UINT_MAX - 16:0 - 17:Invalid parameters at L2 API
 ///
 ///     Zero value is not an error, and can represent NN cycles output. This might let the NN communicate something like
 ///     it cannot solve the request.
@@ -83,15 +83,19 @@ public:
     static constexpr CyclesInterfaceType ERROR_SHAVE_LAYOUT{MaxV - 14};
     static constexpr CyclesInterfaceType ERROR_SHAVE_INVALID_INPUT{MaxV - 15};
 
-    static constexpr CyclesInterfaceType ERROR_L2_INVALID_PARAMETERS{MaxV - 16}; // used for invalid parameters for L2 API
+    static constexpr CyclesInterfaceType ERROR_L2_INVALID_PARAMETERS{MaxV -
+                                                                     16};  // used for invalid parameters for L2 API
 
-    static constexpr CyclesInterfaceType ERROR_PROFILING_SERVICE{MaxV - 17};  // used for invalid output from profiling service
+    static constexpr CyclesInterfaceType ERROR_PROFILING_SERVICE{MaxV -
+                                                                 17};  // used for invalid output from profiling service
 
     static constexpr CyclesInterfaceType ERROR_CACHE_MISS{MaxV - 18};  // used for cache miss
 
-    static constexpr CyclesInterfaceType ERROR_SHAVE_OPERATOR_MISSING{MaxV - 19}; // use it in case that the configuration doesnt have the specified Shave in container
+    static constexpr CyclesInterfaceType ERROR_SHAVE_OPERATOR_MISSING{
+            MaxV - 19};  // use it in case that the configuration doesnt have the specified Shave in container
 
-    static constexpr CyclesInterfaceType ERROR_NO_VALID_DMA_COST_PROVIDER{MaxV - 20}; // used when no valid dma cost provider is available
+    static constexpr CyclesInterfaceType ERROR_NO_VALID_DMA_COST_PROVIDER{
+            MaxV - 20};  // used when no valid dma cost provider is available
 
     static constexpr CyclesInterfaceType START_ERROR_RANGE{MaxV - 1000};  ///< 1000 position for errors
 
@@ -250,6 +254,20 @@ public:
     /// @return the same number because it is already in CyclesInterfaceType
     inline static constexpr CyclesInterfaceType toCycleInterfaceType(CyclesInterfaceType conversion_number) {
         return conversion_number;
+    }
+
+    /// @brief function to compute extrapolated/interpolated cost
+    /// @param x the point for which we want to compute cost
+    /// @param x1, y1 first point
+    /// @param x2, y2 second point
+    static CyclesInterfaceType extrapolate_cost(const unsigned int x, const unsigned int x1,
+                                                 const CyclesInterfaceType y1, const unsigned int x2,
+                                                 const CyclesInterfaceType y2) {
+        const float slope = (static_cast<float>(y2) - static_cast<float>(y1)) / static_cast<float>(x2 - x1);
+        const float intercept = static_cast<float>(y1) - slope * static_cast<float>(x1);
+        const CyclesInterfaceType extrapolated_cost = Cycles::toCycleInterfaceType(slope * x + intercept);
+
+        return extrapolated_cost;
     }
 };
 

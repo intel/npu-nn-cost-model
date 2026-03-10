@@ -19,15 +19,10 @@ if(NOT pybind11_FOUND)
     FetchContent_Declare(
         pybind11
         GIT_REPOSITORY https://github.com/pybind/pybind11
-        GIT_TAG v2.10.0
+        GIT_TAG v2.12.0
     )
 
-    FetchContent_GetProperties(pybind11)
-
-    if(NOT pybind11_POPULATED)
-        FetchContent_Populate(pybind11)
-        add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
-    endif()
+    FetchContent_MakeAvailable(pybind11)
 endif()
 
 set(PYTHON_BINDING_CPP ${CMAKE_CURRENT_SOURCE_DIR}/VPUNN.cpp)
@@ -44,15 +39,11 @@ target_include_directories(vpunn_python_bindings
         $<BUILD_INTERFACE:${FLATBUFFERS_SRC_DIR}/include>
 )
 
-# The python bindings depend on some internal libraries
+# The python bindings depend on the main cost model library
 target_link_libraries(vpunn_python_bindings 
     PRIVATE 
-        vpunn_common_settings
-        vpunn_inference 
-        vpunn_optimization
-        vpunn_vpu
-        vpunn_shave
-        flatbuffers
+        npu_costmodel
+        vpunn_common_settings  # For C++17 standard and common compile flags
 )
 
 add_dependencies(vpunn_python_bindings vpunn_python_schema)
@@ -60,27 +51,21 @@ add_dependencies(vpunn_python_bindings vpunn_python_schema)
 # The name of the shared library must match the module name to keep python happy
 set_target_properties(vpunn_python_bindings 
     PROPERTIES 
-    OUTPUT_NAME "VPUNN"
+    OUTPUT_NAME "_VPUNN"
 )
 
 add_custom_target(vpunn_python_create_init_file ALL
-    COMMAND echo "from .VPUNN import DPUWorkload, VPUCostModel, DMAWorkload, DMACostModel_NPU27, DMACostModel_NPU40_50, DMANNWorkload_NPU27, DMANNWorkload_NPU40_50, VPUTensor; VPUNN_lib  = VPUNN" > ${COST_MODEL_BINARY_DIR}/lib/__init__.py
+    COMMAND echo "from . import VPUNN; from .VPUNN import DPUWorkload, VPUCostModel, DMAWorkload, DMACostModel_NPU27, DMACostModel_NPU40_50, DMANNWorkload_NPU27, DMANNWorkload_NPU40_50, VPUTensor; VPUNN_lib = VPUNN; bindings = VPUNN" > ${COST_MODEL_BINARY_DIR}/lib/__init__.py
     VERBATIM
 )
 
 if(SKBUILD)
     find_package(PythonExtensions REQUIRED)
-    set(VPUNN_PYTHON_INSTALLATION_FOLDER ${PYTHON_RELATIVE_SITE_PACKAGES_DIR}/VPUNN)
+    set(VPUNN_PYTHON_INSTALLATION_FOLDER ${PYTHON_RELATIVE_SITE_PACKAGES_DIR}/vpunn)
     set(VPUNN_SCHEMA_PYTHON_INSTALLATION_FOLDER ${PYTHON_RELATIVE_SITE_PACKAGES_DIR}/VPUNN_SCHEMA)
 
     install(
         TARGETS vpunn_python_bindings
-        COMPONENT bindings
-        DESTINATION ${VPUNN_PYTHON_INSTALLATION_FOLDER}
-    )
-
-    install(
-        FILES ${COST_MODEL_BINARY_DIR}/lib/__init__.py
         COMPONENT bindings
         DESTINATION ${VPUNN_PYTHON_INSTALLATION_FOLDER}
     )

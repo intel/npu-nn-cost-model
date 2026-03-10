@@ -6,6 +6,8 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
+#include "vpu/device_layer_properties/device_layer_properties_holder.h"
+#include <algorithm>
 #include "vpu_layer_cost_model.h"
 
 #include <gtest/gtest.h>
@@ -242,9 +244,8 @@ public:
         std::string details = test_case + ":";
         {  // "5-5 k3 p11"},
             std::stringstream buffer;
-            buffer << " [" << l1.inputs[0].width() << "-" << l1.outputs[0].width() << " k" << l1.kernels[Dim::W]
-                   << " p" << l1.padding[Dim::LEFT] << "-" << l1.padding[Dim::RIGHT] << " s" << l1.strides[Dim::W]
-                   << "]";
+            buffer << " [" << l1.inputs[0].width() << "-" << l1.outputs[0].width() << " k" << l1.kernels[Dim::W] << " p"
+                   << l1.padding[Dim::LEFT] << "-" << l1.padding[Dim::RIGHT] << " s" << l1.strides[Dim::W] << "]";
 
             details += buffer.str();
         }
@@ -280,9 +281,9 @@ public:
             int exp_inhalo1{(t_exp.haloIn1.size() > i) ? t_exp.haloIn1[i] : 0};  // zero halo by default
             int exp_inhalo2{(t_exp.haloIn2.size() > i) ? t_exp.haloIn2[i] : 0};  // zero halo by default
             ASSERT_EQ(s.halo.input_0_halo.left, exp_inhalo1) << "left in halo"
-                                                            << " i= " << i << s << t_exp;
+                                                             << " i= " << i << s << t_exp;
             ASSERT_EQ(s.halo.input_0_halo.right, exp_inhalo2) << "right in halo "
-                                                               << " i= " << i << s << t_exp;
+                                                              << " i= " << i << s << t_exp;
 
             // check also stride??
 
@@ -459,14 +460,8 @@ TEST_F(DPULayerTest, SplitAcrossTileSOKAsymmetric) {
     }
 }
 
-#define HALO_ZERO2            \
-    {0, 0} /*in halo top*/, { \
-        0, 0                  \
-    } /*in halo bottom*/
-#define HALO_ZERO3            \
-    {0, 0} /*in halo top*/, { \
-        0, 0                  \
-    } /*in halo bottom*/
+#define HALO_ZERO2 {0, 0} /*in halo top*/, {0, 0} /*in halo bottom*/
+#define HALO_ZERO3 {0, 0} /*in halo top*/, {0, 0} /*in halo bottom*/
 
 TEST_F(DPULayerTest, SplitSOHOVERLAPPED_basic_K3_2T) {
     // IN ,O, K , PT, PB, S
@@ -2129,7 +2124,9 @@ TEST_F(DPULayerTest, Split_SOH_3X_S1_K9_2T_redowa_deeplab_v3_dense_IRv11_FP16) {
              " redowa_deeplab_v3_dense_IRv11"},
     };
 
-    { executeT(SOHO_test, tests_SOHO, " SOH OVERLAPPED : "); }
+    {
+        executeT(SOHO_test, tests_SOHO, " SOH OVERLAPPED : ");
+    }
 
     {
         std::function<std::vector<DPULayer>(const DPULayer*, unsigned int)> split_H_OLD =
@@ -2155,7 +2152,9 @@ TEST_F(DPULayerTest, Split_SOH_3X_S1_K9_2T_redowa_deeplab_v3_dense_IRv11_FP16) {
              },
              " redowa_deeplab_v3_dense_IRv11"},
     };
-    { executeT(SOH_inHALO_test, tests_SOH_inHALO, " SOH input HALO : "); }
+    {
+        executeT(SOH_inHALO_test, tests_SOH_inHALO, " SOH input HALO : ");
+    }
 }
 
 TEST_F(DPULayerTest, Split_SOH_3X_S8_K8_2T_DW_Cnv) {
@@ -2206,7 +2205,9 @@ TEST_F(DPULayerTest, Split_SOH_3X_S8_K8_2T_DW_Cnv) {
              " 4 outputs H32"},
     };
 
-    { executeT(SOHO_test, tests_SOHO, " SOH OVERLAPPED : "); }
+    {
+        executeT(SOHO_test, tests_SOHO, " SOH OVERLAPPED : ");
+    }
 
     {
         std::function<std::vector<DPULayer>(const DPULayer*, unsigned int)> split_H_OLD =
@@ -2243,7 +2244,9 @@ TEST_F(DPULayerTest, Split_SOH_3X_S8_K8_2T_DW_Cnv) {
              },
              " 4 outputs H32"},
     };
-    { executeT(SOH_inHALO_test, tests_SOH_inHALO, " SOH input HALO : "); }
+    {
+        executeT(SOH_inHALO_test, tests_SOH_inHALO, " SOH input HALO : ");
+    }
 }
 
 ///////// SOH input HALO tests
@@ -3204,6 +3207,37 @@ TEST_F(DPULayerTest, DISABLED_zSplitSOHinHALO_basic_K5_3T_DISABLED) {
     };
 
     executeT_SOH_inHALO(tests);
+}
+
+TEST_F(DPULayerTest, NPU_RESERVED_1_TilingExecutionMode_ConvAndCmConv_HaveAllCuboidModes) {
+    auto contains = [](const std::vector<ExecutionMode>& modes, const ExecutionMode m) -> bool {
+        return std::find(modes.begin(), modes.end(), m) != modes.end();
+    };
+
+    auto expect_has_all_cuboid_modes = [&](const DPULayer& layer, const std::string& tag) {
+        const auto& props = LayerPropertiesHolder::get_properties(layer.device);
+        const auto modes = props.getValidTilingExecutionMode(layer);
+
+        EXPECT_TRUE(contains(modes, ExecutionMode::CUBOID_16x16)) << tag;
+        EXPECT_TRUE(contains(modes, ExecutionMode::CUBOID_8x16)) << tag;
+        EXPECT_TRUE(contains(modes, ExecutionMode::CUBOID_4x16)) << tag;
+    };
+
+    const DPULayer conv_layer{
+            VPUDevice::NPU_RESERVED_1,
+            Operation::CONVOLUTION,
+            {VPUTensor(28, 9, 8, 1, DataType::UINT8, Layout::XYZ, false)},
+            {VPUTensor(28, 9, 8, 1, DataType::UINT8, Layout::XYZ, false)},
+            {1, 1},
+            {1, 1},
+            {0, 0, 0, 0},
+    };
+
+    DPULayer cm_conv_layer = conv_layer;
+    cm_conv_layer.op = Operation::CM_CONVOLUTION;
+
+    expect_has_all_cuboid_modes(conv_layer, "CONV must support all cuboid tiling execution modes on NPU_RESERVED_1");
+    expect_has_all_cuboid_modes(cm_conv_layer, "CM_CONV must support all cuboid tiling execution modes on NPU_RESERVED_1");
 }
 
 }  // namespace VPUNN_unit_tests

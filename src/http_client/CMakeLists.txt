@@ -14,45 +14,6 @@ include(FetchContent)
 
 message(STATUS "Preparing dependencies for VPUNN http client.")
 
-# Workaround for libzstd error (uncomment if error involving linking zstdlib found)
-## Setup zstd dependency
-#if(NOT TARGET zstd::libzstd)
-#    message(STATUS "Setting up zstd dependency")
-#    
-#    # Disable building extra components from zstd
-#    set(ZSTD_BUILD_PROGRAMS  OFF CACHE BOOL "Disable zstd CLI" FORCE)
-#    set(ZSTD_BUILD_SHARED    OFF CACHE BOOL "Disable zstd shared libs" FORCE)
-#    set(ZSTD_BUILD_STATIC    ON  CACHE BOOL "Enable zstd static lib" FORCE)
-#    
-#    FetchContent_Declare(
-#        zstd
-#        GIT_REPOSITORY https://github.com/facebook/zstd.git
-#        GIT_TAG        v1.5.5
-#        SOURCE_SUBDIR  build/cmake
-#    )
-#    set(NEED_FETCH_ZSTD TRUE)
-#
-#
-#    FetchContent_MakeAvailable(zstd)
-#endif()
-#
-#if(NEED_FETCH_ZSTD)
-#	# Check existance
-#	if(TARGET libzstd_static)
-#        message(STATUS "libzstd_static: EXISTS")
-#    else()
-#        message(STATUS "libzstd_static: NOT FOUND")
-#    endif()
-#    
-#    # Try different possible target names and create alias
-#    if(TARGET libzstd_static)
-#        add_library(zstd::libzstd ALIAS libzstd_static)
-#        message(STATUS "Created alias zstd::libzstd -> libzstd_static")
-#    else()
-#        message(FATAL_ERROR "Could not find any zstd target to create alias. Check the debug output above.")
-#    endif()
-#endif()
-
 # Fetch httplib (header-only) if not already available
 if(NOT TARGET httplib::httplib)
 	FetchContent_Declare(
@@ -60,7 +21,12 @@ if(NOT TARGET httplib::httplib)
 		GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
 		GIT_TAG        v0.20.0
 	)
-	set(NEED_FETCH_HTTPLIB TRUE)
+
+	# Use MakeAvailable to fetch and configure httplib
+	# Additional httplib options are configured later in this file if needed
+	FetchContent_MakeAvailable(httplib)
+	
+	message(STATUS "httplib fetched and configured without zstd dependencies")
 endif()
 
 # Fetch nlohmann/json (header-only, optional) if not already available
@@ -70,19 +36,8 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
 		GIT_REPOSITORY https://github.com/nlohmann/json.git
 		GIT_TAG        v3.11.3
 	)
-	set(NEED_FETCH_JSON TRUE)
-endif()
 
-if(NEED_FETCH_HTTPLIB)
-	FetchContent_MakeAvailable(
-		httplib
-	)
-endif()
-
-if(NEED_FETCH_JSON)
-	FetchContent_MakeAvailable(
-		json
-	)
+	FetchContent_MakeAvailable(json)
 endif()
 
 # Configure httplib options before making available
@@ -99,6 +54,7 @@ target_include_directories(vpunn_http_client
 		$<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include/>
 	INTERFACE
 		$<TARGET_PROPERTY:httplib::httplib,INTERFACE_INCLUDE_DIRECTORIES>
+		$<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 # Add source files
@@ -111,8 +67,11 @@ target_sources(vpunn_http_client
 target_link_libraries(vpunn_http_client
 	PRIVATE
 		vpunn_common_settings
-		httplib::httplib
+		vpunn_vpu
+	PUBLIC
+	    # Expose these to consumers that will end up linking vpunn_http_client as private
 		nlohmann_json::nlohmann_json
+		httplib::httplib
 )
 
 # Platform-specific linking

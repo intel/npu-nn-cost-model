@@ -10,7 +10,9 @@
 #ifndef VPUNN_NETWORK_COST_MODEL_H
 #define VPUNN_NETWORK_COST_MODEL_H
 
+#include <memory>  // for std::shared_ptr
 #include "vpu/graph.h"
+#include "vpu/vpu_mutex.h"
 #include "vpu_layer_cost_model.h"
 
 namespace VPUNN {
@@ -44,9 +46,9 @@ public:
  * @brief The VPUNN network cost model (also called VPUNN Level3 API)
  *
  */
-class VPUNN_API VPUNetworkCostModel
-        : public VPULayerCostModel,
-          virtual protected VPU_MutexAcces  // for mutex access
+class VPUNN_API VPUNetworkCostModel :
+        public VPULayerCostModel,
+        virtual protected VPU_MutexAcces  // for mutex access
 {
 public:
     /**
@@ -62,18 +64,7 @@ public:
      * @param strategy a per-layer strategy
      * @return unsigned long int
      */
-    unsigned long int Network(VPUComputationDAG& dag, VPUNetworkStrategy& strategy) {
-        unsigned long int cost = 0;
-        for (auto layer : dag) {
-            if (strategy.exists(layer)) {
-                cost = Cycles::cost_adder(cost, layer->cycles(*this, strategy[layer]));
-            } else {
-                throw_error<std::runtime_error>("Impossible to find a strategy for a layer");
-            }
-        }
-
-        return cost;
-    }
+    unsigned long int Network(VPUComputationDAG& dag, VPUNetworkStrategy& strategy);
 };
 
 }  // namespace VPUNN

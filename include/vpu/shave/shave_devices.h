@@ -99,8 +99,10 @@ private:
         const ShaveInstanceHolder_Mock_NPU50 mock_shaves_50{};
         const ShaveInstanceHolder_NPU50CLassic old_shave_50{};
 
-        const ShaveInstanceHolder_NPU50_WithFactors
-                shave_50_with_factors{};  // generated class that populates the factors map
+        const ShaveInstanceHolder_NPU_RESERVED_ithFactors shave_50_with_factors{}; // generated class that populates the factors map
+
+        const ShaveInstanceHolder_HeuristicNPU50 heuristic_shaves_50{};
+        const ShaveInstanceHolder_HeuristicNPU_RESERVED_ithFactors heuristic_shaves_50_with_factors{}; // heuristic models with speed-up factors
 
 
     } collections{};
@@ -117,6 +119,9 @@ private:
     const ShaveSelector selector_old_40{collections.old_shave_40};
     const ShaveSelector selector_50{collections.mock_shaves_50};
     const ShaveSelector selector_old_50{collections.old_shave_50};
+
+    const ShaveSelector selector_50_heuristic{collections.heuristic_shaves_50};
+    const ShaveSelector selector_50_heuristic_with_factors{collections.heuristic_shaves_50_with_factors};
 
     const ShaveSelector selector_50_with_factors{collections.shave_50_with_factors};
 
@@ -158,7 +163,6 @@ public:
             return selector_old_40;
             break;
         case VPUDevice::NPU_5_0:
-        case VPUDevice::NPU_RESERVED:
             return selector_old_50;
             break;
         default:
@@ -181,6 +185,30 @@ public:
         }
     }
 
+    const ShaveSelector& getHeuristicSelector(VPUDevice desired_device) const {
+        switch (desired_device) {
+            case VPUDevice::NPU_5_0:
+                return selector_50_heuristic;
+                break;
+            default:
+                // if there is no heuristic selector for the device, return the regular selector
+                return getOldSelector(desired_device);
+                break;
+        }
+    }
+
+    const ShaveSelector& getHeuristicSelectorWithFactors(VPUDevice desired_device) const {
+        switch (desired_device) {
+            case VPUDevice::NPU_5_0:
+                return selector_50_heuristic_with_factors;
+                break;
+            default:
+                // if there is no heuristic selector for the device, return the regular selector
+                return getHeuristicSelector(desired_device);
+                break;
+        }
+    }
+    
     /**
      * @brief Get the maximum number of parameters across all SHAVE functions
      * 

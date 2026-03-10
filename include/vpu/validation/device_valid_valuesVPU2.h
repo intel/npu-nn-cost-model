@@ -68,8 +68,9 @@ private:
     inline static const Values<int> output_write_tile_options_def{1};
     inline static const Values<ISIStrategy> isi_stategy_options_def{ISIStrategy::CLUSTERING};
 
-    inline static const int weigths_alignment_def{16};
-    inline static const int out_innermost_dim_alignment_def{1};  // no alignment (bytes)
+    inline static const int weigths_alignment_B_def{16};                   // bytes
+    inline static const bool legacy_samples_alignment_weights_def{false};  // no alignment (samples)
+    inline static const int out_innermost_dim_alignment_def{1};            // no alignment (bytes)
     inline static const int input_heigth_start_factor_SOH_def{1};
 
     static constexpr int alignement_size_bytes_def{16384};  // 16KB
@@ -141,12 +142,13 @@ public:
                                  cmx_KB_sizes_def,                   //
                                  output_write_tile_options_def,      //
                                  isi_stategy_options_def,            //
-                                 weigths_alignment_def,              //
+                                 weigths_alignment_B_def,            //
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
-                                 out_innermost_dim_alignment_def) {};
+                                 out_innermost_dim_alignment_def,    //
+                                 legacy_samples_alignment_weights_def) {};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden
     VPU2_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
@@ -159,12 +161,13 @@ public:
                                  cmx_KB_sizes_def,                   //
                                  output_write_tile_options_def,      //
                                  isi_stategy_options_def,            //
-                                 weigths_alignment_def,              //
+                                 weigths_alignment_B_def,            //
                                  input_heigth_start_factor_SOH_,     // special
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
-                                 out_innermost_dim_alignment_def) {};
+                                 out_innermost_dim_alignment_def,    //
+                                 legacy_samples_alignment_weights_def) {};
 
 protected:
     MultiSmartRanges get_output_channels_restriction(const DPUOperation&) const override {

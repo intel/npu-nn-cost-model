@@ -23,6 +23,8 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include "core/dma_map_type_selector.h"  // need this to instantiate the template with specifics like DMANNWorkload_NPU27
+
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;

@@ -52,6 +52,9 @@ protected:
         return ((mem_size % alignment) != 0) ? false : true;
     }
     bool isAligned(long long mem_size, const VPUDevice device) const {
+        if (get_alignment(device) == 0) {
+            return true;  // no alignment needed
+        }
         return ((mem_size % get_alignment(device)) != 0) ? false : true;
     }
 
@@ -60,6 +63,9 @@ protected:
         return (rem == 0) ? mem_size : mem_size + (alignment - rem);
     }
     long long int align(long long mem_size, const VPUDevice device) const {
+        if (get_alignment(device) == 0) {
+            return mem_size;  // no alignment needed
+        }
         const auto rem = mem_size % get_alignment(device);
         return (rem == 0) ? mem_size : mem_size + (get_alignment(device) - rem);
     }

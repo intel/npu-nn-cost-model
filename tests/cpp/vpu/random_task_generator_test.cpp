@@ -39,6 +39,7 @@ protected:
         }
         buffer << "\n";
         const std::string details = buffer.str();
+        /* coverity[copy_instead_of_move] */
         return details;
     }
     void printH(const std::vector<int>& histo) const {

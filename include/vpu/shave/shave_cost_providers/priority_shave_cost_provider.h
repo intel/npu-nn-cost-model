@@ -15,15 +15,6 @@
 #include <memory>
 
 namespace VPUNN {
-
-/**
- * @brief Type alias for a list of SHAVE cost providers.
- * Currently we keep it as a shared_ptr to allow co-ownership in future.
- * If we are going to add a different way to composite the Providers we can
- * simply share the references.
- */
-using ShaveCostProviderList = std::vector<std::shared_ptr<IShaveCostProvider>>;
-
 /**
  * @brief Priority-based SHAVE cost provider that tries multiple providers in order
  * 
@@ -33,7 +24,7 @@ using ShaveCostProviderList = std::vector<std::shared_ptr<IShaveCostProvider>>;
  */
 class PriorityShaveCostProvider : public IShaveCostProvider {
 private:
-    ShaveCostProviderList cost_providers;  ///< List of cost providers in priority order
+    const ShaveCostProviderList cost_providers;  ///< List of cost providers in priority order
 
 public:
     /**

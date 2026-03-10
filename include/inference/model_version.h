@@ -91,6 +91,7 @@ public:
     ModelVersion() {
         reset();
     }
+    ~ModelVersion() = default;
 
 private:
     std::string full_raw_name;

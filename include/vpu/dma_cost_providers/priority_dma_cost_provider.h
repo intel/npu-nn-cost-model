@@ -79,6 +79,7 @@ public:
         }
         return false;
     }
+    ~PriorityDMACostProvider() = default;
 };
     
 }

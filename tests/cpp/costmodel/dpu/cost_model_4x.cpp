@@ -98,7 +98,7 @@ TEST_F(TestCostModelNPU4x, Test_Serializer_for_DPU_vec_function) {
 
     // run all in one vector
     std::vector<VPUNN::CyclesInterfaceType> cycles;
-    ASSERT_NO_THROW(cycles = model_path.DPU(workloads));
+    ASSERT_NO_THROW(cycles = model_path.DPU(std::move(workloads)));
 }
 
 TEST_F(TestCostModelNPU4x, Test_Serializer_for_DPU_function) {
