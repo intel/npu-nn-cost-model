@@ -13,25 +13,26 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <ios>
 #include <iostream>
+#include <mutex>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
-#include <mutex>
-#include <functional>
-#include <optional>
+#include <utility>
 #include <vector>
 
 #include "core/logger.h"
 #include "core/utils.h"
-#include "vpu/dpu_types.h"
 #include "vpu/dma_types.h"
-#include "vpu/utils.h"
+#include "vpu/dpu_types.h"
 #include "vpu/serializer_utils.h"
+#include "vpu/utils.h"
 
 namespace VPUNN {
 
@@ -88,7 +89,8 @@ template <typename T, typename = void>
 struct has_member_map : std::false_type {};
 
 template <typename T>
-struct has_member_map<T, std::void_t<decltype(T::_member_map)>> : std::true_type {};
+// struct has_member_map<T, std::void_t<decltype(T::_member_map)>> : std::true_type {};
+struct has_member_map<T, std::void_t<decltype(std::declval<T&>().get_member_map())>> : std::true_type {};
 
 template <typename T>
 inline constexpr bool has_member_map_v = has_member_map<T>::value;
@@ -416,15 +418,14 @@ private:
     std::vector<std::streampos> line_positions{};  ///> Store the position of each line in the file
 
     /// @brief Trims leading and trailing whitespace (including newlines) from a string, in-place.
-    inline void trim(std::string& s){
+    inline void trim(std::string& s) {
         s.erase(s.find_last_not_of(" \t\r\n") + 1);
         s.erase(0, s.find_first_not_of(" \t\r\n"));
     }
 
     /// @brief Splits a CSV line into tokens, trimming whitespace from each token.
     /// Handles empty trailing fields.
-    inline std::vector<std::string>
-    split_csv_line(const std::string& line) {
+    inline std::vector<std::string> split_csv_line(const std::string& line) {
         std::vector<std::string> tokens;
         std::string token;
         std::istringstream iss(line);
@@ -455,7 +456,7 @@ public:
     Serializer(const bool force_enable = false)
             : serialization_enabled(!force_enable ? get_env_vars({"ENABLE_VPUNN_DATA_SERIALIZATION"})
                                                                     .at("ENABLE_VPUNN_DATA_SERIALIZATION") == "TRUE"
-                                                  : true){};
+                                                  : true) {};
 
     Serializer(const Serializer&) = delete;
     Serializer(Serializer&) = delete;
@@ -483,7 +484,8 @@ public:
         if (!serialization_enabled) {
             return;
         } else {
-            std::lock_guard<std::recursive_mutex> lock(file_mutex); // protect initialization since several writes to file could happen here
+            std::lock_guard<std::recursive_mutex> lock(
+                    file_mutex);  // protect initialization since several writes to file could happen here
 
             // Reset the serializer - close file stream, empty all buffers
             reset();
@@ -565,7 +567,7 @@ public:
     /// @return true if the write buffer is clean, false otherwise
     bool is_write_buffer_clean() const {
         const auto& write_tokens = get_write_tokens();
-        
+
         if (!write_tokens.has_value()) {
             return true;  // No write tokens for this thread, buffer is clean
         }
@@ -583,7 +585,8 @@ public:
 
     /// @brief Get write tokens for the current thread
     /// @return A vector of write tokens for the current thread, or std::nullopt if no tokens are available
-    std::optional<std::reference_wrapper<std::vector<std::string>>> get_write_tokens(const bool create_if_empty = false) {
+    std::optional<std::reference_wrapper<std::vector<std::string>>> get_write_tokens(
+            const bool create_if_empty = false) {
         std::lock_guard<std::mutex> lock(write_tokens_map_mutex);
 
         const auto thread_id = std::this_thread::get_id();
@@ -679,7 +682,7 @@ public:
     void serialize(Args&&... args) {
         if (!is_initialized())
             return;
-        
+
         auto write_tokens_opt = get_write_tokens(true);  // Get write tokens for the current thread, create if empty
         if (!write_tokens_opt.has_value())
             return;
@@ -692,8 +695,8 @@ public:
 
             // Check if currently evaluated type has a member map
             if constexpr (has_member_map_v<argtype>) {
-                // Iterate over the member map and serialize each member if it exists in the index map
-                for (auto& [key, value] : arg._member_map) {
+                //  Iterate over the member map and serialize each member if it exists in the index map
+                for (auto& [key, value] : arg.get_member_map()) {
                     if (index_map.count(key) > 0) {
                         const int idx = index_map[key];  // key index to position in the write buffer
 
@@ -790,18 +793,18 @@ public:
                 const auto& member_names = argtype::_get_member_names();
                 // Iterate over the member_names and deserialize each member if it exists in the index map
                 for (auto& key_member : member_names) {
-                    const auto it = arg._member_map.find(key_member);
+                    const auto it = arg.get_member_map().find(key_member);
                     if (index_map.count(key_member) > 0 &&
                         index_map.at(key_member) < static_cast<int>(read_tokens.size())) {
                         std::istringstream ss(read_tokens[index_map.at(key_member)]);
-                        if (ss.str().length() <= 0) continue;  // empty value, skip
+                        if (ss.str().length() <= 0)
+                            continue;  // empty value, skip
 
                         const auto key_var{key_member};
 
                         // Member map is a heterogeneous map, so we need to use std::visit to handle different types
                         std::visit(
                                 [&ss, &key_var](auto&& _arg) {
-                                    
                                     // Special case - getter/setter style field - TODO: generalize
                                     if constexpr (std::is_same_v<std::decay_t<decltype(_arg)>,
                                                                  VPUNN::SetGet_MemberMapValues>) {
@@ -831,7 +834,6 @@ public:
                                     // special case when value can be computed, handled in lambda function
                                     if constexpr (std::is_same_v<std::decay_t<decltype(_arg)>,
                                                                  VPUNN::SetGet_MemberMapValues>) {
-
                                         // arg have two parameters first one is true and that means that arg is in
                                         // set_mode, the second parameter, which is an empty string, indicates that the
                                         // value will be set by the lambda function either to the default value or based
@@ -938,12 +940,13 @@ private:
     const FileFormat format{fmt};                      ///> Serialization format
     FileHandler<fmt> file{};                           ///> File handler
     std::unordered_map<std::string, int> index_map{};  ///> First stores key name (eg column name), then a position
-    std::unordered_map<std::thread::id, std::vector<std::string>> write_tokens_map{}; ///> Buffer to store tokens to be written - needs to be alive between
-                                                                                  /// serialization calls until end()
-    int line_index{-1};                                ///> Index of the current line in the file
+    std::unordered_map<std::thread::id, std::vector<std::string>>
+            write_tokens_map{};  ///> Buffer to store tokens to be written - needs to be alive between
+                                 /// serialization calls until end()
+    int line_index{-1};          ///> Index of the current line in the file
 
-    std::recursive_mutex file_mutex{};                ///> Mutex to protect file operations from concurrent access
-    mutable std::mutex   write_tokens_map_mutex{};    ///> Mutex to protect write_tokens_map from concurrent access
+    std::recursive_mutex file_mutex{};            ///> Mutex to protect file operations from concurrent access
+    mutable std::mutex write_tokens_map_mutex{};  ///> Mutex to protect write_tokens_map from concurrent access
 
     /// @brief Create an index map to store positions of each unique identifier of a field.
     /// Eg. Positions of each column in a CSV file

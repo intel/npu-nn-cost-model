@@ -9,6 +9,7 @@
 #include "vpu/shave/shave_devices.h"
 #include "vpu_shave_cost_model.h"
 #include "vpu/validation/shave_workloads_sanitizer.h"
+#include "vpu/shave/shave_cost_providers/shave_provider_bundles.h"
 
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -25,12 +26,12 @@ using namespace VPUNN;
 class SHAVEWorkloadsSanitizer_Test : public ::testing::Test {
 public:
 protected:
-    std::shared_ptr<VPUNN::PriorityShaveCostProvider> only_new_provider{std::make_shared<VPUNN::PriorityShaveCostProvider>(ShaveCostProviderBundles::createNewShaveOnlyProviders())};
+    std::shared_ptr<VPUNN::IShaveCostProvider> only_new_provider{ShaveCostProviderBundles::createNewShaveOnlyProvider()};
     
     class SHAVECostModelTest : public VPUNN::SHAVECostModel {
         public:
             SHAVECostModelTest(std::shared_ptr<IShaveCostProvider> provider) 
-                : VPUNN::SHAVECostModel(provider) {}
+                : VPUNN::SHAVECostModel(std::move(provider)) {}
     };
 
     SHAVECostModelTest model_with_new_provider{only_new_provider};

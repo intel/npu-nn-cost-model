@@ -10,20 +10,20 @@
 #ifndef L1_COST_SERIALIZATION_WRAPPER_H
 #define L1_COST_SERIALIZATION_WRAPPER_H
 
+#include "performance_mode.h"
 #include "vpu/serialization/serialization_wrapper.h"
 #include "vpu/validation/dpu_operations_validator.h"
-#include "performance_mode.h"
 
 namespace VPUNN {
 
 class L1CostSerializationWrap : public CostSerializationWrap {
 private:
     // Has to be static since L1CostSerializationWrap is created at every call to DPU()
-    // and OperationsContext it's too heavy to be created each time
-    static const OperationsContext ops_context;  ///< sanitizer mechanisms
+    // and OperationsContext is too heavy to be created each time.
+    // Use function-local static to avoid static initialization order issues (not confirmed, but might help).
+    static const OperationsContext& ops_context();  ///< sanitizer mechanisms
 
 private:
-
     /// @brief Turns OFF the swizzling
     ///
     /// @param workload [in, out] that will be changed in case the conditions are met
@@ -37,31 +37,29 @@ private:
     }
 
     void serialize_info_and_compute_workload_uid(const DPUWorkload& wl) {
-        auto wl_op = DPUOperation(wl, ops_context.get_config(wl.device));
+        auto wl_op = DPUOperation(wl, ops_context().get_config(wl.device));
         serializer_operation_uid = wl.hash();
-        serializer.serialize(wl_op,
-                             SerializableField<std::string>{"workload_uid", std::to_string(serializer_operation_uid)},
-                             SerializableField<std::string>{"info", wl.get_layer_info()},
-                             SerializableField<std::string>{"mpe_engine", MPEEngine_ToText.at(static_cast<int>(wl_op.mpe_engine))});
+        serializer.serialize(
+                wl_op, SerializableField<std::string>{"workload_uid", std::to_string(serializer_operation_uid)},
+                SerializableField<std::string>{"info", wl.get_layer_info()},
+                SerializableField<std::string>{"mpe_engine", MPEEngine_ToText.at(static_cast<int>(wl_op.mpe_engine))});
     }
 
 public:
-    L1CostSerializationWrap(CSVSerializer& ser, bool inhibit = false,
-                            size_t the_uid = 0)
-            : CostSerializationWrap(ser, inhibit, the_uid) // initialize the base class
+    L1CostSerializationWrap(CSVSerializer& ser, bool inhibit = false, size_t the_uid = 0)
+            : CostSerializationWrap(ser, inhibit, the_uid)  // initialize the base class
     {
     }
 
     ~L1CostSerializationWrap() = default;
 
-    void serializeInfoAndComputeWorkloadUid(const DPUWorkload& wl, bool close_line=false) {
+    void serializeInfoAndComputeWorkloadUid(const DPUWorkload& wl, bool close_line = false) {
         if (!is_serialization_enabled() || is_error_present_during_serialization())
             return;
         try {
             serialize_info_and_compute_workload_uid(wl);
 
-            if (close_line)
-            {
+            if (close_line) {
                 serializer.end();
             }
         } catch (const std::exception& e) {
@@ -94,9 +92,8 @@ public:
     }
 
     void serializeCyclesAndComputeWorkloadUid_closeLine(std::vector<DPUWorkload> serializer_orig_wls,
-        const std::vector<CyclesInterfaceType> cycles_vector,
-        const std::string& dpu_nickname)
-    {
+                                                        const std::vector<CyclesInterfaceType> cycles_vector,
+                                                        const std::string& dpu_nickname) {
         if (!is_serialization_enabled() || is_error_present_during_serialization())
             return;
 
@@ -104,13 +101,12 @@ public:
             try {
                 swizzling_turn_OFF(serializer_orig_wls[idx]);  // swizz guard sanitization
                 auto wl_op = DPUOperation(serializer_orig_wls[idx],
-                                          ops_context.get_config(serializer_orig_wls[idx].device));
+                                          ops_context().get_config(serializer_orig_wls[idx].device));
                 serializer_operation_uid = wl_op.hash();
                 serializer.serialize(wl_op, SerializableField<std::string>{"workload_uid",
                                                                            std::to_string(serializer_operation_uid)});
 
-                serializer.serialize(SerializableField<decltype(cycles_vector[idx])>{
-                        dpu_nickname, cycles_vector[idx]});
+                serializer.serialize(SerializableField<decltype(cycles_vector[idx])>{dpu_nickname, cycles_vector[idx]});
                 serializer.end();
             } catch (const std::exception& e) {
                 Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";

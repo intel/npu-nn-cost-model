@@ -7,6 +7,13 @@
 # Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 # Software Package for additional details.
 
-import VPUNN
+from ._VPUNN import *
+import inspect
 
-VPUNN_lib = VPUNN.bindings
+__all__ = []
+
+for name, obj in list(globals().items()):
+    if not name.startswith("_") and not inspect.ismodule(obj):
+        __all__.append(name)
+        if hasattr(obj, "__module__"):
+            obj.__module__ = "vpunn"

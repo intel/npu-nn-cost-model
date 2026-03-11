@@ -29,7 +29,11 @@
 // #define VPU_4_0_MODEL_PATH "../../../models/vpu_4_0_cloned_from27.vpunn"
 static_assert(false, "VPU_4_0_MODEL_PATH is not defined, please define it in CMakeLists.txt");
 #endif
-
+#ifndef VPU_4_0_159_STRICT_MODEL_PATH
+// #define VPU_4_0_159_STRICT_MODEL_PATH "../../../models/vpu_40_159_strict.vpunn"
+// #define VPU_4_0_159_STRICT_MODEL_PATH "../../../models/vpu_4_0_cloned_from27.vpunn"
+static_assert(false, "VPU_4_0_159_STRICT_MODEL_PATH is not defined, please define it in CMakeLists.txt");
+#endif
 #ifndef VPU_4_1_MODEL_PATH
 // #define VPU_4_1_MODEL_PATH "../../../models/vpu_4_1.vpunn"
 // #define VPU_4_0_MODEL_PATH "../../../models/vpu_4_0_cloned_from27.vpunn"

@@ -22,36 +22,58 @@ if (VPUNN_BUILD_HTTP_CLIENT)
     add_subdirectory(http_client)
 endif()
 
-# Python bindings
-if(ENABLE_PYTHON_BINDING OR SKBUILD)
-    add_subdirectory(python)
+# Main unified cost model library
+if(VPUNN_BUILD_SHARED_LIB)
+    add_library(npu_costmodel SHARED)
+else()
+    add_library(npu_costmodel STATIC)
 endif()
 
-# Combine all
-add_library(npu_costmodel INTERFACE)
-
+# Public API headers (exposed to users)
 target_include_directories(npu_costmodel
-    INTERFACE 
+    PUBLIC
         $<BUILD_INTERFACE:${COST_MODEL_ROOT_DIR}/include>
         $<BUILD_INTERFACE:${COST_MODEL_BINARY_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
         $<BUILD_INTERFACE:${FLATBUFFERS_SRC_DIR}/include>
+    PRIVATE
+        ${COST_MODEL_ROOT_DIR}/include/core
+        ${COST_MODEL_ROOT_DIR}/include/inference
+        ${COST_MODEL_ROOT_DIR}/include/kernels
+        ${COST_MODEL_ROOT_DIR}/include/vpu
 )
 
-target_link_libraries(npu_costmodel
-    INTERFACE
+target_sources(npu_costmodel
+    PRIVATE 
+        vpu_cost_model.cpp
+        vpu_layer_cost_model.cpp
+        vpu_dma_cost_model.cpp
+        vpu_network_cost_model.cpp
+        vpu_shave_cost_model.cpp
+)
+
+target_link_libraries(npu_costmodel    
+    PRIVATE 
+        vpunn_common_settings
+        flatbuffers
         vpunn_core
         vpunn_kernels
         vpunn_inference
         vpunn_optimization
         vpunn_shave
         vpunn_vpu
-        flatbuffers
-        $<$<BOOL:${ENABLE_PYTHON_BINDING}>:vpunn_python_bindings>
         $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
 )
 
+add_dependencies(npu_costmodel vpunn_cpp_schema)
+
 # Alias for consistent naming
 add_library(VPUNN::npu_costmodel ALIAS npu_costmodel)
+
+# Python bindings (must be after npu_costmodel is defined)
+if(ENABLE_PYTHON_BINDING OR SKBUILD)
+    add_subdirectory(python)
+endif()
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR) # Only configure installation for VPUNN standalone build
     include(GNUInstallDirs)
@@ -86,18 +108,19 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR) # Only configure installation f
     if(TARGET cache_app)
         install(TARGETS cache_app
             EXPORT VPUNNTargets
-            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-            OPTIONAL
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}/$<$<BOOL:${CMAKE_CONFIGURATION_TYPES}>:$<CONFIG>>" # specifies where executable files (runtime artifacts) should be installed
+            OPTIONAL # the install will not fail if target doesn't exist at install time
         )
     endif()
 
-    install(TARGETS 
+    # For multi-config generators, install to config-specific subdirectories
+    # For single-config generators, install directly to lib/bin directories
+    install(TARGETS
         ${VPUNN_INSTALL_TARGETS}
         EXPORT VPUNNTargets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        OPTIONAL
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}/$<$<BOOL:${CMAKE_CONFIGURATION_TYPES}>:$<CONFIG>>"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}/$<$<BOOL:${CMAKE_CONFIGURATION_TYPES}>:$<CONFIG>>"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}/$<$<BOOL:${CMAKE_CONFIGURATION_TYPES}>:$<CONFIG>>"
     )
 
     # Install public headers
@@ -160,6 +183,7 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR) # Only configure installation f
     )
 
     # Generate config file
+    # Standard path for CMake config files are in lib/cmake/<PackageName>, i.e. CMAKE_INSTALL_LIBDIR
     configure_package_config_file(
         "${VPUNN_CONFIG_TEMPLATE}"
         "${CMAKE_CURRENT_BINARY_DIR}/VPUNNConfig.cmake" 

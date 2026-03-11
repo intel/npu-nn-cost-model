@@ -14,7 +14,6 @@ using namespace VPUNN;
 
 class TestCostModelVPU2x : public TestCostModel {
 protected:
-
     const VPUDevice device20{VPUDevice::VPU_2_0};
     const VPUDevice device27{VPUDevice::VPU_2_7};
 
@@ -144,6 +143,93 @@ TEST_F(TestCostModelVPU2x, MAXPOOL_Example_NoGT) {
     };
 
     executeTests(tests);
+}
+
+TEST_F(TestCostModel, Compute_Input1_size_TestVPU2x) {
+    auto mk_wl = [](VPUDevice dev, Operation op, DataType dtype) -> DPUWorkload {
+        return DPUWorkload{
+                dev,
+                op,
+                {VPUNN::VPUTensor(56, 56, 57, 1, dtype)},  // input dimensions
+                {VPUNN::VPUTensor(56, 56, 57, 1, dtype)},  // output dimensions
+                {3, 3},                                    // kernels
+                {1, 1},                                    // strides
+                {1, 1},                                    // padding
+                VPUNN::ExecutionMode::CUBOID_16x16         // execution mode
+        };
+    };
+
+    auto test_message = [](const DPUWorkload& wl) {
+        // clang-format off
+        std::string message = std::string("Test case:") +
+                              " Device: " + VPUDevice_ToText.at(static_cast<int>(wl.device)) + 
+                              " Operation: " + Operation_ToText.at(static_cast<int>(wl.op)) +
+                              " input0/input1 dtype: " + DataType_ToText.at(static_cast<int>(wl.inputs[0].get_dtype())) +"\n";
+
+        // clang-format on
+
+        return message;
+    };
+    struct TestInput {
+        VPUNN::DPUWorkload wl;
+    };
+
+    struct TestExpectation {
+        int inpu1_W;
+        int inpu1_H;
+        int inpu1_C;
+        int inpu1_B;
+    };
+
+    struct TestCase {
+        TestInput t_in;
+        TestExpectation t_exp;
+        std::string text = "";
+    };
+
+    using TestsVector = std::vector<TestCase>;
+
+    const TestsVector tests_2_7 = {
+            // clang-format off
+
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CONVOLUTION, DataType::INT1)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CONVOLUTION, DataType::INT2)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CONVOLUTION, DataType::INT4)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CONVOLUTION, DataType::INT8)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CONVOLUTION, DataType::INT16)}, {1, 1, 528   /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CONVOLUTION, DataType::FLOAT32)}, {1, 1, 528 /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CM_CONVOLUTION, DataType::INT1)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CM_CONVOLUTION, DataType::INT2)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CM_CONVOLUTION, DataType::INT4)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CM_CONVOLUTION, DataType::INT8)}, {1, 1, 528    /* 3*3*57 -> aligned to 16 -> 528 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CM_CONVOLUTION, DataType::INT16)}, {1, 1, 520   /* 3*3*57 -> aligned to  8 -> 520 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::CM_CONVOLUTION, DataType::FLOAT32)}, {1, 1, 520 /* 3*3*57 -> aligned to  8 -> 520 */, 57}},
+
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::DW_CONVOLUTION, DataType::INT1)}, {1, 1,  16   /* 3*3 -> aligned to 16 -> 16 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::DW_CONVOLUTION, DataType::INT2)}, {1, 1,  16   /* 3*3 -> aligned to 16 -> 16 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::DW_CONVOLUTION, DataType::INT4)}, {1, 1,  16   /* 3*3 -> aligned to 16 -> 16 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::DW_CONVOLUTION, DataType::INT8)}, {1, 1,  16   /* 3*3 -> aligned to 16 -> 16 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::DW_CONVOLUTION, DataType::INT16)}, {1, 1, 16   /* 3*3 -> aligned to 16 -> 16 */, 57}},
+            {{mk_wl(VPUDevice::VPU_2_7, Operation::DW_CONVOLUTION, DataType::FLOAT32)}, {1, 1, 16 /* 3*3 -> aligned to 16 -> 16 */, 57}},
+
+            // clang-format on
+
+    };
+
+    const DPU_OperationSanitizer sanitizer;
+    auto run_tests = [&sanitizer, &test_message](const TestsVector& tests) {
+        for (auto& t : tests) {
+            std::cout << test_message(t.t_in.wl);
+            auto wl_op = DPUOperation(t.t_in.wl, sanitizer.getDeviceConfiguration(t.t_in.wl.device));
+
+            EXPECT_EQ(wl_op.input_1.width, t.t_exp.inpu1_W) << test_message(t.t_in.wl);
+            EXPECT_EQ(wl_op.input_1.height, t.t_exp.inpu1_H) << test_message(t.t_in.wl);
+            EXPECT_EQ(wl_op.input_1.channels, t.t_exp.inpu1_C) << test_message(t.t_in.wl);
+            EXPECT_EQ(wl_op.input_1.batch, t.t_exp.inpu1_B) << test_message(t.t_in.wl);
+        }
+    };
+    run_tests(tests_2_7);
 }
 
 TEST_F(TestCostModelVPU2x, LoadModels_BasicAssertions) {
@@ -720,13 +806,12 @@ TEST_F(TestCostModelVPU2x, SmokeTestDPUVPU27Model) {
 
 TEST_F(TestCostModelVPU2x, SmokeTestDMA) {
     auto dma_cycles = empty_model.DMA(device27, VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8),
-                                VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8), VPUNN::MemoryLocation::DRAM,
-                                VPUNN::MemoryLocation::CMX);
+                                      VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8),
+                                      VPUNN::MemoryLocation::DRAM, VPUNN::MemoryLocation::CMX);
 
-    auto dma_cycles_model =
-            empty_model.DMA(device27, VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8),
-                      VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8), VPUNN::MemoryLocation::DRAM,
-                      VPUNN::MemoryLocation::CMX);
+    auto dma_cycles_model = empty_model.DMA(device27, VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8),
+                                            VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8),
+                                            VPUNN::MemoryLocation::DRAM, VPUNN::MemoryLocation::CMX);
 
     // Expect equality.
     EXPECT_EQ(dma_cycles, 1242 + static_cast<unsigned int>(std::ceil(56 * 56 * 16 * 1300 / 27000.0f)));
@@ -736,8 +821,8 @@ TEST_F(TestCostModelVPU2x, SmokeTestDMA) {
 TEST_F(TestCostModelVPU2x, SmokeTestCompressedDMA) {
     // Compressed DMA with 50% CR
     auto dma_cycles = empty_model.DMA(device27, VPUNN::VPUTensor(25088, 1, 1, 1, VPUNN::DataType::UINT8),
-                                VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8), VPUNN::MemoryLocation::DRAM,
-                                VPUNN::MemoryLocation::CMX);
+                                      VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8),
+                                      VPUNN::MemoryLocation::DRAM, VPUNN::MemoryLocation::CMX);
 
     // Expect equality.
     EXPECT_EQ(dma_cycles, 1242 + static_cast<unsigned int>(std::ceil(25088 * 1300 / 27000.0f)));
@@ -745,15 +830,15 @@ TEST_F(TestCostModelVPU2x, SmokeTestCompressedDMA) {
 
 TEST_F(TestCostModelVPU2x, SmokeTestPermutedDMA) {
     // DMA + Permute
-    auto dma_cycles_fp16 = empty_model.DMA(device27,
-                                     VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::FLOAT16, VPUNN::Layout::CMAJOR),
-                                     VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::FLOAT16, VPUNN::Layout::ZMAJOR),
-                                     VPUNN::MemoryLocation::DRAM, VPUNN::MemoryLocation::CMX);
+    auto dma_cycles_fp16 =
+            empty_model.DMA(device27, VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::FLOAT16, VPUNN::Layout::CMAJOR),
+                            VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::FLOAT16, VPUNN::Layout::ZMAJOR),
+                            VPUNN::MemoryLocation::DRAM, VPUNN::MemoryLocation::CMX);
 
-    auto dma_cycles_uint8 = empty_model.DMA(device27,
-                                      VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::CMAJOR),
-                                      VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::ZMAJOR),
-                                      VPUNN::MemoryLocation::DRAM, VPUNN::MemoryLocation::CMX);
+    auto dma_cycles_uint8 =
+            empty_model.DMA(device27, VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::CMAJOR),
+                            VPUNN::VPUTensor(56, 56, 16, 1, VPUNN::DataType::UINT8, VPUNN::Layout::ZMAJOR),
+                            VPUNN::MemoryLocation::DRAM, VPUNN::MemoryLocation::CMX);
 
     // Expect equality.
     unsigned int tensor_size_fp16 = 56 * 56 * 16 * 2;
@@ -1472,7 +1557,6 @@ TEST_F(TestCostModelVPU2x, Compressed_CONV_Sanity_test_VPU27_IC1_special) {
 
     };
 
-
     {
         VPUNN::DPUWorkload wl{std::move(wl_ref)};
         VPUNN::DPUWorkload wl_equiv{std::move(wl_ref_equiv)};
@@ -1821,7 +1905,7 @@ TEST_F(TestCostModelVPU2x, Check_Wl_halo_data_test) {
 
             const DPUOperation dpu{wl_ref_halo};
 
-            CyclesInterfaceType cyc = cost_models.getModel(device27).DPU(std::move(wl_ref_halo), info);
+            CyclesInterfaceType cyc = cost_models.getModel(device27).DPU(wl_ref_halo, info);
 
             if (!is_error_code(t.t_exp.cycles)) {
                 ASSERT_FALSE(is_error_code(cyc)) << cyc << wl_ref_halo;
@@ -2325,9 +2409,12 @@ TEST_F(TestCostModelVPU2x, Dual_sparsity_NN_Output_Cycle_valid_values_Test) {
             // compute the runtime
             const CyclesInterfaceType cyc_dual_sparsity{
                     cost_models.getModel(device27).DPU(std::move(wl_ref_weight_and_input_spars_on), info)};
-            const CyclesInterfaceType cyc_weight_sparsity{cost_models.getModel(device27).DPU(std::move(wl_ref_weight_spars_on), info)};
-            const CyclesInterfaceType cyc_input_sparsity{cost_models.getModel(device27).DPU(std::move(wl_ref_input_spars_on), info)};
-            const CyclesInterfaceType cyc_NO_sparsity{cost_models.getModel(device27).DPU(std::move(wl_ref_no_sparsity), info)};
+            const CyclesInterfaceType cyc_weight_sparsity{
+                    cost_models.getModel(device27).DPU(std::move(wl_ref_weight_spars_on), info)};
+            const CyclesInterfaceType cyc_input_sparsity{
+                    cost_models.getModel(device27).DPU(std::move(wl_ref_input_spars_on), info)};
+            const CyclesInterfaceType cyc_NO_sparsity{
+                    cost_models.getModel(device27).DPU(std::move(wl_ref_no_sparsity), info)};
 
             // PRECONDITIONS:
             //  cycles value for workloads when only input sparsity is active or only weight sparsity is active should
@@ -2901,17 +2988,21 @@ TEST_F(TestCostModelVPU2x, MTL_Weigths_types_CONV_NPU27) {
 
     // check runtime equivalence
     {
-        EXPECT_EQ(cost_models.getModel(device27).DPU(base_wl8_4), cost_models.getModel(device27).DPU(std::move(base_wl8_8)));
-        EXPECT_EQ(cost_models.getModel(device27).DPU(base_wl16_4), cost_models.getModel(device27).DPU(std::move(base_wl16_16)));
+        EXPECT_EQ(cost_models.getModel(device27).DPU(base_wl8_4),
+                  cost_models.getModel(device27).DPU(std::move(base_wl8_8)));
+        EXPECT_EQ(cost_models.getModel(device27).DPU(base_wl16_4),
+                  cost_models.getModel(device27).DPU(std::move(base_wl16_16)));
 
         DPUWorkload base_wl16_8{base_wl16_4};
         base_wl16_8.weight_type = DataType::INT8;
 
-        EXPECT_EQ(cost_models.getModel(device27).DPU(std::move(base_wl16_4)), cost_models.getModel(device27).DPU(std::move(base_wl16_8)));
+        EXPECT_EQ(cost_models.getModel(device27).DPU(std::move(base_wl16_4)),
+                  cost_models.getModel(device27).DPU(std::move(base_wl16_8)));
 
         DPUWorkload base_wl8_16{base_wl8_4};
         base_wl8_16.weight_type = DataType::FLOAT16;
-        EXPECT_EQ(cost_models.getModel(device27).DPU(std::move(base_wl8_4)), cost_models.getModel(device27).DPU(std::move(base_wl8_16)));
+        EXPECT_EQ(cost_models.getModel(device27).DPU(std::move(base_wl8_4)),
+                  cost_models.getModel(device27).DPU(std::move(base_wl8_16)));
     }
 
     // EXPECT_TRUE(false);

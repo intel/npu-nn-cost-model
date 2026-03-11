@@ -81,81 +81,38 @@ The `example` folder contains few examples on how to build and use the cost mode
   - Selecting the optimal MPE mode for a VPU_2_0 workload
   - Choosing the optimal workload split strategy amound multiple ones
 
+## Install
+
+To test the install option, for find_package(VPUNN) functionality.
+
+```bash
+git clone <repo-url> <repo-name>
+cd <repo-name>
+```
+```bash
+cmake -S . -B build
+cmake --build build -j
+```
+```bash
+cmake --install build --prefix <install-path> [--config <config-type-for-multiconfig-systems (windows)>]
+```
+```bash
+cd <your-custom-repo>
+cmake -S . -B build -DCMAKE_PREFIX_PATH=<install-path>
+cmake --build build -j
+```
+
 ## Using the cost model: Python
 
-You can install the library by typing `pip install .`
-
-Do this in a python virtual environment.
-
-### Cost models
-
-Run the `vpu_cost_model` script to evaluate workloads from the command line
+To install the Python package, run the following command from the root of the repository:
 
 ```bash
-usage: vpu_cost_model [-h] --model MODEL [-t {cycles,power,utilization}] {VPU_2_7,VPU_4_0} ...
-
-VPU cost model
-
-positional arguments:
-  {VPU_2_7,VPU_4_0}
-
-options:
-  -h, --help            show this help message and exit
-  --model MODEL, -m MODEL
-                        Model path
+pip install .
 ```
 
-there are two possible VPU versions, each version has a DPU and DMA model. It is possible to bring up the help menu in the following ways:
+This will use `scikit-build` to compile the C++ extension (bindings) and install the Python package.
 
-```
-vpu_cost_model VPU_2_7 DPU -h
-vpu_cost_model VPU_2_7 DMA -h
-vpu_cost_model VPU_4_0 DPU -h
-vpu_cost_model VPU_4_0 DMA -h
-```
-
-minimal example usage:
-```
-vpu_cost_model VPU_2_7 DPU -o CONVOLUTION --inch 64 --outch 64 --height 16 --width 16 --kh 3 --kw 3 --indt UINT8 --outdt UINT8 --mpe-mode CUBOID_16x16
-vpu_cost_model VPU_2_7 DMA -l 1024 --sw 1024 --dw 1024 -d DDR2CMX
-vpu_cost_model VPU_4_0 DPU -o CONVOLUTION --inch 64 --outch 64 --height 16 --width 16 --kh 3 --kw 3 --indt UINT8 --outdt UINT8 --mpe-mode CUBOID_16x16
-vpu_cost_model VPU_4_0 DMA 1024 --sw 1024 --dw 1024 -d DDR2CMX
-```
-
-#### VPUNN builder
-
-Generate a VPUNN model from a tensorflow one
-
-```bash
-optional arguments:
-  -h, --help       show this help message and exit
-  --name NAME      Model name
-  --output OUTPUT  Output model (default model.vpunn)
-```
-
-### VPUNN to JSON
-
-Convert a VPUNN model into json for debugging purpose
-
-```bash
-usage: vpunn_to_json [-h] file
-
-positional arguments:
-  file        graphFile to deserialize to json OR an already deserialized json
-
-optional arguments:
-  -h, --help  show this help message and exit
-```
-
-## Javascript (WASM) support
-
-To compile the Web Assembly (WASM) version of the library, follow the steps below:
-
-1. Install Emscripten (link [here](https://emscripten.org/docs/getting_started/downloads.html))
-2. Configure Emscripten with cmake by typing `emmake cmake ..`
-3. Build the Javascript interface `emmake make vpunn_js -j`
-
-The build command produces an `npm` package that can be later installed in any js project by doing `npm install <path to build folder>/dist/vpunn-*.tgz`
+It is recommended to do this in a python virtual environment.
 
 ## Developer guide
 
@@ -195,19 +152,6 @@ Example: running only cost model integration test: `./tests/cpp/test_cost_model`
 ### E2E Python test
 
 `pytest tests/python/test_e2e.py -v`
-
-### WASM test
-
-Assuming you build VPUNN WASM library in `build_wasm`, install VPUNN locally with all its dependencies.
-
-```bash
-npm install --prefix tests/js
-npm install --save-optional build_wasm/dist/vpunn-*.tgz --prefix tests/js
-```
-
-Start testing by running
-
-`npm run test --prefix=tests/js`
 
 ### Code coverage
 

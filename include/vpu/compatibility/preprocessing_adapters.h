@@ -518,7 +518,7 @@ public:
 /// adapting input to NPU40
 class NN5XInputAdapter {
 public:
-    /// some operations are replaced to supported ones. 
+    /// some operations are replaced to supported ones.
     /// This might happen also via the types namespace specific mapping. But is better to be controlled also from here
     static Operation mock_replace_operations(const Operation in_operation) {
         auto operation{in_operation};
@@ -607,6 +607,39 @@ public:
 
         return ff;
     }
+};
+
+// from type 16 on
+class NN6XInputAdapter : protected NN5XInputAdapter {
+public:
+    /// some operations are replaced to supported ones.
+    /// This might happen also via the types namespace specific mapping. But is better to be controlled also from here
+    static Operation mock_replace_operations(const Operation in_operation, const DPUWorkload& wl) {
+        auto operation{in_operation};
+
+        switch (operation) {
+        // case Operation::LAYER_NORM:  // cascade, would be better a map available?
+        // case Operation::ELTWISE_MUL:
+        //     operation = Operation::ELTWISE;  // map to elementwise
+        //     break;
+        case Operation::AVEPOOL:
+            operation = Operation::DW_CONVOLUTION;  // map to DW
+            break;
+        case Operation::CONVOLUTION:
+            if ((wl.inputs[0].channels() < 16) &&
+                wl.is_input_autopad())  // Convs <16 are not trained, they are replaced in profiling to CM_CONV
+            {
+                operation = Operation::CM_CONVOLUTION;
+            }
+            break;
+        default:
+            break;  // nothing
+        }
+
+        return operation;
+    }
+
+    using NN5XInputAdapter::avoid_untrained_space;
 };
 
 }  // namespace VPUNN

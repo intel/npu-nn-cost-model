@@ -10,8 +10,11 @@
 #ifndef DPU_THEORETICAL_COST_PROVIDER_H
 #define DPU_THEORETICAL_COST_PROVIDER_H
 
-#include "vpu/performance.h"
+#include <cmath>                 // For std::ceil, std::max
+#include "vpu/dpu_types_info.h"  // For mpe_mode_to_nthw_ntk_grid, compute_size_in_bytes
 #include "vpu/types.h"
+#include "vpu/utils.h"  // For ceil_division, multiply_vector
+#include "vpu/vpu_performance_model.h"
 
 namespace VPUNN {
 /**
@@ -27,7 +30,7 @@ namespace VPUNN {
  */
 class DPUTheoreticalCostProvider {
 private:
-    const HWPerformanceModel& performanceInfo;///< configured hw characteristics
+    const HWPerformanceModel& performanceInfo;  ///< configured hw characteristics
 
 public:
     DPUTheoreticalCostProvider(const HWPerformanceModel& performance_): performanceInfo(performance_) {

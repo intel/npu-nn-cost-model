@@ -510,7 +510,7 @@ public:
     auto Shave_Resim_Generic_ModelsList(const std::string& inputCSV, const std::string& outputCSV) {
         std::cout << "\n Processing : " << inputCSV;
 
-        SHAVECostModel empty_model{std::string(""), 16384, true};
+        SHAVECostModel empty_model{std::string(""), 16384};
 
         std::vector<std::string> sim_tags{"model_cost_shave"};
 
@@ -829,48 +829,6 @@ TEST_F(SerializerSimulator, DISABLED_Model_Merge_All) {
 }
 */
 
-
-
-// The following test runs an inference on wlds obtained from a csv file
-TEST_F(SerializerSimulator, DISABLED_Inference_vpu5) {
-    const std::string inputCSV = "C:\\Users\\tgodea\\OneDrive - Intel Corporation\\Desktop\\vpu_owt2_and_owt3";
-    std::cout << "\n Processing : " << inputCSV;
-
-    // new columns in CSV
-    const std::string output0_cycles_tag{"inference_cycles"};
-
-    Serializer<FileFormat::CSV> serializer_IN{true};
-    {
-        // const auto stdfields{createStandardFieldNames()};
-        const std::vector<std::string> noFields{};
-        serializer_IN.initialize(inputCSV, FileMode::READONLY, std::move(noFields));  // open file, basic fields
-        EXPECT_TRUE(serializer_IN.is_initialized());
-    }
-
-    Serializer<FileFormat::CSV> serializer_out{true};
-    {
-        auto out_fields{serializer_IN.get_field_names()};  // + extra fields for output
-        out_fields.emplace_back(output0_cycles_tag);       // output 0, normally a identity resim with input pred cycles
-        serializer_out.initialize(inputCSV + "_Resim", FileMode::READ_WRITE, std::move(out_fields));
-        EXPECT_TRUE(serializer_out.is_initialized());
-    }
-
-    VPUCostModel model_5_0{NPU_5_0_MODEL_PATH};
-    EXPECT_TRUE(model_5_0.nn_initialized());
-
-    SerializableField<CyclesInterfaceType> cycles_buff{output0_cycles_tag, 0};
-    Series allFields{};
-    serializer_IN.jump_to_beginning();
-    DPUOperation wl_buff;
-    while (serializer_IN.deserialize(wl_buff, allFields)) {
-        auto dpu_wl = wl_buff.clone_as_DPUWorkload();
-        std::string info_real;
-        const CyclesInterfaceType cycles = model_5_0.DPU(dpu_wl, info_real);
-        cycles_buff.value = cycles;
-        serializer_out.serialize(allFields, cycles_buff);
-        serializer_out.end();
-    }
-}
 TEST_F(SerializerSimulator, DISABLE_Multi_Model_Resim_Agnostic_GT) {
     const std::string folder{"c:\\gitwrk\\CM_Profilings\\UTests\\ALL_MEXP\\"};
 

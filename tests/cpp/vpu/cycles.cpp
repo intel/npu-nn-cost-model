@@ -47,6 +47,22 @@ TEST_F(TestCyclesInterfaceType, BasicOps) {
     //    EXPECT_EQ(ptr, &VPUNN::Cycles::ERROR_INPUT_TOO_BIG);
     //   EXPECT_EQ(ptr, &VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION);
 }
+TEST_F(TestCyclesInterfaceType, Extrapolated_cost_function_test) {
+    const unsigned int x1 = 32;
+    const unsigned int y1 = 320;
+
+    const unsigned int x2 = 64;
+    const unsigned int y2 = 640;
+
+    const unsigned int x = 96;
+
+    const unsigned int y_expected = Cycles::extrapolate_cost(x, x1, y1, x2, y2);
+
+    const unsigned int y_expected_manual = y1 + ((y2 - y1) * (x - x1)) / (x2 - x1);
+
+    EXPECT_EQ(y_expected, y_expected_manual);
+
+}
 
 class CycleAdderCheckerTest : public ::testing::Test {
 protected:

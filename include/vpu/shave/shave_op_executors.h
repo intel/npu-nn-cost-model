@@ -20,6 +20,7 @@
 #include "SoftmaxModel.h"
 #include "elementwise.h"
 #include "poly_models.h"
+#include "shave_heuristic_models.h"
 
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
@@ -702,8 +703,74 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////
+class ShaveSimpleHeuristicModelActivation : public ShaveOpExecutor {
+private:
+    const ShaveSimpleHeuristicModel model;  ///< model instance
 
-/// @brief Executor around the simple linear  model where the input  variable is the size of output (tehLegacy/initial
+public:
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w) const override {
+        const auto& total_num_of_elements = w.total_number_of_elements();
+        const auto cycles = model.getCycles(total_num_of_elements);
+        return cycles;
+    };
+
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int, const int) const override {
+        return dpuCycles(w);
+    };
+
+    ShaveSimpleHeuristicModelActivation(const std::string& name, float elements_per_cycle, float code_derate, float bw_derate, float entry_cost_cycles)
+            : ShaveOpExecutor(name),
+              model(elements_per_cycle, code_derate, bw_derate, entry_cost_cycles) {
+    }
+
+    std::string toString() const override {
+        std::stringstream stream;
+        stream << "ShaveSimpleHeuristicModelActivation: \n"  //
+               << " Operation: \t" << getName() << " ;\n"    //
+               << " Model    : \t" << model << " ;\n";       //
+
+        return stream.str();
+    }
+};
+
+class ShaveRooflineHeuristicModelActivation : public ShaveOpExecutor {
+private:
+    const ShaveRooflineHeuristicModel model;  ///< model instance
+public:
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w) const override {
+        const auto& total_num_of_elements = w.total_number_of_elements();
+        const auto& total_size_in_bits = w.total_size_in_bits();
+        
+        int num_of_channels = 0;
+        for (const auto& t : w.get_outputs()) {
+            num_of_channels += t.channels();
+        }
+        
+        const auto cycles = model.getCycles(total_size_in_bits, total_num_of_elements, num_of_channels);
+        return cycles;
+    }
+
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int, const int) const override {
+        return dpuCycles(w);
+    };
+
+    ShaveRooflineHeuristicModelActivation(const std::string& name, float arithmetic_ops_per_32_outputs, float memory_ops_per_32_outputs, bool unaligned_by_nature, float bw_derate, float code_derate, float entry_cost_cycles, float scalar_cost_per_channel, float unalignment_derate)
+            : ShaveOpExecutor(name),
+              model(arithmetic_ops_per_32_outputs, memory_ops_per_32_outputs, unaligned_by_nature, bw_derate, code_derate, entry_cost_cycles, scalar_cost_per_channel, unalignment_derate) {
+    }
+
+    std::string toString() const override {
+        std::stringstream stream;
+        stream << "ShaveRooflineHeuristicModelActivation: \n"  //
+               << " Operation: \t" << getName() << " ;\n"      //
+               << " Model    : \t" << model << " ;\n";         //
+
+        return stream.str();
+    }
+};
+//////////////////////////////////////////////////////////////////////
+
+/// @brief Executor around the simple linear  model where the input  variable is the size of output (theLegacy/initial
 /// model)
 /// @tparam KERNEL_NAME is the class name of the legacy model
 template <typename KERNEL_NAME, unsigned int efficiencyX1000, unsigned int latency>

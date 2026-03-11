@@ -11,8 +11,6 @@
 #define VPUNN_CACHE
 
 #include <list>
-#include <map>
-#include <unordered_map>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -24,6 +22,7 @@
 
 #include "core/persistent_cache.h"
 #include "core/utils.h"
+#include "core/map_type_selector.h"
 
 namespace VPUNN {
 
@@ -112,30 +111,6 @@ public:
     const AccessCounter& getPreloadedCacheCounter() const {
         return deserialized_table.getCounter();
     }
-};
-
-// Custom hasher for std::vector<float> using FNV-1a
-struct VectorFloatHasher {
-    std::size_t operator()(const std::vector<float>& vec) const noexcept {
-        return static_cast<std::size_t>(fnv1a_hash(vec));
-    }
-};
-
-// Type trait to select appropriate map type based on key
-// Default: use std::map for types without custom hasher (O(log n) lookup)
-// Specialize this template in the header where your key type is defined
-// to use std::unordered_map with a custom hasher for O(1) lookup
-template<typename K>
-struct MapTypeSelector {
-    template<typename V>
-    using type = std::map<K, V>;
-};
-
-// Specialization for std::vector<float>: use std::unordered_map
-template<>
-struct MapTypeSelector<std::vector<float>> {
-    template<typename V>
-    using type = std::unordered_map<std::vector<float>, V, VectorFloatHasher>;
 };
 
 /**

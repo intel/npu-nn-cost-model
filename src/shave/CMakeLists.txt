@@ -195,7 +195,141 @@ set(P1 "shave_layers_vpu_40.csv") #must contain at least one input
 set(P2 "SHAVE_V40.inl")
 PARSE_CSV( ${P1} ${P2} "Shave NPU40 WIP")
 
-# ####################################################################################################
+# New heuristic models parser
+function(GENERATE_HEURISTIC_INITIALIZER kernel_name arith_ops mem_ops unaligned bw_derate code_derate scalar_cost entry_cost simple_heuristic)
+    if(ARGC EQUAL 9)
+        # use the passed params
+    else()
+        message(FATAL_ERROR "Wrong number of parameters in GENERATE_HEURISTIC_INITIALIZER function: ${ARGC} instead of 9")
+    endif()
+
+    # Check if simple_heuristic flag is 1
+    if(simple_heuristic STREQUAL "1")
+        # Generate AddSimpleHeuristic call
+        # Build parameter list, using defaults for empty values
+        set(params "\"${kernel_name}\"")
+        
+        # elements_per_cycle - not in CSV, use default
+        # code_derate parameter
+        if(NOT code_derate STREQUAL "")
+            set(params "${params}, 1.0f, ${code_derate}f")
+            # bw_derate parameter
+            if(NOT bw_derate STREQUAL "")
+                set(params "${params}, ${bw_derate}f")
+                # entry_cost parameter
+                if(NOT entry_cost STREQUAL "")
+                    # Check if entry_cost contains a decimal point
+                    string(FIND "${entry_cost}" "." has_decimal)
+                    if(has_decimal EQUAL -1)
+                        set(params "${params}, ${entry_cost}.f")
+                    else()
+                        set(params "${params}, ${entry_cost}f")
+                    endif()
+                endif()
+            endif()
+        endif()
+        
+        set(ADD_LINE "AddSimpleHeuristic(${params})\;  // simple_heuristic")
+    else()
+        # Generate AddRooflineModel call
+        set(params "\"${kernel_name}\"")
+        
+        # arithmetic_ops_per_32_outputs - if empty, use 0.0f
+        if(arith_ops STREQUAL "")
+            set(params "${params}, 0.0f")
+        else()
+            set(params "${params}, ${arith_ops}f")
+        endif()
+        
+        # memory_ops_per_32_outputs - if empty, use 0.0f
+        if(mem_ops STREQUAL "")
+            set(params "${params}, 0.0f")
+        else()
+            set(params "${params}, ${mem_ops}f")
+        endif()
+        
+        # unaligned_by_nature - if empty, let default take place
+        if(NOT unaligned STREQUAL "")
+            set(params "${params}, ${unaligned}")
+            
+            # bw_derate
+            if(NOT bw_derate STREQUAL "")
+                set(params "${params}, ${bw_derate}f")
+                
+                # code_derate
+                if(NOT code_derate STREQUAL "")
+                    set(params "${params}, ${code_derate}f")
+                    
+                    # entry_cost_cycles
+                    if(NOT entry_cost STREQUAL "")
+                        # Check if entry_cost contains a decimal point
+                        string(FIND "${entry_cost}" "." has_decimal)
+                        if(has_decimal EQUAL -1)
+                            set(params "${params}, ${entry_cost}.f")
+                        else()
+                            set(params "${params}, ${entry_cost}f")
+                        endif()
+                        
+                        # scalar_cost_per_channel
+                        if(NOT scalar_cost STREQUAL "")
+                            set(params "${params}, ${scalar_cost}f")
+                            # unalignment_derate uses default
+                        endif()
+                    endif()
+                endif()
+            endif()
+        endif()
+        
+        set(ADD_LINE "AddRooflineModel(${params})\;  // roofline")
+    endif()
+    
+    set(LIST_HEURISTIC_INITIALIZER "${LIST_HEURISTIC_INITIALIZER}${ADD_LINE} \n " PARENT_SCOPE)
+endfunction()
+
+function(PARSE_HEURISTIC_CSV csv_file inl_out_file info)
+    message(STATUS "\n >> Starting to generate heuristic initializer for ${info}")
+    message(STATUS "\n >> PARAMS:\n csv_file: " ${csv_file} "\n inl_out_file: " ${inl_out_file} "\n info: " ${info})
+
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${csv_file}" config)
+    STRING(REPLACE " " "" config "${config}")
+    STRING(REPLACE "\n" ";" config "${config}")
+
+    set(SKIP_HEADER TRUE)
+    set(LIST_HEURISTIC_INITIALIZER "")
+
+    foreach(LINE IN LISTS config)
+        if(SKIP_HEADER)
+            set(SKIP_HEADER FALSE)
+        else()
+            # Parse CSV line manually to handle empty fields
+            # Expected format: kernel_name,arith_ops,mem_ops,unaligned,bw_derate,code_derate,scalar_cost,entry_cost,simple_heuristic
+            
+            # Extract each field by position
+            string(REGEX MATCH "^([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*)$" _ ${LINE})
+            set(kernel_name "${CMAKE_MATCH_1}")
+            set(arith_ops "${CMAKE_MATCH_2}")
+            set(mem_ops "${CMAKE_MATCH_3}")
+            set(unaligned "${CMAKE_MATCH_4}")
+            set(bw_derate "${CMAKE_MATCH_5}")
+            set(code_derate "${CMAKE_MATCH_6}")
+            set(scalar_cost "${CMAKE_MATCH_7}")
+            set(entry_cost "${CMAKE_MATCH_8}")
+            set(simple_heuristic "${CMAKE_MATCH_9}")
+            
+            GENERATE_HEURISTIC_INITIALIZER("${kernel_name}" "${arith_ops}" "${mem_ops}" "${unaligned}" 
+                                          "${bw_derate}" "${code_derate}" "${scalar_cost}" "${entry_cost}" "${simple_heuristic}")
+        endif()
+    endforeach()
+
+    set(SHAVE_ADD_LIST "${LIST_HEURISTIC_INITIALIZER}")
+    vpu_cost_model_safe_file_write("${COST_MODEL_BINARY_DIR}/include/vpu/shave/${inl_out_file}" ${SHAVE_ADD_LIST} WRITE)
+    message(STATUS " >> Generated heuristic initializer for ${info} in ${inl_out_file}")
+endfunction()
+
+# Parse the heuristic CSV file
+set(P1 "shave_layers_heuristic_npu5.csv")
+set(P2 "shave_heuristic_npu5.inl")
+PARSE_HEURISTIC_CSV(${P1} ${P2} "Shave Heuristic Models NPU5")
 
 # shave library for new cpps
 if(VPUNN_BUILD_SHARED_LIB)
@@ -233,11 +367,6 @@ target_link_libraries(vpunn_shave
 # @Returns:
 #   Generates header file with populate class
 function(GEN_HEADER_FILE_FOR_FACTORS_POPULATE CSV_FILE CLASS_NAME output_file)
-    # set POPULATE_INFO for the file header
-    set(POPULATE_INFO "// This file is auto-generated. Do not edit directly.\n")
-    string(TIMESTAMP current_time "%Y-%m-%d %H:%M:%S")
-    string(APPEND POPULATE_INFO "// Generated at: ${current_time}\n")
-
     GEN_CONTENT_FROM_CSV(
         "${CSV_FILE}"
         POPULATE_CONTENT
@@ -255,4 +384,12 @@ GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
     "${CMAKE_CURRENT_SOURCE_DIR}/shave_factors_npu5.csv"
     "_NPU5"         # the class name will be PopulatedFactorsLUT_NPU5
     "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_factors_population_npu5.h"
+)
+
+
+# Generate header file for heuristic factors
+GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
+    "${CMAKE_CURRENT_SOURCE_DIR}/shave_heuristic_factors_npu5.csv"
+    "_Heuristic"    # the class name will be PopulatedFactorsLUT_Heuristic
+    "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_factors_population_heuristic.h"
 )

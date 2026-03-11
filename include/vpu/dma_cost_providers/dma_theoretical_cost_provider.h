@@ -10,12 +10,16 @@
 #ifndef DMA_THEORETICAL_COST_PROVIDER_H
 #define DMA_THEORETICAL_COST_PROVIDER_H
 
+#include <algorithm>                      // for std::min, std::max
+#include <cmath>                          // for std::floor
+#include <tuple>                          // for std::tuple and structured bindings
+#include "dma_cost_provider_interface.h"  // for IDMACostProvider
 #include "performance_mode.h"
-#include "vpu/types.h"
-
+#include "vpu/cycles_interface_types.h"                           // for CyclesInterfaceType, Cycles
+#include "vpu/dpu_types_info.h"                                   // for dtype_to_bytes
 #include "vpu/hw_characteristics/HW_characteristics_supersets.h"  // for HWCharacteristicsSet
 #include "vpu/hw_characteristics/itf_HW_characteristics_set.h"    // for IHWCharacteristicsSet
-#include "dma_cost_provider_interface.h"                          // for IDMACostProvider
+#include "vpu/types.h"
 
 namespace VPUNN {
 /**
@@ -276,11 +280,11 @@ public:
         DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_LNL;  // legacy one
         DMATheoreticalCostProvider_PTL dma_theoretical_PTL(
                 HWCharacteristicsSuperSets::get_mainConfigurationRef());  // new one, default config
-        
+
         if (cost_source) {
             *cost_source = "theoretical";
         }
-        
+
         if (wl.device < VPUDevice::VPU_4_0) {
             return dma_theoretical_LNL.DMATheoreticalCyclesLegacyLNL(wl);
         } else {  // VPU 4.0 and newer

@@ -164,7 +164,8 @@ protected:
         DPUWorkload wl{workload};
 
         std::string errInfo;
-        unsigned cost_cyc{};
+        CyclesInterfaceType cost_cyc{};
+
         ASSERT_NO_THROW(cost_cyc = crt_model.DPU(wl, errInfo)) << info << wl;
 
         std::stringstream buffer;
@@ -245,7 +246,7 @@ TEST_F(TestCostModelNPU5x, FP32_output_basic) {
             device,
             Operation::CONVOLUTION,
             {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
-            {VPUTensor(21, 21, 512, 1, DataType::FLOAT32)},             // output dimensions
+            {VPUTensor(21, 21, 512, 1, DataType::FLOAT32)},                  // output dimensions
             {3, 3},                                                          // kernels
             {3, 3},                                                          // strides
             {0, 0, 0, 0},                                                    // padding
@@ -272,7 +273,7 @@ TEST_F(TestCostModelNPU5x, FP32_output_basic) {
             {1, 1},                                                          // kernels
             {1, 1},                                                          // strides
             {0, 0, 0, 0},                                                    // padding
-            ExecutionMode::CUBOID_8x16,                                     // execution mode
+            ExecutionMode::CUBOID_8x16,                                      // execution mode
             ActivationFunction::NONE,                                        // activation
             0.0F,                                                            // act_sparsity
             0.0F,                                                            // weight_sparsity
@@ -299,7 +300,8 @@ TEST_F(TestCostModelNPU5x, FP32_output_basic) {
         basicTest(wl, crt_model, "Elemwise should fit into memory.");
     }
 
-    auto checkSame = [&crt_model](const DPUWorkload& w1, const DPUWorkload& w2, std::string info = "", const int thresh = 0) {
+    auto checkSame = [&crt_model](const DPUWorkload& w1, const DPUWorkload& w2, std::string info = "",
+                                  const int thresh = 0) {
         DPUWorkload wl{w1};
 
         std::string errInfo;
@@ -333,7 +335,7 @@ TEST_F(TestCostModelNPU5x, FP32_output_basic) {
             device,
             Operation::CONVOLUTION,
             {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
-            {VPUTensor(21, 21, 512, 1, DataType::FLOAT16)},             // output dimensions
+            {VPUTensor(21, 21, 512, 1, DataType::FLOAT16)},                  // output dimensions
             {3, 3},                                                          // kernels
             {3, 3},                                                          // strides
             {0, 0, 0, 0},                                                    // padding
@@ -360,7 +362,7 @@ TEST_F(TestCostModelNPU5x, FP32_output_basic) {
             {1, 1},                                                          // kernels
             {1, 1},                                                          // strides
             {0, 0, 0, 0},                                                    // padding
-            ExecutionMode::CUBOID_8x16,                                     // execution mode
+            ExecutionMode::CUBOID_8x16,                                      // execution mode
             ActivationFunction::NONE,                                        // activation
             0.0F,                                                            // act_sparsity
             0.0F,                                                            // weight_sparsity
@@ -436,15 +438,16 @@ TEST_F(TestCostModel, Acceptance_DataTypes_Test) {
     };
 
     using TestVector = std::vector<TestIn>;
-    TestVector tst = {{VPUDevice::NPU_5_0,  // device
-                       NPU_5_0_MODEL_PATH,  // model_path
-                       {                    // invalid dtypes
-                        {DataType::INT4, DataType::INT4},
-                        {DataType::INT2, DataType::INT2},
-                        {DataType::INT1, DataType::INT1}},
-                       {// valid dtypes
-                        {DataType::FLOAT16, DataType::HF8},
-                        {DataType::BFLOAT16, DataType::UINT8}}},
+    TestVector tst = {
+            {VPUDevice::NPU_5_0,  // device
+             NPU_5_0_MODEL_PATH,  // model_path
+             {                    // invalid dtypes
+              {DataType::INT4, DataType::INT4},
+              {DataType::INT2, DataType::INT2},
+              {DataType::INT1, DataType::INT1}},
+             {// valid dtypes
+              {DataType::FLOAT16, DataType::HF8},
+              {DataType::BFLOAT16, DataType::UINT8}}},
     };
 
     for (auto& test_in : tst) {
@@ -497,6 +500,94 @@ TEST_F(TestCostModel, Basic_NPU50_vs_VPU40_DPU) {
         EXPECT_EQ(cycles_40, 3445);  // theoretical, but at 1700MHz
         EXPECT_EQ(cycles_50, 1723);  // theoretical, but at 1950MHz with 4k macs
     }
+}
+
+TEST_F(TestCostModel, Compute_Input1_size_TestNPU5X) {
+    auto mk_wl = [](VPUDevice dev, Operation op, DataType dtype) -> DPUWorkload {
+        return DPUWorkload{
+                dev,
+                op,
+                {VPUNN::VPUTensor(56, 56, 57, 1, dtype)},  // input dimensions
+                {VPUNN::VPUTensor(56, 56, 57, 1, dtype)},  // output dimensions
+                {3, 3},                                    // kernels
+                {1, 1},                                    // strides
+                {1, 1},                                    // padding
+                VPUNN::ExecutionMode::CUBOID_16x16         // execution mode
+        };
+    };
+
+    auto test_message = [](const DPUWorkload& wl) {
+        // clang-format off
+        std::string message = std::string("Test case:") +
+                              " Device: " + VPUDevice_ToText.at(static_cast<int>(wl.device)) + 
+                              " Operation: " + Operation_ToText.at(static_cast<int>(wl.op)) +
+                              " input0/input1 dtype: " + DataType_ToText.at(static_cast<int>(wl.inputs[0].get_dtype())) +"\n";
+
+        // clang-format on
+
+        return message;
+    };
+    struct TestInput {
+        VPUNN::DPUWorkload wl;
+    };
+
+    struct TestExpectation {
+        int inpu1_W;
+        int inpu1_H;
+        int inpu1_C;
+        int inpu1_B;
+    };
+
+    struct TestCase {
+        TestInput t_in;
+        TestExpectation t_exp;
+        std::string text = "";
+    };
+
+    using TestsVector = std::vector<TestCase>;
+
+    const TestsVector tests_5_0 = {
+            // clang-format off
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::INT1)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::INT2)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::INT4)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::INT8)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::INT16)}, {1, 1, 513 /* 3*3*57 */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::FLOAT32)}, {1, 1, 513 /* 3*3*57 */, 57}},
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::INT1)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::INT2)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::INT4)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::INT8)}, {1, 1,  513 /* 3*3*57  */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::INT16)}, {1, 1, 513 /* 3*3*57 */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::FLOAT32)}, {1, 1, 513 /* 3*3*57 */, 57}},
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::INT1)}, {1, 1, 9  /* 3*3 */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::INT2)}, {1, 1, 9  /* 3*3 */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::INT4)}, {1, 1, 9  /* 3*3 */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::INT8)}, {1, 1, 9  /* 3*3 */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::INT16)}, {1, 1, 9 /* 3*3 */, 57}},
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::FLOAT32)}, {1, 1, 9  /* 3*3 */, 57}},
+
+            // clang-format on
+
+    };
+
+    const DPU_OperationSanitizer sanitizer;
+    auto run_tests = [&sanitizer, &test_message](const TestsVector& tests) {
+        for (auto& t : tests) {
+            std::cout << test_message(t.t_in.wl);
+            auto wl_op = DPUOperation(t.t_in.wl, sanitizer.getDeviceConfiguration(t.t_in.wl.device));
+
+            EXPECT_EQ(wl_op.input_1.width, t.t_exp.inpu1_W) << test_message(t.t_in.wl);
+            EXPECT_EQ(wl_op.input_1.height, t.t_exp.inpu1_H) << test_message(t.t_in.wl);
+            EXPECT_EQ(wl_op.input_1.channels, t.t_exp.inpu1_C) << test_message(t.t_in.wl);
+            EXPECT_EQ(wl_op.input_1.batch, t.t_exp.inpu1_B) << test_message(t.t_in.wl);
+        }
+    };
+
+    run_tests(tests_5_0);
 }
 
 }  // namespace VPUNN_unit_tests

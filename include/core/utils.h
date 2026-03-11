@@ -10,8 +10,10 @@
 #ifndef VPUNN_CORE_UTILS_H
 #define VPUNN_CORE_UTILS_H
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <mutex>
 #include <shared_mutex>
 #include <sstream>
@@ -20,7 +22,6 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <algorithm>
 
 namespace VPUNN {
 
@@ -31,6 +32,16 @@ static inline void set_env_var(const std::string& name, const std::string& value
 #else
     // POSIX-specific code (Linux/macOS)
     setenv(name.c_str(), value.c_str(), 1);  // 1 means overwrite the variable if it exists
+#endif
+}
+
+static inline void unset_env_var(const std::string& name) {
+#ifdef _WIN32
+    std::string envString = name + "=";
+    _putenv(envString.c_str());  // Set to empty string on Windows
+#else
+    // POSIX-specific code (Linux/macOS)
+    unsetenv(name.c_str());
 #endif
 }
 

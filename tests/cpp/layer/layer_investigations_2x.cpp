@@ -1980,5 +1980,4 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOHO_possible_inte
     EXPECT_FALSE(simple_fail_all);  // centrally
 }
 
-
-}
+}  // namespace VPUNN_unit_tests

@@ -108,13 +108,13 @@ protected:
                        const std::unordered_map<VPUDevice, int>& cmx_KB_sizes_,                //
                        const Values<int>& output_write_tile_options_,                          //
                        const Values<ISIStrategy>& isi_stategy_options_,                        //
-                       const int& weigths_alignment_,                                          //
+                       const int& weigths_alignment_B_,                                        //
                        const int& input_heigth_width_start_factor_SOHW_,                       //
                        const IDeviceValidValues::ValidDatatypes& valid_datatypes,              //
                        const Values<Operation>& valid_operations_,                             //
-                       const int& alignement_size_bytes_,       // page size, NPU specific
-                       const int& out_innermost_dim_alignment_  //
-                       )
+                       const int& alignement_size_bytes_,        // page size, NPU specific
+                       const int& out_innermost_dim_alignment_,  // bytes
+                       const bool& legacy_samples_alignment_weights_)
             : operations_dynamic_behavior{op_dynamic_constraints},                          //
               valid_execution_order_map{valid_execution_order_},                            //
               valid_swizzlings{valid_swizzlings_},                                          //
@@ -123,12 +123,13 @@ protected:
               cmx_KB_sizes{cmx_KB_sizes_},                                                  //
               output_write_tile_options{output_write_tile_options_},                        //
               isi_stategy_options{isi_stategy_options_},                                    //
-              weigths_alignment{weigths_alignment_},                                        //
+              weigths_alignment_B{weigths_alignment_B_},                                    //
               input_heigth_width_start_factor_SOHW{input_heigth_width_start_factor_SOHW_},  //
               valid_datatypes_map{valid_datatypes},
               valid_operations{valid_operations_},
               alignement_size_bytes{alignement_size_bytes_},
-              out_innermost_dim_alignment{out_innermost_dim_alignment_} {
+              out_innermost_dim_alignment_B{out_innermost_dim_alignment_},
+              legacy_samples_alignment_weights{legacy_samples_alignment_weights_} {
     }
 
 protected:
@@ -154,7 +155,7 @@ public:
     }
 
     virtual const IDeviceValidValues::ValidDatatypes& get_valid_datatypes_map(const MPEEngine& /*engine*/) const {
-            return valid_datatypes_map;
+        return valid_datatypes_map;
     }
 
     virtual const Values<DataType>& get_input_valid_datatypes(const DPUOperation& dpu) const {
@@ -279,13 +280,22 @@ public:
     }
 
     /// provides the default/nominal weights alignment for the device. Can be used in case we need to align the weights
-    /// TODO: unclear measurement unit, BYtes or samples?  Now it is interpreted as Samples
-    int get_specific_weigths_alignment() const {
-        return weigths_alignment;
+    /// in Bytes
+    int get_specific_weights_alignment_B() const {
+        return weigths_alignment_B;
     }
 
-    int get_specific_out_innermost_dim_alignment() const {
-        return out_innermost_dim_alignment;
+    /// in case legacy mode is enabled , provides the legacy weights alignment for the device in Samples
+    int get_specific_legacy_weights_alignment_Samples() const {
+        // no alignment if not legacy mode
+        return is_legacy_samples_alignment_weights() ? weigths_alignment_B : 1;
+    }
+
+    int get_specific_out_innermost_dim_alignment_B() const {
+        return out_innermost_dim_alignment_B;
+    }
+    bool is_legacy_samples_alignment_weights() const {
+        return legacy_samples_alignment_weights;
     }
 
     const Values<Operation>& get_valid_operations() const {
@@ -342,7 +352,9 @@ protected:
     const Values<int> output_write_tile_options;  ///<
     const Values<ISIStrategy> isi_stategy_options;
 
-    const int weigths_alignment{16};                    ///< default alignment for weights,
+    /// default alignment for weights,normally it is in bytes. Except if legacy  mode on
+    /// (get_specific_legacy_weights_alignment_Samples true) where it is interpreted as samples
+    const int weigths_alignment_B{16};
     const int input_heigth_width_start_factor_SOHW{1};  ///<  to be set in derived implementations
 
     int get_spatial_range_start_factor_HW() const {
@@ -355,8 +367,10 @@ protected:
 
     const int alignement_size_bytes;  // page size, NPU specific
 
-    const int out_innermost_dim_alignment;  ///< alignment for innermost dimension (in bytes), used when we compute
-                                            ///< output_0 tensor's memory
+    const int out_innermost_dim_alignment_B;  ///< alignment for innermost dimension (in bytes), used when we compute
+                                              ///< output_0 tensor's memory
+    const bool legacy_samples_alignment_weights;  ///< legacy alignment for weights in samples (not bytes). applies to
+                                                  ///< weigths_alignment_B interpretation
 
     // const fixed here
 private:

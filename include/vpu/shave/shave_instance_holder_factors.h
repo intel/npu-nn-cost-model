@@ -20,7 +20,8 @@ namespace VPUNN {
  * @brief Template class to create a SHAVE instance holder with speed-up factors
  * This class combines a populated lookup table of speed-up factors with a SHAVE instance holder
  * to create a DeviceShaveContainer that applies the speed-up factors to the SHAVE operations.
- * @tparam PopulatedFactorsLUT generated class type that populates the speed-up factors lookup table, it inherits `FactorsLookUpTable`
+ * @tparam PopulatedFactorsLUT generated class type that populates the speed-up factors lookup table, it inherits
+ * `FactorsLookUpTable`
  * @tparam InstanceHolder the base SHAVE instance holder class to wrap
  * @tparam deviceGen the VPUDevice enum value representing the target device generation
  */
@@ -36,6 +37,7 @@ public:
     ShaveInstanceHolderWithFactors(): DeviceShaveContainer(deviceGen) {
         populate();
     }
+    ~ShaveInstanceHolderWithFactors() = default;
 
 protected:
     void populate() {
@@ -46,13 +48,13 @@ protected:
             const auto& executor{shave_container.getShaveExecutor(shave_op)};
             auto speed_up_factor = factors_map.getOperatorFactor(shave_op);
             this->template AddMock<GlobalHarwdwareCharacteristics::get_dpu_fclk(deviceGen),
-                                              GlobalHarwdwareCharacteristics::get_cmx_fclk(deviceGen)>(
-                    executor.getName(), executor, speed_up_factor);
+                                   GlobalHarwdwareCharacteristics::get_cmx_fclk(deviceGen)>(executor.getName(),
+                                                                                            executor, speed_up_factor);
         }
     }
 
 private:
-    const PopulatedLUT factors_map; // initialize the factors_map that will be already populated
+    const PopulatedLUT factors_map;  // initialize the factors_map that will be already populated
     InstanceHolder shave_holder;
 };
 }  // namespace VPUNN

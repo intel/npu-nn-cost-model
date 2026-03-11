@@ -362,21 +362,6 @@ inline std::string enumName<CostSourceHint>() {
     return "CostSourceHint";
 }
 
-enum class ProfilingServiceBackend { SILICON, VPUEM, __size };
-static const EnumMap ProfilingServiceBackend_ToText{
-        link(ProfilingServiceBackend::SILICON, "silicon"),
-        link(ProfilingServiceBackend::VPUEM, "vpuem"),
-};
-template <>
-inline const EnumMap& mapToText<ProfilingServiceBackend>() {
-    return ProfilingServiceBackend_ToText;
-}
-
-template <>
-inline std::string enumName<ProfilingServiceBackend>() {
-    return "ProfilingServiceBackend";
-}
-
 /**
  * @brief MPE Engine types
  *

@@ -40,6 +40,7 @@ public:
     }
 
     void populate();  ///< to be implemented automatically in a .cpp file
+    ~ShaveInstanceHolder_NPU40() = default;
 };
 
 

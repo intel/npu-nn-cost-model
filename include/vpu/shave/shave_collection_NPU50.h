@@ -26,6 +26,7 @@
  * So if you want to change the factors for NPU5, you have to change the corresponding csv file from CMakeLists and re-generate.
  */
 #include "vpu/shave/generated_shave_factors_population_npu5.h"
+#include "vpu/shave/generated_shave_factors_population_heuristic.h"
 
 namespace VPUNN {
 
@@ -39,7 +40,10 @@ public:
     ShaveInstanceHolder_Mock_NPU50(): ShaveInstanceHolder_Mock_NPU50_BASE(1.0f) {
         // populate();  // done in base
     }
+    ~ShaveInstanceHolder_Mock_NPU50() = default;
 };
+
+
 class ShaveInstanceHolder_NPU50 : public DeviceShaveContainer {
 public:
     using DeviceShaveContainer::getDevice;
@@ -52,9 +56,27 @@ public:
     }
 
     void populate();  ///< to be implemented automatically in a .cpp file
+    ~ShaveInstanceHolder_NPU50() = default;
 };
 
-using ShaveInstanceHolder_NPU50_WithFactors =
+class ShaveInstanceHolder_HeuristicNPU50 : public DeviceShaveContainer {
+public:
+    using DeviceShaveContainer::getDevice;
+    const DeviceShaveContainer& getContainer() const {
+        return *this;
+    }
+    ShaveInstanceHolder_HeuristicNPU50() : DeviceShaveContainer(VPUDevice::NPU_5_0) {
+        populate();
+    }
+
+    void populate();  ///< to be implemented automatically in a .cpp file
+    ~ShaveInstanceHolder_HeuristicNPU50() = default;
+};
+
+using ShaveInstanceHolder_NPU_RESERVED_ithFactors =
             ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0>;
+
+using ShaveInstanceHolder_HeuristicNPU_RESERVED_ithFactors =
+            ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50, VPUDevice::NPU_5_0>;
 }  // namespace VPUNN
 #endif

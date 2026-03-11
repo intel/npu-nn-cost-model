@@ -11,6 +11,7 @@
 #include "vpu/shave/elementwise.h"
 
 #include "vpu/shave/layers.h"
+#include "vpu/shave/shave_cost_providers/shave_provider_bundles.h"
 
 #include <gtest/gtest.h>
 #include "common/common_helpers.h"
@@ -28,14 +29,14 @@ class TestSHAVE : public ::testing::Test {
 public:
 protected:
     VPUNN::SHAVECostModel empty_model{};
-    VPUNN::SHAVECostModel model_with_cache{std::string{"../../../models/shave_5_1.cachebin"}, 16384, true};
+    VPUNN::SHAVECostModel model_with_cache{std::string{"../../../models/shave_5_1.cachebin"}, 16384};
 
-    std::shared_ptr<VPUNN::PriorityShaveCostProvider> only_new_provider{std::make_shared<VPUNN::PriorityShaveCostProvider>(ShaveCostProviderBundles::createNewShaveOnlyProviders())};
+    std::shared_ptr<VPUNN::IShaveCostProvider> only_new_provider{ShaveCostProviderBundles::createNewShaveOnlyProvider()};
     
     class SHAVECostModelTest : public VPUNN::SHAVECostModel {
         public:
             SHAVECostModelTest(std::shared_ptr<IShaveCostProvider> provider) 
-                : VPUNN::SHAVECostModel(provider) {}
+                : VPUNN::SHAVECostModel(std::move(provider)) {}
     };
 
     SHAVECostModelTest model_with_new_provider{only_new_provider};
@@ -174,7 +175,7 @@ TEST_F(TestSHAVE, SHAVE_v2_Cache_Smoke) {
     shave_cacheToBe.write_cache(temp_cache_file);
 
     // need to load a cache that contains 1 & 2  values already cached
-    SHAVECostModel model_shave_cache{temp_cache_file, 16384, true};
+    SHAVECostModel model_shave_cache{temp_cache_file, 16384};
 
     {
         std::string info;
@@ -318,7 +319,6 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_5x) {
             EXPECT_GT(shave_instance.toString().length(), 50);
         }
     }
-
 }
 
 }  // namespace VPUNN_unit_tests

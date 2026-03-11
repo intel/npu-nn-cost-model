@@ -589,7 +589,7 @@ TEST_F(TestDMANNCostModelNPU4x, SweepGT_DMATime_40_Theoretical) {
     constexpr bool ignore_relative_errors_failures{false};  // no t allowing this failures
 
     auto runTest = [=, &old_model](const TestCase& tc) {
-        const auto dmaNN_{tc.t_in};
+        const auto & dmaNN_{tc.t_in};
 
         std::string info{"NA"};
         // const auto cycles_ = model_4_0.computeCycles(dmaNN_, info);

@@ -24,6 +24,7 @@
 #include "preprocessing_adapters.h"
 
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -241,6 +242,21 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 
 }  // namespace intf_16
 
+// Capabilities provider trait
+struct DefaultCapabilities {
+    static inline const std::set<std::string> capabilities = {};
+    static const std::set<std::string>& get() {
+        return capabilities;
+    }
+};
+
+struct NPU_RESERVED_12Capabilities {
+    static inline const std::set<std::string> capabilities = {"DW_MXP_AVP_SupportsMoreThan64Ch", "dcim", "uint16"};
+    static const std::set<std::string>& get() {
+        return capabilities;
+    }
+};
+
 // interface class
 
 /// Inserts different datatypes into a descriptor buffer
@@ -271,13 +287,15 @@ public:
  * DATA CHANGES:
  *
  */
-template <class T, typename DeviceAdapter, NNVersions V>
+template <class T, typename DeviceAdapter, NNVersions V, typename CapabilitiesProvider = DefaultCapabilities>
 class Preprocessing_Interface16_Archetype :
-        public PreprocessingInserter<T, Preprocessing_Interface16_Archetype<T, DeviceAdapter, V>> {
+        public PreprocessingInserter<T,
+                                     Preprocessing_Interface16_Archetype<T, DeviceAdapter, V, CapabilitiesProvider>> {
 private:
     inline static const DPU_OperationValidator workload_validator{};  ///< sanitizer mechanisms
 protected:
-    friend class PreprocessingInserter<T, Preprocessing_Interface16_Archetype<T, DeviceAdapter, V>>;
+    friend class PreprocessingInserter<T,
+                                       Preprocessing_Interface16_Archetype<T, DeviceAdapter, V, CapabilitiesProvider>>;
 
     /**
      * @brief Transform a DPUWorkload into a DPUWorkload descriptor
@@ -299,11 +317,14 @@ protected:
         // for enums we must put here the equivalent version  from the target interface, not latest types
 
         {
-            const auto operation{DeviceAdapter::mock_replace_operations(workload.op)};
+            const auto operation{DeviceAdapter::mock_replace_operations(workload.op, workload)};
             offset = ins.template insert<only_simulate>(intf_16::convert<intf_16::Operation>(operation), offset);
 
-            // ELM_MUL rem
-            // Reduce_mean and SUm to be one op
+            if (operation == Operation::REDUCE_MS || operation == Operation::REDUCE_SUMSQUARES) {
+                Logger::warning()
+                        << "The DPU NN loaded was not trained for REDUCE operations, but one was encountered! "
+                           "Unreliable predicted values for cost! \n";
+            }
         }
 
         offset =
@@ -380,8 +401,16 @@ public:
     }
 
     /// @brief Ctor , inits the content with expected size
+    Preprocessing_Interface16_Archetype(const std::set<std::string>& nn_capabilities)
+            : PreprocessingInserter<T, Preprocessing_Interface16_Archetype<T, DeviceAdapter, V, CapabilitiesProvider>>(
+                      size_of_descriptor, nn_capabilities) {
+    }
+
+    /// @brief Ctor using template-provided capabilities
     Preprocessing_Interface16_Archetype()
-            : PreprocessingInserter<T, Preprocessing_Interface16_Archetype<T, DeviceAdapter, V>>(size_of_descriptor) {};
+            : PreprocessingInserter<T, Preprocessing_Interface16_Archetype<T, DeviceAdapter, V, CapabilitiesProvider>>(
+                      size_of_descriptor, CapabilitiesProvider::get()) {
+    }
 
     /// @brief default virtual destructor
     virtual ~Preprocessing_Interface16_Archetype() = default;
@@ -390,7 +419,7 @@ public:
 //---------------------------------------------------------
 template <class T>
 using Preprocessing_Interface16 =
-        Preprocessing_Interface16_Archetype<T, NN5XInputAdapter, NNVersions::VERSION_16_NPU_RESERVED_12>;
+        Preprocessing_Interface16_Archetype<T, NN6XInputAdapter, NNVersions::VERSION_16_NPU_RESERVED_12, NPU_RESERVED_12Capabilities>;
 
 }  // namespace VPUNN
 

@@ -638,11 +638,11 @@ private:
         pack_mode_0,  // a sample cannot span a number of bytes larger than what it normally occupies, a byte cannot
                       // contain 2 dimensions
         pack_mode_1,  // a sample cannot span a number of bytes larger than what it normally occupies, a byte can
-                      // contain 2 dimensions
+                      // contain 2 dimensions. Not aligned (to byte[s]) Innermost dimension
         pack_mode_2,  // a sample can span a number of bytes larger than what it normally occupies, a byte cannot
                       // contain 2 dimensions
         pack_mode_3,  // a sample can span a number of bytes larger than what it normally occupies, a byte can contain 2
-                      // dimensions
+                      // dimensions. Not aligned (to byte[s]) Innermost dimension
     };
 
     static constexpr PackMode packmode{

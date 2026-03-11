@@ -13,15 +13,15 @@
 #include <array>
 #include <iostream>
 #include <map>
-#include <sstream>  //
+
 #include <string>
 #include <variant>
 #include <vector>
 
+#include "core/utils.h"
+#include "dpu_defaults.h"
 #include "dpu_types.h"
 #include "vpu_tensor.h"
-#include "dpu_defaults.h"
-#include "core/utils.h"
 
 namespace VPUNN {
 
@@ -35,24 +35,31 @@ private:
 
     // input and output tensors number and content must be correlated with the operation and among themselves. Not all
     // combinations are possible
-    std::vector<VPUTensor> inputs{};  ///< The input tensors. Mainly shape and datatype are used
+    std::vector<VPUTensor> inputs{};   ///< The input tensors. Mainly shape and datatype are used
     std::vector<VPUTensor> outputs{};  ///< The output tensors. Mainly shape and datatype are used
     std::string loc_name{};            ///< The location name
 
 public:
-using Param = std::variant<int, float, std::string, bool>;
-using Parameters = std::vector<SHAVEWorkload::Param>;
-using ExtraParameters = std::map<std::string, Param>;
+    using Param = std::variant<int, float, std::string, bool>;
+    using Parameters = std::vector<SHAVEWorkload::Param>;
+    using ExtraParameters = std::map<std::string, Param>;
 
 private:
-Parameters call_params{};  ///<  can emulate call parameters
-ExtraParameters extra_params{};  ///< Additional parameters as a map
+    Parameters call_params{};        ///<  can emulate call parameters
+    ExtraParameters extra_params{};  ///< Additional parameters as a map
 
 public:
     /// @brief ctor must exist since we have aggregate initialization possible on this type (abstract type)
     SHAVEWorkload(const std::string& operation_name, const VPUDevice& device, const std::vector<VPUTensor>& inputs,
-                  const std::vector<VPUTensor>& outputs, const Parameters& params = {}, const ExtraParameters& extra_param = {}, const std::string& loc_name = "")
-            : name(operation_name), device{device}, inputs{inputs}, outputs{outputs}, loc_name(loc_name), call_params{params}, extra_params{extra_param} {
+                  const std::vector<VPUTensor>& outputs, const Parameters& params = {},
+                  const ExtraParameters& extra_param = {}, const std::string& loc_name = "")
+            : name(operation_name),
+              device{device},
+              inputs{inputs},
+              outputs{outputs},
+              loc_name(loc_name),
+              call_params{params},
+              extra_params{extra_param} {
     }
 
     SHAVEWorkload(const SHAVEWorkload&) = default;
@@ -61,6 +68,8 @@ public:
     /// @brief Default constructor
     SHAVEWorkload() = default;
 
+    /// default destructor explicit stated here for gcov problems.
+    ~SHAVEWorkload() = default;
 
     // accessors
 
@@ -88,141 +97,62 @@ public:
         return loc_name;
     };
 
-    uint32_t hash() const {
-        std::stringstream ss;
-        ss << static_cast<int>(get_device()) << ",";
-        ss << get_name() << ",";
-        for (const auto& input : get_inputs()) {
-            ss << input.batches() << "," << input.channels() << "," << input.height() << "," << input.width() << "," << (int)input.get_dtype() << "," << (int)input.get_layout() << ",";
-        }
+    /// @brief Set the location name used for debugging purposes
+    // void set_loc_name(const std::string& name) {
+        // loc_name = name;
+    // }
+    
+    uint32_t hash() const;
+
+    /// @brief Get the total number of elements from all input and output tensors
+    long long total_number_of_elements() const {
+        long long total_elements = 0;
         for (const auto& output : get_outputs()) {
-            ss << output.batches() << "," << output.channels() << "," << output.height() << "," << output.width() << "," << (int)output.get_dtype() << "," << (int)output.get_layout()
-               << ",";
+            total_elements += static_cast<long long>(output.volume());
         }
 
-        for (const auto& param : get_params()) {
-            std::visit(
-                    [&ss](auto&& arg) {
-                        ss << arg << ",";
-                    },
-                    param);
+        for (const auto& input : get_inputs()) {
+            total_elements += static_cast<long long>(input.volume());
         }
 
-        for(const auto& extra_param : get_extra_params()) {
-            ss << extra_param.first << "/";
-            std::visit(
-                [&ss](auto&& arg) {
-                    if constexpr (std::is_same_v<std::decay_t<decltype(arg)>, std::string>) {
-                        ss << arg;
-                    } else {
-                        ss << std::to_string(arg);
-                    }
-                },
-                extra_param.second);
-            ss << ",";
-        }
-        
-        return fnv1a_hash(ss.str());
+        return total_elements;
     }
 
-    std::string toString() const {
-        std::stringstream stream;
-        stream << "SHAVEWorkload: \n"                                                                                //
-               << " Operation: \t" << name << " ;\n"                                                                 //
-               << " device: \t" << (int)device << " : " << VPUDevice_ToText.at(static_cast<int>(device)) << " ;\n";  //
-
-        // inputs and outputs tensors
-        {
-            stream << " inputs: \t{\n";
-            for (size_t i = 0; i < inputs.size(); i++) {
-                stream << " input[" << i << "]: \t{\n" << inputs[i] << " } ;\n";
+    long long total_size_in_bits() const {
+        long long total_size_bits = 0;
+        for (const auto& output : get_outputs()) {
+            const auto out_dtype_bits = dtype_to_bits(output.get_dtype());
+            if (out_dtype_bits <= 0) {
+                return 0;  // unknown datatype
+            } else {
+                total_size_bits += static_cast<long long>(output.volume()) * static_cast<long long>(out_dtype_bits);
             }
-            stream << "\t}inputs \n";
-        }
-        {
-            stream << " outputs: \t{\n";
-            for (size_t i = 0; i < outputs.size(); i++) {
-                stream << " output[" << i << "]: \t{\n" << outputs[i] << " } ;\n";
-            }
-            stream << "\t}outputs \n";
         }
 
-        auto toStream = [&stream](const Param& v) {
-            if (const int* pvali = std::get_if<int>(&v)) {
-                stream << *pvali;
-            } else if (const float* pvalf = std::get_if<float>(&v)) {
-                stream << *pvalf;
-            } else if (const std::string* pvals = std::get_if<std::string>(&v)) {
-                stream << *pvals;
-            } else if (const bool* pvalb = std::get_if<bool>(&v)) {
-                stream << (*pvalb ? "true" : "false");
+        for (const auto& input : get_inputs()) {
+            const auto in_dtype_bits = dtype_to_bits(input.get_dtype());
+            if (in_dtype_bits <= 0) {
+                return 0;  // unknown datatype
+            } else {
+                total_size_bits += static_cast<long long>(input.volume()) * static_cast<long long>(in_dtype_bits);
             }
-        };
-        {  // parameters
-            stream << " parameters: \t{\n";
-            for (size_t i = 0; i < call_params.size(); i++) {
-                stream << " param[" << i << "]: \t{ ";  //
-                toStream(call_params[i]);
-                stream << " } ;\n";  //
-            }
-            stream << "\t} \n";
         }
-        {  // extra parameters
-            stream << " extra parameters: \t{\n";
-            for (const auto& [key, value] : extra_params) {
-                stream << " key: " << key << " -> value: ";
-                toStream(value);
-                stream << " ;\n";
-            }
-            stream << "\t} \n";
-        }
-        stream << out_terminator() << "SHAVEWorkload ";  // terminator
 
-        return stream.str();
-    };
+        return total_size_bits;
+    }
+
+    /// @brief Convert workload to string representation
+    std::string toString() const;
+
+    /// @brief Friend declaration for operator<
     friend bool operator<(const VPUNN::SHAVEWorkload& lhs, const VPUNN::SHAVEWorkload& rhs);
 };
 
-inline std::ostream& operator<<(std::ostream& stream, const VPUNN::SHAVEWorkload& d) {
-    stream << d.toString();
-    return stream;
-}
+/// @brief Stream output operator for SHAVEWorkload
+std::ostream& operator<<(std::ostream& stream, const VPUNN::SHAVEWorkload& d);
 
-inline bool operator<(const VPUNN::SHAVEWorkload& lhs, const VPUNN::SHAVEWorkload& rhs) {
-    // lexicographical_compare style
-    {  // name
-        if (lhs.name < rhs.name)
-            return true;
-        if (rhs.name < lhs.name)
-            return false;
-    }
-
-    {  // device
-        if (lhs.device < rhs.device)
-            return true;
-        if (rhs.device < lhs.device)
-            return false;
-    }
-    {  // inputs
-        if (lhs.inputs < rhs.inputs)
-            return true;
-        if (rhs.inputs < lhs.inputs)
-            return false;
-    }
-    {  // outputs
-        if (lhs.outputs < rhs.outputs)
-            return true;
-        if (rhs.outputs < lhs.outputs)
-            return false;
-    }
-    {  // call_params
-        if (lhs.call_params < rhs.call_params)
-            return true;
-        if (rhs.call_params < lhs.call_params)
-            return false;
-    }
-    return false;  // all are  no smaller or no larger than other
-}
+/// @brief Less than comparison operator for SHAVEWorkload
+bool operator<(const VPUNN::SHAVEWorkload& lhs, const VPUNN::SHAVEWorkload& rhs);
 
 }  // namespace VPUNN
 

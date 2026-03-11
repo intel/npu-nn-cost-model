@@ -33,7 +33,7 @@ public:
     };
 
 protected:
-    static const VPUDevice dev{VPUDevice::VPU_2_7};
+    inline static const VPUDevice dev{VPUDevice::VPU_2_7};
     // Layer 1 elm Float to int with Layout change!
     inline static const DPUWorkload s1_elmws_c0{
             dev,

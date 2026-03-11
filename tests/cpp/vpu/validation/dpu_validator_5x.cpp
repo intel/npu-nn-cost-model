@@ -93,32 +93,150 @@ TEST_F(DPU_OperationValidator_TestNPU5x, Compute_memory_subByte_dtypes) {
         }
     };
 
-    // old test cases, now for datatypes<8 bits we expect to throw exception when we try to compute input_0 and output_0
-    // memory const TestsVector tests = {
-    //        // clang-format off
-    //        {{std::move(wl_int4)}, {94080 /* (15*49*256*4(=bits))/8 */, 94080 /* (15*49*256*4(=bits))/8 */}, "in/out
-    //        dtype INT4"},
-    //        {{std::move(wl_int2)}, {47040 /* (15*49*256*2(=bits))/8 */, 47040 /* (15*49*256*2(=bits))/8 */}, "in/out
-    //        dtype INT2"},
-    //        {{std::move(wl_int1)}, {23520 /* (15*49*256*1(=bits))/8 */, 23520 /* (15*49*256*1(=bits))/8 */}, "in/out
-    //        dtype INT1"},
-    //        {{std::move(wl_float16_hf8)}, {376320 /* (15*49*252*16(=bits))/8 */, 188160  /* (15*49*252*8(=bits))/8
-    //        */}, "in dtype FLOAT16, out dtype HF8"},
-    //        {{std::move(wl_bfloat16_uint8)}, {376320 /* (15*49*252*16(=bits))/8 */, 188160  /* (15*49*252*8(=bits))/8
-    //        */}, "in dtype BFLOAT16, out dtype UINT8"},
-    //        // clang-format on
-    //};
-
     const TestsVector tests = {
             // clang-format off
-            {{std::move(wl_int4)}, {0, 0, true}, "in/out dtype INT4"},
-            {{std::move(wl_int2)}, {0, 0, true}, "in/out dtype INT2"},
-            {{std::move(wl_int1)}, {0, 0, true}, "in/out dtype INT1"},
-            {{std::move(wl_float16_hf8)}, {376320 /* (15*49*252*16(=bits))/8 */, 188160  /* (15*49*252*8(=bits))/8 */}, "in dtype FLOAT16, out dtype HF8"},
-            {{std::move(wl_bfloat16_uint8)}, {376320 /* (15*49*252*16(=bits))/8 */, 188160  /* (15*49*252*8(=bits))/8 */}, "in dtype BFLOAT16, out dtype UINT8"},
+   {{std::move(wl_int4)}, {94080 /* (15*49*256*4(=bits))/8 */, 94080 /* (15*49*256*4(=bits))/8 */}, "in/out dtype INT4"},
+   {{std::move(wl_int2)}, {47040 /* (15*49*256*2(=bits))/8 */, 47040 /* (15*49*256*2(=bits))/8 */}, "in/out dtype INT2"},
+   {{std::move(wl_int1)}, {23520 /* (15*49*256*1(=bits))/8 */, 23520 /* (15*49*256*1(=bits))/8 */}, "in/outdtype INT1"},
+   {{std::move(wl_float16_hf8)}, {376320 /* (15*49*252*16(=bits))/8 */, 188160  /* (15*49*252*8(=bits))/8 */}, "in dtype FLOAT16, out dtype HF8"},
+   {{std::move(wl_bfloat16_uint8)}, {376320 /* (15*49*252*16(=bits))/8 */, 188160  /* (15*49*252*8(=bits))/8 */}, "in dtype BFLOAT16, out dtype UINT8"},
             // clang-format on
     };
+
     verify_memory(tests);
+}
+TEST_F(DPU_OperationValidator_TestNPU5x, Input1_memory_computation_test) {
+    auto mk_wl = [](const VPUDevice dev, const Operation op, const DataType dtype, const unsigned int c,
+                    bool weights_sparsity = false) -> DPUWorkload {
+        const HaloWorkload zeroHalo;
+        const SEPModeInfo sepInfo{};
+        return VPUNN::DPUWorkload{
+                dev,
+                op,
+                {VPUNN::VPUTensor(27, 18, c, 1, DataType::UINT8)},  // input dimensions
+                {VPUNN::VPUTensor(27, 18, c, 1, DataType::UINT8)},  // output dimensions
+                {3, 3},                                             // kernels
+                {1, 1},                                             // strides
+                {0, 0, 0, 0},                                       // padding
+                VPUNN::ExecutionMode::CUBOID_16x16,                 // execution mode
+                VPUNN::ActivationFunction::NONE,                    // activation
+                0.0F,                                               // act_sparsity
+                0.0F,                                               // weight_sparsity
+                {swz_def, swz_def},                                 // input_swizzling
+                {swz_def},                                          // output_swizzling
+                1,                                                  // output_write_tiles
+                {0, 0, 0, 0},                                       // offsets
+                VPUNN::ISIStrategy::CLUSTERING,                     // isi_strategy
+                weights_sparsity,                                   // weight_sparsity_enabled
+                zeroHalo,                                           // halo
+                sepInfo,                                            // sep
+                dtype                                               // datatype for weights
+
+        };
+    };
+
+    struct TestInput {
+        VPUNN::DPUWorkload wl;  // the wl for which we compute memory
+    };
+
+    struct TestExpectation {
+        long long in1_mem_size_exp;  // memory expected; it depends on test input
+    };
+
+    struct TestCase {
+        TestInput t_in;
+        TestExpectation t_exp;
+    };
+
+    using TestsVector = std::vector<TestCase>;
+
+    auto test_info = [](const DPUWorkload& wl) -> std::string {
+        std::string info =
+                " device: \t" + VPUDevice_ToText.at(static_cast<int>(wl.device)) + " Operation: \t" +
+                Operation_ToText.at(static_cast<int>(wl.op)) + " input1 dtype: \t" +
+                (wl.weight_type.has_value() ? DataType_ToText.at(static_cast<int>(wl.weight_type.value())) : "Same") +
+                " channels: \t" + std::to_string(wl.inputs[0].z()) + " weight_sparsity_enabled: \t" +
+                (wl.weight_sparsity_enabled ? "true" : "false") + "\n";
+        return info;
+    };
+
+    // this lambda function verify if the input1 memory is computed correctly for different workloads
+    auto verify_input1_memory = [this, &test_info](const TestsVector& tests) {
+        int i = 1;  // index of test cases
+        for (const auto& t : tests) {
+            VPUNN::DPUWorkload wl_ref{t.t_in.wl};
+            std::cout << "Test case "
+                      << " " << i << ": " << test_info(wl_ref) << "\n";
+
+            {
+                long long mem = 0;
+                auto wl{wl_ref};
+                const auto& config = dut.get_config(wl.device);
+                const DPUOperation op(wl, config);
+                const IOperationDynamicConstraints& operation_behaviour{config.get_specific_behaviour(op.operation)};
+
+                EXPECT_NO_THROW(mem = operation_behaviour.input_1_contiguous_size_bytes(config, op))
+                        << "Test : " << i << " ," << wl << std::endl;
+                EXPECT_EQ(mem, t.t_exp.in1_mem_size_exp) << "Test case "
+                                                         << " " << i << ": " << test_info(std::move(wl_ref)) << "\n";
+            }
+            i++;
+        }
+    };
+
+    {
+        const TestsVector tests_npu5 = {
+                // clang-format off
+            /************************************************ TABLE HEADER ********************************************************/
+            /*  || workload || input1 memory expected ||    */
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT1,  64)},{6144}},  //1*1*(64*3*3)*64   /* 576ch and dtype UINT1  => 72B for channels   should be aligned to 16B => 80B   */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT2,  64)},{10240}}, //1*1*(64*3*3)*64   /* 576ch and dtype UINT2  => 144B for channels  should be aligned to 16B => 144B  */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT4,  64)},{19456}}, //1*1*(64*3*3)*64   /* 576ch and dtype UINT4  => 288B for channels  should be aligned to 16B => 288B  */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT8,  64)},{37888}}, //1*1*(64*3*3)*64   /* 576ch and dtype UINT8  => 576B for channels  should be aligned to 16B => 576B  */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT16, 64)},{74752}}, //1*1*(64*3*3)*64*2 /* 576ch and dtype UINT16 => 1152B for channels should be aligned to 16B => 1152B */  + 64*16 /*weights table*/
+
+            //WEIGHT SPARSITY = TRUE
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT1,  64, true)},{11264}}, //1*1*(64*3*3)*64   /* 576ch and dtype UINT1  => 72B for channels   should be aligned to 16B => 80B   */  + 64*16 /*weights table*/ + 80*64 /*sparsity map*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT2,  64, true)},{15360}}, //1*1*(64*3*3)*64   /* 576ch and dtype UINT2  => 144B for channels  should be aligned to 16B => 144B  */  + 64*16 /*weights table*/ + 80*64 /*sparsity map*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT4,  64, true)},{24576}}, //1*1*(64*3*3)*64   /* 576ch and dtype UINT4  => 288B for channels  should be aligned to 16B => 288B  */  + 64*16 /*weights table*/ + 80*64 /*sparsity map*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT8,  64, true)},{43008}}, //1*1*(64*3*3)*64   /* 576ch and dtype UINT8  => 576B for channels  should be aligned to 16B => 576B  */  + 64*16 /*weights table*/ + 80*64 /*sparsity map*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT16, 64, true)},{79872}}, //1*1*(64*3*3)*64*2 /* 576ch and dtype UINT16 => 1152B for channels should be aligned to 16B => 1152B */  + 64*16 /*weights table*/ + 80*64 /*sparsity map*/
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT1,  21)},{1008}},  //1*1*(21*3*3)*21   /* 189ch and dtype UINT1  => 24B for channels  should be aligned to 16B => 32B  */  + 21*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT2,  21)},{1344}},  //1*1*(21*3*3)*21   /* 189ch and dtype UINT2  => 48B for channels  should be aligned to 16B => 48B  */  + 21*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT4,  21)},{2352}},  //1*1*(21*3*3)*21   /* 189ch and dtype UINT4  => 95B for channels  should be aligned to 16B => 96B  */  + 21*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT8,  21)},{4368}},  //1*1*(21*3*3)*21   /* 189ch and dtype UINT8  => 189B for channels should be aligned to 16B => 193B */  + 21*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CONVOLUTION, DataType::UINT16, 21)},{8400}},  //1*1*(21*3*3)*21*2 /* 189ch and dtype UINT16 => 378B for channels should be aligned to 16B => 384B */  + 21*16 /*weights table*/
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::UINT1,  16)},{768}},  //1*1*(16*3*3)*16   /* 144ch and dtype UINT1  => 18B for channels  should be aligned to 16B => 32B  */  + 16*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::UINT2,  16)},{1024}}, //1*1*(16*3*3)*16   /* 144ch and dtype UINT2  => 36B for channels  should be aligned to 16B => 48B  */  + 16*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::UINT4,  16)},{1536}}, //1*1*(16*3*3)*16   /* 144ch and dtype UINT4  => 72B for channels  should be aligned to 16B => 80B  */  + 16*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::UINT8,  16)},{2560}}, //1*1*(16*3*3)*16   /* 144ch and dtype UINT8  => 144B for channels should be aligned to 16B => 144B */  + 16*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::CM_CONVOLUTION, DataType::UINT16, 16)},{4864}}, //1*1*(16*3*3)*16*2 /* 144ch and dtype UINT16 => 288B for channels should be aligned to 16B => 288B */  + 16*16 /*weights table*/
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::UINT1,  64)},{2048}}, //1*1*(3*3)*64   /* 9ch and dtype UINT1  => 2B for channels  should be aligned to 16B => 16B */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::UINT2,  64)},{2048}}, //1*1*(3*3)*64   /* 9ch and dtype UINT2  => 3B for channels  should be aligned to 16B => 16B */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::UINT4,  64)},{2048}}, //1*1*(3*3)*64   /* 9ch and dtype UINT4  => 5B for channels  should be aligned to 16B => 16B */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::UINT8,  64)},{2048}}, //1*1*(3*3)*64   /* 9ch and dtype UINT8  => 9B for channels  should be aligned to 16B => 16B */  + 64*16 /*weights table*/
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::DW_CONVOLUTION, DataType::UINT16, 64)},{3072}}, //1*1*(3*3)*64*2 /* 9ch and dtype UINT16 => 18B for channels should be aligned to 16B => 32B */  + 64*16 /*weights table*/
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::ELTWISE, DataType::UINT1,  64)},{3888}},  //27*18*(64/8 B) -> same dim as input0  
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::ELTWISE, DataType::UINT2,  64)},{7776}},  //27*18*(64/4 B) -> same dim as input0
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::ELTWISE, DataType::UINT4,  64)},{15552}}, //27*18*(64/2 B) -> same dim as input0
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::ELTWISE, DataType::UINT8,  64)},{31104}}, //27*18*(64   B) -> same dim as input0   
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::ELTWISE, DataType::UINT16, 64)},{62208}}, //27*18*(64*2 B) -> same dim as input0
+
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::MAXPOOL, DataType::UINT1,  64)},{0}}, // maxpool operation doesn't have weights
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::MAXPOOL, DataType::UINT2,  64)},{0}}, // maxpool operation doesn't have weights
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::MAXPOOL, DataType::UINT4,  64)},{0}}, // maxpool operation doesn't have weights
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::MAXPOOL, DataType::UINT8,  64)},{0}}, // maxpool operation doesn't have weights
+            {{mk_wl(VPUDevice::NPU_5_0, Operation::MAXPOOL, DataType::UINT16, 64)},{0}}, // maxpool operation doesn't have weights
+
+                // clang-format on
+        };
+
+        verify_input1_memory(tests_npu5);
+    }
 }
 
 TEST_F(DPU_OperationValidator_TestNPU5x, Check_Memory_size_32Bit_output_NPU50) {
@@ -268,11 +386,11 @@ TEST_F(DPU_OperationValidator_TestNPU5x, Check_Memory_size_32Bit_output_NPU50) {
         EXPECT_EQ(mem.output_0, align(21 * 21 * (512) * 1 * 4, device_req)); /* 21, 21, 512, 1 */
     }
 
-        const DPUWorkload wl_5{
+    const DPUWorkload wl_5{
             device_req,
             Operation::CONVOLUTION,
             {VPUTensor(64, 64, 64, 1, DataType::UINT8)},                     // input dimensions
-            {VPUTensor(21, 21, 512 - 16, 1, DataType::INT32)},             // output dimensions
+            {VPUTensor(21, 21, 512 - 16, 1, DataType::INT32)},               // output dimensions
             {3, 3},                                                          // kernels
             {3, 3},                                                          // strides
             {0, 0, 0, 0},                                                    // padding

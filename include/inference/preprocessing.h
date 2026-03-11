@@ -11,6 +11,7 @@
 #define PREPROCESSING_H
 
 #include <vpu/types.h>
+#include <set>
 #include <sstream>  // for error formating
 #include <stdexcept>
 #include <string>
@@ -30,7 +31,8 @@ namespace VPUNN {
 template <class T>
 class Preprocessing {
 private:
-    const size_t size_of_current_descriptor;  ///< size of the descriptor, used to initialize the processed_output
+    const size_t size_of_current_descriptor;      ///< size of the descriptor, used to initialize the processed_output
+    const std::set<std::string> nn_capabilities;  ///< set of capabilities supported by the NN model
 
 protected:
     std::vector<T> makeSizedContainer() const {
@@ -66,6 +68,13 @@ protected:
      */
     virtual const std::vector<T> generate_descriptor(const DPUWorkload& workload, size_t& debug_offset) const = 0;
 
+
+    /// protected constructor because we want to transmit the capabilities only to Archetype interface
+    Preprocessing(size_t size_of_descriptor, const std::set<std::string>& nn_capabilities_)
+            : size_of_current_descriptor{size_of_descriptor},  //
+              nn_capabilities(nn_capabilities_)                //
+    {};
+
 public:
     /// @brief provides the interface number this instance implements
     /// @returns the interface version
@@ -81,6 +90,18 @@ public:
      */
     unsigned int output_size() const {
         return static_cast<unsigned int>(size_of_current_descriptor);
+    }
+
+    /// @brief provides all the NN version properties supported by the model
+    const std::set<std::string>& getAllNNVersionProperties() const {
+        return nn_capabilities;
+    }
+
+    /// @brief Checks if a given property is supported.
+    /// @param property_name The name of the property to check for support.
+    /// @returns true if the property is supported; otherwise, false.
+    bool supportsProperty(const std::string& property_name) const {
+        return nn_capabilities.find(property_name) != nn_capabilities.end();
     }
 
 public:

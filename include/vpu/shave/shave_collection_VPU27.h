@@ -28,7 +28,9 @@ public:
         populate();
     }
 
-    void populate();  ///< to be implemented automatically in a .cpp file 
+    void populate();  ///< to be implemented automatically in a .cpp file
+
+    ~ShaveInstanceHolder_VPU27() = default;
 };
 
 class ShaveInstanceHolder_VPU27CLassic : public DeviceShaveContainer {
@@ -43,6 +45,8 @@ public:
     }
 
     void populate();  ///< to be implemented automatically
+
+    ~ShaveInstanceHolder_VPU27CLassic() = default;
 };
 
 }  // namespace VPUNN

@@ -52,6 +52,10 @@ For speed-up factors there is a generation flow that needs to be taken into cons
 3. In the output path, during build time, `PopulatedFactorsLUT_<specified suffix name>` class is generated based on `ShaveFactorsPopulation.h.in` CMake template file.
 4. This class populates the factors of `FactorsLookUpTable` that can be letter be used.
 
+Currently there are two factor files:
+- `shave_factors_npu5.csv` generates `PopulatedFactorsLUT_NPU5` used by `ShaveInstanceHolder_NPU_RESERVED_ithFactors`
+- `shave_heuristic_factors.csv` generates `PopulatedFactorsLUT_Heuristic` used by `ShaveInstanceHolder_HeuristicNPU_RESERVED_ithFactors`
+
 # Shave current operators
 
 #### Here is all the information about the current profiled operators. **In case that your shave operator does not exist in this list, you can use the default shave operator.** The **default operator** will return the number of DPUCycles equal to the number of elements in the tensor.
@@ -213,6 +217,7 @@ These operators below are not taking any extra parameters, The represent the Act
 ## NPU5.0 operators (mock)
 Mocked from NPU4.0, speed up factor of 1 for the moment . Will be updated based on measurements.
 
+
 ## VPUEM Operators Usage
   
 All these operation are available for VPU2.7, VPU4.0 and NPU5.0, it is only necessary to change the values of the parameters corresponding to the generation of the device. 
@@ -274,6 +279,7 @@ Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
 
 
+
 ## VPUEM Operators NPU5.0
 
 A Piecewise Operation is a simple operation based on a 3 slopes equation. Available Piecewise Operations from VPUEM:
@@ -294,3 +300,4 @@ Available Softmax Operations from VPUEM:
 
 Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
+

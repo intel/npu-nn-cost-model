@@ -10,67 +10,37 @@
 #ifndef VPU_DMA_COST_MODEL_H
 #define VPU_DMA_COST_MODEL_H
 
-#include <algorithm>
-#include <functional>
-#include <numeric>
+#include <memory>
 #include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#include <tuple>
 
 #include "core/cache.h"
-#include "core/logger.h"
-
-#include "inference/dma_preprocessing.h"
-#include "inference/dma_preprop_factory.h"
-#include "inference/post_process.h"
-
-#include "vpu/dma_types.h"
-#include "vpu/dma_workload.h"
-#include "vpu/performance.h"
-#include "vpu/power.h"
-#include "vpu/types.h"
-
-#include "inference/dma_post_process.h"
-#include "inference/dma_postprocessing_factory.h"
-#include "inference/vpunn_runtime.h"
-#include "vpu/utils.h"
-#include "vpu/validation/checker_utils.h"
-
-#include "vpu/cycles_interface_types.h"
-#include "vpu/validation/dpu_operations_sanitizer.h"
-
-#include "vpu/shave/shave_collection.h"
-#include "vpu/shave/shave_devices.h"
-
+#include "core/dma_map_type_selector.h"  // need this to instantiate the template with specifics like DMANNWorkload_NPU27 and other...
 #include "core/serializer.h"
-#include "vpu/vpu_mutex.h"
-
+#include "vpu/cycles_interface_types.h"
 #include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
-#include "vpu/serialization/dma_cost_serialization_wrapper.h"
-
 #include "vpu/dma_cost_providers/dmann_cost_provider.h"
 #include "vpu/dma_cost_providers/priority_dma_cost_provider.h"
-#include "vpu/dma_cost_providers/dma_cost_provider_bundles.h"
-
-#include <typeinfo>
+#include "vpu/dma_workload.h"
+#include "vpu/types.h"
+#include "vpu/validation/sanity_report.h"  // For SanityReport
+#include "vpu/http_cost_provider_intf.h"
+#include "vpu/http_cost_provider_factory.h"
 
 namespace VPUNN {
 
 /**
  * @brief
  *Has to be factored to own file or to be redesigned, why we need this, what's the purpose
- * WE want from the VPUX to use same interface or same descriptor as we use in DMANN part
- * ALso the theoretical DMA should have a common interface(datatype dma workload) with the DMANN
+ * We want from the VPUX to use same interface or same descriptor as we use in DMANN part
+ * Also the theoretical DMA should have a common interface(datatype dma workload) with the DMANN
  */
 class VPUNN_API DMATheoreticalCostModel {
 private:
     const DMATheoreticalCostProvider dma_theoretical{};
 
 public:
-    explicit DMATheoreticalCostModel() {
-        Logger::initialize();
-    }
+    explicit DMATheoreticalCostModel();
 
 protected:
     /**
@@ -86,11 +56,7 @@ protected:
      */
     unsigned int DMA(VPUDevice device, const VPUTensor& input, const VPUTensor& output,
                      MemoryLocation input_location = MemoryLocation::DRAM,
-                     MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const {
-        // Call the helper function
-        return dma_theoretical.get_cost(
-                {device, input, output, input_location, output_location, output_write_tiles});
-    }
+                     MemoryLocation output_location = MemoryLocation::CMX, unsigned int output_write_tiles = 1) const;
 
     /**
      * @brief Return the number of cycles needed to compute a DMA transfer
@@ -98,10 +64,7 @@ protected:
      * @param wl a DMAWorkload
      * @return unsigned int the number of cycles of the DMA transfer
      */
-    unsigned int DMA(const DMAWorkload& wl) const {
-        // Call the helper function
-        return dma_theoretical.get_cost(wl);
-    }
+    unsigned int DMA(const DMAWorkload& wl) const;
 };
 
 /**
@@ -118,18 +81,18 @@ public:
     using DescType = DMADesc;  ///< Useful for deducing the type of the descriptor
 
 private:
-    std::shared_ptr<IDMACostProvider<DMADesc>> ptr_internal_dma_cost_provider;  ///< shared ownership of DMA cost provider
-                                                                                        ///< bundle with priority fallback mechanism
-    
+    std::shared_ptr<IDMACostProvider<DMADesc>>
+            ptr_internal_dma_cost_provider;  ///< shared ownership of DMA cost provider
+                                             ///< bundle with priority fallback mechanism
+
     IDMACostProvider<DMADesc>& dma_cost_provider{
-        *ptr_internal_dma_cost_provider
-    };  ///< provides cycles through priority-based provider selection
-    
+            *ptr_internal_dma_cost_provider};  ///< provides cycles through priority-based provider selection
+
     mutable LRUCache<DMADesc, float> cache;  ///< all devices cache/LUT for DMA ops
                                              ///< this is a preloaded cache that features also a dynamic one
 
+    const std::unique_ptr<IHttpCostProvider> http_dma_cost_provider;  ///< HTTP cost provider for DMA
     mutable CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
-    
 public:
     /**
      * @brief Construct a new DMACostModel object
@@ -141,17 +104,7 @@ public:
      * @param cache_filename filename for cache persistence
      */
     explicit DMACostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
-                          const unsigned int batch_size = 1, const std::string& cache_filename = "")
-            : ptr_internal_dma_cost_provider(std::make_shared<PriorityDMACostProvider<DMADesc>>(
-                  DMACostProviderBundles::createDefaultDMACostProviders<DMADesc>(filename, batch_size, profile))),
-              cache(cache_size, cache_filename) {
-        Logger::initialize();
-
-        // is_profiling_service_enabled = init_profiling_service();
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, DMANNCostProvider<DMADesc>::get_names_for_serializer());
-    }
-    // VPUCostModel(const VPUCostModel&) = delete;
-    // VPUCostModel(VPUCostModel&&) = default;
+                          const unsigned int batch_size = 1, const std::string& cache_filename = "");
 
     /**
      * @brief Construct a new DMACostModel object
@@ -167,16 +120,9 @@ public:
      */
     explicit DMACostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
-                          const char* cache_data = nullptr, size_t cache_data_length = 0)
-            : ptr_internal_dma_cost_provider(std::make_shared<PriorityDMACostProvider<DMADesc>>(
-                  DMACostProviderBundles::createDefaultDMACostProviders<DMADesc>(
-                      model_data, model_data_length, batch_size, copy_model_data, profile))),
-              cache(cache_size, cache_data, cache_data_length) {
-        Logger::initialize();
+                          const char* cache_data = nullptr, size_t cache_data_length = 0);
 
-        // is_profiling_service_enabled = init_profiling_service();
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, DMANNCostProvider<DMADesc>::get_names_for_serializer());
-    }
+    virtual ~DMACostModel() = default;
 
 public:
     /**
@@ -185,23 +131,14 @@ public:
      * @return true the VPUNN network is initialized
      * @return false the VPUNN network is not initialized
      */
-    bool nn_initialized() const {
-        // Cast to PriorityDMACostProvider to access has_nn_initialized()
-        auto priority_provider = std::dynamic_pointer_cast<const PriorityDMACostProvider<DMADesc>>(ptr_internal_dma_cost_provider);
-        if (priority_provider) {
-            return priority_provider->has_nn_initialized();
-        }
-        return false;
-    }
-    
+    bool nn_initialized() const;
+
     /**
      * @brief Get access to the preloaded cache counter for statistics
-     * 
+     *
      * @return const AccessCounter& Reference to the cache counter
      */
-    const AccessCounter& getPreloadedCacheCounter() const {
-        return cache.getPreloadedCacheCounter();
-    }
+    const AccessCounter& getPreloadedCacheCounter() const;
 
 protected:
     ///@ brief checks some validity criteria and performs sanitization that does not alter relevance
@@ -212,10 +149,7 @@ protected:
     /// @param workload [in, out] to be checked and changed
     /// @param result [out] holds error code
     /// @returns true if checks were OK, false if this wl is not to be used
-    bool sanitize_workload(DMADesc&, SanityReport& result) const {
-        // sanitizer.check_and_sanitize(workload, result);
-        return result.is_usable();
-    }
+    bool sanitize_workload(DMADesc&, SanityReport& result) const;
 
 public:
     /**
@@ -255,69 +189,34 @@ public:
      * @throws runtime_error: cannot generate the NN descriptor, e.g expected sizes do not match
      *
      */
-    CyclesInterfaceType computeCycles(const DMADesc& wl) {
-        std::string dummy_info{};
-        return computeCycles(wl, dummy_info);
-    }
+    CyclesInterfaceType computeCycles(const DMADesc& wl);
 
     /// @brief same like  @see computeCycles(DMANNWorkload wl) , the extra param is to have as output the textual
     /// errors/findings discovered when handling the workload
     /// @param wl the workload to infer on
     /// @param li will collect error info regarding wl checking.
     /* coverity[pass_by_value] */
-    std::tuple<CyclesInterfaceType, std::string> computeCyclesMsg(DMADesc wl) {
-        std::string dummy_info{};
-        auto previous_print_mode{Checker::set_print_tags(false)};
-        const auto r{computeCycles(wl, dummy_info)};
-        Checker::set_print_tags(previous_print_mode);
-        return std::make_tuple(r, dummy_info);
-    }
+    std::tuple<CyclesInterfaceType, std::string> computeCyclesMsg(DMADesc wl);
 
     /// @brief same like  @see computeCycles(DMANNWorkload wl) , the extra param is to have as output the textual
     /// errors/findings discovered when handling the workload
     /// @param wl the workload to infer on
     /// @param info [out] will collect error info regarding wl checking.
-    CyclesInterfaceType computeCycles(const DMADesc& wl, std::string& info) {
-        return Execute_and_sanitize(wl, info);
-    }
+    CyclesInterfaceType computeCycles(const DMADesc& wl, std::string& info);
 
 private:
     /* @brief Execution
      */
-    CyclesInterfaceType Execute_and_sanitize(const DMADesc& wl, std::string& info) {
-        DMACostSerializationWrap<DMADesc> serialization_handler(interogation_serializer);
-        serialization_handler.serializeDMAWorkload(wl);
-
-        // sanitize and check the input.
-        SanityReport problems{};
-        //const auto is_inference_relevant = sanitize_workload(wl, problems);
-        info = problems.info;
-
-        std::string cost_source = "unknown";
-        CyclesInterfaceType cycles{problems.value()};  // neutral value or reported problems at sanitization
-        
-        //if (is_inference_relevant){
-        cycles = get_cost(wl, info, &cost_source);
-        //}
-
-        serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(cost_source), info);
-
-        return cycles;
-    }
+    CyclesInterfaceType Execute_and_sanitize(const DMADesc& wl, std::string& info);
 
     /**
      * @brief Wrapper over run_cost_providers for handling situations where a workload cannot be resolved with only one
-     * inference. 
+     * inference.
      *
      * @param workload is the workload to be inferred
      * @return the runtime or error
      */
-    CyclesInterfaceType get_cost(const DMADesc& workload, std::string& info, std::string* cost_source = nullptr) const {
-        // @todo : impact on energy?, CHeck if energy/DPUINfo/Theoretical cycles/ops considers this situation to reduce
-        // energy
-
-        return run_cost_providers(workload, info, cost_source);  // normal wl handling
-    }
+    CyclesInterfaceType get_cost(const DMADesc& workload, std::string& info, std::string* cost_source = nullptr) const;
 
     /**
      * @brief Run the cost providers for a given workload.
@@ -331,43 +230,7 @@ private:
      * @return The number of cycles required for the workload.
      */
     CyclesInterfaceType run_cost_providers(const DMADesc& workload, std::string& info,
-                                           std::string* cost_source = nullptr) const {
-        auto cycles = Cycles::NO_ERROR;
-
-        // First look into cache (similar to SHAVE model approach)
-        const auto cached_cost{cache.get(workload, cost_source)};
-        if (cached_cost) {
-            cycles = static_cast<CyclesInterfaceType>(std::floor(*cached_cost));
-            return cycles;
-        } else {
-            // for now let the info be empty
-            info = "";
-            // Will enable on a further step where we have a profiling service available
-//             if (is_profiling_service_enabled) {
-//                 auto dpu_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
-//                 if (cost_source) *cost_source = "profiling_service_" + profiling_backend;
-// #ifdef VPUNN_BUILD_HTTP_CLIENT
-//                 cycles = http_dpu_cost_provider->getCost(dpu_op, info, profiling_backend);
-// #else
-//                 info = "";  // Avoid unreferenced var warning
-// #endif
-//             } else {
-//                 cycles = Cycles::ERROR_PROFILING_SERVICE;
-//             }
-
-
-            // Use priority-based provider (NN with fallback to theoretical)
-            cycles = dma_cost_provider.get_cost(workload, cost_source);
-    
-            // Add valid cycles to cache for future lookups
-            if (!Cycles::isErrorCode(cycles)) {
-                cache.add(workload, static_cast<float>(cycles));
-            }
-        }
-
-        return cycles;
-    }
-
+                                           std::string* cost_source = nullptr) const;
 };
 
 }  // namespace VPUNN

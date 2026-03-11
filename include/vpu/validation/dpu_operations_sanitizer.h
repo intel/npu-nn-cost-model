@@ -92,8 +92,35 @@ public:
             const int avaialable_cmx_memo{config.get_cmx_size(wl.device)};
             const auto necesarry_cmx_memo = cmx_memory.cmx;
 
+            // CMX capacity check: if the workload's computed CMX footprint exceeds the device's available CMX,
+            // abort sanitization and report a detailed diagnostic (required/available/over-by, plus device/op).
             if (avaialable_cmx_memo < necesarry_cmx_memo) {
                 result.mark_size_too_big();
+
+                const auto over_by = necesarry_cmx_memo - avaialable_cmx_memo;
+                const float ratio =
+                        (avaialable_cmx_memo > 0)
+                                ? (static_cast<float>(necesarry_cmx_memo) / static_cast<float>(avaialable_cmx_memo))
+                                : 0.0f;
+
+                const auto device_key = static_cast<int>(wl.device);
+                const auto op_key = static_cast<int>(wl.op);
+
+                const auto device_it = VPUDevice_ToText.find(device_key);
+                const auto op_it = Operation_ToText.find(op_key);
+
+                const std::string device_text =
+                        (device_it != VPUDevice_ToText.end()) ? device_it->second : "UNKNOWN_DEVICE";
+                const std::string op_text = (op_it != Operation_ToText.end()) ? op_it->second : "UNKNOWN_OP";
+
+                const std::string ratio_text =
+                        (avaialable_cmx_memo > 0) ? (std::to_string(ratio) + "x") : "n/a (available_cmx<=0)";
+
+                result.info = "CMX capacity exceeded: required=" + std::to_string(necesarry_cmx_memo) +
+                              " B available=" + std::to_string(avaialable_cmx_memo) +
+                              " B over_by=" + std::to_string(over_by) + " B (required/available=" + ratio_text +
+                              ") device=" + device_text + " op=" + op_text;
+
                 return;
             }
 
@@ -135,6 +162,10 @@ public:
     const IDeviceValidValues& getDeviceConfiguration(VPUDevice device) const {
         return get_config(device);  // for now
     }
+
+    DPU_OperationSanitizer(const DPU_OperationSanitizer&) = default;
+    DPU_OperationSanitizer() = default;
+    ~DPU_OperationSanitizer() = default;
 };
 
 }  // namespace VPUNN

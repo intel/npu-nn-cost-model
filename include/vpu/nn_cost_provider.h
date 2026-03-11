@@ -10,21 +10,29 @@
 #ifndef NN_COST_PROVIDER_H_
 #define NN_COST_PROVIDER_H_
 
+#include <algorithm>  // for std::fill, std::transform, std::replace
+#include <cmath>      // for std::ceil
+#include <map>        // for std::map
+#include <memory>     // for std::shared_ptr
+#include <optional>   // for std::optional
+#include <shared_mutex>
+#include <sstream>      // for std::stringstream
+#include <stdexcept>    // for std::runtime_error
+#include <string_view>  // for std::string_view
+#include <thread>
 #include "core/cache.h"
+#include "core/dpu_map_type_selector.h"
+#include "core/logger.h"  // for Logger::error()
+#include "core/utils.h"   // for get_env_vars()
 #include "inference/post_process.h"
 #include "inference/postprocessing_factory.h"
 #include "inference/preprocessing.h"
 #include "inference/preprop_factory.h"
 #include "inference/vpunn_runtime.h"
 #include "vpu/cycles_interface_types.h"
-
-#include <thread>
-#include <unordered_map>
-
-#include <shared_mutex>
-
 #include "vpu/nn_cost_provider_execution_context.h"
 #include "vpu/serialization/l1_cost_serialization_wrapper.h"
+#include "vpu/types.h"  // for DPUWorkload, VPUDevice
 
 namespace VPUNN {
 
@@ -90,11 +98,10 @@ public:
     const AccessCounter& getPreloadedCacheCounter() const {
         // Assumption is that only one of the legacy or new cache is used at a time,
         // thus, we have to select the one that is in use by looking if there were any accesses to it.
-            // return the one with bigger number of accesses
+        // return the one with bigger number of accesses
         return (cache.getPreloadedCacheCounter().getAccesses() >= new_cache.getPreloadedCacheCounter().getAccesses())
-                        ? cache.getPreloadedCacheCounter()
-                        : new_cache.getPreloadedCacheCounter();
-
+                       ? cache.getPreloadedCacheCounter()
+                       : new_cache.getPreloadedCacheCounter();
     }
 
     /// @brief provides the nickname of the model, used for cache and serializer
@@ -105,18 +112,12 @@ public:
 
 protected:
     // Helper to determine if workload should use new hash method (newer devices)
-    template <typename WlT>
-    static bool use_new_hash_method(const WlT& workload) {
-        if constexpr (std::is_same_v<WlT, DPUWorkload>) {
-            // For newer device versions, use new hash method
-            return workload.device >= VPUDevice::NPU_RESERVED_1;
-        } else {
-            return false;
-        }
+    static bool use_new_hash_method(const DPUWorkload& workload) {
+        // For newer device versions, use new hash method
+        return workload.device >= VPUDevice::NPU_RESERVED_1;
     }
 
-    template <typename WlT>
-    float infer_raw_input(const WlT& workload) const {
+    float infer_raw_input(const DPUWorkload& workload) const {
         auto& ctx = get_execution_context();
 
         if (!is_initialized()) {
@@ -153,8 +154,7 @@ protected:
         }
     }
 
-    template <typename WlT>
-    CyclesInterfaceType infer(const WlT& workload) const {
+    CyclesInterfaceType infer(const DPUWorkload& workload) const {
         const float raw_value = infer_raw_input(workload);
 
         if (post_processing.is_NN_value_invalid(raw_value)) {
@@ -164,8 +164,7 @@ protected:
     }
 
     /// returns a reference that is owned by the executor context, normally thread bounded
-    template <typename WlT>
-    const std::vector<float>& infer_raw_input(const std::vector<WlT>& workloads) const {
+    const std::vector<float>& infer_raw_input(const std::vector<DPUWorkload>& workloads) const {
         auto& ctx = get_execution_context();
 
         ctx.workloads_results_buffer.resize(workloads.size());
@@ -205,15 +204,14 @@ protected:
         //\todo: optimization (skip this if no processing required?)
         // post process the value : adapt it to the device and context.
         std::transform(workloads.cbegin(), workloads.cend(), ctx.workloads_results_buffer.cbegin(),
-                       ctx.workloads_results_buffer.begin(), [this](const WlT& wl, const float nn_wl) {
+                       ctx.workloads_results_buffer.begin(), [this](const DPUWorkload& wl, const float nn_wl) {
                            return this->post_processing.process(wl, nn_wl);
                        });
 
         return ctx.workloads_results_buffer;
     }
 
-    template <typename WlT>
-    std::vector<CyclesInterfaceType> infer(const std::vector<WlT>& workloads) const {
+    std::vector<CyclesInterfaceType> infer(const std::vector<DPUWorkload>& workloads) const {
         const auto number_of_workloads{workloads.size()};  ///< fixed value remembered here, workloads is non const
         std::vector<CyclesInterfaceType> cycles_vector(number_of_workloads);
 
@@ -263,8 +261,7 @@ protected:
     }
 
 public:
-    template <typename WlT>
-    CyclesInterfaceType get_cost(const WlT& workload) const {
+    CyclesInterfaceType get_cost(const DPUWorkload& workload) const {
         if (!is_initialized()) {
             return Cycles::ERROR_INFERENCE_NOT_POSSIBLE;
         }
@@ -349,6 +346,21 @@ public:
     /// @returns a pair containing (minimum_valid_value maximum_valid_value)
     std::pair<float, float> get_NN_Valid_interval() const noexcept {
         return post_processing.get_NN_Valid_interval();
+    }
+
+     // TODO: do not forget to delete this in the future, existence of this getter that exposes the guts is a smell
+    const Preprocessing<float>& get_preprocessing() const noexcept {
+        return preprocessing;
+    }
+
+    /// @brief Generates the descriptor for a given workload based on the preprocessing logic
+    /// @param workload The workload to be transformed
+    /// @returns A vector of floats representing the descriptor, or an empty vector if not initialized
+    std::vector<float> getDescriptor(const DPUWorkload& workload) const {
+        if (!is_initialized()) {
+            return {};
+        }
+        return preprocessing.transformSingle(workload);
     }
 
 private:

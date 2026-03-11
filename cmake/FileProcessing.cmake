@@ -236,11 +236,6 @@ function(GEN_CONTENT_FROM_CSV csv_file_path out_content out_pattern)
         string(APPEND output_content "// Generated from CSV: ${PARSE_CSV_DESCRIPTION}\n")
     endif()
     string(APPEND output_content "// Source: ${csv_file_path}\n")
-    string(APPEND output_content "// Generated at: ")
-
-    # Add timestamp
-    string(TIMESTAMP current_time "%Y-%m-%d %H:%M:%S")
-    string(APPEND output_content "${current_time}\n\n")
 
     # Process each data row
     set(row_count 0)

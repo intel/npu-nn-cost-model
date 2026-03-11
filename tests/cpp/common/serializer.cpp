@@ -20,6 +20,8 @@
 #include <vpu/validation/data_dpu_operation.h>
 #include <vpu_cost_model.h>
 
+#include "vpu/validation/data_shave_operation.h"
+
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
@@ -365,6 +367,20 @@ TEST_F(VPUNNSerializerTest, MultiThreaded_Serialization) {
     }
 
     EXPECT_EQ(found.size(), num_threads * rows_per_thread);
+}
+
+TEST_F(VPUNNSerializerTest, Has_member_map_Test) {
+    EXPECT_TRUE(has_member_map_v<DMAWorkload>);
+    // DMANNWorkload_NPU27
+    EXPECT_TRUE(has_member_map_v<DMANNWorkload_NPU27>);
+    // DMANNWorkload_NPU40_50
+    EXPECT_TRUE(has_member_map_v<DMANNWorkload_NPU40>);
+
+    //DPUOperation
+    EXPECT_TRUE(has_member_map_v<DPUOperation>);
+
+    //SHAVEOperation
+    EXPECT_TRUE(has_member_map_v<SHAVEOperation>);
 }
 
 }  // namespace VPUNN_unit_tests

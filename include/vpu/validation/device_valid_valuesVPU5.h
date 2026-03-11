@@ -79,8 +79,9 @@ private:
             ISIStrategy::SPLIT_OVER_K,
     };
 
-    inline static const int weigths_alignment_def{32};
-    inline static const int out_innermost_dim_alignment_def{16};  // bytes
+    inline static const int weigths_alignment_B_def{16};                   // bytes
+    inline static const bool legacy_samples_alignment_weights_def{false};  // no alignment (samples)
+    inline static const int out_innermost_dim_alignment_def{16};           // bytes
     inline static const int input_heigth_start_factor_SOH_def{1};
 
     static constexpr int alignement_size_bytes_def{
@@ -196,13 +197,14 @@ public:
                                  cmx_KB_sizes_def,                   //
                                  output_write_tile_options_def,      //
                                  isi_stategy_options_def,            //
-                                 weigths_alignment_def,              //
+                                 weigths_alignment_B_def,            //
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
-                                 out_innermost_dim_alignment_def) {};
-  
+                                 out_innermost_dim_alignment_def,    //
+                                 legacy_samples_alignment_weights_def) {};
+
     /// constructor with link to operations dynamic behavior and input channels rules and restrictions
     VPURESERVEDorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
                                const std::unordered_map<Operation, SmartRanges>& input_channels_restrictions_,
@@ -215,12 +217,13 @@ public:
                                  cmx_KB_sizes_def,                   //
                                  output_write_tile_options_def,      //
                                  isi_stategy_options_def,            //
-                                 weigths_alignment_def,              //
+                                 weigths_alignment_B_def,            //
                                  input_heigth_start_factor_SOH_def,  //
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
-                                 out_innermost_dim_alignment_def),
+                                 out_innermost_dim_alignment_def,    //
+                                 legacy_samples_alignment_weights_def),
               input_channels_restrictions{input_channels_restrictions_},
               batch_restrictions{{batch_restrictions_}} {};
 
@@ -237,12 +240,13 @@ public:
                                  cmx_KB_sizes_def,                   //
                                  output_write_tile_options_def,      //
                                  isi_stategy_options_def,            //
-                                 weigths_alignment_def,              //
+                                 weigths_alignment_B_def,            //
                                  input_heigth_start_factor_SOH_,     // special
                                  valid_datatypes_map_default,        //
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
-                                 out_innermost_dim_alignment_def),
+                                 out_innermost_dim_alignment_def,    //
+                                 legacy_samples_alignment_weights_def),
               input_channels_restrictions{input_channels_restrictions_},
               batch_restrictions{{batch_restrictions_}} {};
 
@@ -311,7 +315,7 @@ protected:  // only const attributes can be visible in derived
             {Operation::MAXPOOL, SmartRanges(16, 64, 16, 32)},  // special case {16, 32, 64}
             {Operation::ELTWISE_MUL, SmartRanges(16, input_spatial_dim_max, 16)},
             {Operation::LAYER_NORM, SmartRanges(16, input_spatial_dim_max, 16)},
-            {Operation::AVEPOOL, SmartRanges(16, 64, 16, 32)},  // special case {16, 32, 64}// add AVGPOOL
+            {Operation::AVEPOOL, SmartRanges(16, 64, 16, 32)}, // special case {16, 32, 64}// add AVGPOOL
     };
 
     const MultiSmartRanges input_channels_restriction_extensions{

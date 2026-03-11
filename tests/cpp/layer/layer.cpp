@@ -1355,10 +1355,10 @@ TEST_F(VPULayerCostModelTest, Regression_sprint125_investigation_Test) {
         const VPUNN::DPULayer tst_layer0(wl_0);
         const VPUNN::DPULayer tst_layer1(wl_1);
         const std::vector<TestCase> tests{
-                {{tst_layer0, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+                {{std::move(tst_layer0), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 36500U, 36500U * no_fail + 1000U},
                  "SOW, ch 512 "},
-                {{tst_layer1, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+                {{std::move(tst_layer1), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 73800U, 73800U * no_fail + 1000U},
                  "SOW, ch 1024 "},
 

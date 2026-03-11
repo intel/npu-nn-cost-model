@@ -9,12 +9,16 @@
 
 # example/
 
-add_executable(vpunn_profile cost_model.profiler.cpp)
+add_executable(example_app dummy_example.cpp)
 
-target_link_libraries(vpunn_profile 
-	PRIVATE 
-		npu_costmodel
-		vpunn_common_settings
-		flatbuffers
-		$<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:nlohmann_json::nlohmann_json>
+target_link_libraries(example_app
+    PRIVATE
+        npu_costmodel
+        vpunn_common_settings
+)
+
+# Install target for example_app
+install(TARGETS example_app
+    RUNTIME DESTINATION bin
+    COMPONENT examples
 )

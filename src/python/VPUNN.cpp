@@ -13,7 +13,7 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(VPUNN, m) {
+PYBIND11_MODULE(_VPUNN, m) {
     m.doc() = "Minimal VPUNN Python bindings for DPU and DMA cost modeling";
 
     // Core enums needed for DPUWorkload
@@ -94,7 +94,12 @@ PYBIND11_MODULE(VPUNN, m) {
     py::enum_<VPUNN::ISIStrategy>(m, "ISIStrategy")
         .value("CLUSTERING", VPUNN::ISIStrategy::CLUSTERING)
         .value("SPLIT_OVER_H", VPUNN::ISIStrategy::SPLIT_OVER_H)
-        .value("SPLIT_OVER_K", VPUNN::ISIStrategy::SPLIT_OVER_K);
+        .value("SPLIT_OVER_K", VPUNN::ISIStrategy::SPLIT_OVER_K)
+        .value("SPLIT_OVER_K_nxtHW", VPUNN::ISIStrategy::SPLIT_OVER_K_nxtHW);
+
+    py::enum_<VPUNN::MPEEngine>(m, "MPEEngine")
+        .value("SCL", VPUNN::MPEEngine::SCL)
+        .value("dCIM", VPUNN::MPEEngine::DCIM);
 
     // DMA-related enums
     py::enum_<VPUNN::MemoryLocation>(m, "MemoryLocation")
@@ -152,12 +157,13 @@ PYBIND11_MODULE(VPUNN, m) {
         .def_readwrite("output_write_tiles", &VPUNN::DPUWorkload::output_write_tiles)
         .def_readwrite("offsets", &VPUNN::DPUWorkload::offsets)
         .def_readwrite("isi_strategy", &VPUNN::DPUWorkload::isi_strategy)
+        .def_readwrite("weight_type", &VPUNN::DPUWorkload::weight_type)
         .def_readwrite("weight_sparsity_enabled", &VPUNN::DPUWorkload::weight_sparsity_enabled)
-        .def("get_layer_info", &VPUNN::DPUWorkload::get_layer_info)
-        .def("set_layer_info", &VPUNN::DPUWorkload::set_layer_info)
-        .def("is_inplace_output", &VPUNN::DPUWorkload::is_inplace_output)
-        .def("is_weightless_operation", &VPUNN::DPUWorkload::is_weightless_operation)
-        .def("get_weight_type", &VPUNN::DPUWorkload::get_weight_type);
+        .def_readwrite("weightless_operation", &VPUNN::DPUWorkload::weightless_operation)
+        .def_readwrite("in_place_output_memory", &VPUNN::DPUWorkload::in_place_output_memory)
+        .def_readwrite("superdense_memory", &VPUNN::DPUWorkload::superdense_memory)
+        .def_readwrite("mpe_engine", &VPUNN::DPUWorkload::mpe_engine)
+        .def_readwrite("reduce_minmax_op", &VPUNN::DPUWorkload::reduce_minmax_op);
 
     // DMAWorkload structure (legacy)
     py::class_<VPUNN::DMAWorkload>(m, "DMAWorkload")
@@ -212,9 +218,12 @@ PYBIND11_MODULE(VPUNN, m) {
         .def("DPUMsg", &VPUNN::VPUCostModel::DPUMsg, 
              "Calculate DPU cost and return cycles with error message",
              py::arg("workload"))
-       .def("DPU", static_cast<VPUNN::CyclesInterfaceType (VPUNN::VPUCostModel::*)(VPUNN::DPUWorkload) const>(&VPUNN::VPUCostModel::DPU),
+        .def("DPU", static_cast<VPUNN::CyclesInterfaceType (VPUNN::VPUCostModel::*)(VPUNN::DPUWorkload) const>(&VPUNN::VPUCostModel::DPU),
            "Calculate DPU cost and return cycles only",
            py::arg("workload"))
+        .def("getDescriptor", &VPUNN::VPUCostModel::getDescriptor,
+             "Get the DPU cost model descriptor for a given workload",
+             py::arg("workload"))
        ;
 
     // DMACostModel classes for different DMA workload types

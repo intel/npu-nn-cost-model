@@ -49,7 +49,8 @@ static void inferInputTensorShape(DPUWorkload& wl, const DPULayer& originalLayer
     // For the operation that are not having a kernel with depth (e.g. ELEMENTWISE)
     // - the input's Z should be equal to output's Z  (as a more general rule)
     const auto input_channel =
-            ((wl.op == Operation::CONVOLUTION) || (wl.op == Operation::CM_CONVOLUTION) || wl.output_autopad)  // kernels need all input Z
+            ((wl.op == Operation::CONVOLUTION) || (wl.op == Operation::CM_CONVOLUTION) ||
+             wl.is_output_autopad())    // kernels need all input Z
                     ? wl.inputs[0].z()  // use what the split left here by default (maybe original z, maybe a Z split of
                                         // inputs(future?))
                     : wl.outputs[0].z();  // for elementwise operations the in-out channels should match
@@ -224,6 +225,12 @@ public:
         return dpuMulSplits;
     }
 
+private:
+    static SmartRanges getValidIntraTilesChannelsOptions(/*VPUDevice device*/) {
+        return SmartRanges{16, 64, 16, 32};  // 16,32,64
+    }
+
+public:
     /**
      * @brief Tile multiple workloads using the ZTiling algorithm
      *
@@ -236,14 +243,16 @@ public:
         if (layer_on_tile.device < VPUDevice::NPU_5_0  //
             || (force_LegacyZTiling)                   // Every device runs as before
         ) {                                            // Some layers have a max size in Z by specification
-            const std::vector<unsigned int> validZTiles{requireMaxZTile(layer_on_tile)
-                                                                ? std::vector<unsigned int>({16, 32, 64})
-                                                                  : std::vector<unsigned int>({})};
+            const std::vector<unsigned int> validZTiles{
+                    requireMaxZTile(layer_on_tile)
+                            ? getValidIntraTilesChannelsOptions().transformSmartRangetoVector<unsigned int>()
+                            : std::vector<unsigned int>({})};
+
             splitOverZ(layer_on_tile, splitPool, mode, nWorkloads, validZTiles);
         } else {  // experimental for new devices
             const SplitDimension splitter{
-                    requireMaxZTile(layer_on_tile) ? SmartRanges{16, 64, 16, 32}  // 16,32,64
-                                                   : SmartRanges{1, 8192, 16}     // div 16
+                    requireMaxZTile(layer_on_tile) ? getValidIntraTilesChannelsOptions() : SmartRanges{1, 8192, 16}
+                    // div 16
             };
             splitInNOverZ(layer_on_tile, splitPool, mode, nWorkloads, splitter);
         }

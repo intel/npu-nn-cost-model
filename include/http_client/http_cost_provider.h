@@ -18,23 +18,24 @@
 #undef CPPHTTPLIB_ZLIB_SUPPORT
 #endif
 
+#include <nlohmann/json.hpp>
 #include "httplib.h"
 
 #ifdef NO_ERROR
-#undef NO_ERROR  // winerror.h defines NO_ERROR, which is redefined for Cycles type
+#undef NO_ERROR  // winerror.h defines NO_ERROR, which is enum member for Cycles type
 #endif
 
 #ifdef ADD
-#undef ADD
+#undef ADD  // arpa/nameser.h defines ADD macro on Linux
 #endif
-
-#include <nlohmann/json.hpp>
 
 #include "vpu/types.h"
 #include "vpu/validation/data_dpu_operation.h"
+#include "vpu/profiling_service.h"
+#include "core/utils.h"
+#include "vpu/http_cost_provider_intf.h"
 
 namespace VPUNN {
-
 /**
  * @struct ProfilerResponse
  * @brief Represents the response from a profiling request.
@@ -58,17 +59,16 @@ public:
      * @param host The hostname or IP address of the server.
      * @param port The port number to connect to.
      */
-    HTTPClient(const std::string host, int port)
-            : _host(host), _port(port), _client(_host, _port), _debug(false) {
-              };
+    HTTPClient(const std::string& host, int port);
 
     /**
      * @brief Sends a JSON request to the specified path.
      * @param payload The JSON payload to send.
      * @param path The endpoint path for the request.
      * @return The JSON response from the server.
+     * @throws std::runtime_error if the request fails or the response cannot be parsed.
      */
-    nlohmann::json sendJsonRequest(const nlohmann::json& payload, const std::string& path);
+    nlohmann::json sendJsonRequest(const nlohmann::json& payload, const std::string& path) const;
 
     /**
      * @brief Enable or disable debug output.
@@ -77,10 +77,10 @@ public:
     void setDebug(bool enable) { _debug = enable; }
 
 protected:
-    const std::string _host;        ///< The hostname or IP address.
-    const int _port;                ///< The port number.
-    httplib::Client _client;        ///< The HTTP client instance.
-    bool _debug;                    ///< Debug flag for verbose output.
+    const std::string _host;            ///< The hostname or IP address.
+    const int _port;                    ///< The port number.
+    mutable httplib::Client _client;    ///< The HTTP client instance.
+    bool _debug;                        ///< Debug flag for verbose output.
 };
 
 /**
@@ -95,59 +95,100 @@ public:
      * @brief Processes the profiler's JSON response.
      * @param response The JSON response from the profiler.
      * @return A ProfilerResponse object containing the processed data.
+     * @throws std::runtime_error if the response cannot be parsed correctly.
      */
-    ProfilerResponse handle_profiler_response(const nlohmann::json& response);
+    ProfilerResponse handle_profiler_response(const nlohmann::json& response) const;
 
      /**
      * @brief Checks if the profiling service is available.
      * @param check_backend Optional parameter to specify backend to check.
      * @return True if available (or at least 1 backend available if check_backend not set), false otherwise.
+     * @throws std::runtime_error if there is an error during sendJsonRequest.
      */
-    bool is_available(const std::string& check_backend = "");
+    bool is_available(const std::string& check_backend = "") const;
 };
 
 /**
- * @class HttpDPUCostProvider
- * @brief Provides DPU cost metrics via HTTP requests.
+ * @class HttpCostProvider
+ * @brief Provides cost information by communicating with a profiling service over HTTP.
  */
-class HttpDPUCostProvider {
+class HttpCostProvider : public IHttpCostProvider {
 public:
-    HttpDPUCostProvider(const std::string host = "irlccggpu04.ir.intel.com", const int port = 5000): _client(host, port), _debug(false) {};
+    HttpCostProvider(const std::string& host = default_host, int port = default_port);
+
+    /**
+     * @brief Factory static function that initializes HttpCostProvider from environment variables.
+     * @return A unique pointer to the initialized HttpCostProvider, nullptr otherwise.
+     */
+    static std::unique_ptr<HttpCostProvider> initFromEnvironment();
+    
+    /**
+     * @brief Checks if the profiling service is available.
+     * @return True if available, false otherwise.
+     */
+    bool is_available() const override;
+
+protected:
+    /**
+     * @brief Variant-based dispatcher for the templated getCost method.
+     *
+     * Uses std::visit to dispatch the HttpWorkloadVariant to the corresponding
+     * getCost<T>() instantiation (e.g., DPUOperation or DMANN workload types).
+     * 
+     * @param op The workload operation wrapped in a HttpWorkloadVariant.
+     * @param info A string to store additional information.
+     * @return The cost as CyclesInterfaceType, in case of error returns Cycles::ERROR_PROFILING_SERVICE.
+     */
+    CyclesInterfaceType getCostImpl(const HttpWorkloadVariant& op, std::string& info) const override;
     
     /**
      * @brief Retrieves the cost associated with a given DPU operation.
-     * @param op The DPUOperation for which to get the cost.
+     * @tparam WlT The type of the workload operation.
+     * @param op The operation of type WlT for which to get the cost.
      * @param info A string to store additional information.
      * @param backend The backend to use for retrieving cost.
-     * @return The cost as CyclesInterfaceType.
+     * @return The cost as CyclesInterfaceType, in case of error returns Cycles::ERROR_PROFILING_SERVICE.
      */
-    CyclesInterfaceType getCost(const DPUOperation& op, std::string& info, const std::string& backend = "silicon");
+    template <typename WlT>
+    CyclesInterfaceType getHttpCost(const WlT& op, std::string& info) const;
 
-    bool is_available(const std::string& check_backend = "") {
-        return _client.is_available(check_backend);
-    }
+public:
+    /**
+     * @brief Converts ProfilingServiceBackend enum to string representation.
+     * @param backend The backend enum value to convert.
+     * @return String representation of the backend, defaults to "SILICON" if invalid.
+     */
+    const std::string profilingBackendToString(ProfilingServiceBackend backend=ProfilingServiceBackend::SILICON) const override;
 
     /**
      * @brief Enable or disable debug output.
      * @param enable True to enable debug output, false to disable.
      */
-    void setDebug(bool enable) { 
-        _debug = enable; 
-        _client.setDebug(enable);
-    }
+    void setDebug(bool enable) override;
+
+    ~HttpCostProvider() = default;
 
 private:
-    HTTPProfilingClient _client; ///< The HTTPProfilingClient instance.
-    bool _debug;                 ///< Debug flag for verbose output.
-    
-    // TODO -- extend serializer to output json serialized dpu ops.
-    /**
-     * @brief Converts a DPUOperation to its JSON representation.
-     * @param op The DPUOperation to convert.
-     * @return A JSON object representing the DPUOperation.
-     */
-    const nlohmann::json dpuop_as_json(const DPUOperation& op);
-};
+    HTTPProfilingClient _client;    ///< The HTTPProfilingClient instance.
+    std::string profiling_backend;  ///< The actual profiling backend that is used.
+    bool _debug;                    ///< Debug flag for verbose output.
 
+    /**
+     * @brief Default values for the HttpCostProvider in case environment variables are not set.
+     * or are invalid.
+     */
+    static constexpr const char*  default_host = "irlccggpu04.ir.intel.com";
+    static constexpr int default_port = 5000;
+    static constexpr const char* default_backend = "silicon";
+
+    /**
+     * @brief Converts a DMANNWorkload type to its JSON representation.
+     * @tparam WlT The type of the workload operation.
+     * @param op The DMANNWorkload to convert.
+     * @return A JSON object representing the DMANNWorkload type.
+     */
+    template <typename WlT>
+    const nlohmann::json toJson(const WlT& wl) const;
+};
 }  // namespace VPUNN
-#endif
+#endif // HTTP_COST_PROVIDER_H_

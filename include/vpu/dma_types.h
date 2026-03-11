@@ -10,43 +10,21 @@
 #ifndef VPUNN_DMA_TYPES_H
 #define VPUNN_DMA_TYPES_H
 
-#include <algorithm>
 #include <array>
-#include <cstdlib>
-#include <limits>
-#include <numeric>
+#include <mutex>
+#include <string>
+#include <tuple>  // For std::tie used in SizeStride::operator<
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include "types.h"
+
+#include "profiling_service.h"
+#include "types.h"  // all basic NPU types
 #include "utils.h"
-
-#include <cmath>
-#include <iostream>
-#include <map>
-#include <sstream>  //
-#include <string>
-
-#include "dpu_defaults.h"
 
 namespace VPUNN {
 
 // when making a new interface version, start copying from here
-
-/*
-/// gives the EnumMap for a E enum type
-/// has to be fully implemented for each type we want to cover
-template <typename E>
-inline const EnumMap& mapToText();
-
-/// creates the  EnumInverseMap for a particular E enum type
-/// @pre the EnumMap<E> must exists
-template <typename E>
-inline const EnumInverseMap& mapFromText() {
-static auto m = createInverseMap(mapToText<E>());
-return m;
-}
-*/
 
 /**
  * @brief Memory locations
@@ -114,6 +92,7 @@ inline std::string enumName<Num_DMA_Engine>() {
  * @brief The base structure that encodes a DMA workloads
  * @deprecated Will be removed in next releases
  */
+/* coverity[rule_of_five_violation:FALSE] */
 struct DMAWorkload {
     VPUDevice device;  ///< VPU device
 
@@ -131,27 +110,74 @@ struct DMAWorkload {
         return "dma_workload_";
     }
 
-    using _ref_supported_type = std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<VPUTensor>,
-                                             std::reference_wrapper<MemoryLocation>, std::reference_wrapper<unsigned int>>;
+    using _ref_supported_type =
+            std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<VPUTensor>,
+                         std::reference_wrapper<MemoryLocation>, std::reference_wrapper<unsigned int>>;
 
-    const std::unordered_map<std::string, _ref_supported_type> _member_map{
-            {"device", std::ref(device)},
-            {"input", std::ref(input)},
-            {"output", std::ref(output)},
-            {"input_location", std::ref(input_location)},
-            {"output_location", std::ref(output_location)},
-            {"output_write_tiles", std::ref(output_write_tiles)}
-    };
+    using MemberMapType = std::unordered_map<std::string, _ref_supported_type>;
 
-    static const std::vector<std::string> _get_member_names() {
-        return {"device",
-                "input",
-                "output",
-                "input_location",
-                "output_location",
-                "output_write_tiles"
-        };
+    const MemberMapType& get_member_map() const {
+        ensure_member_map();
+        return _member_map;
     }
+    MemberMapType& get_member_map() {
+        ensure_member_map();
+        return _member_map;
+    }
+
+private:
+    mutable MemberMapType _member_map{};
+
+    void populate_member_map() {
+        _member_map = MemberMapType{{"device", std::ref(device)},
+                                    {"input", std::ref(input)},
+                                    {"output", std::ref(output)},
+                                    {"input_location", std::ref(input_location)},
+                                    {"output_location", std::ref(output_location)},
+                                    {"output_write_tiles", std::ref(output_write_tiles)}};
+    }
+
+    mutable std::mutex _member_map_mutex{};
+    void ensure_member_map() const {
+        std::lock_guard<std::mutex> lock(_member_map_mutex);
+        if (is_member_map_initialized()) {
+            return;
+        }
+        (const_cast<DMAWorkload*>(this))->populate_member_map();
+    }
+    bool is_member_map_initialized() const {
+        return !_member_map.empty();  // NOT empty
+    }
+
+public:
+    static const std::vector<std::string> _get_member_names() {
+        return {"device", "input", "output", "input_location", "output_location", "output_write_tiles"};
+    }
+
+    DMAWorkload() = default;
+
+    DMAWorkload(const VPUDevice& _device, const VPUTensor& _input, const VPUTensor& _output,
+                const MemoryLocation& _input_location, const MemoryLocation& _output_location,
+                unsigned int _output_write_tiles = 1)
+            : device{_device},
+              input{_input},
+              output{_output},
+              input_location{_input_location},
+              output_location{_output_location},
+              output_write_tiles{_output_write_tiles} {
+    }
+
+    DMAWorkload(const DMAWorkload& w)
+            : device{w.device},
+              input{w.input},
+              output{w.output},
+              input_location{w.input_location},
+              output_location{w.output_location},
+              output_write_tiles{w.output_write_tiles} {
+    }
+    DMAWorkload& operator=(DMAWorkload&&) = delete;
+    DMAWorkload& operator=(const DMAWorkload&) = delete;
+    ~DMAWorkload() = default;
 };
 
 /**
@@ -185,6 +211,9 @@ struct DMANNWorkload_NPU27 {
 
     MemoryDirection transfer_direction;  ///< from where to where
 
+    ProfilingServiceBackend profiling_service_backend_hint{
+            ProfilingServiceBackend::__size};  ///< hint about what profiling service backend to use
+
     std::string loc_name{};  ///< The location name
 
     int getAccessedBytes() const {
@@ -200,31 +229,50 @@ struct DMANNWorkload_NPU27 {
     using _ref_supported_type = std::variant<std::reference_wrapper<VPUDevice>, std::reference_wrapper<MemoryDirection>,
                                              std::reference_wrapper<int>, std::reference_wrapper<std::string>>;
 
-    const std::unordered_map<std::string, _ref_supported_type> _member_map{
-            {"device", std::ref(device)},
-            {"num_planes", std::ref(num_planes)},
-            {"length", std::ref(length)},
-            {"src_width", std::ref(src_width)},
-            {"dst_width", std::ref(dst_width)},
-            {"src_stride", std::ref(src_stride)},
-            {"dst_stride", std::ref(dst_stride)},
-            {"src_plane_stride", std::ref(src_plane_stride)},
-            {"dst_plane_stride", std::ref(dst_plane_stride)},
-            {"transfer_direction", std::ref(transfer_direction)},
-            {"loc_name", std::ref(loc_name)}};
+    using MemberMapType = std::unordered_map<std::string, _ref_supported_type>;
 
+    const MemberMapType& get_member_map() const {
+        ensure_member_map();
+        return _member_map;
+    }
+    MemberMapType& get_member_map() {
+        ensure_member_map();
+        return _member_map;
+    }
+
+private:
+    mutable MemberMapType _member_map{};
+
+    void populate_member_map() {
+        _member_map = MemberMapType{{"device", std::ref(device)},
+                                    {"num_planes", std::ref(num_planes)},
+                                    {"length", std::ref(length)},
+                                    {"src_width", std::ref(src_width)},
+                                    {"dst_width", std::ref(dst_width)},
+                                    {"src_stride", std::ref(src_stride)},
+                                    {"dst_stride", std::ref(dst_stride)},
+                                    {"src_plane_stride", std::ref(src_plane_stride)},
+                                    {"dst_plane_stride", std::ref(dst_plane_stride)},
+                                    {"transfer_direction", std::ref(transfer_direction)},
+                                    {"loc_name", std::ref(loc_name)}};
+    }
+
+    mutable std::mutex _member_map_mutex{};
+    void ensure_member_map() const {
+        std::lock_guard<std::mutex> lock(_member_map_mutex);
+        if (is_member_map_initialized()) {
+            return;
+        }
+        (const_cast<DMANNWorkload_NPU27*>(this))->populate_member_map();
+    }
+    bool is_member_map_initialized() const {
+        return !_member_map.empty();  // NOT empty
+    }
+
+public:
     static const std::vector<std::string> _get_member_names() {
-        return {"device",
-                "num_planes",
-                "length",
-                "src_width",
-                "dst_width",
-                "src_stride",
-                "dst_stride",
-                "src_plane_stride",
-                "dst_plane_stride",
-                "transfer_direction",
-                "loc_name"};
+        return {"device",     "num_planes",       "length",           "src_width",          "dst_width", "src_stride",
+                "dst_stride", "src_plane_stride", "dst_plane_stride", "transfer_direction", "loc_name"};
     }
 
     DMANNWorkload_NPU27() = default;
@@ -277,27 +325,10 @@ struct DMANNWorkload_NPU27 {
     virtual ~DMANNWorkload_NPU27() = default;
 
     /// equality test operator
-    bool operator==(const DMANNWorkload_NPU27& b) const {
-        return device == b.device &&
-               num_planes == b.num_planes &&
-               length == b.length &&
-               src_width == b.src_width &&
-               dst_width == b.dst_width &&
-               src_stride == b.src_stride &&
-               dst_stride == b.dst_stride &&
-               src_plane_stride == b.src_plane_stride &&
-               dst_plane_stride == b.dst_plane_stride &&
-               transfer_direction == b.transfer_direction &&
-               loc_name == b.loc_name;
-    }
+    bool operator==(const DMANNWorkload_NPU27& b) const;
+
     /// less than operator for std::map compatibility
-    bool operator<(const DMANNWorkload_NPU27& b) const {
-        return std::tie(device, num_planes, length, src_width, dst_width, src_stride, dst_stride,
-                         src_plane_stride, dst_plane_stride, transfer_direction, loc_name) <
-               std::tie(b.device, b.num_planes, b.length, b.src_width, b.dst_width, b.src_stride,
-                         b.dst_stride, b.src_plane_stride, b.dst_plane_stride, b.transfer_direction,
-                         b.loc_name);
-    }
+    bool operator<(const DMANNWorkload_NPU27& b) const;
 
     /// @brief Compute FNV-1a hash for cache lookups
     /// @return 32-bit hash value for this workload
@@ -345,6 +376,9 @@ struct DMANNWorkload_NPU40_50 {
 
     std::string loc_name{};  ///< The location name
 
+    ProfilingServiceBackend profiling_service_backend_hint{
+            ProfilingServiceBackend::__size};  ///< hint about what profiling service backend to use
+
     /// How many bytes are being transferred read and written
     int getAccessedBytes() const {
         const auto unitBlock{src_width};
@@ -365,40 +399,68 @@ struct DMANNWorkload_NPU40_50 {
                                              std::reference_wrapper<Num_DMA_Engine>, std::reference_wrapper<int>,
                                              std::reference_wrapper<std::string>>;
 
-    const std::unordered_map<std::string, _ref_supported_type> _member_map{
-            {"device", std::ref(device)},
-            {"src_width", std::ref(src_width)},
-            {"dst_width", std::ref(dst_width)},
-            {"num_dim", std::ref(num_dim)},
-            {"num_engine", std::ref(num_engine)},
-            {"direction", std::ref(transfer_direction)},
+    using MemberMapType = std::unordered_map<std::string, _ref_supported_type>;
 
-            {"src_stride_1", std::ref(e_dim[0].src_stride)},
-            {"dst_stride_1", std::ref(e_dim[0].dst_stride)},
-            {"src_dim_size_1", std::ref(e_dim[0].src_dim_size)},
-            {"dst_dim_size_1", std::ref(e_dim[0].dst_dim_size)},
+    const MemberMapType& get_member_map() const {
+        ensure_member_map();
+        return _member_map;
+    }
+    MemberMapType& get_member_map() {
+        ensure_member_map();
+        return _member_map;
+    }
 
-            {"src_stride_2", std::ref(e_dim[1].src_stride)},
-            {"dst_stride_2", std::ref(e_dim[1].dst_stride)},
-            {"src_dim_size_2", std::ref(e_dim[1].src_dim_size)},
-            {"dst_dim_size_2", std::ref(e_dim[1].dst_dim_size)},
+private:
+    mutable MemberMapType _member_map{};
 
-            {"src_stride_3", std::ref(e_dim[2].src_stride)},
-            {"dst_stride_3", std::ref(e_dim[2].dst_stride)},
-            {"src_dim_size_3", std::ref(e_dim[2].src_dim_size)},
-            {"dst_dim_size_3", std::ref(e_dim[2].dst_dim_size)},
+    void populate_member_map() {
+        _member_map = MemberMapType{{"device", std::ref(device)},
+                                    {"src_width", std::ref(src_width)},
+                                    {"dst_width", std::ref(dst_width)},
+                                    {"num_dim", std::ref(num_dim)},
+                                    {"num_engine", std::ref(num_engine)},
+                                    {"direction", std::ref(transfer_direction)},
 
-            {"src_stride_4", std::ref(e_dim[3].src_stride)},
-            {"dst_stride_4", std::ref(e_dim[3].dst_stride)},
-            {"src_dim_size_4", std::ref(e_dim[3].src_dim_size)},
-            {"dst_dim_size_4", std::ref(e_dim[3].dst_dim_size)},
+                                    {"src_stride_1", std::ref(e_dim[0].src_stride)},
+                                    {"dst_stride_1", std::ref(e_dim[0].dst_stride)},
+                                    {"src_dim_size_1", std::ref(e_dim[0].src_dim_size)},
+                                    {"dst_dim_size_1", std::ref(e_dim[0].dst_dim_size)},
 
-            {"src_stride_5", std::ref(e_dim[4].src_stride)},
-            {"dst_stride_5", std::ref(e_dim[4].dst_stride)},
-            {"src_dim_size_5", std::ref(e_dim[4].src_dim_size)},
-            {"dst_dim_size_5", std::ref(e_dim[4].dst_dim_size)},
-            {"loc_name", std::ref(loc_name)}};
+                                    {"src_stride_2", std::ref(e_dim[1].src_stride)},
+                                    {"dst_stride_2", std::ref(e_dim[1].dst_stride)},
+                                    {"src_dim_size_2", std::ref(e_dim[1].src_dim_size)},
+                                    {"dst_dim_size_2", std::ref(e_dim[1].dst_dim_size)},
 
+                                    {"src_stride_3", std::ref(e_dim[2].src_stride)},
+                                    {"dst_stride_3", std::ref(e_dim[2].dst_stride)},
+                                    {"src_dim_size_3", std::ref(e_dim[2].src_dim_size)},
+                                    {"dst_dim_size_3", std::ref(e_dim[2].dst_dim_size)},
+
+                                    {"src_stride_4", std::ref(e_dim[3].src_stride)},
+                                    {"dst_stride_4", std::ref(e_dim[3].dst_stride)},
+                                    {"src_dim_size_4", std::ref(e_dim[3].src_dim_size)},
+                                    {"dst_dim_size_4", std::ref(e_dim[3].dst_dim_size)},
+
+                                    {"src_stride_5", std::ref(e_dim[4].src_stride)},
+                                    {"dst_stride_5", std::ref(e_dim[4].dst_stride)},
+                                    {"src_dim_size_5", std::ref(e_dim[4].src_dim_size)},
+                                    {"dst_dim_size_5", std::ref(e_dim[4].dst_dim_size)},
+                                    {"loc_name", std::ref(loc_name)}};
+    }
+
+    mutable std::mutex _member_map_mutex{};
+    void ensure_member_map() const {
+        std::lock_guard<std::mutex> lock(_member_map_mutex);
+        if (is_member_map_initialized()) {
+            return;
+        }
+        (const_cast<DMANNWorkload_NPU40_50*>(this))->populate_member_map();
+    }
+    bool is_member_map_initialized() const {
+        return !_member_map.empty();  // NOT empty
+    }
+
+public:
     static const std::vector<std::string> _get_member_names() {
         auto fields = std::vector<std::string>{"device",     "src_width", "dst_width", "num_dim",
                                                "num_engine", "direction", "loc_name"};
@@ -457,53 +519,15 @@ struct DMANNWorkload_NPU40_50 {
     DMANNWorkload_NPU40_50& operator=(DMANNWorkload_NPU40_50&&) = delete;
     virtual ~DMANNWorkload_NPU40_50() = default;
 
-    bool operator==(const DMANNWorkload_NPU40_50& b) const {
-        // Compare device, widths, num_dim, and num_engine
-        if (device != b.device ||
-            src_width != b.src_width ||
-            dst_width != b.dst_width ||
-            num_dim != b.num_dim ||
-            num_engine != b.num_engine ||
-            transfer_direction != b.transfer_direction) {
-            return false;
-        }
+    /// equality test operator
+    bool operator==(const DMANNWorkload_NPU40_50& b) const;
 
-        // Compare all extra dimensions up to num_dim
-        for (int i = 0; i < num_dim; i++) {
-            if (e_dim[i].src_stride != b.e_dim[i].src_stride ||
-                e_dim[i].dst_stride != b.e_dim[i].dst_stride ||
-                e_dim[i].src_dim_size != b.e_dim[i].src_dim_size ||
-                e_dim[i].dst_dim_size != b.e_dim[i].dst_dim_size) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    bool operator<(const DMANNWorkload_NPU40_50& b) const {
-        return std::tie(device, src_width, dst_width, num_dim, e_dim, num_engine, transfer_direction, loc_name) <
-               std::tie(b.device, b.src_width, b.dst_width, b.num_dim, b.e_dim, b.num_engine, b.transfer_direction,
-                         b.loc_name);
-    }
+    /// less than operator for std::map compatibility
+    bool operator<(const DMANNWorkload_NPU40_50& b) const;
 
     /// @brief Compute FNV-1a hash for cache lookups
     /// @return 32-bit hash value for this workload
     uint32_t hash() const;
-};
-
-// Custom hasher for DMAWorkload_NPU27 using the hash() method
-struct DMANNWorkload_NPU27Hasher {
-    std::size_t operator()(const DMANNWorkload_NPU27& wl) const noexcept {
-        return static_cast<std::size_t>(wl.hash());
-    }
-};
-
-// Custom hasher for DMANNWorkload_NPU40_50 using the hash() method
-struct DMANNWorkload_NPU40_50Hasher {
-    std::size_t operator()(const DMANNWorkload_NPU40_50& wl) const noexcept {
-        return static_cast<std::size_t>(wl.hash());
-    }
 };
 
 /// DMA descriptor aliases
@@ -540,28 +564,6 @@ class DMANNWorkloadCreator;
 
 // when making a new interface version, Stop copying here
 
-}  // namespace VPUNN
-
-
-// Template specialization for MapTypeSelector (defined in cache.h)
-// This must be in global namespace after VPUNN namespace closes
-namespace VPUNN {
-template <typename K>
-struct MapTypeSelector;  // Forward declaration
-
-// Specialization for DMANNWorkload_NPU27: use std::unordered_map with custom hasher
-template <>
-struct MapTypeSelector<DMANNWorkload_NPU27> {
-    template <typename V>
-    using type = std::unordered_map<DMANNWorkload_NPU27, V, DMANNWorkload_NPU27Hasher>;
-};
-
-// Specialization for DMANNWorkload_NPU40_50: use std::unordered_map with custom hasher
-template <>
-struct MapTypeSelector<DMANNWorkload_NPU40_50> {
-    template <typename V>
-    using type = std::unordered_map<DMANNWorkload_NPU40_50, V, DMANNWorkload_NPU40_50Hasher>;
-};
 }  // namespace VPUNN
 
 #endif  // VPUNN_TYPES_H

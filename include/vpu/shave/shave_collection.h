@@ -114,6 +114,38 @@ protected:
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
 
+    // Simple heuristic model: parameters moved from template params into function arguments
+    void AddSimpleHeuristic(const std::string& name,
+                            float elements_per_cycle = 1.0f,
+                            float code_derate = 1.0f,
+                            float bw_derate = 1.0f,
+                            float entry_cost = 2000.0f) {
+        auto p{new ShaveSimpleHeuristicModelActivation(name, elements_per_cycle, code_derate, bw_derate, entry_cost)};
+        addOp(map_content_t(p, &DeviceShaveContainer::deleter));
+    }
+
+    // Roofline model: parameters moved from template params into function arguments
+    void AddRooflineModel(const std::string& name,
+                          float arithmetic_ops_per_32_outputs,
+                          float memory_ops_per_32_outputs,
+                          bool unaligned_by_nature = false,
+                          float bw_derate = 0.7f,
+                          float code_derate = 0.8f,
+                          float entry_cost_cycles = 1000.f,
+                          float scalar_cost_per_channel = 0.0f,
+                          float unalignment_derate = 2.0f) {
+        auto p{new ShaveRooflineHeuristicModelActivation(name,
+                                                arithmetic_ops_per_32_outputs,
+                                                memory_ops_per_32_outputs,
+                                                unaligned_by_nature,
+                                                bw_derate,
+                                                code_derate,
+                                                entry_cost_cycles,
+                                                scalar_cost_per_channel,
+                                                unalignment_derate)};
+        addOp(map_content_t(p, &DeviceShaveContainer::deleter));
+    }
+
     //// just a mock
     // void Add(const std::string& name) {
     //     addOp(map_content_t((new ShaveOPMOckTest(name)), &DeviceShaveContainer::deleter));
