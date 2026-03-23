@@ -744,7 +744,7 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
     // Create instance holders with factors to test CMake integration
     using ShaveInstanceHolder_NPU40_WithFactors =
             ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_NPU40, VPUDevice::VPU_4_0>;
-    using ShaveInstanceHolder_NPU_RESERVED_ithFactors =
+    using ShaveInstanceHolder_NPU50_WithFactors =
             ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0>;
 
     // Test NPU 4.0 with factors - check which functions have non-default factors
@@ -788,7 +788,7 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
 
     // Test NPU 5.0 with factors - only check if populated
     {
-        ShaveInstanceHolder_NPU_RESERVED_ithFactors ih_with_factors;
+        ShaveInstanceHolder_NPU50_WithFactors ih_with_factors;
         const DeviceShaveContainer& list_with_factors = ih_with_factors.getContainer();
 
         // Verify device is correctly set
@@ -970,7 +970,7 @@ TEST_F(ShaveCollectionTest, NPU5FactorsEquivalentToGetSelector) {
     // selector_50 uses mock_shaves_50 (all factors implicitly 1.0f)
     const ShaveSelector& selector_no_factors = shave_config.getSelector(VPUDevice::NPU_5_0);
     
-    // selector_50_with_factors uses ShaveInstanceHolder_NPU_RESERVED_ithFactors (PTL with all factors = 1.0f)
+    // selector_50_with_factors uses ShaveInstanceHolder_NPU50_WithFactors (PTL with all factors = 1.0f)
     const ShaveSelector& selector_with_factors = shave_config.getSelectorWithFactors(VPUDevice::NPU_5_0);
     
     // Get list of available functions from the selector without factors
@@ -1035,10 +1035,10 @@ TEST_F(ShaveCollectionTest, NPU5FactorsEquivalentToGetSelector) {
 TEST_F(ShaveCollectionTest, HeuristicNPU50FactorsDifference) {
     // Test that PopulatedFactorsLUT_Heuristic applies speed-up factors correctly
     // by comparing costs between ShaveInstanceHolder_HeuristicNPU50 (no factors)
-    // and ShaveInstanceHolder_HeuristicNPU_RESERVED_ithFactors (with speed-up factors from CSV)
+    // and ShaveInstanceHolder_HeuristicNPU50_WithFactors (with speed-up factors from CSV)
     
     ShaveInstanceHolder_HeuristicNPU50 holder_no_factors;
-    ShaveInstanceHolder_HeuristicNPU_RESERVED_ithFactors holder_with_factors;
+    ShaveInstanceHolder_HeuristicNPU50_WithFactors holder_with_factors;
     
     EXPECT_EQ(holder_no_factors.getDevice(), VPUDevice::NPU_5_0);
     EXPECT_EQ(holder_with_factors.getDevice(), VPUDevice::NPU_5_0);

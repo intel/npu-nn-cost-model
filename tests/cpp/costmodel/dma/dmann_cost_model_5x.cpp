@@ -49,6 +49,20 @@ TEST_F(TestDMANNCostModelNPU5x, SmokeTestDMA_50) {
         EXPECT_EQ(dma_cycles, 1129 /*@1700MHz*/) << wl_50 << Cycles::toErrorText(dma_cycles);
     }
 
+    {
+        DMANNWorkload_NPU50 wl_50W{
+                VPUNN::VPUDevice::NPU_5_0_W,  // VPUDevice device;  ///< NPU device
+                65535,                        // int src_width;
+                65535,                        // int dst_width;
+                0,                            // int num_dim;
+                {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+                Num_DMA_Engine::Num_Engine_1,
+                MemoryDirection::CMX2CMX  // MemoryDirection transfer_direction;
+        };
+        auto dma_cycles = dma_model.computeCycles(wl_50W);
+
+        EXPECT_EQ(dma_cycles, 1129 /*@1700MHz*/) << wl_50W << Cycles::toErrorText(dma_cycles);
+    }
 }
 
 TEST_F(TestDMANNCostModelNPU5x, SmokeTestDMA_50_V1) {
@@ -73,6 +87,22 @@ TEST_F(TestDMANNCostModelNPU5x, SmokeTestDMA_50_V1) {
                 << Cycles::toErrorText(dma_cycles);  ///  1129 cyc is measured directly in the test, not from profiling
     }
 
+    {
+        DMANNWorkload_NPU50 wl_50W{
+                VPUNN::VPUDevice::NPU_5_0_W,  // VPUDevice device;  ///< NPU device
+                65535,                        // int src_width;
+                65535,                        // int dst_width;
+                0,                            // int num_dim;
+                {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+                Num_DMA_Engine::Num_Engine_1,
+                MemoryDirection::CMX2CMX  // MemoryDirection transfer_direction;
+        };
+        auto dma_cycles = dma_model.computeCycles(wl_50W);
+
+        EXPECT_EQ(dma_cycles, 1129 /*@1700MHz*/)
+                << wl_50W
+                << Cycles::toErrorText(dma_cycles);  ///  1129 cyc is measured directly in the test, not from profiling
+    }
 }
 
 // this test is for New/Updated theoretical model

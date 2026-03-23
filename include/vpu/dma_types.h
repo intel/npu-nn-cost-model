@@ -542,8 +542,8 @@ inline const DMANNWorkload_NPU50 create_DMANNWorkload_NPU50() {
     return DMANNWorkload_NPU50{VPUDevice::NPU_5_0};
 }
 
-inline const DMANNWorkload_NPU50 create_DMANNWorkload_NPU_RESERVED() {
-    return DMANNWorkload_NPU50{VPUDevice::NPU_RESERVED};
+inline const DMANNWorkload_NPU50 create_DMANNWorkload_NPU50_W() {
+    return DMANNWorkload_NPU50{VPUDevice::NPU_5_0_W};
 }
 
 /**

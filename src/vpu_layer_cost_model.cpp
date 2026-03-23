@@ -138,7 +138,7 @@ CyclesInterfaceType VPULayerCostModel::compute_dma_cycles(const DMATransfer1D& d
                             device_match = true;
                         break;
                     case VPUDevice::NPU_5_0:
-                    case VPUDevice::NPU_RESERVED:
+                    case VPUDevice::NPU_5_0_W:
                         if constexpr (std::is_same_v<WLType, DMANNWorkload_NPU50>)
                             device_match = true;
                         break;

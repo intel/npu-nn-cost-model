@@ -64,6 +64,7 @@ protected:
         cost_models.addModel(VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH);
         cost_models.addModel(VPUDevice::VPU_4_0, VPU_4_0_MODEL_PATH);
         cost_models.addModel(VPUDevice::NPU_5_0, NPU_5_0_MODEL_PATH);
+        cost_models.addModel(VPUDevice::NPU_5_0_W, NPU_5_0_MODEL_PATH);
     }
 
     void SetUp() override {

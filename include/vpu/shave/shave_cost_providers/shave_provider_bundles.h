@@ -191,7 +191,7 @@ public:
      * @brief Create a device-specific provider with different implementations per device
      * 
      * This creates a DeviceMappingShaveCostProvider that:
-     * - Uses composite with name mapping for NPU 5.0, RESERVED, and 6.0
+     * - Uses composite with name mapping for NPU 5.0, 5.0_W, and 6.0
      * - Falls back to old selector with name mapping for other devices
      * 
      * @return std::shared_ptr<IShaveCostProvider> Device-mapped provider
@@ -209,6 +209,7 @@ public:
             {VPUDevice::VPU_2_7, default_provider},
             {VPUDevice::VPU_4_0, default_provider},
             {VPUDevice::NPU_5_0, new_device_provider_npu5},
+            {VPUDevice::NPU_5_0_W, new_device_provider_npu5},
         };
 
         return std::make_shared<DeviceMappingShaveCostProvider>(

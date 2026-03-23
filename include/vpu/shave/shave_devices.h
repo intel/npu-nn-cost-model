@@ -97,12 +97,13 @@ private:
         const ShaveInstanceHolder_NPU40CLassic old_shave_40{};
 
         const ShaveInstanceHolder_Mock_NPU50 mock_shaves_50{};
+        const ShaveInstanceHolder_Mock_NPU50W mock_shaves_50W{};
         const ShaveInstanceHolder_NPU50CLassic old_shave_50{};
 
-        const ShaveInstanceHolder_NPU_RESERVED_ithFactors shave_50_with_factors{}; // generated class that populates the factors map
+        const ShaveInstanceHolder_NPU50_WithFactors shave_50_with_factors{}; // generated class that populates the factors map
 
         const ShaveInstanceHolder_HeuristicNPU50 heuristic_shaves_50{};
-        const ShaveInstanceHolder_HeuristicNPU_RESERVED_ithFactors heuristic_shaves_50_with_factors{}; // heuristic models with speed-up factors
+        const ShaveInstanceHolder_HeuristicNPU50_WithFactors heuristic_shaves_50_with_factors{}; // heuristic models with speed-up factors
 
 
     } collections{};
@@ -118,6 +119,7 @@ private:
     const ShaveSelector selector_old_27{collections.old_shave_27};
     const ShaveSelector selector_old_40{collections.old_shave_40};
     const ShaveSelector selector_50{collections.mock_shaves_50};
+    const ShaveSelector selector_50W{collections.mock_shaves_50W};
     const ShaveSelector selector_old_50{collections.old_shave_50};
 
     const ShaveSelector selector_50_heuristic{collections.heuristic_shaves_50};
@@ -142,6 +144,9 @@ public:
         case VPUDevice::NPU_5_0:
             return selector_50;
             break;
+        case VPUDevice::NPU_5_0_W:
+            return selector_50W;
+            break;
         default:
             static const DeviceShaveContainer empty_shaves{VPUDevice::__size};
             static const ShaveSelector empty_selector{empty_shaves};
@@ -163,6 +168,7 @@ public:
             return selector_old_40;
             break;
         case VPUDevice::NPU_5_0:
+        case VPUDevice::NPU_5_0_W:
             return selector_old_50;
             break;
         default:

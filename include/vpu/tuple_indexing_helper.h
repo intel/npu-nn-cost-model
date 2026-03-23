@@ -42,6 +42,10 @@ public:
             return index;
         }
         index++;  // 5
+        if constexpr (device == VPUDevice::NPU_5_0_W) {
+            return index;
+        }
+        index++;  // 6
 
         return index;  // Default
     }
@@ -59,6 +63,8 @@ public:
             return std::get<get_device_index<VPUDevice::VPU_4_0>()>(theTuple);
         case VPUDevice::NPU_5_0:
             return std::get<get_device_index<VPUDevice::NPU_5_0>()>(theTuple);
+        case VPUDevice::NPU_5_0_W:
+            return std::get<get_device_index<VPUDevice::NPU_5_0_W>()>(theTuple);
         default:
             return std::get<get_device_index<VPUDevice::__size>()>(theTuple);
         }

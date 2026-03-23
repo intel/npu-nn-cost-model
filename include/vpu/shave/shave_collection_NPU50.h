@@ -43,6 +43,15 @@ public:
     ~ShaveInstanceHolder_Mock_NPU50() = default;
 };
 
+using ShaveInstanceHolder_Mock_NPU50W_BASE =
+        ShaveInstanceHolder_Mock<ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0_W>;
+class ShaveInstanceHolder_Mock_NPU50W : public ShaveInstanceHolder_Mock_NPU50W_BASE {
+public:
+    ShaveInstanceHolder_Mock_NPU50W(): ShaveInstanceHolder_Mock_NPU50W_BASE(1.0f) {
+        // populate();  // done in base
+    }
+    ~ShaveInstanceHolder_Mock_NPU50W() = default;
+};
 
 class ShaveInstanceHolder_NPU50 : public DeviceShaveContainer {
 public:
@@ -73,10 +82,10 @@ public:
     ~ShaveInstanceHolder_HeuristicNPU50() = default;
 };
 
-using ShaveInstanceHolder_NPU_RESERVED_ithFactors =
+using ShaveInstanceHolder_NPU50_WithFactors =
             ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0>;
 
-using ShaveInstanceHolder_HeuristicNPU_RESERVED_ithFactors =
+using ShaveInstanceHolder_HeuristicNPU50_WithFactors =
             ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50, VPUDevice::NPU_5_0>;
 }  // namespace VPUNN
 #endif

@@ -196,6 +196,7 @@ TEST_F(TestHWPerformanceModel_BASICS, TestGetProfilingClkMHz) {
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::VPU_2_7).get_profiling_clk_MHz(), 38.4f);
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::VPU_4_0).get_profiling_clk_MHz(), 38.4f / 2);
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_profiling_clk_MHz(), 38.4f / 2);
+    EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::NPU_5_0_W).get_profiling_clk_MHz(), 38.4f / 2);
 
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::__size).get_profiling_clk_MHz(),
                     0);  // Test with an unknown device
@@ -209,6 +210,7 @@ TEST_F(TestHWPerformanceModel_BASICS, TestGetProfilingClkHz_default) {
     EXPECT_EQ(hw_info.device(VPUDevice::VPU_2_7).get_profiling_clk_Hz(), 38400000);
     EXPECT_EQ(hw_info.device(VPUDevice::VPU_4_0).get_profiling_clk_Hz(), 38400000 / 2);
     EXPECT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_profiling_clk_Hz(), 38400000 / 2);
+    EXPECT_EQ(hw_info.device(VPUDevice::NPU_5_0_W).get_profiling_clk_Hz(), 38400000 / 2);
 
     EXPECT_EQ(hw_info.device(VPUDevice::__size).get_profiling_clk_Hz(), 0);             // Test with an unknown device
     EXPECT_EQ(hw_info.device(static_cast<VPUDevice>(9999)).get_profiling_clk_Hz(), 0);  // Test with an unknown device

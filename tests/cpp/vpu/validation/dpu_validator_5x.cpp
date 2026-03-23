@@ -482,6 +482,12 @@ TEST_F(DPU_OperationValidator_TestNPU5x, NPU50_presence_Test) {
         EXPECT_TRUE(dut.is_supported(wl.device)) << " device: \t" << (int)wl.device << " : "
                                                  << VPUDevice_ToText.at(static_cast<int>(wl.device)) << " ;\n";
     }
+    {  // no ISI strategy
+        auto wl{std::move(wl_ref)};
+        wl.device = VPUDevice::NPU_5_0_W;
+        EXPECT_TRUE(dut.is_supported(wl.device)) << " device: \t" << (int)wl.device << " : "
+                                                 << VPUDevice_ToText.at(static_cast<int>(wl.device)) << " ;\n";
+    }
 }
 
 TEST_F(DPU_OperationValidator_TestNPU5x, Output_tensor_memory_computation_test_for_different_innermost_dim_NPU5) {

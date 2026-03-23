@@ -324,7 +324,7 @@ using OperationsContext =
         Behavior_Device_Mapping<OperationsBehaviour,  // operations
                                 VPU2_0_WorkloadValidValues, VPU2_7_WorkloadValidValues, VPU4_0_WorkloadValidValues
                                 ,
-                                VPURESERVEDorkloadValidValues
+                                VPU5_0_WorkloadValidValues
 
                                 >;
 

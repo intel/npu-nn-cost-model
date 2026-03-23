@@ -238,6 +238,18 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
             std::cout << "\n  : " << o;
         }
     }
+    {
+        const auto d{VPUDevice::NPU_5_0_W};
+        auto ops = model_with_new_provider.getShaveSupportedOperations(d);
+
+        EXPECT_EQ(ops.size(), 80);
+
+        std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
+                  << "  has # SHAVE operators : " << ops.size() << " -----------------------------------";
+        for (const auto& o : ops) {
+            std::cout << "\n  : " << o;
+        }
+    }
     {  // special in-existing
         const auto d{VPUDevice::__size};
         auto ops = model_with_new_provider.getShaveSupportedOperations(d);
@@ -301,6 +313,26 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_40) {
 TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_5x) {
     {
         const auto d{VPUDevice::NPU_5_0};
+        auto ops = empty_model.getShaveSupportedOperations(d);
+
+        const auto ops_cnt{ops.size()};
+        EXPECT_GT(ops_cnt, 1);
+
+        std::cout << "\n -------------------------- DEVICE : " << VPUDevice_ToText.at((int)d)
+                  << "  has # SHAVE operators : " << ops_cnt << " -----------------------------------";
+        int i{1};
+        for (const auto& o : ops) {
+            std::cout << "\n*** ----------- " << i++ << " of " << ops_cnt << " : " << o << " ---------\n";
+            const auto& shv = empty_model.getShaveInstance(o, d);
+            EXPECT_TRUE(shv.has_value());
+            const auto& shave_instance = shv.value().get();
+            std::cout << "Shave instance details: " << shave_instance.toString() << "\n";
+            
+            EXPECT_GT(shave_instance.toString().length(), 50);
+        }
+    }
+    {
+        const auto d{VPUDevice::NPU_5_0_W};
         auto ops = empty_model.getShaveSupportedOperations(d);
 
         const auto ops_cnt{ops.size()};

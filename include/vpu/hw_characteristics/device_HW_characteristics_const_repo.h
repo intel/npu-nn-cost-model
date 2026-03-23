@@ -49,12 +49,14 @@ private:
                                                          VPU2_7_HWCharacteristics,     //
                                                          VPU4_0_HWCharacteristics_v0,  // classic
                                                          VPU5_0_HWCharacteristics_v0,  // classic
+                                                         VPU5_0_HWCharacteristics_v0,  // classic
                                                          Default_HWCharacteristics>;
 
     using MainEvo1SetTupleHWCharacteristics = std::tuple<VPU2_0_HWCharacteristics,     //
                                                          VPU2_1_HWCharacteristics,     //
                                                          VPU2_7_HWCharacteristics,     //
                                                          VPU4_0_HWCharacteristics_v1,  // DMA update1
+                                                         VPU5_0_HWCharacteristics_v1,  // DMA upd1
                                                          VPU5_0_HWCharacteristics_v1,  // DMA upd1
                                                          Default_HWCharacteristics>;
 
@@ -63,6 +65,7 @@ private:
                                                       VPU2_1_HWCharacteristics,         //
                                                       VPU2_7_HWCharacteristics_legacy,  //
                                                       VPU4_0_HWCharacteristics_legacy,  //
+                                                      VPU5_0_HWCharacteristics_legacy,  //
                                                       VPU5_0_HWCharacteristics_legacy,  //
                                                       Default_HWCharacteristics>;
 

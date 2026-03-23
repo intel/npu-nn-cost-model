@@ -33,6 +33,8 @@ TEST_F(TestDMANNCostModel, Create_DMA40_and_DMA50) {
 
         const DMANNWorkload_NPU50 wl_50 = create_DMANNWorkload_NPU50();
         EXPECT_TRUE(wl_50.device == VPUDevice::NPU_5_0) << wl_50;
+        const DMANNWorkload_NPU50 wl_50_W = create_DMANNWorkload_NPU50_W();
+        EXPECT_TRUE(wl_50_W.device == VPUDevice::NPU_5_0_W) << wl_50_W;
     }
 }
 

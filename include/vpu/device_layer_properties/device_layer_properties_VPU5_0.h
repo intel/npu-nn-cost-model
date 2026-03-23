@@ -17,9 +17,9 @@
 
 namespace VPUNN {
 
-/// @brief data holder for VPU 5.0 and VPU\ RESERVED layer properties.
+/// @brief data holder for VPU 5.0 and VPU 5.0_W layer properties.
 ///
-/// This struct encapsulates device-specific static configuration data for VPU 5.0 and VPU\ RESERVED.
+/// This struct encapsulates device-specific static configuration data for VPU 5.0 and VPU 5.0_W.
 /// Its main purpose is to provide a central definition of valid tiling strategies,
 /// operation-to-execution-mode mappings, and the default execution mode for these devices.
 ///
@@ -27,7 +27,7 @@ namespace VPUNN {
 /// - This struct is not intended for direct use by client code.
 /// - It is used as a template parameter for higher-level property classes (such as LayerProperties_All_Devices)
 ///   that implement the actual device-specific logic and interface for layer property queries.
-/// - The scope of this struct is internal to the layer properties implementation for VPU 5.0/RESERVED.
+/// - The scope of this struct is internal to the layer properties implementation for VPU 5.0/5.0_W.
 struct VPU5_0_LayerPropertiesData {
     inline static const std::vector<VPUTilingStrategy> valid_tiling_strategies{
             VPUTilingStrategy::NONE,         VPUTilingStrategy::SOH_Overlapped, VPUTilingStrategy::SOK,
