@@ -279,7 +279,6 @@ Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
 
 
-# INTEL_EMBARGO_NPU5_Begin
 ## VPUEM Operators NPU5.0
 
 A Piecewise Operation is a simple operation based on a 3 slopes equation. Available Piecewise Operations from VPUEM:
@@ -300,5 +299,3 @@ Available Softmax Operations from VPUEM:
 
 Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
-
-# INTEL_EMBARGO_NPU5_End
