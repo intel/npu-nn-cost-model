@@ -26,6 +26,8 @@
 #include "vpu/profiling_service.h"
 #include "vpu/serializer_utils.h"
 
+#include "vpu/validation/serializable_tensor.h"
+
 namespace VPUNN {
 
 class IDeviceValidValues;  // cannot include the header here, circular dependency
@@ -34,105 +36,7 @@ template <class T>
 using Values = std::vector<T>;  ///< Values type container
 using Channels = Values<int>;   ///< int container, available channel values
 
-/// @brief holds info for a tensor.
-struct TensorInfo {
-    long long height{0};
-    long long width{0};
-    long long channels{0};
-    long long batch{1};
-    DataType datatype{DataType::UINT8};
-    Layout layout{Layout::ZXY};  // same as ZMAJOR
-    float sparsity{0.0F};
-    bool sparsity_enabled{false};
-    Swizzling swizzling{default_init_swizzling()};
 
-    /// constructor based on DPUworkload related VPUTensor structure
-    explicit TensorInfo(const VPUTensor& t)
-            : height{static_cast<int>(t.height())},  // Y
-              width{static_cast<int>(t.width())},    // X
-              channels{static_cast<int>(t.z())},
-              batch{static_cast<int>(t.b())},
-              datatype{t.get_dtype()},
-              layout{t.get_layout()},
-              sparsity_enabled{t.get_sparsity()} {
-    }
-
-    TensorInfo() = default;
-
-    /// @brief Get the size in samples
-    /// @return how many elements are in this tensor shape
-    long long numberOfElements() const {
-        return height * width * channels * batch;
-    }
-
-    /// @brief Get the size in bytes based on packmode
-    /// @return size in bytes
-    unsigned int tensor_size_B() const {
-        const std::array<unsigned int, 4> shape{static_cast<unsigned int>(width), static_cast<unsigned int>(height),
-                                                static_cast<unsigned int>(channels), static_cast<unsigned int>(batch)};
-        VPUTensor t{shape, datatype, layout, sparsity_enabled};
-        return t.size();
-    }
-
-    /// @brief This function compute the size in bytes of the innermost dimension of a given tensor by using the
-    /// function tensor_size_B() which takes into account datatype size and the way memory is packed (packmode)
-    /// @return size in bytes of the innermost dimension
-    long long get_tensor_innermost_dim_B() const noexcept {
-        const auto innermost_dim{layout_to_order(layout)[0]};  // innermost dimension
-
-        // create a TensorInfo that contains only the innermost dimension
-        TensorInfo t_inner_dim_algn{*this};
-        t_inner_dim_algn.width = 1;
-        t_inner_dim_algn.height = 1;
-        t_inner_dim_algn.channels = 1;
-        t_inner_dim_algn.batch = 1;
-
-        switch (innermost_dim) {
-        case Dim::Act::X:
-            t_inner_dim_algn.width = width;
-            break;
-        case Dim::Act::Y:
-            t_inner_dim_algn.height = height;
-            break;
-        case Dim::Act::Z:
-            t_inner_dim_algn.channels = channels;
-            break;
-        case Dim::Act::B:
-            t_inner_dim_algn.batch = batch;
-            break;
-        default:
-            break;  // nothing
-        }
-
-        const auto innermost_dim_B{t_inner_dim_algn.tensor_size_B()};
-
-        return innermost_dim_B;
-    }
-
-    /// @brief Product of all shape dimensions except the innermost one (element count, not bytes)
-    long long numberOfElementsExcludingInnermost() const noexcept {
-        const auto innermost_dim{layout_to_order(layout)[0]};  // innermost dimension
-        switch (innermost_dim) {
-        case Dim::Act::X:  // exclude width
-            return height * channels * batch;
-        case Dim::Act::Y:  // exclude height
-            return width * channels * batch;
-        case Dim::Act::Z:  // exclude channels
-            return width * height * batch;
-        case Dim::Act::B:  // exclude batch
-            return width * height * channels;
-        default:
-            return width * height * channels * batch;  // fallback: all dims
-        }
-    }
-
-    /// @brief Convert to VPUTensor
-    VPUTensor toVPUTensor() const {
-        return VPUTensor({static_cast<unsigned int>(width), static_cast<unsigned int>(height),
-                          static_cast<unsigned int>(channels), static_cast<unsigned int>(batch)},
-                         datatype, layout, sparsity_enabled);
-    }
-};
 
 /// @brief kernel related informations, including stride and padding
 struct KernelInfo {
@@ -535,7 +439,7 @@ private:
 
                 {"sep_enabled", std::ref(sep_activators.sep_activators)},
                 {"sep_w",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -545,7 +449,7 @@ private:
                      return sep_activators.storage_elements_pointers.width();
                  }},
                 {"sep_h",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -555,7 +459,7 @@ private:
                      return sep_activators.storage_elements_pointers.height();
                  }},
                 {"sep_c",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -565,7 +469,7 @@ private:
                      return sep_activators.storage_elements_pointers.channels();
                  }},
                 {"sep_b",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -575,7 +479,7 @@ private:
                      return sep_activators.storage_elements_pointers.batches();
                  }},
                 {"sep_act_w",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -585,7 +489,7 @@ private:
                      return sep_activators.actual_activators_input.width();
                  }},
                 {"sep_act_h",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -595,7 +499,7 @@ private:
                      return sep_activators.actual_activators_input.height();
                  }},
                 {"sep_act_c",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -605,7 +509,7 @@ private:
                      return sep_activators.actual_activators_input.channels();
                  }},
                 {"sep_act_b",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          DimType value;
                          if (is_unsigned_int(s, value)) {
@@ -616,14 +520,14 @@ private:
                  }},
                 {"sep_no_sparse_map", std::ref(sep_activators.no_sparse_map)},
                 {"in_place_input1",  // weightless_operation
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          setWeightlessOperation(s);
                      }
                      return weightless_operation;
                  }},
                 {"in_place_output",
-                 [this](bool set_mode, std::string s) -> DimType {
+                 [this](bool set_mode, const std::string& s) -> DimType {
                      if (set_mode) {
                          setInPlaceOutputMemory(s);
                      }
@@ -864,20 +768,6 @@ protected:
         }
     }
 };
-
-inline std::ostream& operator<<(std::ostream& stream, const TensorInfo& d) {
-    stream << "TensorInfo: \n"                                                                                        //
-           << " shape: \t{" << d.width << "," << d.height << ","                                                      //
-           << d.channels << "," << d.batch << "} ;\n"                                                                 //
-           << " dtype: \t" << (int)d.datatype << " : " << DataType_ToText.at(static_cast<int>(d.datatype)) << " ;\n"  //
-           << " layout: \t" << (int)d.layout << " : " << Layout_ToText.at(static_cast<int>(d.layout)) << " ;\n"       //
-           << " sparsity enabled: \t" << (d.sparsity_enabled ? "true" : "false") << " ;\n"                            //
-           << " sparsity value: \t" << d.sparsity << " ;\n"                                                           //
-           << " swizzling: \t{" << (int)d.swizzling << "}"
-           << " :  {" << Swizzling_ToText.at(static_cast<int>(d.swizzling)) << "} ;\n"  //
-            ;
-    return stream;
-}
 
 inline std::ostream& operator<<(std::ostream& stream, const KernelInfo& d) {
     stream << "KernelInfo: \n"                                                              //

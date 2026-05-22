@@ -68,7 +68,7 @@ public:
     VPUDevice getDevice() const {
         return device;
     }
-    bool existsShave(const std::string sw) const {
+    bool existsShave(const std::string& sw) const {
         const auto it = map_shaves.find(sw);
         return (it != map_shaves.end());
     }

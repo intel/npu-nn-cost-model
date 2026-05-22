@@ -114,7 +114,7 @@ protected:
     // Helper to determine if workload should use new hash method (newer devices)
     static bool use_new_hash_method(const DPUWorkload& workload) {
         // For newer device versions, use new hash method
-        return workload.device >= VPUDevice::NPU_RESERVED_1;
+        return workload.device >= VPUDevice::NPU_RESERVED;
     }
 
     float infer_raw_input(const DPUWorkload& workload) const {

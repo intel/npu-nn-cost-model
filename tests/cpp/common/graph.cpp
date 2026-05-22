@@ -170,7 +170,7 @@ TEST_F(TestVPUCompute, StressTestNetworkCostModel) {
         auto dag = generate_helper_dag();
         VPUNN::VPUNetworkStrategy strategy;
         for (auto layer : dag) {
-            strategy[layer] = {1, 1, 1, VPUNN::VPUTilingStrategy::NONE, false, false};
+            strategy[layer] = VPUNN::VPULayerStrategy{1, 1, 1, VPUNN::VPUTilingStrategy::NONE, false, false};
         }
         unsigned long int cost = model.Network(dag, strategy);
         if (idx > 0) {

@@ -10,17 +10,18 @@
 #include "core/serializer.h"
 
 #include <gtest/gtest.h>
-#include <thread>
 #include <atomic>
-#include <filesystem>
 #include <chrono>
+#include <filesystem>
 #include <random>
+#include <thread>
 
-#include "vpu/vpu_tensor.h"
 #include <vpu/validation/data_dpu_operation.h>
 #include <vpu_cost_model.h>
+#include "vpu/vpu_tensor.h"
+#include "common_helpers.h"
 
-#include "vpu/validation/data_shave_operation.h"
+#include "vpu/validation/serializable_shave.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -39,31 +40,45 @@ protected:
         serializer = std::make_unique<SerializerT>();
 
         // 1. create empty test file
-        std::ofstream file(empty_filename + get_extension(serializer->get_format()),
-                           std::ofstream::out | std::ofstream::trunc);
+        const auto empty_path = empty_filename + get_extension(serializer->get_format());
+        std::ofstream file(empty_path, std::ofstream::out | std::ofstream::trunc);
         file.close();
+        cleanup_.track(empty_path);
 
         // 2. create test file with header
-        std::ofstream file1(empty_filename_w_header + get_extension(serializer->get_format()),
-                            std::ofstream::out | std::ofstream::trunc);
+        const auto header_path = empty_filename_w_header + get_extension(serializer->get_format());
+        std::ofstream file1(header_path, std::ofstream::out | std::ofstream::trunc);
         file1 << "col1,col2,col3,col5" << std::endl;
         file1.close();
+        cleanup_.track(header_path);
     }
 
     void TearDown() override {
-        // Remove any files created during the test
+        // Close any open file stream so the file can be deleted
         if (serializer->get_file_stream().is_open()) {
             serializer->reset();
         }
-        std::filesystem::remove(serializer->get_file_name());
-        std::filesystem::remove(empty_filename + get_extension(serializer->get_format()));
-        std::filesystem::remove(empty_filename_w_header + get_extension(serializer->get_format()));
+
+        // cleanup_ destructor runs after this and removes every tracked file.
 
         set_env_var("ENABLE_VPUNN_DATA_SERIALIZATION", "");
         set_env_var("VPUNN_FILE_NAME_POSTFIX", "");
     }
 
+    /// @brief Wrapper: initializes the serializer and automatically tracks the
+    /// resulting file for cleanup.  Tests call this instead of
+    /// serializer->initialize() directly so they never have to think about
+    /// cleanup, regardless of how many files they create.
+    template <typename... Args>
+    void initialize_and_track(Args&&... args) {
+        serializer->initialize(std::forward<Args>(args)...);
+        if (serializer->is_initialized() || serializer->get_file_stream().is_open()) {
+            cleanup_.track(serializer->get_file_name());
+        }
+    }
+
     std::unique_ptr<SerializerT> serializer;  // why ptr?
+    ScopedFileCleanup cleanup_;
 
     std::string empty_filename = "serializer_test_file_empty";
     std::string empty_filename_w_header = "serializer_test_file_w_header";
@@ -88,17 +103,18 @@ TEST_F(VPUNNSerializerTest, Init_Check_is_Initialized) {
 
     EXPECT_FALSE(serializer->is_initialized());
 
-    serializer->initialize(filename, FileMode::READ_WRITE, {});
+    initialize_and_track(filename, FileMode::READ_WRITE, std::vector<std::string>{});
     EXPECT_FALSE(serializer->is_initialized());
 
-    serializer->initialize(filename, FileMode::READ_WRITE, {"int value", "float value"});
+    initialize_and_track(filename, FileMode::READ_WRITE, std::vector<std::string>{"int value", "float value"});
     EXPECT_TRUE(serializer->is_initialized());
 }
 
 TEST_F(VPUNNSerializerTest, Init_From_ExistingEmptyFile) {
     EXPECT_TRUE(std::filesystem::exists(empty_filename + get_extension(serializer->get_format())));
 
-    serializer->initialize(empty_filename, FileMode::READ_WRITE, {"int value", "float value", "int value"});
+    initialize_and_track(empty_filename, FileMode::READ_WRITE,
+                         std::vector<std::string>{"int value", "float value", "int value"});
 
     EXPECT_TRUE(serializer->is_initialized());
 
@@ -115,7 +131,7 @@ TEST_F(VPUNNSerializerTest, Init_From_ExistingEmptyFile) {
 TEST_F(VPUNNSerializerTest, Init_From_ExistingFileWHeader) {
     EXPECT_TRUE(std::filesystem::exists(empty_filename_w_header + get_extension(serializer->get_format())));
 
-    serializer->initialize(empty_filename_w_header, FileMode::READ_WRITE, {});
+    initialize_and_track(empty_filename_w_header, FileMode::READ_WRITE, std::vector<std::string>{});
     EXPECT_TRUE(serializer->is_initialized());
 
     auto field_names = serializer->get_field_names();
@@ -126,7 +142,7 @@ TEST_F(VPUNNSerializerTest, Init_From_ExistingFileWHeader) {
 }
 
 TEST_F(VPUNNSerializerTest, Serialize_DpuOperation) {
-    serializer->initialize("test_dpu_op_serialize", FileMode::READ_WRITE, DPUOperation::_get_member_names());
+    initialize_and_track("test_dpu_op_serialize", FileMode::READ_WRITE, DPUOperation::_get_member_names());
 
     EXPECT_TRUE(serializer->is_initialized());
 
@@ -151,7 +167,7 @@ TEST_F(VPUNNSerializerTest, Serialize_DpuOperation) {
 }
 
 TEST_F(VPUNNSerializerTest, Serialize_MultipleCalls) {
-    serializer->initialize("test_dpu_op_serialize", FileMode::READ_WRITE, {"col0", "col1"});
+    initialize_and_track("test_dpu_op_serialize", FileMode::READ_WRITE, std::vector<std::string>{"col0", "col1"});
 
     EXPECT_TRUE(serializer->is_initialized());
 
@@ -171,7 +187,7 @@ TEST_F(VPUNNSerializerTest, Serialize_MultipleCalls) {
 }
 
 TEST_F(VPUNNSerializerTest, Serialize_Deserialize_DpuOperation) {
-    serializer->initialize("test_dpu_op_deserialize", FileMode::READ_WRITE, DPUOperation::_get_member_names());
+    initialize_and_track("test_dpu_op_deserialize", FileMode::READ_WRITE, DPUOperation::_get_member_names());
 
     EXPECT_TRUE(serializer->is_initialized());
 
@@ -204,7 +220,7 @@ TEST_F(VPUNNSerializerTest, Serialize_Deserialize_DpuOperation) {
 }
 
 TEST_F(VPUNNSerializerTest, Serialize_Deserialize_Multi_SerializableField) {
-    serializer->initialize(empty_filename_w_header, FileMode::READ_WRITE, {});
+    initialize_and_track(empty_filename_w_header, FileMode::READ_WRITE, std::vector<std::string>{});
 
     EXPECT_TRUE(serializer->is_initialized());
 
@@ -248,7 +264,8 @@ TEST_F(VPUNNSerializerTest, Serialize_Deserialize_Multi_SerializableField) {
 }
 
 TEST_F(VPUNNSerializerTest, CopyRow) {
-    serializer->initialize("test_dpu_op_serialize", FileMode::READ_WRITE, {"col2", "col1", "col0", "new_col"});
+    initialize_and_track("test_dpu_op_serialize", FileMode::READ_WRITE,
+                         std::vector<std::string>{"col2", "col1", "col0", "new_col"});
 
     EXPECT_TRUE(serializer->is_initialized());
 
@@ -283,7 +300,7 @@ TEST_F(VPUNNSerializerTest, CopyRow) {
 
 TEST_F(VPUNNSerializerTest, MultiThreaded_Serialization) {
     const std::string filename = "test_multithreaded_serialize";
-    serializer->initialize(filename, FileMode::READ_WRITE, {"thread_id", "value", "2nd_value"});
+    initialize_and_track(filename, FileMode::READ_WRITE, std::vector<std::string>{"thread_id", "value", "2nd_value"});
 
     ASSERT_TRUE(serializer->is_initialized());
 
@@ -311,7 +328,7 @@ TEST_F(VPUNNSerializerTest, MultiThreaded_Serialization) {
                     start_cv.notify_all();  // Notify all threads when all are ready
                 }
             }
-            
+
             {
                 // Wait for the start signal
                 std::unique_lock<std::mutex> lock(start_mutex);
@@ -376,11 +393,11 @@ TEST_F(VPUNNSerializerTest, Has_member_map_Test) {
     // DMANNWorkload_NPU40_50
     EXPECT_TRUE(has_member_map_v<DMANNWorkload_NPU40>);
 
-    //DPUOperation
+    // DPUOperation
     EXPECT_TRUE(has_member_map_v<DPUOperation>);
 
-    //SHAVEOperation
-    EXPECT_TRUE(has_member_map_v<SHAVEOperation>);
+    //SerializableSHAVE
+    EXPECT_TRUE(has_member_map_v<SerializableSHAVE>);
 }
 
 }  // namespace VPUNN_unit_tests

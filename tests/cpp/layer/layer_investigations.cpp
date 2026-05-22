@@ -62,7 +62,7 @@ TEST_F(VPULayerCM_InvestigationTest, DISABLED_UnimplementedStrategies_ResultsTes
 
     const DPULayer tst_layer(wl_ref);
     const std::vector<TestCase> tests{
-            {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+            {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
              {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 1000, fail * 1000 + 1000},
              "SOW "},
 
@@ -100,7 +100,7 @@ TEST_F(VPULayerCM_InvestigationTest, SOW_SmokeTest) {
     const DPULayer tst_layer(wl_ref);
     // TODO: test should be SOHO wins,
     const std::vector<TestCase> tests{
-            {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+            {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
              {VPUNN::Cycles::NO_ERROR, true, 3700, fail * 3700 + 1000},
              "SOW "},
 
@@ -140,11 +140,11 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_CONV75_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 2734, fail * 3734 + 1300},
                  "SOHO , no memmove, "},  // GT is 3734 for 16x16
 
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 5500, fail * 12800 + 2000},
                  "SOK , no memmove, "},  // gt is 12800+ fro all MPE
                                          // SOHO wins
@@ -185,7 +185,7 @@ TEST_F(VPULayerCM_InvestigationTest, EISXW_140892_err_investigation_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::ERROR_INPUT_TOO_BIG, true, 4000, fail * (4686) + 800},
                  "SOK , no memmove, "},
         };
@@ -234,11 +234,11 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_GC105_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 5485, fail * (4 * 1410) + 500},
                  "SOHO , no memmove, "},  // GT 5640
 
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 4000, fail * (4686) + 800},
                  "SOK , no memmove, "},  // GT 4686
                                          // SOK wins
@@ -279,11 +279,11 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_GC124_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 2500, fail * (1361 * 2) + 1000},
                  "SOHO , no memmove, "},  // gt = 2712
 
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 2000, fail * (2134) + 500},
                  "SOK , no memmove, "},  // gt 2134
                                          // SOK wins
@@ -324,11 +324,11 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_CONV251_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 1200, fail * 1585 + 100},
                  "SOHO , no memmove, "},  // gt 1585
 
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 700, fail * 967 + 200},
                  "SOK , no memmove, "},  // gt 967
                                          // SOK wins
@@ -545,10 +545,10 @@ TEST_F(VPULayerCostModelTest, Test_layer_SEP_split_value_propagation_EISXW_13254
             // clang-format off
 
             //strategy: SOHO  we expect SEP split
-            {{wl_small_sep, {1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, true}},{ {all_tiles_small_sep, all_tiles_small_sep, all_tiles_small_sep, all_tiles_small_sep} }, "SOHO, Small sep test"},
+            {{wl_small_sep, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, true}},{ {all_tiles_small_sep, all_tiles_small_sep, all_tiles_small_sep, all_tiles_small_sep} }, "SOHO, Small sep test"},
 
             //strategy: SOK  we don't expect SEP split  => all tiles should have original SEP
-            {{wl_small_sep, {1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, true}},{ {orig_small_sep_info, orig_small_sep_info, orig_small_sep_info, orig_small_sep_info} }, "SOK, Small sep test"},
+            {{wl_small_sep, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, true}},{ {orig_small_sep_info, orig_small_sep_info, orig_small_sep_info, orig_small_sep_info} }, "SOK, Small sep test"},
 
             // clang-format on
     };

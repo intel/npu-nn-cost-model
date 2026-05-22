@@ -45,7 +45,7 @@ inline const EnumInverseMap createInverseMap(const EnumMap& direct_map) {
 /// @brief Holds mappings between names (usually used for direct mapping between interfaces)
 using EnumTextLogicalMap = std::map<const std::string, const std::string>;
 /// @brief creates a pair to be added to the EnumTextLogicalMap
-inline EnumTextLogicalMap::value_type link_logical(const std::string name, const std::string mapped_name) {
+inline EnumTextLogicalMap::value_type link_logical(const std::string& name, const std::string& mapped_name) {
     return EnumTextLogicalMap::value_type{name, mapped_name};
 }
 
@@ -103,11 +103,11 @@ inline typename std::enable_if<has_mapToText<E>::value, const EnumInverseMap&>::
  * @brief VPU IP generations
  *
  */
-enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_5_0, NPU_5_0_W, NPU_RESERVED_1, __size };
+enum class VPUDevice { VPU_2_0, VPU_2_1, VPU_2_7, VPU_4_0, NPU_5_0, NPU_5_0_W, NPU_RESERVED, NPU_RESERVED_1, __size };
 static const EnumMap VPUDevice_ToText{link(VPUDevice::VPU_2_0, "VPU_2_0"), link(VPUDevice::VPU_2_1, "VPU_2_1"),
                                       link(VPUDevice::VPU_2_7, "VPU_2_7"), link(VPUDevice::VPU_4_0, "VPU_4_0"),
                                       link(VPUDevice::NPU_5_0, "NPU_5_0"), link(VPUDevice::NPU_5_0_W, "NPU_5_0_W"),
-                                      link(VPUDevice::NPU_RESERVED_1, "NPU_RESERVED_1")};
+                                      link(VPUDevice::NPU_RESERVED, "NPU_RESERVED"), link(VPUDevice::NPU_RESERVED_1, "NPU_RESERVED_1")};
 template <>
 inline const EnumMap& mapToText<VPUDevice>() {
     return VPUDevice_ToText;
@@ -173,8 +173,12 @@ enum class Operation {
     CM_CONVOLUTION,     //
     LAYER_NORM,         // new LayerNorm (never used properly)!
     ELTWISE_MUL,        // MUL
-    REDUCE_MS,          // Reduce mean , reduce sum
-    REDUCE_SUMSQUARES,  // Reduce Sum of Squares (weightless)
+    REDUCE_MS,          // Reduce mean/sum across channels to 1 output channel. Weightless.
+                        // Behaves like a CONV 1x1: same execution pattern, and
+                        // logical mapping to CONVOLUTION for cost modeling. Differs only in having no weight tensor.
+    REDUCE_SUMSQUARES,  // Reduce Sum of Squares across channels to 1 output channel. Weightless.
+                        // Like REDUCE_MS, maps to a CONV 1x1 execution pattern. The squaring step
+                        // engages multiply units but remains weightless.
     // Other new ops?
     __size
 };
@@ -249,13 +253,14 @@ enum class ExecutionMode {
     CUBOID_8x16,   // from 27, 40 :  NTHW/NTK = 8/8     50 : NTHW/NTK = 8/4
     CUBOID_4x16,   // from 27, 40 :  NTHW/NTK = 4/16    50 : NTHW/NTK = 4/8
     dCIM_32x128,   // from 60 :      NTHW/NTK =
+    dCIM_64x128,   // from 70 :      NTHW/NTK =
     __size
 };
 static const EnumMap ExecutionMode_ToText{
         link(ExecutionMode::VECTOR, "VECTOR"),           link(ExecutionMode::MATRIX, "MATRIX"),
         link(ExecutionMode::VECTOR_FP16, "VECTOR_FP16"), link(ExecutionMode::CUBOID_16x16, "CUBOID_16x16"),
         link(ExecutionMode::CUBOID_8x16, "CUBOID_8x16"), link(ExecutionMode::CUBOID_4x16, "CUBOID_4x16"),
-        link(ExecutionMode::dCIM_32x128, "dCIM_32x128")};
+        link(ExecutionMode::dCIM_32x128, "dCIM_32x128"), link(ExecutionMode::dCIM_64x128, "dCIM_64x128")};
 
 template <>
 inline const EnumMap& mapToText<ExecutionMode>() {

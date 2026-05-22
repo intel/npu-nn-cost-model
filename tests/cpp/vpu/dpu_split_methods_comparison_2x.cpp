@@ -62,8 +62,10 @@ protected:
 
         const std::int32_t delta = std::abs((std::int32_t)cycles_clu - (std::int32_t)cycles_soh);
         const std::int32_t maxDelta = (std::int32_t)(cycles_clu * tolerance_even);
-
-        const auto deltapercent = ((float)delta / cycles_clu) * 100;
+        auto deltapercent{0.0f};
+        if (cycles_clu != 0) { /* coverity[divide_by_zero] */
+            deltapercent = ((float)delta / cycles_clu) * 100;
+        }
 
         // EXPECT_EQ(cycles_clu, cycles_soh) << t_header << " Cost not similar enough.\n"
         //                                   << "cost clustering: " << cycles_clu << "\n"
@@ -94,8 +96,10 @@ protected:
 
         const std::int32_t delta = std::abs((std::int32_t)cycles_clu - (std::int32_t)cycles_soh);
         const std::int32_t maxDelta = static_cast<std::int32_t>(cycles_clu * tolerance_SOK);
-
-        const auto deltapercent = ((float)delta / cycles_clu) * 100;
+        auto deltapercent{0.0f};
+        if (cycles_clu != 0) { /* coverity[divide_by_zero] */
+            deltapercent = ((float)delta / cycles_clu) * 100;
+        }
 
         // EXPECT_EQ(cycles_clu, cycles_soh) << t_header << " Cost not similar enough.\n"
         //                                   << "cost clustering: " << cycles_clu << "\n"

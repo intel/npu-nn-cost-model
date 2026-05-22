@@ -1,15 +1,16 @@
 #include "http_client/http_cost_provider.h"
-#include "vpu/http_workload_variant.h"
 #include <functional>
 #include <iostream>
 #include <variant>
+#include "vpu/http_workload_variant.h"
 
 namespace VPUNN {
 
 // Trait to map workload types to their JSON payload keys
 template <typename WlT>
 struct WorkloadKeyTrait {
-    static constexpr const char* key = "workload";  // default
+    // default as nothing , so that if we forget to specialize for a
+    // workload type we get a compile error when trying to access the key
 };
 
 template <>
@@ -27,26 +28,34 @@ struct WorkloadKeyTrait<DMANNWorkload_NPU40_50> {
     static constexpr const char* key = "dma_workload";
 };
 
-HTTPClient::HTTPClient(const std::string& host, int port)
-        : _host(host), _port(port), _client(_host, _port), _debug(false) {}
+template <>
+struct WorkloadKeyTrait<SHAVEWorkload> {
+    static constexpr const char* key = "shave_workload";
+};
+
+HTTPClient::HTTPClient(const std::string& host, int port, bool debug)
+        : _host(host), _port(port), _client(_host, _port), _debug(debug) {
+}
 
 nlohmann::json HTTPClient::sendJsonRequest(const nlohmann::json& request, const std::string& path) const {
     if (_debug) {
         std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Sending request to path: " << path << std::endl;
         std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Request payload: " << request.dump(2) << std::endl;
     }
-    
+
     try {
         auto res = _client.Post(path, request.dump(), "application/json");
         if (res) {
             if (_debug) {
-                std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Response received, status: " << res->status << std::endl;
+                std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Response received, status: " << res->status
+                          << std::endl;
                 std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Response body: " << res->body << std::endl;
             }
             return nlohmann::json::parse(res->body);
         } else {
             if (_debug) {
-                std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Failed to receive response from server" << std::endl;
+                std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Failed to receive response from server"
+                          << std::endl;
             }
             throw std::runtime_error("Failed to send request to server");
         }
@@ -70,10 +79,10 @@ nlohmann::json HTTPClient::sendJsonRequest(const nlohmann::json& request, const 
 
 bool HTTPProfilingClient::is_available(const std::string& check_backend) const {
     if (_debug) {
-        std::cout << "[DEBUG] HTTPProfilingClient::is_available - Checking availability for backend: " 
+        std::cout << "[DEBUG] HTTPProfilingClient::is_available - Checking availability for backend: "
                   << (check_backend.empty() ? "any" : check_backend) << std::endl;
     }
-    
+
     nlohmann::json status_request_payload;
 
     status_request_payload["params"] = nlohmann::json::object();
@@ -93,13 +102,13 @@ bool HTTPProfilingClient::is_available(const std::string& check_backend) const {
                 if (check_backend == "silicon") {
                     bool silicon_available = res["profiling"].get<std::string>() == "true";
                     if (_debug) {
-                        std::cout << "[DEBUG] HTTPProfilingClient::is_available - Silicon backend available: " 
+                        std::cout << "[DEBUG] HTTPProfilingClient::is_available - Silicon backend available: "
                                   << (silicon_available ? "true" : "false") << std::endl;
                     }
                     return silicon_available;
                 } else {
                     if (_debug) {
-                        std::cout << "[DEBUG] HTTPProfilingClient::is_available - Backend " << check_backend 
+                        std::cout << "[DEBUG] HTTPProfilingClient::is_available - Backend " << check_backend
                                   << " is available" << std::endl;
                     }
                     return true;
@@ -117,9 +126,10 @@ bool HTTPProfilingClient::is_available(const std::string& check_backend) const {
 VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nlohmann::json& response) const {
     if (_debug) {
         std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Processing response" << std::endl;
-        std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Response: " << response.dump(2) << std::endl;
+        std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Response: " << response.dump(2)
+                  << std::endl;
     }
-    
+
     ProfilerResponse profiler_response;
     try {
         if (response.contains("info")) {
@@ -132,7 +142,7 @@ VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nloh
                 }
                 profiler_response.res_type = "success";
                 if (_debug) {
-                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Success response, cost size: " 
+                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Success response, cost size: "
                               << profiler_response.cost.size() << std::endl;
                 }
             }
@@ -142,7 +152,7 @@ VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nloh
                 profiler_response.message = response["msg"].get<std::string>();
                 profiler_response.res_type = "generation_error";
                 if (_debug) {
-                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Generation error: " 
+                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Generation error: "
                               << profiler_response.message << std::endl;
                 }
             }
@@ -152,7 +162,7 @@ VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nloh
                 profiler_response.message = response["msg"].get<std::string>();
                 profiler_response.res_type = "profiling_error";
                 if (_debug) {
-                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Profiling error: " 
+                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Profiling error: "
                               << profiler_response.message << std::endl;
                 }
                 if (response.contains("path")) {
@@ -165,7 +175,7 @@ VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nloh
                 profiler_response.message = response["msg"].get<std::string>();
                 profiler_response.res_type = "compilation_error";
                 if (_debug) {
-                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Compilation error: " 
+                    std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Compilation error: "
                               << profiler_response.message << std::endl;
                 }
                 if (response.contains("path")) {
@@ -180,7 +190,7 @@ VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nloh
             profiler_response.res_type = response["warning"].get<std::string>();
             profiler_response.path = response["path"].get<std::string>();
             if (_debug) {
-                std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Warning: " 
+                std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Warning: "
                           << profiler_response.message << std::endl;
             }
         }
@@ -188,7 +198,8 @@ VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nloh
         if (response.contains("error")) {
             profiler_response.success = false;
             if (_debug) {
-                std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Error response detected" << std::endl;
+                std::cout << "[DEBUG] HTTPProfilingClient::handle_profiler_response - Error response detected"
+                          << std::endl;
             }
 
             if (response["error"].contains("msg")) {
@@ -217,22 +228,20 @@ VPUNN::ProfilerResponse HTTPProfilingClient::handle_profiler_response(const nloh
     return profiler_response;
 }
 
-std::unique_ptr<HttpCostProvider> HttpCostProvider::initFromEnvironment() {
-    bool use_profiling_service{
-            get_env_vars({"ENABLE_VPUNN_PROFILING_SERVICE"}).at("ENABLE_VPUNN_PROFILING_SERVICE") == "TRUE"};
-    
-    std::string host = default_host;
-    int port = default_port;
-    std::string backend = default_backend;
-    bool debug = false;
+std::unique_ptr<const HttpCostProvider> HttpCostProvider::initFromEnvironment() {
+    bool use_profiling_service{get_env_vars({"ENABLE_VPUNN_PROFILING_SERVICE"}).at("ENABLE_VPUNN_PROFILING_SERVICE") ==
+                               "TRUE"};
+
+    std::string host{default_host};
+    int port{default_port};
+    std::string backend{default_backend};
+    bool debug{false};
 
     if (use_profiling_service) {
-        std::string env_host =
-                get_env_vars({"VPUNN_PROFILING_SERVICE_HOST"}).at("VPUNN_PROFILING_SERVICE_HOST");
+        std::string env_host = get_env_vars({"VPUNN_PROFILING_SERVICE_HOST"}).at("VPUNN_PROFILING_SERVICE_HOST");
         int env_port = 0;
         try {
-            env_port = std::stoi(
-                    get_env_vars({"VPUNN_PROFILING_SERVICE_PORT"}).at("VPUNN_PROFILING_SERVICE_PORT"));
+            env_port = std::stoi(get_env_vars({"VPUNN_PROFILING_SERVICE_PORT"}).at("VPUNN_PROFILING_SERVICE_PORT"));
         } catch (const std::exception&) {
             env_port = 0;
         }
@@ -252,27 +261,26 @@ std::unique_ptr<HttpCostProvider> HttpCostProvider::initFromEnvironment() {
         backend = env_backend.empty() ? default_backend : env_backend;
     }
 
-    auto provider = std::make_unique<HttpCostProvider>(host, port);
-    // Set the used values for backend and debug
-    provider->profiling_backend = backend;
-    provider->setDebug(debug);
+    auto provider = std::make_unique<HttpCostProvider>(host, port, debug, backend);
+    //provider->profiling_backend = std::move(backend);
     return provider;
 }
 
-HttpCostProvider::HttpCostProvider(const std::string& host, int port)
-            : _client(host, port), _debug(false) {}
+HttpCostProvider::HttpCostProvider(const std::string& host, int port, bool debug, std::string profiling_backend_)
+        : _client(host, port, debug), profiling_backend{profiling_backend_}, _debug(debug) {
+}
 
 const std::string HttpCostProvider::profilingBackendToString(ProfilingServiceBackend backend) const {
-        const auto& backend_map = mapToText<ProfilingServiceBackend>();
-        auto backend_idx = static_cast<int>(backend);
+    const auto& backend_map = mapToText<ProfilingServiceBackend>();
+    auto backend_idx = static_cast<int>(backend);
 
-        // Use SILICON as default for invalid backends
-        if(backend == ProfilingServiceBackend::__size || backend_map.find(backend_idx) == backend_map.end()) {
-            backend_idx = static_cast<int>(ProfilingServiceBackend::SILICON);
-        }
-
-        return backend_map.at(backend_idx);
+    // Use SILICON as default for invalid backends
+    if (backend == ProfilingServiceBackend::__size || backend_map.find(backend_idx) == backend_map.end()) {
+        backend_idx = static_cast<int>(ProfilingServiceBackend::SILICON);
     }
+
+    return backend_map.at(backend_idx);
+}
 
 template <typename WlT>
 CyclesInterfaceType HttpCostProvider::getHttpCost(const WlT& workload, std::string& info) const {
@@ -287,11 +295,12 @@ CyclesInterfaceType HttpCostProvider::getHttpCost(const WlT& workload, std::stri
     try {
         if (!is_available()) {
             if (_debug) {
-                std::cout << "[DEBUG] HttpDPUCostProvider::getHttpCost - Profiling service is not available" << std::endl;
+                std::cout << "[DEBUG] HttpDPUCostProvider::getHttpCost - Profiling service is not available"
+                          << std::endl;
             }
             return Cycles::ERROR_PROFILING_SERVICE;
         }
-        
+
         nlohmann::json payload;
 
         payload["params"] = nlohmann::json::object();
@@ -314,13 +323,15 @@ CyclesInterfaceType HttpCostProvider::getHttpCost(const WlT& workload, std::stri
             if (parsed_res.cost.size() == 1) {
                 cycles = parsed_res.cost[0];
                 if (_debug) {
-                    std::cout << "[DEBUG] HttpDPUCostProvider::getHttpCost - Single latency returned: " << cycles << std::endl;
+                    std::cout << "[DEBUG] HttpDPUCostProvider::getHttpCost - Single latency returned: " << cycles
+                              << std::endl;
                 }
             } else if (parsed_res.cost.size() > 1) {
                 // If multiple latencies are returned, take the maximum
                 cycles = *std::max_element(parsed_res.cost.begin(), parsed_res.cost.end());
                 if (_debug) {
-                    std::cout << "[DEBUG] HttpDPUCostProvider::getHttpCost - Multiple latencies returned, max: " << cycles << std::endl;
+                    std::cout << "[DEBUG] HttpDPUCostProvider::getHttpCost - Multiple latencies returned, max: "
+                              << cycles << std::endl;
                 }
             }
         } else {
@@ -338,15 +349,10 @@ CyclesInterfaceType HttpCostProvider::getHttpCost(const WlT& workload, std::stri
 bool HttpCostProvider::is_available() const {
     try {
         return _client.is_available(profiling_backend);
-    } catch(const std::exception&) {
+    } catch (const std::exception&) {
         // in case of any exception, consider the profiling service as unavailable
         return false;
     }
-}
-
-void HttpCostProvider::setDebug(bool enable) { 
-    _debug = enable; 
-    _client.setDebug(enable);
 }
 
 template <>
@@ -464,7 +470,7 @@ const nlohmann::json HttpCostProvider::toJson<DMANNWorkload_NPU40_50>(const DMAN
     payload["src_width"] = wl.src_width;
     payload["dst_width"] = wl.dst_width;
     payload["num_dim"] = wl.num_dim;
-    
+
     payload["src_stride_1"] = wl.e_dim[0].src_stride;
     payload["dst_stride_1"] = wl.e_dim[0].dst_stride;
     payload["src_dim_size_1"] = wl.e_dim[0].src_dim_size;
@@ -474,25 +480,26 @@ const nlohmann::json HttpCostProvider::toJson<DMANNWorkload_NPU40_50>(const DMAN
     payload["dst_stride_2"] = wl.e_dim[1].dst_stride;
     payload["src_dim_size_2"] = wl.e_dim[1].src_dim_size;
     payload["dst_dim_size_2"] = wl.e_dim[1].dst_dim_size;
-    
+
     payload["src_stride_3"] = wl.e_dim[2].src_stride;
     payload["dst_stride_3"] = wl.e_dim[2].dst_stride;
     payload["src_dim_size_3"] = wl.e_dim[2].src_dim_size;
     payload["dst_dim_size_3"] = wl.e_dim[2].dst_dim_size;
-    
+
     payload["src_stride_4"] = wl.e_dim[3].src_stride;
     payload["dst_stride_4"] = wl.e_dim[3].dst_stride;
     payload["src_dim_size_4"] = wl.e_dim[3].src_dim_size;
     payload["dst_dim_size_4"] = wl.e_dim[3].dst_dim_size;
-    
+
     payload["src_stride_5"] = wl.e_dim[4].src_stride;
     payload["dst_stride_5"] = wl.e_dim[4].dst_stride;
     payload["src_dim_size_5"] = wl.e_dim[4].src_dim_size;
     payload["dst_dim_size_5"] = wl.e_dim[4].dst_dim_size;
-    
-    payload["num_engine"] = enumName<Num_DMA_Engine>() + "." + mapToText<Num_DMA_Engine>().at(static_cast<int>(wl.num_engine));
-    payload["transfer_direction"] = enumName<MemoryDirection>() + "." + mapToText<MemoryDirection>().at(static_cast<int>(wl.transfer_direction));
 
+    payload["num_engine"] =
+            enumName<Num_DMA_Engine>() + "." + mapToText<Num_DMA_Engine>().at(static_cast<int>(wl.num_engine));
+    payload["transfer_direction"] = enumName<MemoryDirection>() + "." +
+                                    mapToText<MemoryDirection>().at(static_cast<int>(wl.transfer_direction));
 
     return payload;
 }
@@ -509,15 +516,92 @@ const nlohmann::json HttpCostProvider::toJson<DMANNWorkload_NPU27>(const DMANNWo
     payload["dst_stride"] = wl.dst_stride;
     payload["src_plane_stride"] = wl.src_plane_stride;
     payload["dst_plane_stride"] = wl.dst_plane_stride;
-    payload["transfer_direction"] = enumName<MemoryDirection>() + "." + mapToText<MemoryDirection>().at(static_cast<int>(wl.transfer_direction));   
+    payload["transfer_direction"] = enumName<MemoryDirection>() + "." +
+                                    mapToText<MemoryDirection>().at(static_cast<int>(wl.transfer_direction));
+
+    return payload;
+}
+
+template <>
+const nlohmann::json HttpCostProvider::toJson<SHAVEWorkload>(const SHAVEWorkload& wl) const {
+    nlohmann::json payload;
+    payload["device"] = enumName<VPUDevice>() + "." + mapToText<VPUDevice>().at(static_cast<int>(wl.get_device()));
+    payload["operation"] = wl.get_name();
+
+    const auto& wl_inputs = wl.get_inputs();
+    for (size_t i = 0; i < wl_inputs.size(); ++i) {
+        std::string idx_str = std::to_string(i);
+        payload["input_" + idx_str + "_batch"] = wl_inputs[i].batches();
+        payload["input_" + idx_str + "_channels"] = wl_inputs[i].channels();
+        payload["input_" + idx_str + "_height"] = wl_inputs[i].height();
+        payload["input_" + idx_str + "_width"] = wl_inputs[i].width();
+        payload["input_" + idx_str + "_datatype"] = wl_inputs[i].get_dtype();
+        payload["input_" + idx_str + "_layout"] = wl_inputs[i].get_layout();
+        payload["input_" + idx_str + "_sparsity_enabled"] = wl_inputs[i].get_sparsity();
+    }
+
+    const auto& wl_outputs = wl.get_outputs();
+    for (size_t i = 0; i < wl_outputs.size(); ++i) {
+        std::string idx_str = std::to_string(i);
+        payload["output_" + idx_str + "_batch"] = wl_outputs[i].batches();
+        payload["output_" + idx_str + "_channels"] = wl_outputs[i].channels();
+        payload["output_" + idx_str + "_height"] = wl_outputs[i].height();
+        payload["output_" + idx_str + "_width"] = wl_outputs[i].width();
+        payload["output_" + idx_str + "_datatype"] = wl_outputs[i].get_dtype();
+        payload["output_" + idx_str + "_layout"] = wl_outputs[i].get_layout();
+        payload["output_" + idx_str + "_sparsity_enabled"] = wl_outputs[i].get_sparsity();
+    }
+
+    // Convert parameters to strings
+    const auto paramToString = [](const SHAVEWorkload::Param& p) {
+        if (const int* pvalInt = std::get_if<int>(&p)) {
+            return std::to_string(*pvalInt);
+        } else if (const float* pvalFloat = std::get_if<float>(&p)) {
+            return std::to_string(*pvalFloat);
+        } else if (const std::string* pvalString = std::get_if<std::string>(&p)) {
+            return *pvalString;
+        } else if (const bool* pvalBool = std::get_if<bool>(&p)) {
+            return *pvalBool ? std::string("true") : std::string("false");
+        }
+        return std::string("");
+    };
+
+    const auto get_extra_param_strings =
+            [&](const SHAVEWorkload::ExtraParameters& extra_params) -> std::vector<std::string> {
+        std::vector<std::string> extra_param_strings;
+        for (const auto& [key, value] : extra_params) {
+            extra_param_strings.push_back(key + "/" + paramToString(value));
+        }
+
+        return extra_param_strings;
+    };
+
+    const auto get_param_strings = [&](const SHAVEWorkload::Parameters& call_params) -> std::vector<std::string> {
+        std::vector<std::string> param_strs;
+        for (const auto& param : call_params) {
+            param_strs.push_back(paramToString(param));
+        }
+        return param_strs;
+    };
+
+    const auto& wl_extras = get_param_strings(wl.get_params());
+    for (size_t i = 0; i < wl_extras.size(); ++i) {
+        payload["param_" + std::to_string(i)] = wl_extras[i];
+    }
+    const auto& wl_extra_params = get_extra_param_strings(wl.get_extra_params());
+    for (size_t i = 0; i < wl_extra_params.size(); ++i) {
+        payload["extra_param_" + std::to_string(i)] = wl_extra_params[i];
+    }
 
     return payload;
 }
 
 CyclesInterfaceType HttpCostProvider::getCostImpl(const HttpWorkloadVariant& op, std::string& info) const {
-    return std::visit([this, &info](const auto& workload) -> CyclesInterfaceType {
-        return getHttpCost(workload.get(), info);
-    }, op.data);
+    return std::visit(
+            [this, &info](const auto& workload) -> CyclesInterfaceType {
+                return getHttpCost(workload.get(), info);
+            },
+            op.data);
 }
 
 }  // namespace VPUNN

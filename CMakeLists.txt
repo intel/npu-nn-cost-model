@@ -78,6 +78,12 @@ target_sources(vpunn_common_settings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/com
 # Apply C++ standard requirement to this target and (optionally) to dependents
 target_compile_features(vpunn_common_settings PUBLIC cxx_std_17)
 
+# Compile definitions (PUBLIC so direct link consumers inherit them; they can choose PRIVATE linkage)
+target_compile_definitions(vpunn_common_settings PUBLIC
+    INTEL_EMBARGO_NPU5       # INTEL_EMBARGO_NPU5_Content
+    INTEL_EMBARGO_NPU5020    # INTEL_EMBARGO_NPU5020_Content
+)
+
 if(VPUNN_OPT_LEGACY_DMA_TH_4)
     target_compile_definitions(vpunn_common_settings PUBLIC VPUNN_OPT_LEGACY_DMA_TH_4)
     message(STATUS "-- Enable Legacy Gen4 DMA Theoretical")
@@ -118,9 +124,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
     endif()
 endif()
 
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+
     # lots of warnings and all warnings as errors
     message(STATUS "Setting GCC/Clang specific flags for common settings")
+
     target_compile_options(vpunn_common_settings PUBLIC
             -Wall -Wextra -Werror -pedantic -Wdouble-promotion -Wfloat-conversion
             $<$<CONFIG:Debug>:-g>
@@ -131,7 +140,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     target_compile_options(vpunn_common_settings PUBLIC
             # Enable /bigobj for debug build type with MSVC - remove after vpunn headers are cleaned up
             $<$<CONFIG:Debug>:/bigobj>
-            /W4 /WX /MP
+            /W4 /WX /MP 
         )
     # TODO figure out why it propagates to VPUx even though it is linked as PRIVATE in other libs
     # and re-enable

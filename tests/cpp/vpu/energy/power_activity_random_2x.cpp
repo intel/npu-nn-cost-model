@@ -102,10 +102,10 @@ TEST_F(ActivityFactorVPU2x, TestPowerActivityFactorU8Conv) {
                                             VPUNN::DataType::UINT8);
             EXPECT_NEAR(my_energy.DPUActivityFactor(wl), expected[j] /** convToReferenceVirus*/, tolerance[j] * scale)
                     << "ic=" << *i << " NN cyc:" << model.DPU(wl)
-                    << " , ThCyc: " << dpu_theoretical.DPUTheoreticalCycles(wl)
-                    << " , GTcyc:" << exp_GrndTCyc[j] << " , Power Ideal Cyc: " << performance.DPU_Power_IdealCycles(wl)
-                    << " , Efficiency Ideal Cyc: " << performance.DPU_Efficency_IdealCycles(wl) << " , ExpAF:" << expected[j]
-                    << toDict(wl) << wl;
+                    << " , ThCyc: " << dpu_theoretical.DPUTheoreticalCycles(wl) << " , GTcyc:" << exp_GrndTCyc[j]
+                    << " , Power Ideal Cyc: " << performance.DPU_Power_IdealCycles(wl)
+                    << " , Efficiency Ideal Cyc: " << performance.DPU_Efficency_IdealCycles(wl)
+                    << " , ExpAF:" << expected[j] << toDict(wl) << wl;
 
             EXPECT_EQ(dpu_theoretical.DPUTheoreticalCycles(wl), exp_theorCyc[j]);
             EXPECT_EQ(performance.DPU_Power_IdealCycles(wl), exp_idealCyc[j]);
@@ -163,10 +163,10 @@ TEST_F(ActivityFactorVPU2x, TestPowerActivityFactorConv576) {
         auto wl = generate_helper_layer(16, 576, 576, VPUNN::Operation::CONVOLUTION, VPUNN::VPUDevice::VPU_2_7, *i);
         EXPECT_NEAR(my_energy.DPUActivityFactor(wl), expected[j], weak_tol * scale)  //@todo make not so weak
                 << "dtype=" << (int)*i << " NN cyc:" << model.DPU(wl)
-                << " , ThCyc: " << dpu_theoretical.DPUTheoreticalCycles(wl)
-                << " , GTcyc:" << exp_GrndTCyc[j] << " , Power Ideal Cyc: " << performance.DPU_Power_IdealCycles(wl)
-                << " , Efficiency Ideal Cyc: " << performance.DPU_Efficency_IdealCycles(wl) << " , ExpAF:" << expected[j]
-                << toDict(wl) << wl;
+                << " , ThCyc: " << dpu_theoretical.DPUTheoreticalCycles(wl) << " , GTcyc:" << exp_GrndTCyc[j]
+                << " , Power Ideal Cyc: " << performance.DPU_Power_IdealCycles(wl)
+                << " , Efficiency Ideal Cyc: " << performance.DPU_Efficency_IdealCycles(wl)
+                << " , ExpAF:" << expected[j] << toDict(wl) << wl;
 
         EXPECT_EQ(dpu_theoretical.DPUTheoreticalCycles(wl), exp_theorCyc[j]);
         EXPECT_EQ(performance.DPU_Power_IdealCycles(wl), exp_idealCyc[j]);

@@ -34,7 +34,7 @@
 
 namespace VPUNN {
 
-/** @brief type interface forNPU_RESERVED_1 v3 named 15. This is a convention on what to contain the VPUNN's input
+/** @brief type interface forNPU_RESERVED v3 named 15. This is a convention on what to contain the VPUNN's input
  * descriptor in this namespace all the types will be stored exactly like they are required by this interface
  * vs intf14: UINT16 added to Dtypes, dCIM execution mode
  * vs intf14: This a bridge interface  between 14 and next one. It handles new types added to global types but keeps the
@@ -378,7 +378,7 @@ public:
 //---------------------------------------------------------
 template <class T>
 using Preprocessing_Interface15 =
-        Preprocessing_Interface15_Archetype<T, NN5XInputAdapter, NNVersions::VERSION_15_NPU_RESERVED_11>;
+        Preprocessing_Interface15_Archetype<T, NN5XInputAdapter, NNVersions::VERSION_15_NPU_RESERVED1>;
 
 }  // namespace VPUNN
 

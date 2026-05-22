@@ -10,10 +10,9 @@
 
 #include <gtest/gtest.h>
 
-#include "vpu/dpu_workload.h"
 #include "vpu/dpu_types.h"
+#include "vpu/dpu_workload.h"
 #include "vpu/performance.h"
-
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -38,9 +37,9 @@ protected:
      */
 
     struct TestInputs {
-        DataType in_type;                                ///< Input tensor data type
-        DataType out_type;                               ///< Output tensor data type
-        std::optional<DataType> wts_type = std::nullopt; ///< Optional weights data type (if different from input)
+        DataType in_type;                                 ///< Input tensor data type
+        DataType out_type;                                ///< Output tensor data type
+        std::optional<DataType> wts_type = std::nullopt;  ///< Optional weights data type (if different from input)
     };
 
     struct TestCases {
@@ -51,7 +50,6 @@ protected:
     using TestVector = std::vector<TestCases>;
 
 protected:
-
     /**
      * @brief Executes test function on generated workloads and validates results
      *
@@ -132,24 +130,26 @@ private:
 TEST_F(NativeComputationTest, DetectAnyFloatingPointInputType) {
     TestVector any_fp = {
             //   Input Type     |    Output Type    |    Weights Type    | Expectation
-            {{DataType::INT32, DataType::INT32}, false},                    // INT32 -> INT32: No FP types
-            {{DataType::UINT8, DataType::UINT8}, false},                    // UINT8 -> UINT8: No FP types
-            {{DataType::UINT8, DataType::UINT8, DataType::FLOAT16}, false}, // UINT8 -> UINT8 (FP16 weights): Input/output are not FP
-            {{DataType::FLOAT16, DataType::UINT8}, true},                   // FLOAT16 -> UINT8: Input is FP
-            {{DataType::BFLOAT16, DataType::UINT8}, true},                  // BFLOAT16 -> UINT8: Input is FP
-            {{DataType::FLOAT32, DataType::UINT8}, true},                   // FLOAT32 -> UINT8: Input is FP
-            {{DataType::HF8, DataType::UINT8}, true},                       // HF8 -> UINT8: Input is FP
-            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16}, true},    // HF8 -> UINT8 (FP16 weights): Input is FP
-            {{DataType::BF8, DataType::UINT8}, true},                       // BF8 -> UINT8: Input is FP
-            {{DataType::FLOAT32, DataType::INT8, DataType::INT4}, true},    // FLOAT32 -> INT8 (INT4 weights): Input is FP
-            {{DataType::UINT8, DataType::BF8, DataType::UINT8}, false},     // UINT8 -> BF8 (UINT8 weights): Input is not FP
-            {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8}, true}, // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP
+            {{DataType::INT32, DataType::INT32}, false},  // INT32 -> INT32: No FP types
+            {{DataType::UINT8, DataType::UINT8}, false},  // UINT8 -> UINT8: No FP types
+            {{DataType::UINT8, DataType::UINT8, DataType::FLOAT16},
+             false},                                        // UINT8 -> UINT8 (FP16 weights): Input/output are not FP
+            {{DataType::FLOAT16, DataType::UINT8}, true},   // FLOAT16 -> UINT8: Input is FP
+            {{DataType::BFLOAT16, DataType::UINT8}, true},  // BFLOAT16 -> UINT8: Input is FP
+            {{DataType::FLOAT32, DataType::UINT8}, true},   // FLOAT32 -> UINT8: Input is FP
+            {{DataType::HF8, DataType::UINT8}, true},       // HF8 -> UINT8: Input is FP
+            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16}, true},  // HF8 -> UINT8 (FP16 weights): Input is FP
+            {{DataType::BF8, DataType::UINT8}, true},                     // BF8 -> UINT8: Input is FP
+            {{DataType::FLOAT32, DataType::INT8, DataType::INT4}, true},  // FLOAT32 -> INT8 (INT4 weights): Input is FP
+            {{DataType::UINT8, DataType::BF8, DataType::UINT8},
+             false},  // UINT8 -> BF8 (UINT8 weights): Input is not FP
+            {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8},
+             true},  // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP
 
     };
-    check_types(any_fp, 
-                [&](const DPUWorkload& wl) { 
-                    return perf_model.native_comp_is_any_fp(wl); 
-                });
+    check_types(any_fp, [&](const DPUWorkload& wl) {
+        return perf_model.native_comp_is_any_fp(wl);
+    });
 }
 
 /**
@@ -160,27 +160,30 @@ TEST_F(NativeComputationTest, DetectAnyFloatingPointInputType) {
  * - Should return false for FP8 types (HF8, BF8) as they use different precision
  */
 TEST_F(NativeComputationTest, DetectFP16FamilyInputTypes) {
-
     TestVector fp16 = {
             //   Input Type     |    Output Type    |    Weights Type    | Expectation
-            {{DataType::INT32, DataType::INT32}, false},                    // INT32 -> INT32: Not FP16
-            {{DataType::UINT8, DataType::UINT8}, false},                    // UINT8 -> UINT8: Not FP16
-            {{DataType::UINT8, DataType::UINT8, DataType::FLOAT16}, false}, // UINT8 -> UINT8 (FP16 weights): Input/output not FP16
-            {{DataType::FLOAT16, DataType::UINT8}, true},                   // FLOAT16 -> UINT8: Input is FP16
-            {{DataType::BFLOAT16, DataType::UINT8}, true},                  // BFLOAT16 -> UINT8: Input is FP16-class
-            {{DataType::FLOAT32, DataType::UINT8}, true},                   // FLOAT32 -> UINT8: Input is higher precision FP
-            {{DataType::HF8, DataType::UINT8}, false},                      // HF8 -> UINT8: Input is FP8, not FP16
-            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16}, false},   // HF8 -> UINT8 (FP16 weights): Input is FP8, not FP16
-            {{DataType::BF8, DataType::UINT8}, false},                      // BF8 -> UINT8: Input is FP8, not FP16
-            {{DataType::FLOAT32, DataType::INT8, DataType::INT4}, true},    // FLOAT32 -> INT8 (INT4 weights): Input is FP32
-            {{DataType::UINT8, DataType::BF8, DataType::UINT8}, false},     // UINT8 -> BF8 (UINT8 weights): Input is not FP
-            {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8}, true}, // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP16
+            {{DataType::INT32, DataType::INT32}, false},  // INT32 -> INT32: Not FP16
+            {{DataType::UINT8, DataType::UINT8}, false},  // UINT8 -> UINT8: Not FP16
+            {{DataType::UINT8, DataType::UINT8, DataType::FLOAT16},
+             false},                                        // UINT8 -> UINT8 (FP16 weights): Input/output not FP16
+            {{DataType::FLOAT16, DataType::UINT8}, true},   // FLOAT16 -> UINT8: Input is FP16
+            {{DataType::BFLOAT16, DataType::UINT8}, true},  // BFLOAT16 -> UINT8: Input is FP16-class
+            {{DataType::FLOAT32, DataType::UINT8}, true},   // FLOAT32 -> UINT8: Input is higher precision FP
+            {{DataType::HF8, DataType::UINT8}, false},      // HF8 -> UINT8: Input is FP8, not FP16
+            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16},
+             false},                                    // HF8 -> UINT8 (FP16 weights): Input is FP8, not FP16
+            {{DataType::BF8, DataType::UINT8}, false},  // BF8 -> UINT8: Input is FP8, not FP16
+            {{DataType::FLOAT32, DataType::INT8, DataType::INT4},
+             true},  // FLOAT32 -> INT8 (INT4 weights): Input is FP32
+            {{DataType::UINT8, DataType::BF8, DataType::UINT8},
+             false},  // UINT8 -> BF8 (UINT8 weights): Input is not FP
+            {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8},
+             true},  // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP16
     };
 
-    check_types(fp16, 
-                [&](const DPUWorkload& wl) { 
-                    return perf_model.native_comp_on_fp16(wl);
-                });
+    check_types(fp16, [&](const DPUWorkload& wl) {
+        return perf_model.native_comp_on_fp16(wl);
+    });
 }
 
 /**
@@ -201,19 +204,23 @@ TEST_F(NativeComputationTest, DetectFP8InputWithNonFP16Weights) {
             {{DataType::BFLOAT16, DataType::UINT8}, false},                  // BFLOAT16 -> UINT8: FP16-class, not FP8
             {{DataType::FLOAT32, DataType::UINT8}, false},                   // FLOAT32 -> UINT8: FP32, not FP8
             {{DataType::HF8, DataType::UINT8}, true},                        // HF8 -> UINT8: Input is FP8
-            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16}, false},    // HF8 -> UINT8 (FP16 weights): Input is FP8 but weights are FP16
-            {{DataType::BF8, DataType::UINT8}, true},                        // BF8 -> UINT8: Input is FP8
-            {{DataType::FLOAT32, DataType::INT8, DataType::INT4}, false},    // FLOAT32 -> INT8 (INT4 weights): Input not FP8
-            {{DataType::UINT8, DataType::BF8, DataType::UINT8}, false},      // UINT8 -> BF8 (UINT8 weights): Input not FP
-            {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8}, false}, // FLOAT16 -> BFLOAT16 (HF8 weigts): Input not FP8
-            {{DataType::BF8, DataType::INT8, DataType::BF8}, true},          // BF8 -> INT8 (BF8 weights): Input FP8 and weights BF8
-            {{DataType::BF8, DataType::INT8, DataType::UINT2}, true},        // BF8 -> INT8 (UINT2 weights): Input FP8 and weights UINT2
+            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16},
+             false},                                   // HF8 -> UINT8 (FP16 weights): Input is FP8 but weights are FP16
+            {{DataType::BF8, DataType::UINT8}, true},  // BF8 -> UINT8: Input is FP8
+            {{DataType::FLOAT32, DataType::INT8, DataType::INT4},
+             false},  // FLOAT32 -> INT8 (INT4 weights): Input not FP8
+            {{DataType::UINT8, DataType::BF8, DataType::UINT8}, false},  // UINT8 -> BF8 (UINT8 weights): Input not FP
+            {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8},
+             false},  // FLOAT16 -> BFLOAT16 (HF8 weigts): Input not FP8
+            {{DataType::BF8, DataType::INT8, DataType::BF8},
+             true},  // BF8 -> INT8 (BF8 weights): Input FP8 and weights BF8
+            {{DataType::BF8, DataType::INT8, DataType::UINT2},
+             true},  // BF8 -> INT8 (UINT2 weights): Input FP8 and weights UINT2
     };
 
-    check_types(fp8, 
-                [&](const DPUWorkload& wl) {
-                    return perf_model.native_comp_on_fp8(wl);
-                });
+    check_types(fp8, [&](const DPUWorkload& wl) {
+        return perf_model.native_comp_on_fp8(wl);
+    });
 }
 
 /**
@@ -228,24 +235,29 @@ TEST_F(NativeComputationTest, DetectFP8InputWithNonFP16Weights) {
 TEST_F(NativeComputationTest, DetectI8InputWithNonFloatWeights) {
     TestVector i8 = {
             //   Input Type     |    Output Type    |    Weights Type    | Expectation
-            {{DataType::INT32, DataType::INT32}, true},                     // INT32 -> INT32: 32-bit integer (may be treated as I8-compatible)
-            {{DataType::UINT8, DataType::UINT8}, true},                     // UINT8 -> UINT8: Pure 8-bit integer computation
-            {{DataType::UINT8, DataType::UINT8, DataType::FLOAT16}, false}, // UINT8 -> UINT8 (FP16 weights): Mixed precision with FP weights
-            {{DataType::FLOAT16, DataType::UINT8}, false},                  // FLOAT16 -> UINT8: Input is FP, not I8
-            {{DataType::BFLOAT16, DataType::UINT8}, false},                 // BFLOAT16 -> UINT8: Input is FP, not I8
-            {{DataType::FLOAT32, DataType::UINT8}, false},                  // FLOAT32 -> UINT8: Input is FP, not I8
-            {{DataType::HF8, DataType::UINT8}, false},                      // HF8 -> UINT8: Input is FP8, not I8 
-            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16}, false},   // HF8 -> UINT8 (FP16 weights): Input is FP8, not I8
-            {{DataType::BF8, DataType::UINT8}, false},                      // BF8 -> UINT8: Input is FP8, not I8
-            {{DataType::INT4, DataType::BF8, DataType::FLOAT4}, true},      // INT4 -> BF8 (FLOAT4 weights): Input I4, weights FP
-            {{DataType::UINT2, DataType::BFLOAT16, DataType::HF8}, false},  // UINT2 -> BFLOAT16 (HF8 weights): Input I2, weights FP
-            {{DataType::INT1, DataType::INT32, DataType::UINT4}, true}      // INT1 -> INT32 (UINT4 weights): Input I1, weights UINT4
+            {{DataType::INT32, DataType::INT32},
+             true},  // INT32 -> INT32: 32-bit integer (may be treated as I8-compatible)
+            {{DataType::UINT8, DataType::UINT8}, true},  // UINT8 -> UINT8: Pure 8-bit integer computation
+            {{DataType::UINT8, DataType::UINT8, DataType::FLOAT16},
+             false},  // UINT8 -> UINT8 (FP16 weights): Mixed precision with FP weights
+            {{DataType::FLOAT16, DataType::UINT8}, false},   // FLOAT16 -> UINT8: Input is FP, not I8
+            {{DataType::BFLOAT16, DataType::UINT8}, false},  // BFLOAT16 -> UINT8: Input is FP, not I8
+            {{DataType::FLOAT32, DataType::UINT8}, false},   // FLOAT32 -> UINT8: Input is FP, not I8
+            {{DataType::HF8, DataType::UINT8}, false},       // HF8 -> UINT8: Input is FP8, not I8
+            {{DataType::HF8, DataType::UINT8, DataType::FLOAT16},
+             false},                                    // HF8 -> UINT8 (FP16 weights): Input is FP8, not I8
+            {{DataType::BF8, DataType::UINT8}, false},  // BF8 -> UINT8: Input is FP8, not I8
+            {{DataType::INT4, DataType::BF8, DataType::FLOAT4},
+             true},  // INT4 -> BF8 (FLOAT4 weights): Input I4, weights FP
+            {{DataType::UINT2, DataType::BFLOAT16, DataType::HF8},
+             false},  // UINT2 -> BFLOAT16 (HF8 weights): Input I2, weights FP
+            {{DataType::INT1, DataType::INT32, DataType::UINT4},
+             true}  // INT1 -> INT32 (UINT4 weights): Input I1, weights UINT4
     };
 
-    check_types(i8, 
-        [&](const DPUWorkload& wl) {
-            return perf_model.native_comp_on_i8(wl);
-        });
+    check_types(i8, [&](const DPUWorkload& wl) {
+        return perf_model.native_comp_on_i8(wl);
+    });
 }
 
 /**
@@ -260,18 +272,18 @@ TEST_F(NativeComputationTest, DetectI8InputWithNonFloatWeights) {
  */
 TEST_F(NativeComputationTest, DetectI8ForTensors) {
     TestVector test_input_output = {
-        {{DataType::BF8, DataType::BF8}, false},        // BF8 input is not I8
-        {{DataType::UINT8, DataType::UINT8}, true},     // UINT8 input is I8
-        {{DataType::INT8, DataType::INT8}, true},       // INT8 input is I8
-        {{DataType::UINT4, DataType::UINT4}, true},     // UINT4 input is I8
-        {{DataType::INT4, DataType::INT4}, true},       // INT4 input is I8
-        {{DataType::UINT2, DataType::UINT2}, true},     // UINT2 input is I8
-        {{DataType::INT2, DataType::INT2}, true},       // INT2 input is I8
-        {{DataType::UINT1, DataType::UINT1}, true},     // UINT1 input is I8
-        {{DataType::INT1, DataType::INT1}, true},       // INT1 input is I8
-        {{DataType::INT32, DataType::INT32}, true},     // INT32 input is considered I8 family here
-        {{DataType::UINT16, DataType::UINT16}, true},   // UINT16 input is considered I8 family here
-        {{DataType::INT16, DataType::INT16}, true}      // INT16 input is considered I8 family here
+            {{DataType::BF8, DataType::BF8}, false},       // BF8 input is not I8
+            {{DataType::UINT8, DataType::UINT8}, true},    // UINT8 input is I8
+            {{DataType::INT8, DataType::INT8}, true},      // INT8 input is I8
+            {{DataType::UINT4, DataType::UINT4}, true},    // UINT4 input is I8
+            {{DataType::INT4, DataType::INT4}, true},      // INT4 input is I8
+            {{DataType::UINT2, DataType::UINT2}, true},    // UINT2 input is I8
+            {{DataType::INT2, DataType::INT2}, true},      // INT2 input is I8
+            {{DataType::UINT1, DataType::UINT1}, true},    // UINT1 input is I8
+            {{DataType::INT1, DataType::INT1}, true},      // INT1 input is I8
+            {{DataType::INT32, DataType::INT32}, true},    // INT32 input is considered I8 family here
+            {{DataType::UINT16, DataType::UINT16}, true},  // UINT16 input is considered I8 family here
+            {{DataType::INT16, DataType::INT16}, true}     // INT16 input is considered I8 family here
     };
 
     // Test I8 family classification for input tensors
@@ -286,15 +298,15 @@ TEST_F(NativeComputationTest, DetectI8ForTensors) {
 
     // Test I8 family classification for weight tensors (with explicit weight types)
     TestVector test_weights = {
-        {{DataType::BF8, DataType::BF8, DataType::BF8}, false},       // BF8 weights is not I8
-        {{DataType::UINT8, DataType::UINT8, DataType::UINT8}, true},  // UINT8 weights is I8
-        {{DataType::INT8, DataType::INT8, DataType::INT8}, true},     // INT8 weights is I8
-        {{DataType::UINT4, DataType::UINT4, DataType::UINT4}, true},  // UINT4 weights is I8
-        {{DataType::INT4, DataType::INT4, DataType::INT4}, true},     // INT4 weights is I8
-        {{DataType::UINT2, DataType::UINT2, DataType::UINT2}, true},  // UINT2 weights is I8
-        {{DataType::INT2, DataType::INT2, DataType::INT2}, true},     // INT2 weights is I8
-        {{DataType::UINT1, DataType::UINT1, DataType::UINT1}, true},  // UINT1 weights is I8
-        {{DataType::INT1, DataType::INT1, DataType::INT1}, true},     // INT1 weights is I8
+            {{DataType::BF8, DataType::BF8, DataType::BF8}, false},       // BF8 weights is not I8
+            {{DataType::UINT8, DataType::UINT8, DataType::UINT8}, true},  // UINT8 weights is I8
+            {{DataType::INT8, DataType::INT8, DataType::INT8}, true},     // INT8 weights is I8
+            {{DataType::UINT4, DataType::UINT4, DataType::UINT4}, true},  // UINT4 weights is I8
+            {{DataType::INT4, DataType::INT4, DataType::INT4}, true},     // INT4 weights is I8
+            {{DataType::UINT2, DataType::UINT2, DataType::UINT2}, true},  // UINT2 weights is I8
+            {{DataType::INT2, DataType::INT2, DataType::INT2}, true},     // INT2 weights is I8
+            {{DataType::UINT1, DataType::UINT1, DataType::UINT1}, true},  // UINT1 weights is I8
+            {{DataType::INT1, DataType::INT1, DataType::INT1}, true},     // INT1 weights is I8
     };
 
     // Test I8 family classification for dynamically created weight tensors
@@ -304,4 +316,4 @@ TEST_F(NativeComputationTest, DetectI8ForTensors) {
     });
 }
 
-}
+}  // namespace VPUNN_unit_tests

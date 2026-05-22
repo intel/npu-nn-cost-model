@@ -14,16 +14,16 @@
 #include <exception>
 #include <memory>  // for std::make_shared (if used)
 #include <numeric>
-#include <optional>  // for std::optional
-#include <string>    // for std::string
-#include <tuple>     // for std::tuple_size
+#include <optional>      // for std::optional
+#include <string>        // for std::string
+#include <tuple>         // for std::tuple_size
 #include <type_traits>
-#include <variant>  // for std::visit, std::is_same_v
-#include <vector>   // for std::vector
+#include <variant>        // for std::visit, std::is_same_v
+#include <vector>         // for std::vector
 #include "core/logger.h"
 #include "vpu/device_layer_properties/device_layer_properties_holder.h"
 #include "vpu/dpu_defaults.h"
-#include "vpu/optimization/workload_optimization.h"
+#include "vpu/optimization/dpu_tiler_factory.h"
 #include "vpu/performance.h"
 #include "vpu/serialization/l2_cost_serialization_wrapper.h"
 #include "vpu/utils.h"
@@ -39,36 +39,22 @@ void VPULayerCostModel::initialize_serializers() {
     presplit_serializer.initialize("l2_dpu_workloads_presplit", FileMode::READ_WRITE, get_names_for_serializer());
 }
 
-CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, VPULayerStrategy strategy) {
+CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, VPULayerStrategy strategy) const {
     // VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
     return layer_cycles(internal_dpu_cost_provider, layer, strategy.tiling_strategy, strategy.nDPUs, strategy.nTiles,
                         strategy.input_fetching, strategy.output_spilling, strategy.prefetching);
 }
 
 CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, VPULayerStrategy strategy,
-                                             LayerSplitInfo& detailed_split) {
+                                             LayerSplitInfo& detailed_split) const {
     // VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
     return layer_cycles(internal_dpu_cost_provider, layer, strategy.tiling_strategy, strategy.nDPUs, strategy.nTiles,
                         strategy.input_fetching, strategy.output_spilling, strategy.prefetching, &detailed_split);
 }
 
-CyclesInterfaceType VPULayerCostModel::Layer_dCiM(DPULayer& layer, VPULayerStrategy strategy) {
-    Logger::info() << "DCIM LAYER:" << layer.get_layer_info();
-    Logger::info() << strategy;
-    return Cycles::ERROR_TILE_SPLIT_EXCEPTION;
-}
-
-CyclesInterfaceType VPULayerCostModel::Layer_dCiM(DPULayer& layer, VPULayerStrategy strategy,
-                                                  LayerSplitInfo& detailed_split) {
-    Logger::info() << "DCIM LAYER:" << layer.get_layer_info();
-    Logger::info() << strategy;
-    detailed_split.clear();
-    return Cycles::ERROR_TILE_SPLIT_EXCEPTION;
-}
-
 CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU,
                                              unsigned int nTiles, bool input_in_ddr, bool output_in_ddr,
-                                             bool prefetching) {
+                                             bool prefetching) const {
     // VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
     return layer_cycles(internal_dpu_cost_provider, layer, strategy, nDPU, nTiles, input_in_ddr, output_in_ddr,
                         prefetching, nullptr);
@@ -76,30 +62,96 @@ CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, VPUTilingStrategy 
 
 CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU,
                                              unsigned int nTiles, bool input_in_ddr, bool output_in_ddr,
-                                             bool prefetching, LayerSplitInfo& detailed_split) {
+                                             bool prefetching, LayerSplitInfo& detailed_split) const {
     //        VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
     return layer_cycles(internal_dpu_cost_provider, layer, strategy, nDPU, nTiles, input_in_ddr, output_in_ddr,
                         prefetching, &detailed_split);
 }
 
+BatchCostResult VPULayerCostModel::LayerBatched(const std::vector<std::reference_wrapper<LayerBatchElementInfo>>& layers) const {
+    BatchCostResult result;
+
+    if (layers.empty()) {
+        return result;  // empty input -> empty result, is not valid
+    }
+
+    result.costs.resize(layers.size());
+    std::transform(layers.begin(), layers.end(), result.costs.begin(),
+        [this](const std::reference_wrapper<LayerBatchElementInfo>& layer_ref) {
+            try {
+                auto& cfg = layer_ref.get();
+                return cfg.detailed_split != nullptr
+                    ? Layer(cfg.layer, cfg.strategy, *cfg.detailed_split)
+                    : Layer(cfg.layer, cfg.strategy);
+            } catch (const std::exception& e) {
+                Logger::warning() << "Exception in LayerBatched element: " << e.what();
+                return static_cast<CyclesInterfaceType>(Cycles::ERROR_TILE_SPLIT_EXCEPTION);
+            }
+        });
+    result.isValid = std::none_of(result.costs.begin(), result.costs.end(),
+        [](CyclesInterfaceType c) { return Cycles::isErrorCode(c); });
+    return result;
+}
+
+BatchCostResult VPULayerCostModel::LayerBatched(std::vector<LayerBatchElementInfo>& layers) const {
+    std::vector<std::reference_wrapper<LayerBatchElementInfo>> refs(layers.begin(), layers.end());
+    return LayerBatched(refs);
+}
+
+BatchCostResult VPULayerCostModel::LayersPreSplitBatched(const std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>>& layers_pre_split) const {
+    BatchCostResult result;
+
+    if (layers_pre_split.empty()) {
+        return result;  // empty input -> empty result, isValid=false, empty costs
+    }
+
+    result.costs.resize(layers_pre_split.size());
+    std::transform(layers_pre_split.begin(), layers_pre_split.end(), result.costs.begin(),
+        [this](const std::reference_wrapper<LayersPreSplitBatchElementInfo>& presplit_ref) {
+            try {
+                auto& info = presplit_ref.get();
+                return info.detailed_split != nullptr
+                    ? LayersPreSplit(info.layer_splits, info.strategy.nDPUs,
+                                     info.strategy.input_fetching, info.strategy.output_spilling,
+                                     info.strategy.prefetching, *info.detailed_split,
+                                     info.fullLayerHash.value_or(0), info.strategy.tiling_strategy)
+                    
+                    : LayersPreSplit(info.layer_splits, info.strategy.nDPUs,
+                                     info.strategy.input_fetching, info.strategy.output_spilling,
+                                     info.strategy.prefetching);
+            } catch (const std::exception& e) {
+                Logger::warning() << "Exception in LayersPreSplitBatched element: " << e.what();
+                return static_cast<CyclesInterfaceType>(Cycles::ERROR_TILE_SPLIT_EXCEPTION);
+            }
+        });
+    result.isValid = std::none_of(result.costs.begin(), result.costs.end(),
+        [](CyclesInterfaceType c) { return Cycles::isErrorCode(c); });
+    return result;
+}
+
+BatchCostResult VPULayerCostModel::LayersPreSplitBatched(std::vector<LayersPreSplitBatchElementInfo>& pre_split_layers) const {
+    std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>> refs(pre_split_layers.begin(), pre_split_layers.end());
+    return LayersPreSplitBatched(refs);
+}
+
 CyclesInterfaceType VPULayerCostModel::LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
                                                       bool input_in_ddr, bool output_in_ddr, bool prefetching,
                                                       LayerSplitInfo& detailed_split, const size_t fullLayerHash,
-                                                      const std::optional<VPUTilingStrategy> strategyOfSplit) {
+                                                      const std::optional<VPUTilingStrategy> strategyOfSplit) const {
     //        VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
     return layer_pre_split_cycles(internal_dpu_cost_provider, layers_pre_split, nDPU, input_in_ddr, output_in_ddr,
                                   prefetching, &detailed_split, fullLayerHash, strategyOfSplit);
 }
 
 CyclesInterfaceType VPULayerCostModel::LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
-                                                      bool input_in_ddr, bool output_in_ddr, bool prefetching) {
+                                                      bool input_in_ddr, bool output_in_ddr, bool prefetching) const {
     //        VPUCostModel& dpu_cost_provider(*this);  // for now the DPU cost provider is inherited
     return layer_pre_split_cycles(internal_dpu_cost_provider, layers_pre_split, nDPU, input_in_ddr, output_in_ddr,
                                   prefetching, nullptr);
 }
 
 CyclesInterfaceType VPULayerCostModel::LayersPreSplit(const std::vector<SHAVEWorkload>& layers_pre_split,
-                                                      unsigned int nSHV, bool input_in_ddr, bool output_in_ddr) {
+                                                      unsigned int nSHV, bool input_in_ddr, bool output_in_ddr) const {
     return layer_pre_split_cycles(internal_dpu_cost_provider, layers_pre_split, nSHV, input_in_ddr, output_in_ddr);
 }
 
@@ -174,7 +226,7 @@ const std::vector<std::string> VPULayerCostModel::get_names_for_serializer() {
     return fields;
 }
 
-CyclesInterfaceType VPULayerCostModel::layer_cycles(VPUCostModel& dpu_cost_provider, DPULayer& layer,
+CyclesInterfaceType VPULayerCostModel::layer_cycles(const VPUCostModel& dpu_cost_provider, DPULayer& layer,
                                                     VPUTilingStrategy strategy, unsigned int nDPU, unsigned int nTiles,
                                                     bool input_in_ddr, bool output_in_ddr, bool prefetching,
                                                     LayerSplitInfo* detailed_split) const {
@@ -265,7 +317,7 @@ CyclesInterfaceType VPULayerCostModel::layer_cycles(VPUCostModel& dpu_cost_provi
         }  // inter tile layers sanitized and validated
 
         // VPUCostModel& dpu_cost_provider(*this);       // this is the cost provider for the DPU workloads
-        auto tiler = getDPUTiler(dpu_cost_provider);  // intra-tile tiler
+        auto tiler = DPUTilerFactory::getDPUTiler(dpu_cost_provider);  // intra-tile tiler
         for (auto& one_tile_layer : tiles_layer) {
             try {
                 // obtains the best DPU workloads split
@@ -369,7 +421,7 @@ CyclesInterfaceType VPULayerCostModel::layer_cycles(VPUCostModel& dpu_cost_provi
 }
 
 CyclesInterfaceType VPULayerCostModel::layer_pre_split_cycles(
-        VPUCostModel& dpu_cost_provider, const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
+        const VPUCostModel& dpu_cost_provider, const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
         bool input_in_ddr, bool output_in_ddr, bool prefetching, LayerSplitInfo* detailed_split,
         const size_t fullLayerHash, const std::optional<VPUTilingStrategy> strategyOfSplit) const {
     // add missing info by deducing it (not anymore received by params)
@@ -447,7 +499,7 @@ CyclesInterfaceType VPULayerCostModel::layer_pre_split_cycles(
         }  // inter tile layers sanitized and validated
 
         // VPUCostModel& dpu_cost_provider(*this);       // this is the cost provider for the DPU workloads
-        auto tiler = getDPUTiler(dpu_cost_provider);  // intra-tile tiler
+        auto tiler = DPUTilerFactory::getDPUTiler(dpu_cost_provider);  // intra-tile tiler
         for (auto& one_tile_layer : tiles_layer) {
             try {
                 // obtains the best DPU workloads split
@@ -592,7 +644,7 @@ CyclesInterfaceType VPULayerCostModel::layer_pre_split_cycles(
     return cost;
 }
 
-CyclesInterfaceType VPULayerCostModel::layer_pre_split_cycles(VPUCostModel& shave_cost_provider,
+CyclesInterfaceType VPULayerCostModel::layer_pre_split_cycles(const VPUCostModel& shave_cost_provider,
                                                               const std::vector<SHAVEWorkload>& layers_pre_split,
                                                               unsigned int nSHV, bool input_in_ddr,
                                                               bool output_in_ddr) const {
@@ -693,7 +745,7 @@ CyclesInterfaceType VPULayerCostModel::layer_pre_split_cycles(VPUCostModel& shav
 }
 
 CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, unsigned int nDPU, unsigned int nTiles, bool input_in_ddr,
-                                             bool output_in_ddr, bool prefetching) {
+                                             bool output_in_ddr, bool prefetching) const {
     // Cost of a layer if executed in nTiles using nDPU/tile
     auto valid_strategies = getValidTilingStrategies(layer.device);
 

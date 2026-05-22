@@ -24,7 +24,7 @@ public:
      * 
      * @return A unique pointer to the created IHttpCostProvider instance.
      */
-    static std::unique_ptr<IHttpCostProvider> create();
+    static std::unique_ptr<const IHttpCostProvider> create();
 };
 
 }  // namespace VPUNN

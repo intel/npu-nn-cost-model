@@ -18,6 +18,7 @@
 #include "vpu_cost_model.h"
 #include "vpu_shave_cost_model.h"
 
+#include <filesystem>
 #include <unordered_map>
 
 /// @brief namespace for Unit tests of the C++ library
@@ -31,12 +32,13 @@ protected:
     VPUNN::SHAVECostModel empty_model{};
     VPUNN::SHAVECostModel model_with_cache{std::string{"../../../models/shave_5_1.cachebin"}, 16384};
 
-    std::shared_ptr<VPUNN::IShaveCostProvider> only_new_provider{ShaveCostProviderBundles::createNewShaveOnlyProvider()};
-    
+    std::shared_ptr<VPUNN::IShaveCostProvider> only_new_provider{
+            ShaveCostProviderBundles::createNewShaveOnlyProvider()};
+
     class SHAVECostModelTest : public VPUNN::SHAVECostModel {
-        public:
-            SHAVECostModelTest(std::shared_ptr<IShaveCostProvider> provider) 
-                : VPUNN::SHAVECostModel(std::move(provider)) {}
+    public:
+        SHAVECostModelTest(std::shared_ptr<IShaveCostProvider> provider): VPUNN::SHAVECostModel(std::move(provider)) {
+        }
     };
 
     SHAVECostModelTest model_with_new_provider{only_new_provider};
@@ -50,33 +52,25 @@ protected:
 private:
 };
 
-TEST_F(TestSHAVE, DISABLED_CheckTheCacheTest){
-    
-    const VPUNN::VPUTensor input_tensor{128,64,64,1, VPUNN::DataType::FLOAT16, Layout::XYZ};
-    const VPUNN::VPUTensor out_tensor{128,64,64,1, VPUNN::DataType::FLOAT16, Layout::XYZ};
-    
+TEST_F(TestSHAVE, DISABLED_CheckTheCacheTest) {
+    const VPUNN::VPUTensor input_tensor{128, 64, 64, 1, VPUNN::DataType::FLOAT16, Layout::XYZ};
+    const VPUNN::VPUTensor out_tensor{128, 64, 64, 1, VPUNN::DataType::FLOAT16, Layout::XYZ};
+
     SHAVEWorkload::Param param = 2;
     SHAVEWorkload::Parameters params = {param};
     SHAVEWorkload::ExtraParameters extra_params = {};
-    
+
     std::string false_string = "False";
     std::string true_string = "True";
     std::string level = "VPU";
     float eps = 0.000010f;
-    
+
     extra_params["across_channels"] = false_string;
     extra_params["eps"] = eps;
     extra_params["high_precision_normalize"] = false_string;
     extra_params["normalize_variance"] = true_string;
 
-    SHAVEWorkload swwl {
-        "MVN_2Ax",
-        VPUDevice::NPU_5_0,
-        {input_tensor},
-        {out_tensor},
-        params,
-        extra_params
-    };
+    SHAVEWorkload swwl{"MVN_2Ax", VPUDevice::NPU_5_0, {input_tensor}, {out_tensor}, params, extra_params};
 
     std::string info;
     auto shave_cycles = model_with_cache.computeCycles(swwl, info);
@@ -85,11 +79,11 @@ TEST_F(TestSHAVE, DISABLED_CheckTheCacheTest){
 }
 
 TEST_F(TestSHAVE, ShavePresentOldNotNew) {
-    SHAVEWorkload swwl {
-        "HardSigmoid",
-        VPUDevice::VPU_4_0,
-        {input_0},
-        {output_0},
+    SHAVEWorkload swwl{
+            "HardSigmoid",
+            VPUDevice::VPU_4_0,
+            {input_0},
+            {output_0},
     };
     EXPECT_EQ(swwl.get_device(), VPUNN::VPUDevice::VPU_4_0);
     ASSERT_EQ(swwl.get_inputs().size(), 1);
@@ -100,7 +94,6 @@ TEST_F(TestSHAVE, ShavePresentOldNotNew) {
     auto shave_cycles = empty_model.computeCycles(swwl, info);
     EXPECT_GT(shave_cycles, Cycles::NO_ERROR);
     EXPECT_LE(shave_cycles, Cycles::START_ERROR_RANGE);
-
 }
 
 /// @brief tests that V2 prototypeinterface s usable
@@ -167,6 +160,12 @@ TEST_F(TestSHAVE, SHAVE_v2_Cache_Smoke) {
     };
 
     const std::string temp_cache_file{"SHAVE_v2_Cache_Smoke.cache_bin"};
+    const ScopedFileCleanup cleanup{temp_cache_file};
+
+    // Ensure the temp cache file does not exist before the test, and if it exists remove it
+    std::error_code ec;
+    std::filesystem::remove(temp_cache_file, ec);  // never throws
+
     FixedCache shave_cacheToBe{temp_cache_file};
 
     shave_cacheToBe.insert(wlp7.hash(), 1.0f);
@@ -250,7 +249,7 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperators) {
             std::cout << "\n  : " << o;
         }
     }
-    {  // special in-existing
+    {   // special in-existing
         const auto d{VPUDevice::__size};
         auto ops = model_with_new_provider.getShaveSupportedOperations(d);
         EXPECT_EQ(ops.size(), 0);
@@ -281,7 +280,7 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_27) {
             EXPECT_TRUE(shv.has_value());
             const auto& shave_instance = shv.value().get();
             std::cout << "Shave instance details: " << shave_instance.toString() << "\n";
-            
+
             EXPECT_GT(shave_instance.toString().length(), 50);
         }
     }
@@ -301,11 +300,11 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_40) {
         for (const auto& o : ops) {
             std::cout << "\n*** ----------- " << i++ << " of " << ops_cnt << " : " << o << " ---------\n";
             const auto& shv = empty_model.getShaveInstance(o, d);
-            
+
             EXPECT_TRUE(shv.has_value());
             const auto& shave_instance = shv.value().get();
             std::cout << "Shave instance details: " << shave_instance.toString() << "\n";
-            
+
             EXPECT_GT(shave_instance.toString().length(), 50);
         }
     }
@@ -327,7 +326,7 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_5x) {
             EXPECT_TRUE(shv.has_value());
             const auto& shave_instance = shv.value().get();
             std::cout << "Shave instance details: " << shave_instance.toString() << "\n";
-            
+
             EXPECT_GT(shave_instance.toString().length(), 50);
         }
     }
@@ -347,9 +346,70 @@ TEST_F(TestSHAVE, SHAVE_v2_ListOfOperatorsDetails_5x) {
             EXPECT_TRUE(shv.has_value());
             const auto& shave_instance = shv.value().get();
             std::cout << "Shave instance details: " << shave_instance.toString() << "\n";
-            
+
             EXPECT_GT(shave_instance.toString().length(), 50);
         }
+    }
+}
+
+TEST_F(TestSHAVE, SHAVE_v2_Cache_InvalidOperatorName_HitAndMiss) {
+    // Validate that SHAVECostModel cache lookup is done purely on the workload cache key (hash) and takes precedence
+    // over operator validation/resolution.
+    //
+    // - Cache-hit case:
+    //   We pre-populate a cache file with an entry for a SHAVEWorkload whose operator name is intentionally invalid.
+    //   When computeCycles() is called with the exact same workload, the model should return the cached cycles without
+    //   consulting the provider, proving that a cache hit short-circuits operator lookup.
+    //
+    // - Cache-miss case:
+    //   We then query a similar workload but with a small change that alters the hash (different params). This must not
+    //   hit the cache; therefore, the model falls back to the provider, which cannot resolve the invalid operator name
+    //   and should return ERROR_SHAVE_OPERATOR_MISSING.
+    const SHAVEWorkload swl_invalid_in_cache{
+            "NotARealOp",
+            VPUDevice::VPU_4_0,
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+            {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+            {{7}},
+    };
+
+    const int expected_cycles{1234};
+
+    const std::string temp_cache_file{"SHAVE_v2_InvalidOperatorName.cache_bin"};
+
+    const ScopedFileCleanup cleanup{temp_cache_file};
+
+    // Ensure the temp cache file does not exist before the test, and if it exists remove it 
+    std::error_code ec;
+    std::filesystem::remove(temp_cache_file, ec);  // never throws
+
+    FixedCache cache_to_be{temp_cache_file};
+
+    cache_to_be.insert(swl_invalid_in_cache.hash(), static_cast<float>(expected_cycles));
+    cache_to_be.write_cache(temp_cache_file);
+
+    SHAVECostModel model_with_custom_cache{temp_cache_file, 16384};
+
+    // Cache hit: invalid operator name still returns cached value.
+    {
+        std::string info;
+        const auto cycles = model_with_custom_cache.computeCycles(swl_invalid_in_cache, info);
+        EXPECT_EQ(cycles, V(expected_cycles)) << swl_invalid_in_cache << info;
+    }
+
+    // Cache miss: similar workload (different params) -> provider path -> operator missing.
+    {
+        const SHAVEWorkload swl_invalid_not_in_cache{
+                "NotARealOp",
+                VPUDevice::VPU_4_0,
+                {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                {{8}},  // differs from {{7}} -> different hash -> not in cache
+        };
+
+        std::string info;
+        const auto cycles = model_with_custom_cache.computeCycles(swl_invalid_not_in_cache, info);
+        EXPECT_EQ(cycles, V(Cycles::ERROR_SHAVE_OPERATOR_MISSING)) << swl_invalid_not_in_cache << info;
     }
 }
 

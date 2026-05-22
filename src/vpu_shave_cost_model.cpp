@@ -26,7 +26,8 @@ std::shared_ptr<IShaveCostProvider> SHAVECostModel::createDefaultCostProvider() 
 }
 
 SHAVECostModel::SHAVECostModel(const std::string& cache_filename, const unsigned int cache_size)
-        : ptr_internal_shave_cost_provider(createDefaultCostProvider()), cache(cache_size, cache_filename) {
+        : ptr_internal_shave_cost_provider(createDefaultCostProvider()), cache(cache_size, cache_filename),
+          http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
             "shave_workloads", FileMode::READ_WRITE,
             ShaveSerializerUtils::get_names_for_shave_serializer(shave_cost_provider.get_max_num_params()));
@@ -34,7 +35,8 @@ SHAVECostModel::SHAVECostModel(const std::string& cache_filename, const unsigned
 
 SHAVECostModel::SHAVECostModel(const char* cache_data, size_t cache_data_length, const unsigned int cache_size)
         : ptr_internal_shave_cost_provider(createDefaultCostProvider()),
-          cache(cache_size, cache_data, cache_data_length) {
+          cache(cache_size, cache_data, cache_data_length),
+          http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
             "shave_workloads", FileMode::READ_WRITE,
             ShaveSerializerUtils::get_names_for_shave_serializer(shave_cost_provider.get_max_num_params()));
@@ -42,7 +44,8 @@ SHAVECostModel::SHAVECostModel(const char* cache_data, size_t cache_data_length,
 
 SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider,
                                const std::string& cache_filename, const unsigned int cache_size)
-        : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)), cache(cache_size, cache_filename) {
+        : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)), cache(cache_size, cache_filename),
+          http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
             "shave_workloads", FileMode::READ_WRITE,
             ShaveSerializerUtils::get_names_for_shave_serializer(shave_cost_provider.get_max_num_params()));
@@ -51,31 +54,56 @@ SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shav
 SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider, const char* cache_data,
                                size_t cache_data_length, const unsigned int cache_size)
         : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)),
-          cache(cache_size, cache_data, cache_data_length) {
+          cache(cache_size, cache_data, cache_data_length),
+          http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
             "shave_workloads", FileMode::READ_WRITE,
             ShaveSerializerUtils::get_names_for_shave_serializer(shave_cost_provider.get_max_num_params()));
 }
 
-CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl, [[maybe_unused]] std::string& infoOut,
-                                                  bool skipCacheSearch) const {
+CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl, [[maybe_unused]] std::string& infoOut) const {
     // finds func inmpl, executes it, handles errors
     SHAVECostSerializationWrap serialization_handler(serializer);
     std::string apiUsed{"unknown"};
 
     CyclesInterfaceType cycles{Cycles::NO_ERROR};  // Initialize with a default error value
 
-    if (!skipCacheSearch) {  // before finding the shave imnpl check if already in cache for this request
-                             // This is a one cache for all
+    const auto try_cache = [&]() -> CyclesInterfaceType {
         const auto cachedData{cache.get(swl, &apiUsed)};
         if (cachedData) {
             cycles = static_cast<CyclesInterfaceType>(std::floor(*cachedData));
-            serialization_handler.serializeShaveWorkloadWithCycles(swl, apiUsed, cycles);
             return cycles;
         }
+
+        return Cycles::ERROR_CACHE_MISS;  // if not found in cache, we return a cache miss error code
+    };
+    
+    const auto try_profiling = [&]() -> CyclesInterfaceType {
+        // now search with the http provider 
+        if(http_cost_provider) {
+            apiUsed = "profiling_service_" + http_cost_provider->profilingBackendToString(swl.get_profiling_service_backend());
+            
+            auto http_cost = http_cost_provider->getCost(swl, infoOut);
+            if(!Cycles::isErrorCode(http_cost)) {
+                return http_cost;
+            }
+        }
+
+        return Cycles::ERROR_PROFILING_SERVICE;  // if no provider or if provider returns error, we return an error code
+    };
+    
+    // First search in the cache for a pre-computed cost. If found, return it immediately.
+    cycles = try_cache();
+
+    // Second, if not found in cache, try to get the cost from the profiling service.
+    if (Cycles::isErrorCode(cycles)) {
+        cycles = try_profiling();
     }
 
-    cycles = shave_cost_provider.get_cost(swl, &apiUsed);
+    // Finally, if still not found, compute the cost using the SHAVE cost provider.
+    if (Cycles::isErrorCode(cycles)) {
+        cycles = shave_cost_provider.get_cost(swl, &apiUsed);
+    }
 
     // Add the computed cost to the cache for future reuse
     if (cycles < Cycles::START_ERROR_RANGE) {
@@ -86,13 +114,9 @@ CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl, [[ma
     return cycles;
 }
 
-CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl, std::string& infoOut) const {
-    return computeCycles(swl, infoOut, false);  // do not skip cache
-}
-
 CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl) const {
     std::string infoOut;
-    return computeCycles(swl, infoOut, false);  // do not skip cache
+    return computeCycles(swl, infoOut);  // do not skip cache
 }
 
 bool SHAVECostModel::sanitize_workload(const SHAVEWorkload& swl, SanityReport& result) const {

@@ -24,6 +24,8 @@
 #include "core/shave_map_type_selector.h"
 #include "core/vpunn_api.h"
 #include "vpu/cycles_interface_types.h"
+#include "vpu/http_cost_provider_intf.h"
+#include "vpu/http_cost_provider_factory.h"
 
 namespace VPUNN {
 /// @brief High-level cost model for estimating execution cycles of SHAVE workloads on VPU devices
@@ -44,6 +46,7 @@ private:
 
     mutable LRUCache<SHAVEWorkload, float> cache;  ///< all devices cache/LUT for shave ops. Populated in ctor
                                                    ///< this is a preloaded cache that features also a dynamic one
+    const std::unique_ptr<const IHttpCostProvider> http_cost_provider; ///< optional HTTP cost provider for remote cost estimation (e.g., via a profiling service)
 
     /**
      * @brief Creates the default SHAVE cost provider
@@ -76,10 +79,7 @@ public:
     SHAVECostModel(const SHAVECostModel&) = delete;
     virtual ~SHAVECostModel() = default;
 
-    CyclesInterfaceType computeCycles(const SHAVEWorkload& swl, [[maybe_unused]] std::string& infoOut,
-                                      bool skipCacheSearch) const;
-
-    CyclesInterfaceType computeCycles(const SHAVEWorkload& swl, std::string& infoOut) const;
+    CyclesInterfaceType computeCycles(const SHAVEWorkload& swl, [[maybe_unused]] std::string& infoOut) const;
 
     CyclesInterfaceType computeCycles(const SHAVEWorkload& swl) const;
 

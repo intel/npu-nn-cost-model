@@ -16,7 +16,7 @@
 
 namespace VPUNN {
 
-std::unique_ptr<IHttpCostProvider> HttpCostProviderFactory::create() {
+std::unique_ptr<const IHttpCostProvider> HttpCostProviderFactory::create() {
 #ifdef VPUNN_BUILD_HTTP_CLIENT
     return HttpCostProvider::initFromEnvironment();
 #else

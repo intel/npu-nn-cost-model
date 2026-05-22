@@ -29,11 +29,11 @@
 #undef ADD  // arpa/nameser.h defines ADD macro on Linux
 #endif
 
-#include "vpu/types.h"
-#include "vpu/validation/data_dpu_operation.h"
-#include "vpu/profiling_service.h"
 #include "core/utils.h"
 #include "vpu/http_cost_provider_intf.h"
+#include "vpu/profiling_service.h"
+#include "vpu/types.h"
+#include "vpu/validation/data_dpu_operation.h"
 
 namespace VPUNN {
 /**
@@ -58,8 +58,9 @@ public:
      * @brief Constructs an HTTPClient with the given host and port.
      * @param host The hostname or IP address of the server.
      * @param port The port number to connect to.
+     * @param debug Flag to enable or disable debug output (default: false).
      */
-    HTTPClient(const std::string& host, int port);
+    HTTPClient(const std::string& host, int port, bool debug = false);
 
     /**
      * @brief Sends a JSON request to the specified path.
@@ -70,17 +71,11 @@ public:
      */
     nlohmann::json sendJsonRequest(const nlohmann::json& payload, const std::string& path) const;
 
-    /**
-     * @brief Enable or disable debug output.
-     * @param enable True to enable debug output, false to disable.
-     */
-    void setDebug(bool enable) { _debug = enable; }
-
 protected:
-    const std::string _host;            ///< The hostname or IP address.
-    const int _port;                    ///< The port number.
-    mutable httplib::Client _client;    ///< The HTTP client instance.
-    bool _debug;                        ///< Debug flag for verbose output.
+    const std::string _host;          ///< The hostname or IP address.
+    const int _port;                  ///< The port number.
+    mutable httplib::Client _client;  ///< The HTTP client instance.
+    const bool _debug;                ///< Debug flag for verbose output.
 };
 
 /**
@@ -89,9 +84,9 @@ protected:
  */
 class HTTPProfilingClient : public HTTPClient {
 public:
-    HTTPProfilingClient(const std::string host, int port): HTTPClient(host, port) {};
+    HTTPProfilingClient(const std::string& host, int port, bool debug = false): HTTPClient(host, port, debug) {}
 
-     /**
+    /**
      * @brief Processes the profiler's JSON response.
      * @param response The JSON response from the profiler.
      * @return A ProfilerResponse object containing the processed data.
@@ -99,7 +94,7 @@ public:
      */
     ProfilerResponse handle_profiler_response(const nlohmann::json& response) const;
 
-     /**
+    /**
      * @brief Checks if the profiling service is available.
      * @param check_backend Optional parameter to specify backend to check.
      * @return True if available (or at least 1 backend available if check_backend not set), false otherwise.
@@ -114,14 +109,15 @@ public:
  */
 class HttpCostProvider : public IHttpCostProvider {
 public:
-    HttpCostProvider(const std::string& host = default_host, int port = default_port);
+    HttpCostProvider(const std::string& host = default_host, int port = default_port, bool debug = false,
+                     std::string profiling_backend_ = default_backend);
 
     /**
      * @brief Factory static function that initializes HttpCostProvider from environment variables.
      * @return A unique pointer to the initialized HttpCostProvider, nullptr otherwise.
      */
-    static std::unique_ptr<HttpCostProvider> initFromEnvironment();
-    
+    static std::unique_ptr<const HttpCostProvider> initFromEnvironment();
+
     /**
      * @brief Checks if the profiling service is available.
      * @return True if available, false otherwise.
@@ -134,13 +130,13 @@ protected:
      *
      * Uses std::visit to dispatch the HttpWorkloadVariant to the corresponding
      * getCost<T>() instantiation (e.g., DPUOperation or DMANN workload types).
-     * 
+     *
      * @param op The workload operation wrapped in a HttpWorkloadVariant.
      * @param info A string to store additional information.
      * @return The cost as CyclesInterfaceType, in case of error returns Cycles::ERROR_PROFILING_SERVICE.
      */
     CyclesInterfaceType getCostImpl(const HttpWorkloadVariant& op, std::string& info) const override;
-    
+
     /**
      * @brief Retrieves the cost associated with a given DPU operation.
      * @tparam WlT The type of the workload operation.
@@ -158,26 +154,21 @@ public:
      * @param backend The backend enum value to convert.
      * @return String representation of the backend, defaults to "SILICON" if invalid.
      */
-    const std::string profilingBackendToString(ProfilingServiceBackend backend=ProfilingServiceBackend::SILICON) const override;
-
-    /**
-     * @brief Enable or disable debug output.
-     * @param enable True to enable debug output, false to disable.
-     */
-    void setDebug(bool enable) override;
+    const std::string profilingBackendToString(
+            ProfilingServiceBackend backend = ProfilingServiceBackend::SILICON) const override;
 
     ~HttpCostProvider() = default;
 
 private:
-    HTTPProfilingClient _client;    ///< The HTTPProfilingClient instance.
-    std::string profiling_backend;  ///< The actual profiling backend that is used.
-    bool _debug;                    ///< Debug flag for verbose output.
+    const HTTPProfilingClient _client;    ///< The HTTPProfilingClient instance.
+    const std::string profiling_backend;  ///< The actual profiling backend that is used.
+    const bool _debug;                    ///< Debug flag for verbose output.
 
     /**
      * @brief Default values for the HttpCostProvider in case environment variables are not set.
      * or are invalid.
      */
-    static constexpr const char*  default_host = "irlccggpu04.ir.intel.com";
+    static constexpr const char* default_host = "irlccggpu04.ir.intel.com";
     static constexpr int default_port = 5000;
     static constexpr const char* default_backend = "silicon";
 
@@ -191,4 +182,4 @@ private:
     const nlohmann::json toJson(const WlT& wl) const;
 };
 }  // namespace VPUNN
-#endif // HTTP_COST_PROVIDER_H_
+#endif  // HTTP_COST_PROVIDER_H_

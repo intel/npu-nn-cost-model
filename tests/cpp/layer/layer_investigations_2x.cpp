@@ -61,13 +61,13 @@ TEST_F(VPULayerCM_InvestigationTestVPU2x, DWConv_SOK_SOH_Comparison_EISXW_92399)
     {
         const DPULayer tst_layer(wl_h17_orig);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 95000, 95000 + 8000},  //  v16 96k        v17: 98k         //v159 99k
                  "SOHO , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 75000, 75000 + 15000},  // v16 77k, v17 87k,  //v159 76k  GT??
                  "SOK , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 114000,
                   114000 + 50000},  // v16  115k      v17: 115k:157k   //v159 124k
                  "SOH Halo , no memmove, "},
@@ -739,11 +739,11 @@ TEST_F(VPULayerCM_InvestigationTestVPU2x, Layer_MAXP_EISXW_na_MINGQI_NPU27) {
     {  // note:
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 22000,
                   fail * 22000 + 2200},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "SOHh , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 22000,
                   fail * 22000 + 2200},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "SOHO , no memmove, "},
@@ -1082,24 +1082,24 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, Most_used_temporalTiles_SOKtt2_1
         std::cout << "\n ------- SOK  WING:   tt2-19 ------- \n";
         const DPULayer tst_layer(wl_Ktt2);  // has 3 output rows, what h split!
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 480000u,
                   /*fail * */ (480000u + 20000u)},  // v17:485910  GT:xx  (intratile:)
                                                     // VPUXVPUNN(old v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 240000,
                   fail * (240000u + 20000)},  // v17:248143  GT:xx  (intratile K64x7 K32x1)
                                               // VPUXVPUNN(old v): xx, v159NN:xx   VPUXnn:264960(160)/242082(159)
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 800000,
                   /* fail * */ (800000u + 500000)},  // v17:822045:1264680    GT:? v159NN: xx
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 480000, (480000u + 20000u)},  // v17:CLU:492045  GT:?  (intratile:)
                  "FUll , no memmove, "},
 
@@ -1113,25 +1113,25 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, Most_used_temporalTiles_SOKtt2_1
         std::cout << "\n ------- SOH  WING:   tt1-6 ------- \n";
         const DPULayer tst_layer(wl_Htt1);  // h =8
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1,
                   /*fail * */ (1u + 1u)},  // v17:ERROR_INPUT_TOO_BIG  GT:xx  (intratile: )   VPUXVPUNN(old
                                            // v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1,
                   /*fail * */ (1u + 1)},  // v17: ERROR_INPUT_TOO_BIG  GT:xx  (intratile x1)
                                           // VPUXVPUNN(old v): xx, v159NN:xx
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 750000,
                   fail * (750000u + 750000)},  // v17:763575: 1390740 , (intratile:  K64x15:K32x30) GT:? v159NN: xx
                                                // . VPUXNN: 783870
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1, (1 + 1)},  // v17: ERROR_INPUT_TOO_BIG  GT:?
                  "FUll , no memmove, "},
 
@@ -1416,24 +1416,24 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOKtt0_1_SOHtt0) {
         std::cout << "\n ------- SOK  WING:   tt0 ------- \n";
         const DPULayer tst_layer(wl_Ktt0);  // has 3 output rows, what h split!
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 460000u,
                   /*fail * */ (460000u + 20000u)},  // v17:464670  GT:xx  (intratile:)
                                                     // VPUXVPUNN(old v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 230000,
                   fail * (230000u + 20000)},  // v17:241568  GT:xx  (intratile K64x7 K32x1)
                                               // VPUXVPUNN(old v): xx, v159NN:xx
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 710000,
                   /*fail * */ (710000u + 500000)},  // v17:725460: 1169790    GT:? v159NN: xx
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 460000, (460000u + 30000u)},  // v17:CLU:479220  GT:?  (intratile:)
                  "FUll , no memmove, "},
 
@@ -1446,24 +1446,24 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOKtt0_1_SOHtt0) {
         std::cout << "\n ------- SOK  WING:   tt1 ------- \n";
         const DPULayer tst_layer(wl_Ktt1);  // has 3 output rows, what h split!
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 470000u,
                   /*fail * */ (470000u + 30000u)},  // v17:483450  GT:xx  (intratile:)
                                                     // VPUXVPUNN(old v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 230000,
                   fail * (230000u + 30000)},  // v17:246757  GT:xx  (intratile K64x7 K32x1)
                                               // VPUXVPUNN(old v): xx, v159NN:xx
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 810000,
                   /*fail * */ (810000u + 550000)},  // v17:822045:1226910    GT:? v159NN: xx
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 470000, (470000u + 30000u)},  // v17:CLU:489450  GT:?  (intratile:)
                  "FUll , no memmove, "},
 
@@ -1477,24 +1477,24 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOKtt0_1_SOHtt0) {
         std::cout << "\n ------- SOH  WING:   tt0 ------- \n";
         const DPULayer tst_layer(wl_Htt0);  // h =9, padding T:4
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1,
                   /*fail * */ (1u + 1u)},  // v17:ERROR_INPUT_TOO_BIG  GT:xx  (intratile: )   VPUXVPUNN(old
                                            // v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 596000,
                   /*fail * */ (596000u + 20000)},  // v17:607920  GT:xx  (intratile x1)
                                                    // VPUXVPUNN(old v): xx, v159NN:xx
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 890000,
                   fail * (890000u + 900000)},  // v17:905415:1712340 , (intratile:  K64x15) GT:? v159NN: xx
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1, (1 + 1)},  // v17: ERROR_INPUT_TOO_BIG  GT:?
                  "FUll , no memmove, "},
 
@@ -1635,24 +1635,24 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOKtt22_23_SOHtt7)
         std::cout << "\n ------- SOK  WING:   tt22 ------- \n";
         const DPULayer tst_layer(wl_Ktt22);  // has 3 output rows, what h split!
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 470000u,
                   /*fail * */ (470000u + 30000u)},  // v17:486345  GT:xx  (intratile:)
                                                     // VPUXVPUNN(old v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 230000,
                   fail * (230000u + 20000)},  // v17:247870  GT:xx  (intratile K64x7 K32x1)
                                               // VPUXVPUNN(old v): xx, v159NN:xx
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 700000,
                   /*fail * */ (700000u + 1200000)},  // v17:779340:1809450    GT:? v159NN: xx
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 480000, (480000u + 20000u)},  // v17:CLU:491565  GT:?  (intratile:)
                  "FUll , no memmove, "},
 
@@ -1665,24 +1665,24 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOKtt22_23_SOHtt7)
         std::cout << "\n ------- SOK  WING:   tt23 ------- \n";
         const DPULayer tst_layer(wl_Ktt23);  // has 3 output rows, what h split!
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 430000u,
                   /*fail * */ (430000u + 30000u)},  // v17:438270  GT:xx  (intratile:)
                                                     // VPUXVPUNN(old v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 230000,
                   fail * (230000u + 30000)},  // v17:235680  GT:xx  (intratile K64x7 K32x1)
                                               // VPUXVPUNN(old v): xx, v159NN:xx
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 650000,
                   /*fail * */ (650000u + 750000)},  // v17: 662175:1272630   GT:? v159NN: xx
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 450000, (450000u + 30000u)},  // v17:CLU:469140  GT:?  (intratile:)
                  "FUll , no memmove, "},
 
@@ -1696,24 +1696,24 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOKtt22_23_SOHtt7)
         std::cout << "\n ------- SOH  WING:   tt7 ------- \n";
         const DPULayer tst_layer(wl_Htt7);  // h =8
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1,
                   /*fail * */ (1u + 1u)},  // v17:ERROR_INPUT_TOO_BIG  GT:xx  (intratile: )   VPUXVPUNN(old
                                            // v):xx. v159NN: xx
                  "SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 410000,
                   /*fail * */ (410000u + 40000)},  // v17:434268,  GT:xx  (intratile x1)
                                                    // VPUXVPUNN(old v): xx, v159NN:xx
                  "SOK , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
                  {VPUNN::Cycles::NO_ERROR, true, 750000,
                   fail * (750000u + 750000)},  // v17:763575:1390740 , (intratile:  K64x15) GT:? v159NN: xx
                  "SOH Halo , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1, (1 + 1)},  // v17: ERROR_INPUT_TOO_BIG  GT:?
                  "FUll , no memmove, "},
 
@@ -1929,47 +1929,47 @@ TEST_F(VPULayerInvstgt_EISXW_119193_Deeplab_v3, TemporalTiles_SOHO_possible_inte
     wl_Htt1_H5.outputs[0] = {VPUTensor(65, 4 + 4 - 3, 960 /*64x15*/, 1, DataType::FLOAT16)};
 
     const std::vector<TestCase> tests{
-            {{(DPULayer)wl_Htt1, {1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+            {{(DPULayer)wl_Htt1, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
              {Cycles::ERROR_INPUT_TOO_BIG, true, 1, fail * (1u + 1u)},  // v17:ERROR_INPUT_TOO_BIG  GT:xx  (intratile: )
                                                                         // VPUXVPUNN(old v):xx. v159NN: xx
              "SOHO H8 , no memmove, "},
 
-            {{(DPULayer)wl_Htt1, {1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
+            {{(DPULayer)wl_Htt1, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
              {Cycles::NO_ERROR, true, 750000,
               fail * (750000u +
                       750000)},  // v17:763575:1390740 , (intratile:  K64x15) GT:? v159NN: xx  . VPUXNN: 783870
              "SOH Halo H8 , no memmove, "},
 
             //--------------------h7
-            {{(DPULayer)wl_Htt1_H7, {1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+            {{(DPULayer)wl_Htt1_H7, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
              {Cycles::ERROR_INPUT_TOO_BIG, true, 480000, fail * (480000u + 20000u)},  // v17:  GT:xx  (intratile: )
                                                                                       // VPUXVPUNN(old v):xx. v159NN: xx
              "SOHO H7 , no memmove, "},
 
-            {{(DPULayer)wl_Htt1_H7, {1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
+            {{(DPULayer)wl_Htt1_H7, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
              {Cycles::NO_ERROR, true, 770000,
               fail * (770000 + 750000)},  // v17: 783165:1390740 , (intratile:  K64x15) GT:? v159NN: xx  . VPUXNN:
              "SOH Halo H7 , no memmove, "},
             //--------------------h6
-            {{(DPULayer)wl_Htt1_H6, {1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+            {{(DPULayer)wl_Htt1_H6, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
              {Cycles::NO_ERROR, true, 480000u, fail * (480000u + 200000u)},  // v17:492045  GT:xx  (intratile: )
                                                                              // VPUXVPUNN(old
                                                                              // v):xx. v159NN: xx
              "SOHO H6 , no memmove, "},
 
-            {{(DPULayer)wl_Htt1_H6, {1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
+            {{(DPULayer)wl_Htt1_H6, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
              {Cycles::NO_ERROR, true, 770000,
               fail * (770000 + 700000)},  // v17:  :1317750 , (intratile:  K64x15) GT:? v159NN: xx  . VPUXNN:
              "SOH Halo H6 , no memmove, "},
 
             //--------------------h5
-            {{(DPULayer)wl_Htt1_H5, {1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+            {{(DPULayer)wl_Htt1_H5, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
              {Cycles::NO_ERROR, true, 480000u, fail * (480000u + 20000u)},  // v17:492045  GT:xx  (intratile: )
                                                                             // VPUXVPUNN(old
                                                                             // v):xx. v159NN: xx
              "SOHO H5 , no memmove, "},
 
-            {{(DPULayer)wl_Htt1_H5, {1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
+            {{(DPULayer)wl_Htt1_H5, VPULayerStrategy{1U, 1U, 2U, VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},  // RELEVANT
              {Cycles::NO_ERROR, true, 750000,
               fail * (750000u + 7500000)},  // v17:804900:1317750 , (intratile:  K64x15) GT:? v159NN: xx  . VPUXNN:
              "SOH Halo H5 , no memmove, "},

@@ -56,7 +56,14 @@ public:
      * @return unaltered name of the model as it is stored in the source/filename of the loaded model
      */
     std::string network_name() const {
-        return (model != nullptr) ? model->name()->c_str() : "";
+        if (model != nullptr) {
+            const auto modname{model->name()};
+            if (modname != nullptr) {
+                return modname->str();
+            }
+        }
+        return std::string("");
+        // return (model != nullptr) ? model->name()->c_str() : "";
     }
 
     /**

@@ -64,7 +64,8 @@ TEST_F(TestVPUPowerFactorLUTNPU4x, NPU40_AvailabilitySmoke) {
         ASSERT_NO_THROW(operation_pf =
                                 power_factor_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
                 << "FP8" << wl;
-        EXPECT_NEAR(operation_pf, 0.0f, 0.005) << "FP8" << wl;
+        // FP8 not in VPU_4_0 SCL LUT -> fallback to INT8 CONV at ch=16 (value=1.0, adjustor=1.0)
+        EXPECT_NEAR(operation_pf, 1.0f, 0.005) << "FP8" << wl;
     }
     {  // int8
         const std::array<VPUTensor, 1> outputs3200{VPUTensor(10, 10, 32, 1, DataType::UINT8)};
@@ -85,6 +86,51 @@ TEST_F(TestVPUPowerFactorLUTNPU4x, NPU40_AvailabilitySmoke) {
                 << "I8 " << wl;
         EXPECT_NEAR(operation_pf, 1.0f, 0.005) << "I8 " << wl;
     }
+}
+
+// ==================================================================================
+// Fallback mechanism tests for VPU_4_0
+// Inherits from VPU_2_7: SCL has INT8 + FP16. No FP8 entry -> FP8 falls back to INT8.
+// DCIM engine is not in the LUT -> returns empty (0.0).
+// ==================================================================================
+TEST_F(TestVPUPowerFactorLUTNPU4x, VPU40_SCL_MissingFP8_FallbackToINT8) {
+    const VPUPowerFactorLUT pf_lut{};
+    auto wl = make_conv_wl(VPUDevice::VPU_4_0, DataType::HF8, DataType::BF8);
+
+    float result{0.0f};
+    ASSERT_NO_THROW(result = pf_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+            << "SCL FP8 fallback to INT8 on VPU_4_0" << wl;
+    EXPECT_NEAR(result, 1.0f, 0.005) << "SCL FP8 should fallback to INT8 (1.0) on VPU_4_0" << wl;
+}
+
+TEST_F(TestVPUPowerFactorLUTNPU4x, VPU40_DCIM_INT8_ReturnsEmpty) {
+    const VPUPowerFactorLUT pf_lut{};
+    auto wl = make_conv_wl(VPUDevice::VPU_4_0, DataType::UINT8, DataType::UINT8, MPEEngine::DCIM);
+
+    float result{-1.0f};
+    ASSERT_NO_THROW(result = pf_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+            << "DCIM INT8 on VPU_4_0" << wl;
+    EXPECT_NEAR(result, 0.0f, 0.005) << "DCIM should return empty (0.0) on VPU_4_0" << wl;
+}
+
+TEST_F(TestVPUPowerFactorLUTNPU4x, VPU40_DCIM_FP16_ReturnsEmpty) {
+    const VPUPowerFactorLUT pf_lut{};
+    auto wl = make_conv_wl(VPUDevice::VPU_4_0, DataType::FLOAT16, DataType::FLOAT16, MPEEngine::DCIM);
+
+    float result{-1.0f};
+    ASSERT_NO_THROW(result = pf_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+            << "DCIM FP16 on VPU_4_0" << wl;
+    EXPECT_NEAR(result, 0.0f, 0.005) << "DCIM should return empty (0.0) on VPU_4_0" << wl;
+}
+
+TEST_F(TestVPUPowerFactorLUTNPU4x, VPU40_DCIM_FP8_ReturnsEmpty) {
+    const VPUPowerFactorLUT pf_lut{};
+    auto wl = make_conv_wl(VPUDevice::VPU_4_0, DataType::HF8, DataType::BF8, MPEEngine::DCIM);
+
+    float result{-1.0f};
+    ASSERT_NO_THROW(result = pf_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+            << "DCIM FP8 on VPU_4_0" << wl;
+    EXPECT_NEAR(result, 0.0f, 0.005) << "DCIM should return empty (0.0) on VPU_4_0" << wl;
 }
 
 }  // namespace VPUNN_unit_tests

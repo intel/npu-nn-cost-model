@@ -1,4 +1,4 @@
-# Copyright © 2024 Intel Corporation
+# Copyright © 2026 Intel Corporation
 # SPDX-License-Identifier: Apache 2.0
 # LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 # is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -18,9 +18,19 @@ endif()
 # Add source files
 target_sources(vpunn_optimization 
     PRIVATE 
-        workload_optimization.cpp 
-        tiler.cpp 
-        splits.cpp
+        tiling_primitives.cpp
+        dimension_tiler.cpp
+        efficiency_based_splitter.cpp
+        workload_cost_evaluator.cpp
+        tiler.cpp
+        dpu_tiler_impl.cpp
+        dpu_tiler_factory.cpp
+        hwtiling.cpp
+        htiling.cpp
+        wtiling.cpp 
+        ztiling.cpp
+        zefftiling.cpp
+        tiling_algorithm_factory.cpp
 )
 
 target_include_directories(vpunn_optimization

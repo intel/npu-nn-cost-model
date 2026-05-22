@@ -45,6 +45,7 @@ protected:
     DPUWorkload wl_glob_50;
 
 
+
     VPUCostModel empty_model{};
     ModelMap<VPUCostModel> cost_models{""};
 
@@ -57,6 +58,7 @@ protected:
         wl_glob_40.device = VPUDevice::VPU_4_0;
         wl_glob_50 = wl_glob_40;
         wl_glob_50.device = VPUDevice::NPU_5_0;
+
 
 
         cost_models.addModel(VPUDevice::VPU_2_0, VPU_2_0_MODEL_PATH);

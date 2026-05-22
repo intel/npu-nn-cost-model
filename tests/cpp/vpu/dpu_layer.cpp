@@ -3209,7 +3209,7 @@ TEST_F(DPULayerTest, DISABLED_zSplitSOHinHALO_basic_K5_3T_DISABLED) {
     executeT_SOH_inHALO(tests);
 }
 
-TEST_F(DPULayerTest, NPU_RESERVED_1_TilingExecutionMode_ConvAndCmConv_HaveAllCuboidModes) {
+TEST_F(DPULayerTest, NPU_RESERVED_TilingExecutionMode_ConvAndCmConv_HaveAllCuboidModes) {
     auto contains = [](const std::vector<ExecutionMode>& modes, const ExecutionMode m) -> bool {
         return std::find(modes.begin(), modes.end(), m) != modes.end();
     };
@@ -3224,7 +3224,7 @@ TEST_F(DPULayerTest, NPU_RESERVED_1_TilingExecutionMode_ConvAndCmConv_HaveAllCub
     };
 
     const DPULayer conv_layer{
-            VPUDevice::NPU_RESERVED_1,
+            VPUDevice::NPU_RESERVED,
             Operation::CONVOLUTION,
             {VPUTensor(28, 9, 8, 1, DataType::UINT8, Layout::XYZ, false)},
             {VPUTensor(28, 9, 8, 1, DataType::UINT8, Layout::XYZ, false)},
@@ -3236,8 +3236,8 @@ TEST_F(DPULayerTest, NPU_RESERVED_1_TilingExecutionMode_ConvAndCmConv_HaveAllCub
     DPULayer cm_conv_layer = conv_layer;
     cm_conv_layer.op = Operation::CM_CONVOLUTION;
 
-    expect_has_all_cuboid_modes(conv_layer, "CONV must support all cuboid tiling execution modes on NPU_RESERVED_1");
-    expect_has_all_cuboid_modes(cm_conv_layer, "CM_CONV must support all cuboid tiling execution modes on NPU_RESERVED_1");
+    expect_has_all_cuboid_modes(conv_layer, "CONV must support all cuboid tiling execution modes on NPU_RESERVED");
+    expect_has_all_cuboid_modes(cm_conv_layer, "CM_CONV must support all cuboid tiling execution modes on NPU_RESERVED");
 }
 
 }  // namespace VPUNN_unit_tests

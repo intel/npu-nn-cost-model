@@ -1,4 +1,4 @@
-// Copyright © 2024 Intel Corporation
+// Copyright © 2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,15 +11,11 @@
 #define VPUNN_TILER_H
 
 #include <list>
-#include <memory>
 #include <set>
 #include <string>
-#include <vector>
-#include "vpu/layer.h"
-#include "vpu/optimization/workload_optimization_types.h"
-#include "vpu/types.h"
-#include "vpu/utils.h"
 
+#include "vpu/dpu_types.h"
+#include "vpu/layer.h"
 #include "vpu/layer_split_info.h"
 
 namespace VPUNN {
@@ -97,20 +93,6 @@ public:
     ///  @brief name of the actual type, for debug purposes
     virtual std::string name() const = 0;
 };
-
-/**
- * @brief A list of algorithms
- */
-
-using TilingAlgorithmsContainer = std::list<std::unique_ptr<ITilerAlgorithm>>;
-/**
- * @brief Factory functions that returns a list of algorithms from the strategies
- *
- * @param layer the DPULayer
- * @param options the split algorithm optimization options
- * @return TilingAlgorithms
- */
-TilingAlgorithmsContainer getTilingAlgorithms(const DPULayer& layer, const SplitOptions& options);
 
 }  // namespace VPUNN
 

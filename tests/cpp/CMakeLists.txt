@@ -80,6 +80,7 @@ file(GLOB_RECURSE test_src
     "${CMAKE_CURRENT_SOURCE_DIR}/inference/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/kernels/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/layer/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/optimization/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/shave/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/vpu/*.cpp"
 )
@@ -99,13 +100,13 @@ target_compile_definitions(test_cost_model
         VPU_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_4_0.vpunn"
         VPU_4_1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn"
         VPU_4_0_159_STRICT_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_40_159_strict.vpunn"
-        NPU_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_5_1.vpunn"  
+        NPU_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_5_1.vpunn"
         # DMA models
         VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn"
         VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn"
         VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn"
-        NPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn"     
-        NPU_DMA_5_0_V1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn"  
+        NPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn" 
+        NPU_DMA_5_0_V1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn"
 )
 
 # Link libraries 
@@ -137,7 +138,9 @@ target_include_directories(test_cost_model
 # endif()
 
 add_dependencies(test_cost_model vpunn_cpp_schema)
-
+#   target_compile_definitions(test_cost_model PUBLIC 
+#         VPUNN_BUILD_HTTP_CLIENT
+#     )
 include(GoogleTest)
 gtest_discover_tests(test_cost_model 
     DISCOVERY_TIMEOUT 30

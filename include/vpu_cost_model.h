@@ -66,7 +66,7 @@ protected:
     const IEnergy my_energy{*this, internal_shave_cost_model,
                             performance};  ///< energy aspects, not used here but instantiated
 
-    const std::unique_ptr<IHttpCostProvider> http_dpu_cost_provider; ///< HTTP cost provider for DPU
+    const std::unique_ptr<const IHttpCostProvider> http_dpu_cost_provider; ///< HTTP cost provider for DPU
     
     const DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
 
@@ -435,16 +435,6 @@ public:
     CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut) const;
 
     CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl) const;
-
-    /**
-     * @brief Return the number of cycles needed to compute a Shave kernel without posibility of skipping Cache
-     *
-     * @param shave_wl a Shave workload contains: name of kernel, device, in out tensor. PLus optional parameters of the
-     * operations
-     * @param infoOut  a string that will contain informative error information (in case of error)
-     * @return the number of cycles of the Shave kernel, in DPU cycles of the desired device nominal frequency. OR ERROR
-     */
-    CyclesInterfaceType SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut, bool skipCacheValues) const;
 
     /// gets the list of names of supported operators on a specified device. Each device has own operators
     ///

@@ -27,7 +27,6 @@
 #include "device_valid_valuesVPU4.h"
 
 #include "device_valid_valuesVPU5.h"
-
 #include "interface_operations_behavior.h"
 #include "interface_valid_values.h"
 #include "layer_operations_valid_behaviours.h"

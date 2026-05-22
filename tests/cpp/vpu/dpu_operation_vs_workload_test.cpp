@@ -82,4 +82,40 @@ TEST_F(DPUOp_vs_DPUWl_Equivalence_Functions, Function_is_preconditions_for_inpla
     EXPECT_EQ(_dpu_wl.is_preconditions_for_inplace_output(), _dpu_op.is_preconditions_for_inplace_output());
 }
 
+TEST_F(DPUOp_vs_DPUWl_Equivalence_Functions, Autopad_Flags_Preservation_Test) {
+    // Verify input_autopad and output_autopad are preserved across DPUWorkload <--> DPUOperation conversions
+
+    // Build a workload with both autopad flags set to true
+    DPUWorkload wl_with_autopad = dpu_wl;
+    wl_with_autopad.input_autopad = true;
+    wl_with_autopad.output_autopad = true;
+
+    // DPUWorkload -> DPUOperation: flags must be preserved 
+    {
+        const DPUOperation op_from_wl{wl_with_autopad};
+        EXPECT_TRUE(op_from_wl.input_autopad) << "input_autopad lost during DPUWorkload -> DPUOperation";
+        EXPECT_TRUE(op_from_wl.output_autopad) << "output_autopad lost during DPUWorkload -> DPUOperation";
+    }
+    // Also verify false -> false
+    {
+        const DPUOperation op_from_wl{dpu_wl};  // defaults: both false
+        EXPECT_FALSE(op_from_wl.input_autopad) << "input_autopad should be false when source is false";
+        EXPECT_FALSE(op_from_wl.output_autopad) << "output_autopad should be false when source is false";
+    }
+
+    // DPUOperation -> DPUWorkload (clone_as_DPUWorkload): flags must be preserved 
+    {
+        const DPUOperation op_with_autopad{wl_with_autopad};
+        const DPUWorkload wl_cloned = op_with_autopad.clone_as_DPUWorkload();
+        EXPECT_TRUE(wl_cloned.is_input_autopad()) << "input_autopad lost during DPUOperation -> DPUWorkload";
+        EXPECT_TRUE(wl_cloned.is_output_autopad()) << "output_autopad lost during DPUOperation -> DPUWorkload";
+    }
+    // Also verify false -> false
+    {
+        const DPUWorkload wl_cloned = dpu_op.clone_as_DPUWorkload();  // defaults: both false
+        EXPECT_FALSE(wl_cloned.is_input_autopad()) << "input_autopad should be false when source is false";
+        EXPECT_FALSE(wl_cloned.is_output_autopad()) << "output_autopad should be false when source is false";
+    }
+}
+
 }  // namespace VPUNN_unit_tests

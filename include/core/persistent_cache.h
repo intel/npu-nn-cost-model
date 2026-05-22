@@ -18,6 +18,8 @@
 #include <map>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
+#include <string>
 #include <vector>
 #include <mutex>
 
@@ -90,7 +92,7 @@ public:
         misses.store(0, std::memory_order_relaxed);
     }
 
-    void printToLog(const std::string prefix = "") const {
+    void printToLog(std::string_view prefix = {}) const {
         Logger::info() << "\n" << prefix << printString() << "\n";
     }
 

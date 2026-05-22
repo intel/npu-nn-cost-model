@@ -10,14 +10,17 @@
 #ifndef VPUNN_LAYER_COST_MODEL_H
 #define VPUNN_LAYER_COST_MODEL_H
 
-#include <memory>
-#include <optional>
 #include <string>  // for std::string
 #include <variant>
 #include <vector>                        // for std::vector
+#include <functional>
+#include <optional>
+#include <memory>
+
 #include "core/dma_map_type_selector.h"  // need this to instantiate the template with specifics like DMANNWorkload_NPU27
 #include "core/serializer.h"
 #include "vpu/cycles_interface_types.h"
+#include "vpu/dma_types.h"
 #include "vpu/layer.h"
 #include "vpu/layer_split_info.h"
 #include "vpu/types.h"
@@ -25,8 +28,61 @@
 #include "vpu_cost_model.h"
 #include "vpu_dma_cost_model_variant.h"
 #include "vpu_layer_strategy.h"
+#include "vpu_layer_pre_split_strategy.h"
 
 namespace VPUNN {
+
+/** @brief Input descriptor for a single entry in a batched DPU layer cost estimation.
+ *
+ * Pairs a @ref DPULayer workload description with the @ref VPULayerStrategy that
+ * controls how the layer is mapped onto the hardware (number of tiles, DPUs,
+ * memory placement, prefetching, etc.).
+ *
+ * An array of these descriptors is passed to @ref VPULayerCostModel::LayerBatched
+ * to evaluate multiple layer/strategy combinations in a single call.
+ */
+struct LayerBatchElementInfo {
+    DPULayer layer;                                 ///< The DPU workload to evaluate
+    VPULayerStrategy strategy;                      ///< Execution strategy (tiling, DPU count, memory placement, prefetching)
+    std::unique_ptr<LayerSplitInfo> detailed_split{nullptr}; ///< Optional detailed split info for the layer, used for serialization and analysis
+};
+
+/** @brief Input descriptor for a single entry in a batched pre-split layer cost estimation.
+ *
+ * Represents a layer that has already been split across CMX tiles by the caller.
+ * The @c layer_splits vector contains splitted @ref DPULayer instances. The accompanying
+ * @ref VPULayersPreSplitStrategy supplies the execution context (DPU count, memory placement,
+ * prefetching).  An optional hash of the original unsplit layer can be provided to
+ * enable serialization/statistics grouping.
+ *
+ * An array of these descriptors is passed to
+ * @ref VPULayerCostModel::LayersPreSplitBatched to evaluate multiple pre-split
+ * configurations in a single call.
+ */
+struct LayersPreSplitBatchElementInfo {
+    std::vector<DPULayer> layer_splits;             ///< Per-tile DPU layers (one element per CMX tile)
+    VPULayersPreSplitStrategy strategy;             ///< Execution strategy (DPU count, memory placement, prefetching)
+    std::optional<size_t> fullLayerHash{};          ///< Optional hash of the original unsplit layer; empty when unavailable
+    std::unique_ptr<LayerSplitInfo> detailed_split{nullptr}; ///< Optional detailed split info for the original layer, used for serialization and analysis
+};
+
+/** @brief Result of a batched cost estimation call.
+ *
+ * Returned by @ref VPULayerCostModel::LayerBatched and
+ * @ref VPULayerCostModel::LayersPreSplitBatched.
+ *
+ * @c costs has the same size as the input vector: element holds the cycle
+ * count (or error code) for input descriptor.
+ * @c isValid is @c true only when every element in @c costs is a valid cycle
+ * count (i.e. none is an error code).
+ *
+ * When the input vector is empty both fields keep their default values
+ * (@c isValid = false, @c costs empty).
+ */
+struct BatchCostResult {
+    bool isValid{false};                        ///< @c true when all entries computed without errors
+    std::vector<CyclesInterfaceType> costs{};   ///< Per-entry cost (one element per input descriptor); may contain error codes
+};
 
 /// @brief The VPUNN layer cost model (also called VPUNN Level2 API)
 class VPUNN_API VPULayerCostModel {
@@ -254,16 +310,48 @@ public:
      * @param strategy the layer strategy, shaves do not matter
      * @return  measured best cycles or error code . \see Cycles for error codes
      */
-    CyclesInterfaceType Layer(DPULayer& layer, VPULayerStrategy strategy);
+    CyclesInterfaceType Layer(DPULayer& layer, VPULayerStrategy strategy) const;
 
-    CyclesInterfaceType Layer(DPULayer& layer, VPULayerStrategy strategy, LayerSplitInfo& detailed_split);
+    CyclesInterfaceType Layer(DPULayer& layer, VPULayerStrategy strategy, LayerSplitInfo& detailed_split) const;
 
-    // layer for dCIiM targeted layers, just rename the prev 2 methods. Alternative is to absorb the dCiM or SCL flag
-    // inside of VPULayerStrategy
+    /**
+     * @brief Evaluate the cost of multiple DPU layers in a single batched call.
+     *
+     * Each element in @p layers pairs a @ref DPULayer with a @ref VPULayerStrategy
+     * and an optional @ref LayerSplitInfo.  The method calls @ref Layer for every
+     * element and collects the per-element cycle counts into a @ref BatchCostResult.
+     *
+     * Because the elements are passed through @c std::reference_wrapper the caller
+     * can observe any side-effects produced by @ref Layer (e.g. a populated
+     * @c detailed_split) without an extra copy. The constraint is to pass references to distinct objects
+     * to avoid writing multiple times or modifying the same object.
+     *
+     * @param layers  references to the layer/strategy descriptors to evaluate;
+     *                an empty vector returns a default @ref BatchCostResult
+     *                (@c isValid = false, @c costs empty).
+     * @return @ref BatchCostResult with one cost entry per input element and
+     *         @c isValid = true when none of the entries is an error code.
+     *         \see Cycles for error codes
+     */
+    BatchCostResult LayerBatched(const std::vector<std::reference_wrapper<LayerBatchElementInfo>>& layers) const;
 
-    CyclesInterfaceType Layer_dCiM(DPULayer& layer, VPULayerStrategy strategy);
-
-    CyclesInterfaceType Layer_dCiM(DPULayer& layer, VPULayerStrategy strategy, LayerSplitInfo& detailed_split);
+    /**
+     * @brief Convenience overload that accepts a mutable vector of @ref LayerBatchElementInfo directly.
+     *
+     * Behaves identically to the @c std::reference_wrapper overload but eliminates
+     * the need for the caller to wrap each element in @c std::ref.  Internally the
+     * method builds the required reference wrappers and delegates to the primary
+     * overload, so side-effects (e.g. a populated @c detailed_split) are still
+     * written back into the caller's vector elements.
+     *
+     * @param layers  mutable vector of layer/strategy descriptors to evaluate;
+     *                an empty vector returns a default @ref BatchCostResult
+     *                (@c isValid = false, @c costs empty).
+     * @return @ref BatchCostResult with one cost entry per input element and
+     *         @c isValid = true when none of the entries is an error code.
+     */
+    BatchCostResult LayerBatched(std::vector<LayerBatchElementInfo>& layers) const;
+    
 
     /**
      * @brief Compute the optimal cost of a DPULayer using a specific strategy and context
@@ -284,7 +372,7 @@ public:
      */
     CyclesInterfaceType Layer(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU = 1,
                               unsigned int nTiles = 1, bool input_in_ddr = false, bool output_in_ddr = false,
-                              bool prefetching = true);
+                              bool prefetching = true) const;
     /**
      * @brief Compute the optimal cost of a DPULayer using a specific strategy and execution mode
      *
@@ -307,7 +395,7 @@ public:
      * @return measured best cycles or error code . \see Cycles for error codes
      */
     CyclesInterfaceType Layer(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU, unsigned int nTiles,
-                              bool input_in_ddr, bool output_in_ddr, bool prefetching, LayerSplitInfo& detailed_split);
+                              bool input_in_ddr, bool output_in_ddr, bool prefetching, LayerSplitInfo& detailed_split) const;
 
     /**
      * @brief Compute the optimal cost of a pre split layer. Layer is already split on tiles, only the intratile split
@@ -343,15 +431,57 @@ public:
                                        const size_t fullLayerHash = 0,  // hash on layer only, computed by VPUX
                                        const std::optional<VPUTilingStrategy> strategyOfSplit =
                                                (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
-    );
+    ) const;
 
     /// version without detailed split output parameter and no hash or tiling strategy.
     CyclesInterfaceType LayersPreSplit(const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU,
-                                       bool input_in_ddr, bool output_in_ddr, bool prefetching);
+                                       bool input_in_ddr, bool output_in_ddr, bool prefetching) const;
 
     /// version without detailed split output parameter and no hash or tiling strategy.
     CyclesInterfaceType LayersPreSplit(const std::vector<SHAVEWorkload>& layers_pre_split, unsigned int nSHV,
-                                       bool input_in_ddr, bool output_in_ddr);
+                                       bool input_in_ddr, bool output_in_ddr) const;
+
+
+    /**
+     * @brief Evaluate the cost of multiple pre-split layer configurations in a single batched call.
+     *
+     * Each element in @p pre_split_layers contains a vector of per-tile @ref DPULayer
+     * instances (already split by the caller), a @ref VPULayersPreSplitStrategy, an
+     * optional full-layer hash for serialization grouping, and an optional
+     * @ref LayerSplitInfo.  The method calls the appropriate @ref LayersPreSplit
+     * overload for every element and collects the per-element cycle counts into a
+     * @ref BatchCostResult.
+     *
+     * Because the elements are passed through @c std::reference_wrapper the caller
+     * can observe any side-effects (e.g. a populated @c detailed_split) without an
+     * extra copy. The constraint is to pass references to distinct objects
+     * to avoid writing multiple times or modifying the same object.
+     *
+     * @param pre_split_layers  references to the pre-split descriptors to evaluate;
+     *                          an empty vector returns a default @ref BatchCostResult
+     *                          (@c isValid = false, @c costs empty).
+     * @return @ref BatchCostResult with one cost entry per input element and
+     *         @c isValid = true when none of the entries is an error code.
+     *         \see Cycles for error codes
+     */
+    BatchCostResult LayersPreSplitBatched(const std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>>& pre_split_layers) const;
+
+    /**
+     * @brief Convenience overload that accepts a mutable vector of @ref LayersPreSplitBatchElementInfo directly.
+     *
+     * Behaves identically to the @c std::reference_wrapper overload but eliminates
+     * the need for the caller to wrap each element in @c std::ref.  Internally the
+     * method builds the required reference wrappers and delegates to the primary
+     * overload, so side-effects (e.g. a populated @c detailed_split) are still
+     * written back into the caller's vector elements.
+     *
+     * @param pre_split_layers  mutable vector of pre-split descriptors to evaluate;
+     *                          an empty vector returns a default @ref BatchCostResult
+     *                          (@c isValid = false, @c costs empty).
+     * @return @ref BatchCostResult with one cost entry per input element and
+     *         @c isValid = true when none of the entries is an error code.
+     */
+    BatchCostResult LayersPreSplitBatched(std::vector<LayersPreSplitBatchElementInfo>& pre_split_layers) const;
 
 protected:
     /**
@@ -396,14 +526,14 @@ protected:
      * split on workloads. ignored if null
      * @return measured best cycles or error code. \see Cycles for error codes
      */
-    CyclesInterfaceType layer_cycles(VPUCostModel& dpu_cost_provider,  // cost model to be used
+    CyclesInterfaceType layer_cycles(const VPUCostModel& dpu_cost_provider,  // cost model to be used
                                      DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU = 1,
                                      unsigned int nTiles = 1, bool input_in_ddr = false, bool output_in_ddr = false,
                                      bool prefetching = true, LayerSplitInfo* detailed_split = nullptr) const;
 
     /// like Layer but with pre-split layers
     CyclesInterfaceType layer_pre_split_cycles(
-            VPUCostModel& dpu_cost_provider,  // cost model to be used
+            const VPUCostModel& dpu_cost_provider,  // cost model to be used
             const std::vector<DPULayer>& layers_pre_split, unsigned int nDPU = 1, bool input_in_ddr = false,
             bool output_in_ddr = false, bool prefetching = true, LayerSplitInfo* detailed_split = nullptr,
             const size_t fullLayerHash = 0,  // hash on layer only, computed by VPUX
@@ -411,7 +541,7 @@ protected:
                     (std::optional<VPUTilingStrategy>())  // to be sent only for MC pass
     ) const;
 
-    CyclesInterfaceType layer_pre_split_cycles(VPUCostModel& shave_cost_provider,  // cost model to be used
+    CyclesInterfaceType layer_pre_split_cycles(const VPUCostModel& shave_cost_provider,  // cost model to be used
                                                const std::vector<SHAVEWorkload>& layers_pre_split,
                                                unsigned int nSHV = 1, bool input_in_ddr = false,
                                                bool output_in_ddr = false) const;
@@ -431,7 +561,7 @@ public:
      * @return measured best cycles or error code . \\see Cycles for error codes
      */
     CyclesInterfaceType Layer(DPULayer& layer, unsigned int nDPU = 1, unsigned int nTiles = 1,
-                              bool input_in_ddr = false, bool output_in_ddr = false, bool prefetching = true);
+                              bool input_in_ddr = false, bool output_in_ddr = false, bool prefetching = true) const;
 
     // Shave Operations area is next
 

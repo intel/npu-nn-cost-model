@@ -8,6 +8,7 @@
 // Software Package for additional details.
 #include "vpu/optimization/dimension_tiler.h"
 #include "vpu/optimization/tiler.h"
+#include "vpu/optimization/tiling_algorithm_factory.h"
 
 #include <gtest/gtest.h>
 #include <sstream>  // for error formating
@@ -482,7 +483,7 @@ TEST_F(ZTilingTest, splitInNOverZOffset_Test) {
         for (auto& t : tests) {
 
             DPULayer layer{t.t_in.wl};
-            TilingAlgorithmsContainer tiler_z = getTilingAlgorithms(layer, options);
+            TilingAlgorithmsContainer tiler_z = TilingAlgorithmFactory::getTilingAlgorithms(layer, options);
             ASSERT_TRUE(tiler_z.front() != nullptr) << "Could not retrieve the ZTiling algorithm from ITilerAlgorithm interface"
                                             << t.toString();
 

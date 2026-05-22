@@ -91,7 +91,7 @@ private:
     mutable LRUCache<DMADesc, float> cache;  ///< all devices cache/LUT for DMA ops
                                              ///< this is a preloaded cache that features also a dynamic one
 
-    const std::unique_ptr<IHttpCostProvider> http_dma_cost_provider;  ///< HTTP cost provider for DMA
+    const std::unique_ptr<const IHttpCostProvider> http_dma_cost_provider;  ///< HTTP cost provider for DMA
     mutable CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
 public:
     /**

@@ -37,13 +37,6 @@ public:
     virtual bool is_available() const = 0;
 
     /**
-     * @brief Enable or disable debug output.
-     * @param enable True to enable debug output, false to disable.
-     * @return void
-     */
-    virtual void setDebug(bool enable) = 0;
-
-    /**
      * @brief Retrieves the profiling backend as string from the provided enum hint.
      * @param backend The backend enum value to convert.
      * @return String representation of the backend, defaults to "ProfilingServiceBackend::SILICON" if invalid

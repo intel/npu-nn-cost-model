@@ -44,23 +44,23 @@ TEST_F(VPULayerCostModelTestNPU4x, DISABLED_ERROR_TILE_OUTPUT_LayerInvestigation
     {
         const VPUNN::DPULayer tst_layer(wl1);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 5500, 5500 + 1000},
                  " SOHO + 4tiles, no memmove, "},
 
-                {{tst_layer, {1U, 1U, 5U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 5U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 4000, 4000 + 1000},
                  " SOHO + 5tiles , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 5U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 5U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 4000, 4000 + 1000},
                  " SOHO + BR + 5tiles, no memmove, "},
 
-                {{tst_layer, {1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 3000, 3000 + 800},
                  " SOHO + 6tiles, no memmove, "},
 
-                {{tst_layer, {1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 1000, 1000 + 600},
                  " SOK, no memmove, "},
         };
@@ -93,19 +93,19 @@ TEST_F(VPULayerCostModelTestNPU4x, DISABLED_ERROR_TILE_OUTPUT_LayerInvestigation
     {
         const VPUNN::DPULayer tst_layer(wl1);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 9000, 9000 + 1000},
                  " SOHO , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::ERROR_TILE_OUTPUT, true, 9000, 9000 + 1000},
                  " SOK + 4tiles, no memmove, "},
 
-                {{tst_layer, {1U, 1U, 5U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 5U, VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::ERROR_TILE_OUTPUT, true, 9000, 9000 + 1000},
                  " SOK + 5tiles, no memmove, "},
 
-                {{tst_layer, {1U, 1U, 6U, VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 6U, VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::ERROR_TILE_OUTPUT, true, 9000, 9000 + 1000},
                  " SOK + 6tiles, no memmove, "},
         };
@@ -137,13 +137,13 @@ TEST_F(VPULayerCostModelTestNPU4x, CONVOLUTION_Concrete_Multiply8641_NPU40_mock)
 
     show_split = true;
     const std::vector<TestCase> tests{
-            {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+            {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
              {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
              "CLUSTERING , no memmove, with errors"},
-            {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+            {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
              {NO_ERROR_EXPECTED, true, 28500, 37313 + 3700},  // NEED ground truth on this NPU40.  GTL 37313
              "SOK , no memmove"},
-            {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+            {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
              {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
              "SOH ,no memmove, with errors"},
     };
@@ -181,17 +181,17 @@ TEST_F(VPULayerCostModelTestNPU4x, DISABLED_Maxpool_layer_split_NPU40) {
     {
         const VPUNN::DPULayer tst_layer(wl_layer);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 14000U, 14000U * no_fail + 1000U},  // 14492 V17:
                  "Full, no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 5500U, 5500U * no_fail + 1000U},  // 6062 V17:
                  "SOHO /2, no memmove, "},
-                {{tst_layer, {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 2500U, 2500U * no_fail + 1000U},  // 3168 v17:
                  "SOHO /4 , no memmove, "},
 
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 7500U, 7500U * no_fail + 1000U},  // 8228 v17:
                  "SOK , no memmove, "},
 
@@ -347,13 +347,13 @@ TEST_F(VPULayerCostModelTestNPU4x, ZeroNumberOfTiles_Layer_Test_NPU40) {
         auto tst_layer{DPULayer(wl)};
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 0U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 0U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::ERROR_L2_INVALID_PARAMETERS, true, 55000, 55000 + 8000},
                  "NONE , + memmove, "},
-                {{tst_layer, {1U, 1U, 0U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 0U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::ERROR_L2_INVALID_PARAMETERS, true, 30000, 30000 + 3000},
                  "SOHO , + memmove, "},
-                {{tst_layer, {1U, 1U, 0U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 0U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::ERROR_L2_INVALID_PARAMETERS, true, 55000, 55000 + 8000},
                  "SOK , + memmove, "},
         };

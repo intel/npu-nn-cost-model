@@ -403,11 +403,6 @@ CyclesInterfaceType VPUCostModel::SHAVE(const SHAVEWorkload& shave_wl) const {
     return internal_shave_cost_model.computeCycles(shave_wl);
 }
 
-CyclesInterfaceType VPUCostModel::SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut,
-                                        bool skipCacheValues) const {
-    return internal_shave_cost_model.computeCycles(shave_wl, infoOut, skipCacheValues);
-}
-
 std::vector<std::string> VPUCostModel::getShaveSupportedOperations(VPUDevice device) const {
     return internal_shave_cost_model.getShaveSupportedOperations(device);
 }

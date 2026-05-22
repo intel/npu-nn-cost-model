@@ -6,6 +6,7 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
+
 #include "energy_power_factor.h"
 
 /// @brief namespace for Unit tests of the C++ library
@@ -21,6 +22,7 @@ class TestVPUPowerFactorLUTNPU5x : public TestVPUPowerFactorLUT {
 public:
 protected:
     const VPUDevice device{VPUDevice::NPU_5_0};
+
 private:
 };
 
@@ -87,6 +89,41 @@ TEST_F(TestVPUPowerFactorLUTNPU5x, NPU50_AvailabilitySmoke) {
                 << "I8 " << wl;
         EXPECT_NEAR(operation_pf, 0.61f * adjfctor, 0.005) << "I8 " << " adjfactor :" << adjfctor << wl;
     }
+}
+
+// ==================================================================================
+// Fallback mechanism tests for NPU_5_0
+// NPU_5_0 SCL has INT8 + FP8 + FP16 (all types covered, no SCL fallback triggered).
+// DCIM engine is not in the LUT -> returns empty (0.0).
+// ==================================================================================
+TEST_F(TestVPUPowerFactorLUTNPU5x, NPU50_DCIM_INT8_ReturnsEmpty) {
+    const VPUPowerFactorLUT pf_lut{};
+    auto wl = make_conv_wl(VPUDevice::NPU_5_0, DataType::UINT8, DataType::UINT8, MPEEngine::DCIM);
+
+    float result{-1.0f};
+    ASSERT_NO_THROW(result = pf_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+            << "DCIM INT8 on NPU_5_0" << wl;
+    EXPECT_NEAR(result, 0.0f, 0.005) << "DCIM should return empty (0.0) on NPU_5_0" << wl;
+}
+
+TEST_F(TestVPUPowerFactorLUTNPU5x, NPU50_DCIM_FP8_ReturnsEmpty) {
+    const VPUPowerFactorLUT pf_lut{};
+    auto wl = make_conv_wl(VPUDevice::NPU_5_0, DataType::HF8, DataType::BF8, MPEEngine::DCIM);
+
+    float result{-1.0f};
+    ASSERT_NO_THROW(result = pf_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+            << "DCIM FP8 on NPU_5_0" << wl;
+    EXPECT_NEAR(result, 0.0f, 0.005) << "DCIM should return empty (0.0) on NPU_5_0" << wl;
+}
+
+TEST_F(TestVPUPowerFactorLUTNPU5x, NPU50_DCIM_FP16_ReturnsEmpty) {
+    const VPUPowerFactorLUT pf_lut{};
+    auto wl = make_conv_wl(VPUDevice::NPU_5_0, DataType::FLOAT16, DataType::FLOAT16, MPEEngine::DCIM);
+
+    float result{-1.0f};
+    ASSERT_NO_THROW(result = pf_lut.getOperationAndPowerVirusAdjustementFactor(wl, performanceProvider))
+            << "DCIM FP16 on NPU_5_0" << wl;
+    EXPECT_NEAR(result, 0.0f, 0.005) << "DCIM should return empty (0.0) on NPU_5_0" << wl;
 }
 
 }  // namespace VPUNN_unit_tests

@@ -71,6 +71,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, Ideal_Empty_Model) {
         const auto ideal_dpu_cycles{performance_ideal_model.DPU_Power_IdealCycles(wl)};
         float theoretical_hw_util = my_energy_ideal_model.hw_utilization(wl);  // a float
 
+        /* coverity[divide_by_zero] */
         EXPECT_NEAR(theoretical_hw_util, (float)ideal_dpu_cycles / (float)theoretical_dpu_cycles, epsilon);
 
         EXPECT_EQ(theoretical_dpu_cycles, theoretical_wl_20_expected);
@@ -82,6 +83,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, Ideal_Empty_Model) {
         float theoretical_hw_util = my_energy_ideal_model.hw_utilization(wl);  // a float
 
         if (theoretical_dpu_cycles != 0.0F) {  // coverity division by zero
+            /* coverity[divide_by_zero] */
             EXPECT_NEAR(theoretical_hw_util, (float)ideal_dpu_cycles / (float)theoretical_dpu_cycles, epsilon);
         }
 
@@ -162,6 +164,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU_10_2) {
     const auto ideal_dpu_cycles = performance_ideal_model.DPU_Power_IdealCycles(wl);  //
 
     if (hw_util != 0.0F) { // coverity division by zero
+        /* coverity[divide_by_zero] */
         EXPECT_NEAR(dpu_cycles / (ideal_dpu_cycles / hw_util), 1.0F, epsilon)
                 << " info: " << dpu_cycles << ", ideal: " << ideal_dpu_cycles
                 << ", theoretical:  " << theoretical_dpu_cycles << ",  hw_util: " << hw_util << std::endl;
@@ -196,6 +199,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU_11_2) {
     const auto ideal_dpu_cycles = performance_ideal_model.DPU_Power_IdealCycles(wl);  //
 
     if (hw_util != 0.0F) { // coverity division by zero
+        /* coverity[divide_by_zero] */
         EXPECT_NEAR(dpu_cycles / (ideal_dpu_cycles / hw_util), 1.0F, epsilon)
                 << " info: " << dpu_cycles << ", ideal: " << ideal_dpu_cycles
                 << ", theoretical:  " << theoretical_dpu_cycles << ",  hw_util: " << hw_util << std::endl;

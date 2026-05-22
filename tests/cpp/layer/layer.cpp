@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 #include <sstream>  // for error formating
 #include "layer.h"
+#include "vpu/optimization/ztiling.h"
 #include "vpu/shave/layers.h"
 
 namespace VPUNN_unit_tests {
@@ -52,44 +53,44 @@ TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
     unsigned int no_fail = 1;
     {
         const std::vector<TestCase> tests{
-                {{mkLayer(VPUDevice::VPU_2_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_0, 0), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 2.0, B=0 "},
                 {{mkLayer(VPUDevice::VPU_2_0, 1, Layout::ZMAJOR),
-                  {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                  VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 12500, 12500 * no_fail + 1000},
                  "Device 2.0, B=1 "},
                 {{mkLayer(VPUDevice::VPU_2_0, 2, Layout::ZMAJOR),
-                  {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                  VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 6500, 6500 * no_fail + 1000},
                  "Device 2.0, B=2 "},
 
-                {{mkLayer(VPUDevice::VPU_2_7, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_7, 0), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 2_7, B=0 "},
-                {{mkLayer(VPUDevice::VPU_2_7, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_7, 1), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1500, 1500 * no_fail + 1000},
                  "Device 2.7, B=1 "},
-                {{mkLayer(VPUDevice::VPU_2_7, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_2_7, 2), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1300, 1300 * no_fail + 1000},
                  "Device 2.7, B=2 "},
 
-                {{mkLayer(VPUDevice::VPU_4_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_4_0, 0), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 4.0, B=0 "},
-                {{mkLayer(VPUDevice::VPU_4_0, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_4_0, 1), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 2000, 2000 * no_fail + 1000},
                  "Device 4.0, B=1 "},
-                {{mkLayer(VPUDevice::VPU_4_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::VPU_4_0, 2), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1200, 1200 * no_fail + 1000},
                  "Device 4.0, B=2 "},
-                {{mkLayer(VPUDevice::NPU_5_0, 0), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::NPU_5_0, 0), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 5.0, B=0 "},
-                {{mkLayer(VPUDevice::NPU_5_0, 1), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::NPU_5_0, 1), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1000, 1000 * no_fail + 1000},
                  "Device 5.0, B=1 "},
-                {{mkLayer(VPUDevice::NPU_5_0, 2), {1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{mkLayer(VPUDevice::NPU_5_0, 2), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 5.0, B=2 "},
         };
@@ -128,7 +129,7 @@ TEST_F(VPULayerCostModelTest, 01_C01_CONVOLUTION_Multiply_6346) {
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
                 // "CLUSTERING ,flt , sparse "},
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 270000, 270000 + 115000},
                  // v16: 322K,   v17 279k GT???k // Out chnannels %32  //v150 383k
                  "SOK , no memmove, sparse"},
@@ -158,7 +159,7 @@ TEST_F(VPULayerCostModelTest, 01_C02_CONVOLUTION_Multiply_6356) {
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
                 // "CLUSTERING ,flt , sparse "},
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 280000, 280000 + 28000},  // v16 285k, V17 297K,  GT??
                  "SOK , no memmove, sparse"},
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
@@ -186,7 +187,7 @@ TEST_F(VPULayerCostModelTest, 01_C02_CONVOLUTION_Multiply_6356) {
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                 // {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
                 // "CLUSTERING ,flt , sparse "},
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 280000, 280000 + 20000},  // GT??
                  "SOK , no memmove, sparse , padding 00"},
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
@@ -218,7 +219,7 @@ TEST_F(VPULayerCostModelTest, 01_C03_ConvolutionBackpropData_1055) {
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                 // {VPUNN::Cycles::NO_ERROR, true, 132000, 132000 + 1000},  //
                 // "SOK , no memmove, sparse"},
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 275000, 275000 + 25000},  //
                  // pre v16:29xK , after v16 28x
                  "SOHO , no memmove, sparse"},
@@ -249,7 +250,7 @@ TEST_F(VPULayerCostModelTest, 01_C04_ConvolutionBackpropData_1183) {
                 //{{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                 // {VPUNN::Cycles::NO_ERROR, true, 132000, 132000 + 1000},  //
                 // "SOK , no memmove, sparse"},
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 170000, 170000 + 35000},  //
                  // pre v16 200k, v16: 17xk, GT ???k
                  "SOHO , no memmove, sparse"},
@@ -273,13 +274,13 @@ TEST_F(VPULayerCostModelTest, DW_Convolution_AsymetricKernel_1) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 25000, 25000 + 5000},
                  "CLUSTERING , no memove,  "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 23000, 23000 + 3000},  //
                  "SOK , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 14000, 14000 + 2000},  //
                  "SOHO , no memmove, "},
                 // note: SOK always wins (non overlapping regions)
@@ -304,13 +305,13 @@ TEST_F(VPULayerCostModelTest, DW_Convolution_K8Stride8_H32) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 4000, 4000 + 500},  // v159nn:4229  v17:4352
                  "CLUSTERING , ,  "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 3400, 3400 + 350},  // v159nn:3554  v17:3546
                  "SOK , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 4100, 4100 + 400},  // v159nn:4242  v17:4336
                  "SOHO , no memmove, "},
 
@@ -336,13 +337,13 @@ TEST_F(VPULayerCostModelTest, DW_Convolution_K8Stride8_H8) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 5400, 5400 + 1000},
                  "CLUSTERING , ,  "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 2000, 2000 + 1000},  //
                  "SOK , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 7900,
                   7900 + 1000},  // H=8 with K=8 , no padding cannot be split on h
                  "SOH , no memmove, "},
@@ -367,7 +368,7 @@ TEST_F(VPULayerCostModelTest, Model_C1_v2_a_0_int8_NCHW_FP16_LATENCY_API10_MLIR)
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 2000, 4000},
                  "SOK , no memmove, "},
         };
@@ -391,7 +392,7 @@ TEST_F(VPULayerCostModelTest, Model_G_v1_a_0_fp16_NCHW_FP16_LATENCY_API10_MLIR) 
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 18000, 18000 + 8000},  // big
                  "SOK , no memmove, "},
         };
@@ -416,7 +417,7 @@ TEST_F(VPULayerCostModelTest, Model_L_v1_a_1_int8_NCHW_FP16_LATENCY_API10_MLIR) 
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 92000, 92000 + 4000},  // v16 94856 , v17 95654
                  "CLUSTERING , ,  "},
         };
@@ -441,7 +442,7 @@ TEST_F(VPULayerCostModelTest, Model_L_v1_a_1_int8_NCHW_FP16_LATENCY_API10_MLIR_S
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 92000, 92000 + 4000},  // v16 94856 , v17 95654
                  "SOH , no memmove, "},
         };
@@ -465,7 +466,7 @@ TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_LATENCY_MLIR_MO
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 1, VPUNN::Cycles::START_ERROR_RANGE - 1},
                  "SOH , no memmove, "},
         };
@@ -489,7 +490,7 @@ TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_INT8_LATENCY_ML
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 57700, 57700 + 5000},
                  "SOH , no memmove, "},
         };
@@ -514,7 +515,7 @@ TEST_F(VPULayerCostModelTest, redowa_deeplab_v3_dense_IRv11_FP16_INT8_LATENCY_ML
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 100000, 100000 + 17000},  // v16 104000 , v17 114995
                  "SOH , no memmove, "},
         };
@@ -538,7 +539,7 @@ TEST_F(VPULayerCostModelTest, deeplab_v3_SOH_HALO_EISXW_79152) {
         auto tst_layer = tst_layer_ref;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
                  "SOHO , no memmove, "},
         };
@@ -549,7 +550,7 @@ TEST_F(VPULayerCostModelTest, deeplab_v3_SOH_HALO_EISXW_79152) {
         auto tst_layer = tst_layer_ref;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, true}},
                  {Cycles::NO_ERROR, true, 600000, 600000 + 500000 + 350000},  // huge delta , what is the GT
                  // v17: :newmemtens 1390740
                  "SOH w in Halo , no memmove, "},
@@ -612,7 +613,7 @@ TEST_F(VPULayerCostModelTest, SOH_HALO_EISXW_87028) {
         auto tst_layer = tst_layer_ref;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {Cycles::NO_ERROR, true, 19000, 19000 + 2000},
                  "SOHO , no memmove, "},
         };
@@ -623,7 +624,7 @@ TEST_F(VPULayerCostModelTest, SOH_HALO_EISXW_87028) {
         auto tst_layer = tst_layer_ref;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, true}},
                  {Cycles::NO_ERROR, true, 22000, 22000 + 1200},  // 604935 split 15
                  "SOH w in Halo , no memmove, "},
         };
@@ -672,7 +673,7 @@ TEST_F(VPULayerCostModelTest, scale_mobilenet_ssd_FP16_MLIR) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 7000, 7000 + 1000},
                  "SOH , no memmove, "},
         };
@@ -696,7 +697,7 @@ TEST_F(VPULayerCostModelTest, scale_Sphereface_FP16_INT8_MLIR) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 10000, 10000 + 5000},  // big
                  "SOK , no memmove, "},
         };
@@ -720,10 +721,10 @@ TEST_F(VPULayerCostModelTest,
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 650, 650 + 200},  // v159nn:766  v17:792
                  "SOHO , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 250, 250 + 250},  // v159nn:335  v17:414
                  "SOK , no memmove, "},
 
@@ -750,7 +751,7 @@ TEST_F(VPULayerCostModelTest,
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 55000, 55000 + 5000},
                  "CLU , no memmove, "},
         };
@@ -774,7 +775,7 @@ TEST_F(VPULayerCostModelTest, midas_672x384_onnx_dense_IRv10_INT8_NHWC_NHWC_U8_F
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 54000, 54000 + 6000},
                  "CLU , no memmove, "},
         };
@@ -798,7 +799,7 @@ TEST_F(VPULayerCostModelTest, midas_672x384_onnx_dense_IRv10_INT8_NHWC_NHWC_U8_F
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 99000, 99000 + 30000},  // big
                  "SOHO , no memmove, "},
         };
@@ -823,10 +824,10 @@ TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP1
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 2900, 2900 + 200},  // v16 3063, v17 2973, v159nn:3045
                  "SOH O, no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 1700, 1700 + 200},  // v17:1821 v159nn:1773
                  "SOK, no memmove, "},
 
@@ -851,10 +852,10 @@ TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP1
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 7000, 7000 + 1500},  // v17:7755  v159nn:7967
                  "SOHO , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 3600, 3600 + 500},  // v17:3996  v159nn:3720
                  "SOK , no memmove, "},
 
@@ -881,13 +882,13 @@ TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP1
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 3800, 3800 + 400},  // v16 4084     v17 3964 v159nn:4060
                  "SOH O , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 3800, 3800 + 400},  // v16 4080     v17 3992 , v159nn:4080
                  "CLU , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 1750, 1750 + 300},  // v17:1998  v159nn:1860
                  "SOK , no memmove, "},
                 // note: SOK always wins
@@ -912,10 +913,10 @@ TEST_F(VPULayerCostModelTest, isv_SemiSupSegmentationaAtten_onnx_dense_IRv11_FP1
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 17000, 17000 + 2000},  // v17:17838    , v159nn:18270
                  "SOH O , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, true}},
                  {VPUNN::Cycles::NO_ERROR, true, 8000, 8000 + 1500},  // v17:8991  v159nn:8370
                  "SOK , no memmove, "},
 
@@ -942,13 +943,13 @@ TEST_F(VPULayerCostModelTest, CONVOLUTIONPrefetchTest_Multiply6326_IF) {
         tst_layer.weight_sparsity = 0.723566F;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, false, 250000 + 50000, 250000 + 50000 + 30000},
                  "CLUSTERING ,flt , sparse "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, false, 130000 + 25000, 130000 + 25000 + 20000},
                  "SOK , + memmove, sparse"},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, false, 160000 + 50000, 160000 + 50000 + 20000},
                  "SOHO , + memmove, sparse"},
         };
@@ -970,13 +971,13 @@ TEST_F(VPULayerCostModelTest, DW_Convolution_K8Stride8_H32_Prefetch) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 5500, 5500 + 1000},
                  "CLUSTERING , ,  "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 4501, 4501 + 1000},  // v159nn:
                  "SOK , no memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 5501, 5501 + 1000},  // v159nn:
                  "SOH , no memmove, "},
                 // note SOK wins
@@ -1001,13 +1002,13 @@ TEST_F(VPULayerCostModelTest, DWConvolutionPrefetchTest) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 27000, 28000 + 3000},
                  "CLUSTERING ,no prefetch ,  "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 24000, 24000 + 3000},
                  "SOK , no prefetch, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 15000, 15000 + 2000},
                  "SOHO , no prefetch, "},
                 // note: SOK WINS
@@ -1061,13 +1062,13 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE_Prefetch) {
         std::string t{"All floats @ Layer 1 "};
         auto tst_layer = std::move(l1F_ref);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0},
                  t + "CLU +m "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,+m"},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 30000 + 44000, 30000 + 44000 + 10000},  // v159 79k
                  t + "SOH ,+m"},
         };
@@ -1078,13 +1079,13 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE_Prefetch) {
         std::string t{"All UINT8 @ Layer 1 "};
         auto tst_layer = std::move(l1Int_ref);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 73000, 73000 + 5000},
                  t + "CLU +m "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,+m"},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 38000, 38000 + 5000},
                  t + "SOH ,+m"},
         };
@@ -1095,13 +1096,13 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE_Prefetch) {
         std::string t{"Reversed F toI @ Layer 1  mixed"};
         auto tst_layer = std::move(l1FI_ref);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 0, 0 + 0},  //
                  t + "CLU 0m "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 58000, 58000 + 10000},
                  t + "SOHO ,0m"},
         };
@@ -1112,13 +1113,13 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE_Prefetch) {
         std::string t{"Original Layer 1, mixed "};
         auto tst_layer = std::move(l1and2_ref);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 85000, 85000 + 5000},
                  t + "CLU 0m "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 47000, 47000 + 16000},
                  t + "SOHO ,0m"},
         };
@@ -1129,13 +1130,13 @@ TEST_F(VPULayerCostModelTest, Fused_234_3xELEMENTWISE_Prefetch) {
         std::string t{"Original Layer 3, mixed "};
         auto tst_layer = std::move(l3_ref);
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::ERROR_INPUT_TOO_BIG, true, 85000, 85000 + 5000},
                  t + "CLU 0m "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 0, 0 + 0},
                  t + "SOK ,0m"},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 46000, 46000 + 16000},
                  t + "SOH ,0m"},
         };
@@ -1198,13 +1199,13 @@ TEST_F(VPULayerCostModelTest, CMCONVPrefetchTest) {
         tst_layer.weight_sparsity = 0.0f;
 
         const std::vector<TestCase> tests{
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::NONE, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 55000, 55000 + 8000},
                  "NONE , + memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 30000, 30000 + 3000},
                  "SOHO , + memmove, "},
-                {{tst_layer, {1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
+                {{tst_layer, VPULayerStrategy{1U, 1U, 2U, VPUNN::VPUTilingStrategy::SOK, false, false, false}},
                  {VPUNN::Cycles::NO_ERROR, true, 55000, 55000 + 8000},
                  "SOK , + memmove, "},
         };
@@ -1355,10 +1356,10 @@ TEST_F(VPULayerCostModelTest, Regression_sprint125_investigation_Test) {
         const VPUNN::DPULayer tst_layer0(wl_0);
         const VPUNN::DPULayer tst_layer1(wl_1);
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer0), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+                {{std::move(tst_layer0), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 36500U, 36500U * no_fail + 1000U},
                  "SOW, ch 512 "},
-                {{std::move(tst_layer1), {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+                {{std::move(tst_layer1), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 73800U, 73800U * no_fail + 1000U},
                  "SOW, ch 1024 "},
 
@@ -1366,5 +1367,6 @@ TEST_F(VPULayerCostModelTest, Regression_sprint125_investigation_Test) {
         executeTests(tests);
     }
 }
+
 
 }  // namespace VPUNN_unit_tests

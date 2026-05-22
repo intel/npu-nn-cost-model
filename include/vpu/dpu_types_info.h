@@ -202,4 +202,4 @@ inline std::vector<unsigned int> mpe_mode_to_nthw_ntk_grid(ExecutionMode mode) {
 
 }  // namespace VPUNN
 
-#endif  // VPUNN_DATATYPES_H
+#endif  // VPUNN_DPU_TYPES_INFO_H

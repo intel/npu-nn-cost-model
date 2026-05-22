@@ -6,7 +6,7 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#include "vpu/optimization/workload_optimization.h"
+#include "vpu/optimization/dpu_tiler_factory.h"
 
 #include <gtest/gtest.h>
 #include <tuple>
@@ -181,7 +181,7 @@ TEST_F(WorkloadGeneration, WorkloadGenerationCreateTilerMultipleWLs) {
 
             auto layer = generate_helper_layer(make_compatible_device(model), 56, 64);
 
-            std::unique_ptr<VPUNN::IDPUTiler> tiler = VPUNN::getDPUTiler(*model);
+            std::unique_ptr<VPUNN::IDPUTiler> tiler = VPUNN::DPUTilerFactory::getDPUTiler(*model);
 
             if (options.target == VPUNN::VPUOptimizationTarget::POWER) {
                 EXPECT_THROW(

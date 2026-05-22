@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <random>
 #include <vector>
+#include "common/common_helpers.h"
 #include "core/serializer.h"
 #include "vpu/compatibility/types11.h"
 #include "vpu/compatibility/types14.h"
@@ -108,7 +109,7 @@ TEST_F(VPUNNCacheTest, CacheBasicTest_ext) {
     EXPECT_FALSE(cache.get(v2));
 
     EXPECT_NO_THROW(cache.add(v1, val1));
-    EXPECT_NO_THROW(cache.add(v1, val1));//second add 
+    EXPECT_NO_THROW(cache.add(v1, val1));  // second add
 
     EXPECT_NO_THROW(cache.get(v1));
 
@@ -391,6 +392,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
     std::cout << "Current path is : " << pathC << std::endl;
 
     const std::string test_cache_file{"test_cache.bin"};
+    const ScopedFileCleanup cleanup{test_cache_file};
 
     // DPUWorkload wl;  // a wl
 

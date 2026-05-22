@@ -25,11 +25,11 @@ namespace VPUNN {
 /// (set_mode), when first parameter is false (get_mode) doesn't matter the value for the second parameter, we just
 /// return the variable value, we don't set one
 ///
-/// example of usage: let's assume that we have a lambda function f(bool set_mode, std::string s)
+/// example of usage: let's assume that we have a lambda function f(bool set_mode, const std::string& s)
 /// for set_mode the function call looks like this f(true, "5") in this case our variable value will be set to 5
 /// for get_mode the function call looks like this f(false, "5") or f(false, ""), or f(false, "abc"), important is that
 /// first argument should be false, second as you can see doesn't matter
-using SetGet_MemberMapValues = std::function<VPUNN::DimType(bool, std::string)>; 
+using SetGet_MemberMapValues = std::function<VPUNN::DimType(bool, const std::string&)>;
 
 }  // namespace VPUNN
 

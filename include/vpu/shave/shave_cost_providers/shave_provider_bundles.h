@@ -133,7 +133,7 @@ public:
      * 
      * @return std::shared_ptr<IShaveCostProvider> Configured composite provider
      */
-    static std::shared_ptr<IShaveCostProvider> createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU_RESERVED_1() {
+    static std::shared_ptr<IShaveCostProvider> createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU_RESERVED() {
         const auto base_provider = createHeuristicWithFactorsOnlyProvider();
         const auto name_mapping_provider = createNameMappingOldProvider();
 
@@ -199,7 +199,7 @@ public:
     static std::shared_ptr<IShaveCostProvider> createDeviceMappedProvider() {
         // Provider for newer devices (NPU 5.0+)
         const auto new_device_provider_npu5 = createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU5();
-        const auto new_device_provider_NPU_RESERVED_1 = createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU_RESERVED_1();
+        const auto new_device_provider_NPU_RESERVED = createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU_RESERVED();
         // Default provider for older devices
         const auto default_provider = createOldSelectorWithNameMappingProvider();
 

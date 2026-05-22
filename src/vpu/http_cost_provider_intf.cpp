@@ -8,7 +8,7 @@
 // Software Package for additional details.
 
 #include "vpu/http_cost_provider_intf.h"
-#include "vpu/http_workload_variant.h" // this header is exposed only to this .cpp file to avoid pulling heavy type dependencies into the lightweight interface header
+#include "vpu/http_workload_variant.h"
 
 namespace VPUNN {
 
@@ -22,5 +22,6 @@ CyclesInterfaceType IHttpCostProvider::getCost(const WlT& op, std::string& info)
 template CyclesInterfaceType IHttpCostProvider::getCost<DPUOperation>(const DPUOperation&, std::string&) const;
 template CyclesInterfaceType IHttpCostProvider::getCost<DMANNWorkload_NPU27>(const DMANNWorkload_NPU27&, std::string&) const;
 template CyclesInterfaceType IHttpCostProvider::getCost<DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50&, std::string&) const;
+template CyclesInterfaceType IHttpCostProvider::getCost<SHAVEWorkload>(const SHAVEWorkload&, std::string&) const;
 
 }  // namespace VPUNN

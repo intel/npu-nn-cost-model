@@ -1,4 +1,4 @@
-// Copyright © 2024 Intel Corporation
+// Copyright © 2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,18 +10,16 @@
 #ifndef VPUNN_SHAVE_WORKLOAD_H
 #define VPUNN_SHAVE_WORKLOAD_H
 
-#include <array>
 #include <iostream>
 #include <map>
-
 #include <string>
 #include <variant>
 #include <vector>
 
-#include "core/utils.h"
-#include "dpu_defaults.h"
 #include "dpu_types.h"
+#include "dpu_types_info.h"
 #include "vpu_tensor.h"
+#include "profiling_service.h"
 
 namespace VPUNN {
 
@@ -38,8 +36,9 @@ private:
     std::vector<VPUTensor> inputs{};   ///< The input tensors. Mainly shape and datatype are used
     std::vector<VPUTensor> outputs{};  ///< The output tensors. Mainly shape and datatype are used
     std::string loc_name{};            ///< The location name
-
+    
 public:
+    ProfilingServiceBackend profiling_service_backend_hint{ProfilingServiceBackend::__size};  ///< hint about what profiling service backend to use
     using Param = std::variant<int, float, std::string, bool>;
     using Parameters = std::vector<SHAVEWorkload::Param>;
     using ExtraParameters = std::map<std::string, Param>;
@@ -52,12 +51,13 @@ public:
     /// @brief ctor must exist since we have aggregate initialization possible on this type (abstract type)
     SHAVEWorkload(const std::string& operation_name, const VPUDevice& device, const std::vector<VPUTensor>& inputs,
                   const std::vector<VPUTensor>& outputs, const Parameters& params = {},
-                  const ExtraParameters& extra_param = {}, const std::string& loc_name = "")
+                  const ExtraParameters& extra_param = {}, const ProfilingServiceBackend profiling_service_backend_hint = ProfilingServiceBackend::__size, const std::string& loc_name = "")
             : name(operation_name),
               device{device},
               inputs{inputs},
               outputs{outputs},
               loc_name(loc_name),
+              profiling_service_backend_hint{profiling_service_backend_hint},
               call_params{params},
               extra_params{extra_param} {
     }
@@ -96,6 +96,10 @@ public:
     const std::string& get_loc_name() const {
         return loc_name;
     };
+
+    const ProfilingServiceBackend& get_profiling_service_backend() const { 
+        return profiling_service_backend_hint; 
+    }
 
     /// @brief Set the location name used for debugging purposes
     // void set_loc_name(const std::string& name) {
@@ -156,4 +160,4 @@ bool operator<(const VPUNN::SHAVEWorkload& lhs, const VPUNN::SHAVEWorkload& rhs)
 
 }  // namespace VPUNN
 
-#endif  // VPUNN_TYPES_H
+#endif // VPUNN_SHAVE_WORKLOAD_H

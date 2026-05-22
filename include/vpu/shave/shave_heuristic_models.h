@@ -163,6 +163,10 @@ protected:
      * @return Effective throughput in bits per cycle
      */
     float calculateEffectiveThroughput(float memory_ops, float arithmetic_ops) const {
+        if (memory_ops <= 0.0f || arithmetic_ops <= 0.0f) {
+            return 0.0f;
+        }
+
         // Calculate BW and compute throughputs in fp16 elements per cycle
         const float bw_throughput = 32.0f / memory_ops;
         const float compute_throughput = 32.0f / arithmetic_ops;
@@ -257,6 +261,10 @@ public:
 
         // Calculate effective throughput using roofline model
         const float effective_throughput = calculateEffectiveThroughput(memory_ops, arithmetic_ops);
+
+        if (effective_throughput <= 0.0f) {
+            return calculateSimpleHeuristic(total_number_of_elements, num_channels);
+        }
 
         // Calculate and return total cycles
         return calculateTotalCycles(total_size_in_bits, effective_throughput, num_channels);

@@ -725,6 +725,8 @@ public:
                                             std::string name = enumName<T>() + "." +
                                                                mapToText<T>().at(static_cast<const int>(val));
                                             write_tokens[idx] = std::move(name);
+                                        } else if constexpr (std::is_same_v<T, std::string>) {
+                                            write_tokens[idx] = val;
                                         } else {
                                             // Base case - convert to string -- Assumes type T has a valid
                                             // std::to_string implementation

@@ -10,14 +10,61 @@
 #ifndef VPUNN_UT_COMMON_HELPERS_H
 #define VPUNN_UT_COMMON_HELPERS_H
 
+#include <filesystem>
 #include <string>
-#include <vector>
+#include <system_error>
 #include <unordered_map>
+#include <vector>
 #include "nn_models.h"
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
 
 namespace VPUNN_unit_tests {
+
+/// @brief RAII helper for tests that create temporary files.
+///
+/// @details Ensures that tracked files are deleted when the current scope is exited (normal
+/// end of test, ASSERT, early-return, or exception). This keeps the working directory clean
+/// even when a test fails part-way through.
+///
+/// Supports two usage modes:
+///  - Single-file: construct with a path
+///  - Multi-file:  default-construct, then call track() after each file is created.
+///
+/// Removal is best-effort and non-throwing (uses std::error_code), because cleanup
+/// should never fail the test itself.
+class ScopedFileCleanup {
+public:
+    /// @brief Default constructor for multi-file mode — call track() to register paths later.
+    ScopedFileCleanup() = default;
+
+    /// @brief Registers a single file path to be deleted on scope exit.
+    explicit ScopedFileCleanup(std::filesystem::path file_path) {
+        file_paths_.emplace_back(std::move(file_path));
+    }
+
+    ScopedFileCleanup(const ScopedFileCleanup&) = delete;
+    ScopedFileCleanup& operator=(const ScopedFileCleanup&) = delete;
+
+    /// @brief Enable moving of the cleanup object; ownership of tracked paths is transferred.
+    ScopedFileCleanup(ScopedFileCleanup&&) noexcept = default;
+    ScopedFileCleanup& operator=(ScopedFileCleanup&&) noexcept = default;
+    /// @brief Register an additional path to be removed on destruction.
+    void track(std::filesystem::path file_path) {
+        file_paths_.emplace_back(std::move(file_path));
+    }
+
+    /// @brief Best-effort deletion of every tracked file path.
+    ~ScopedFileCleanup() noexcept {
+        std::error_code ec;
+        for (const auto& p : file_paths_) {
+            std::filesystem::remove(p, ec);
+        }
+    }
+
+private:
+    std::vector<std::filesystem::path> file_paths_{};
+};
 
 /// Value
 inline VPUNN::CyclesInterfaceType V(const VPUNN::CyclesInterfaceType v) {
@@ -171,7 +218,7 @@ public:
      * @brief Constructor that creates a fallback model for unregistered devices
      * @param args Constructor arguments for the fallback ModelType instance
      */
-    template<typename... Args>
+    template <typename... Args>
     ModelMap(Args&&... args) {
         models_map.emplace(VPUNN::VPUDevice::__size, std::make_unique<ModelType>(std::forward<Args>(args)...));
     }
@@ -181,7 +228,7 @@ public:
      * @param device The VPU device identifier (e.g., VPU_2_7, VPU_4_0)
      * @param args Constructor arguments for the ModelType instance
      */
-    template<typename... Args>
+    template <typename... Args>
     void addModel(const VPUNN::VPUDevice device, Args&&... args) {
         models_map.emplace(device, std::make_unique<ModelType>(std::forward<Args>(args)...));
     }
@@ -201,7 +248,7 @@ public:
         }
         return *models_map[VPUNN::VPUDevice::__size];
     }
-    
+
     void clear() {
         models_map.clear();
     }
@@ -210,7 +257,7 @@ public:
         models_map.clear();
     }
 
-private: 
+private:
     /// Map storing device-specific model instances
     std::unordered_map<VPUNN::VPUDevice, std::unique_ptr<ModelType>> models_map;
 };

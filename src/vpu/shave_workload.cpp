@@ -1,4 +1,4 @@
-// Copyright © 2025 Intel Corporation
+// Copyright © 2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the "Software Package")
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -8,49 +8,46 @@
 // Software Package for additional details.
 
 #include "vpu/shave_workload.h"
+#include "core/primitive_hash.h"
+#include "vpu/workload_hash.h"
+
 #include "core/utils.h"
 #include <iostream>
-#include <sstream>  //
+#include <sstream>  
 
 namespace VPUNN {
 
 uint32_t SHAVEWorkload::hash() const {
-    std::stringstream ss;
-    ss << static_cast<int>(get_device()) << ",";
-    ss << get_name() << ",";
+    uint32_t h = fnv_offset_basis;
+
+    // Hash device
+    h = PrimitiveHash::hash_enum(h, get_device());
+
+    // Hash operation name
+    h = PrimitiveHash::hash_string(h, get_name());
+
+    // Hash input and output tensors
     for (const auto& input : get_inputs()) {
-        ss << input.batches() << "," << input.channels() << "," << input.height() << "," << input.width() << ","
-           << (int)input.get_dtype() << "," << (int)input.get_layout() << ",";
+        h = WorkloadHash::hash_tensor(h, input);
     }
     for (const auto& output : get_outputs()) {
-        ss << output.batches() << "," << output.channels() << "," << output.height() << "," << output.width() << ","
-           << (int)output.get_dtype() << "," << (int)output.get_layout() << ",";
+        h = WorkloadHash::hash_tensor(h, output);
     }
 
+    // Hash call parameters
     for (const auto& param : get_params()) {
-        std::visit(
-                [&ss](auto&& arg) {
-                    ss << arg << ",";
-                },
-                param);
+        h = WorkloadHash::hash_param(h, param);
     }
 
-    for (const auto& extra_param : get_extra_params()) {
-        ss << extra_param.first << "/";
-        std::visit(
-                [&ss](auto&& arg) {
-                    if constexpr (std::is_same_v<std::decay_t<decltype(arg)>, std::string>) {
-                        ss << arg;
-                    } else {
-                        ss << std::to_string(arg);
-                    }
-                },
-                extra_param.second);
-        ss << ",";
+    // Hash extra parameters (sorted by key since std::map is ordered)
+    for (const auto& [key, value] : get_extra_params()) {
+        h = PrimitiveHash::hash_string(h, key);
+        h = WorkloadHash::hash_param(h, value);
     }
 
-    return fnv1a_hash(ss.str());
+    return h;
 }
+
 
 std::string SHAVEWorkload::toString() const {
     std::stringstream stream;

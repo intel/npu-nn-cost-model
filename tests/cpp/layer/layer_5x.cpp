@@ -146,11 +146,11 @@ TEST_F(VPULayerCostModelTestNPU5x, TestSerializer_LayerLevel) {
         const DPULayer tst_layer2(wl2);
         const std::vector<TestCase> tests{
                 {{std::move(tst_layer1),
-                  {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 28400, fail * 28401 + 1500},
                  "SOHO , no memmove, CONV "},
                 {{std::move(tst_layer2),
-                  {1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 4200, fail * 4201 + 1000},
                  "SOHO , no memmove, DW_CONV "},
         };
@@ -250,7 +250,7 @@ TEST_F(VPULayerCostModelTestNPU5x, DW_CONV_intraTileSplit_channels_options) {
                 // dw_intraTiles_ch_options
                 for (int intraTile_index = 0; intraTile_index < static_cast<int>(split.all_intra_tile_splits.size());
                      intraTile_index++) {
-                    const auto wls{split.all_intra_tile_splits[intraTile_index]
+                    const auto &wls{split.all_intra_tile_splits[intraTile_index]
                                            .workloads};  // workloads after intra-tile split
 
                     const auto channels =

@@ -7,10 +7,11 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#include "http_client/http_client.h"
-#include "core/utils.h"
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
+#include "core/utils.h"
+#include "http_client/http_client.h"
+#include "layer/layer.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -25,18 +26,14 @@ protected:
     // Store original environment variable values (static - saved once for all tests)
     inline static std::unordered_map<std::string, std::string> original_env_vars;
     inline static const std::vector<std::string> env_var_names = {
-        "ENABLE_VPUNN_PROFILING_SERVICE",
-        "VPUNN_PROFILING_SERVICE_HOST",
-        "VPUNN_PROFILING_SERVICE_PORT",
-        "VPUNN_PROFILING_SERVICE_BACKEND",
-        "VPUNN_HTTP_CLIENT_DEBUG"
-    };
+            "ENABLE_VPUNN_PROFILING_SERVICE", "VPUNN_PROFILING_SERVICE_HOST", "VPUNN_PROFILING_SERVICE_PORT",
+            "VPUNN_PROFILING_SERVICE_BACKEND", "VPUNN_HTTP_CLIENT_DEBUG"};
 
     static void SetUpTestSuite() {
         // Save original environment variable values once for all tests
         original_env_vars = get_env_vars(env_var_names);
     }
-    
+
     void SetUp() override {
         HTTPClientTest<DPUOperation>::SetUp();  // Start mock server
         op.profiling_service_backend_hint = ProfilingServiceBackend::SILICON;
@@ -59,7 +56,7 @@ protected:
 
 /**
  * @brief Helper to temporarily redirect std::cout to another stream.
- * 
+ *
  * Thread-Safety Considerations:
  * - Modifies the global std::cout.rdbuf(), which is not thread-safe across parallel tests
  * - Safe for use within TEST_F(DPUHTTPClient, ...) because:
@@ -71,8 +68,8 @@ protected:
  */
 class CoutRedirect {
 public:
-    explicit CoutRedirect(std::ostream& new_stream)
-        : old_buf(std::cout.rdbuf(new_stream.rdbuf())) {}
+    explicit CoutRedirect(std::ostream& new_stream): old_buf(std::cout.rdbuf(new_stream.rdbuf())) {
+    }
 
     ~CoutRedirect() {
         std::cout.rdbuf(old_buf);
@@ -134,16 +131,17 @@ TEST_F(DPUHTTPClient, DpuOpAsJsonSerialization) {
         // Parse the request JSON
         nlohmann::json request = nlohmann::json::parse(req.body);
 
-        if (HandleStatusCheck(request, res)) return;
+        if (HandleStatusCheck(request, res))
+            return;
 
         // Validate the request structure
         EXPECT_EQ(request["params"]["backend"], "silicon");
         EXPECT_EQ(request["params"]["name"], "profiling_request");
-        
+
         // Verify DPU workload uses the correct key
         EXPECT_TRUE(request.contains("dpu_workload"));
         EXPECT_FALSE(request.contains("workload"));  // Should not use generic key
-        
+
         // Validate the serialized DPUOperation fields
         EXPECT_EQ(request["dpu_workload"]["output_write_tiles"], 2);
         EXPECT_EQ(request["dpu_workload"]["in_place_output"], 1);  // true serialized as 1
@@ -196,13 +194,14 @@ TEST_F(DPUHTTPClient, InitFromEnvironmentWithDebug) {
     ASSERT_EQ(env_check["VPUNN_PROFILING_SERVICE_PORT"], port_str);
     ASSERT_EQ(env_check["VPUNN_PROFILING_SERVICE_BACKEND"], "silicon");
     ASSERT_EQ(env_check["VPUNN_HTTP_CLIENT_DEBUG"], "1");
-    
+
     // Setup mock handler for /generate_workload endpoint
     _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
         // Parse request
         nlohmann::json request = nlohmann::json::parse(req.body);
-        if (HandleStatusCheck(request, res)) return;
-        
+        if (HandleStatusCheck(request, res))
+            return;
+
         // Send a successful response
         nlohmann::json response;
         response["info"] = "success";
@@ -219,21 +218,24 @@ TEST_F(DPUHTTPClient, InitFromEnvironmentWithDebug) {
         // Create provider using initFromEnvironment (this should read VPUNN_HTTP_CLIENT_DEBUG)
         auto provider = HttpCostProvider::initFromEnvironment();
         ASSERT_NE(provider, nullptr);
-    
+
         // Make a request to trigger debug output
         std::string info;
         CyclesInterfaceType cycles = provider->getCost(op, info);
-        
+
         // Verify debug messages are present
-        EXPECT_TRUE(oss.str().find("[DEBUG]") != std::string::npos) 
-            << "Expected debug output but none was found. Captured output:\n" << oss.str();
+        EXPECT_TRUE(oss.str().find("[DEBUG]") != std::string::npos)
+                << "Expected debug output but none was found. Captured output:\n"
+                << oss.str();
         EXPECT_TRUE(oss.str().find("HTTPClient::sendJsonRequest") != std::string::npos)
-            << "Expected HTTPClient debug messages. Captured output:\n" << oss.str();
-        EXPECT_TRUE(oss.str().find("Request payload") != std::string::npos || 
+                << "Expected HTTPClient debug messages. Captured output:\n"
+                << oss.str();
+        EXPECT_TRUE(oss.str().find("Request payload") != std::string::npos ||
                     oss.str().find("Response received") != std::string::npos)
-            << "Expected request/response debug info. Captured output:\n" << oss.str();
-        
-            // Verify the cost was retrieved successfully
+                << "Expected request/response debug info. Captured output:\n"
+                << oss.str();
+
+        // Verify the cost was retrieved successfully
         EXPECT_EQ(cycles, 9999);
     }
 }
@@ -266,8 +268,9 @@ TEST_F(DPUHTTPClient, InitFromEnvironmentWithoutDebug) {
     _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
         // Parse request
         nlohmann::json request = nlohmann::json::parse(req.body);
-        if (HandleStatusCheck(request, res)) return;
-        
+        if (HandleStatusCheck(request, res))
+            return;
+
         // Send a successful response
         nlohmann::json response;
         response["info"] = "success";
@@ -284,18 +287,19 @@ TEST_F(DPUHTTPClient, InitFromEnvironmentWithoutDebug) {
         // Create provider using initFromEnvironment (debug should be disabled)
         auto provider = HttpCostProvider::initFromEnvironment();
         ASSERT_NE(provider, nullptr);
-    
+
         // Make a request
         std::string info;
         CyclesInterfaceType cycles = provider->getCost(op, info);
-        
+
         // Verify NO debug messages are present
-        EXPECT_TRUE(oss.str().find("[DEBUG]") == std::string::npos) 
-            << "Expected NO debug output but found some. Captured output:\n" << oss.str();
-        
+        EXPECT_TRUE(oss.str().find("[DEBUG]") == std::string::npos)
+                << "Expected NO debug output but found some. Captured output:\n"
+                << oss.str();
+
         // Verify the cost was retrieved successfully
         EXPECT_EQ(cycles, 8888);
     }
 }
 
-} // namespace VPUNN_unit_tests
+}  // namespace VPUNN_unit_tests

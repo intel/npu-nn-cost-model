@@ -26,6 +26,7 @@ target_sources(vpunn_vpu
     PRIVATE 
         validation/checker_utils.cpp 
         validation/data_dpu_operation.cpp
+        validation/serializable_shave.cpp
         energy_impl.cpp
         layer.cpp
         dpu_workload.cpp
@@ -34,6 +35,8 @@ target_sources(vpunn_vpu
         shave_workload.cpp
         http_cost_provider_factory.cpp
         http_cost_provider_intf.cpp
+        power.cpp
+        workload_hash.cpp
 )
 
 target_link_libraries(vpunn_vpu

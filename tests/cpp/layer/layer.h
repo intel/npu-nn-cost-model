@@ -109,6 +109,54 @@ protected:
         return test_info->test_suite_name();
     }
 
+    /// Helper: create a default VPULayerStrategy for batched tests
+    VPULayerStrategy makeDefaultLayerStrategy(bool input_fetching = false, bool output_spilling = false,
+                                              bool prefetching = true) {
+        return VPULayerStrategy{
+                1U,                         ///< nDPUs
+                1U,                         ///< nSHVs
+                1U,                         ///< nTiles
+                VPUTilingStrategy::NONE,    ///< tiling_strategy
+                input_fetching,             ///< input_fetching
+                output_spilling,            ///< output_spilling
+                prefetching                 ///< prefetching
+        };
+    }
+
+    /// Helper: create a default VPULayersPreSplitStrategy for batched pre-split tests
+    VPULayersPreSplitStrategy makeDefaultPreSplitStrategy(VPUTilingStrategy tiling = VPUTilingStrategy::SOK,
+                                                          bool input_fetching = false, bool output_spilling = false,
+                                                          bool prefetching = true) {
+        return VPULayersPreSplitStrategy{
+                1U,                 ///< nDPUs
+                tiling,             ///< tiling_strategy
+                input_fetching,     ///< input_fetching
+                output_spilling,    ///< output_spilling
+                prefetching         ///< prefetching
+        };
+    }
+
+    /// Helper: create a valid DPU layer for batched tests
+    DPULayer makeBatchTestLayer(VPUDevice dev, unsigned int width = 16, unsigned int height = 16,
+                                    unsigned int channels = 64) {
+        VPUNN::DPUWorkload wl{
+                dev,
+                Operation::CONVOLUTION,
+                {VPUNN::VPUTensor(width, height, channels, 1, VPUNN::DataType::UINT8)},   // input
+                {VPUNN::VPUTensor(width, height, channels, 1, VPUNN::DataType::UINT8)},   // output
+                {1, 1},                                                                   // kernels
+                {1, 1},                                                                   // strides
+                {0, 0, 0, 0},                                                             // padding
+                ExecutionMode::CUBOID_16x16,                                              // execution mode
+                ActivationFunction::NONE,                                                 // activation
+                0.0F,                                                                     // act_sparsity
+                0.0F,                                                                     // weight_sparsity
+                {Swizzling::KEY_0, Swizzling::KEY_0},                                     // input_swizzling
+                {Swizzling::KEY_0},                                                       // output_swizzling
+        };
+        return DPULayer(wl);
+    }
+
     void DoRegularTest(const TestInput& t_in, const TestExpectations& t_exp, const std::string& test_case = "") {
         DPULayer l1{t_in.l1};
         VPULayerStrategy strategy{t_in.strategy};

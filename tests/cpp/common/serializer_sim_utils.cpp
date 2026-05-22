@@ -17,7 +17,7 @@
 #include <utility>
 
 #include "vpu/validation/data_dpu_operation.h"
-#include "vpu/validation/data_shave_operation.h"
+#include "vpu/validation/serializable_shave.h"
 #include "vpu/vpu_tensor.h"
 #include "vpu_cost_model.h"
 
@@ -535,7 +535,7 @@ public:
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
-        SHAVEOperation wl_buff;
+        SerializableSHAVE wl_buff;
         SerializableField<std::string> info_buff{info_tag, ""};  // from input, read 2nd time
 
         // out over input
@@ -564,7 +564,7 @@ public:
 
                 auto run_model = [&shave_wl](SHAVECostModel& model) {
                     std::string info{};
-                    return std::to_string(model.computeCycles(shave_wl, info, true));
+                    return std::to_string(model.computeCycles(shave_wl, info));
                 };
 
                 simulateFieldsAll[sim_tags[0]] = run_model(empty_model);

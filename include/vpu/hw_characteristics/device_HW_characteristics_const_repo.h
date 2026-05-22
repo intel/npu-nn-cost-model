@@ -19,6 +19,7 @@
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU2_7.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU4.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU5.h"
+
 #include "vpu/hw_characteristics/device_HW_characteristics_base.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_default.h"
 

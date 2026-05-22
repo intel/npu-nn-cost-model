@@ -24,7 +24,6 @@ using namespace VPUNN;
 class TestEnergyandPF_CostModel : public ::testing::Test /* TestCostModel*/ {
 public:
 protected:
-    
     const HWPerformanceModel performanceProvider{};
 
     void SetUp() override {
@@ -200,8 +199,18 @@ protected:
     TestVPUPowerFactorLUT() {
     }
 
+    /// @brief Helper to create a CONVOLUTION workload with specified device, data type and engine
+    DPUWorkload make_conv_wl(VPUDevice device, DataType in_dtype, DataType out_dtype,
+                             MPEEngine engine = MPEEngine::SCL) {
+        const std::array<VPUTensor, 1> ins{VPUTensor(10, 10, 64, 1, in_dtype)};
+        const std::array<VPUTensor, 1> outs{VPUTensor(10, 10, 64, 1, out_dtype)};
+
+        DPUWorkload wl{device, Operation::CONVOLUTION, ins, outs, kernels, strides, padding, execution_order};
+        wl.mpe_engine = engine;
+        return wl;
+    }
+
 private:
 };
-
 
 }  // namespace VPUNN_unit_tests

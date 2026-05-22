@@ -1,4 +1,4 @@
-// Copyright © 2024 Intel Corporation
+// Copyright © 2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -11,26 +11,28 @@
 #define VPUNN_LAYER_STRATEGY_H
 
 #include <iostream>
+#include <optional>
+#include <string>
 
-#include "vpu/types.h"
 #include "vpu/dpu_defaults.h"
 #include "vpu/vpu_tiling_strategy.h"
+#include "vpu/vpu_layer_execution_config.h"
 
 namespace VPUNN {
 
-/// @brief A VPU layer strategy
-struct VPULayerStrategy {
+/// @brief A VPU layer strategy with additional information on tiling and SHV distribution, used for non pre-split layers where the tiling strategy is relevant
+struct VPULayerStrategy : public VPULayerExecutionConfig {
     unsigned int nDPUs{1};   ///< Number of DPUs per tile
     unsigned int nSHVs{1};   ///< Number of Shaves per tile
     unsigned int nTiles{1};  ///< Number of tiles
 
     VPUTilingStrategy tiling_strategy{VPUTilingStrategy::NONE};  ///< tiling strategy
-
-    bool input_fetching{false};   ///< true if the layer input is in DDR
-    bool output_spilling{false};  ///< true if the layer output is in DDR
-
-    bool prefetching{true};  ///< If layer parameters are prefetched with previous layers. If true it considers the
-                             ///< weights are prefetched, if false will fetch the weights considering also sparsity
+    
+    explicit VPULayerStrategy(unsigned int nDPUs = 1, unsigned int nSHVs = 1, unsigned int nTiles = 1,
+                     VPUTilingStrategy tiling_strategy = VPUTilingStrategy::NONE,
+                     bool input_fetching = false, bool output_spilling = false, bool prefetching = true)
+        : VPULayerExecutionConfig{input_fetching, output_spilling, prefetching},
+          nDPUs(nDPUs), nSHVs(nSHVs), nTiles(nTiles), tiling_strategy(tiling_strategy) {}
 };
 
 // struct LayerMetaInfo {         // info about the layer/contextual info (not content oflayer)
