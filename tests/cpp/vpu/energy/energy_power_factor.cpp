@@ -7,7 +7,7 @@
 // Please refer to the "third-party-programs.txt" or other similarly-named text file included with the
 // Software Package for additional details.
 #include "energy_power_factor.h"
-#include "vpu/power.h"
+#include "vpu/energy/power.h"
 
 #include <map>
 #include <string>

@@ -45,6 +45,7 @@ inline constexpr int dtype_to_bytes(const DataType dtype) noexcept {
     case DataType::HF8:
     case DataType::UINT4:
     case DataType::INT4:
+    case DataType::FLOAT4:
     case DataType::UINT2:
     case DataType::INT2:
     case DataType::UINT1:
@@ -79,6 +80,7 @@ inline constexpr int dtype_to_bits(const DataType dtype) noexcept {
         return 8;
     case DataType::UINT4:
     case DataType::INT4:
+    case DataType::FLOAT4:
         return 4;
     case DataType::UINT2:
     case DataType::INT2:
@@ -198,6 +200,17 @@ inline std::vector<unsigned int> mpe_mode_to_nthw_ntk_grid(ExecutionMode mode) {
     default:
         return {1, 1, 1, 1};
     }
+}
+
+/// @brief Returns true if the given execution mode belongs to the dCIM family.
+///
+/// dCIM execution modes require MPEEngine::DCIM and represent distinct hardware tile
+/// configurations. Any new dCIM variant must be added here.
+///
+/// @param mode the ExecutionMode to test
+/// @return true if mode is dCIM_32x128 or dCIM_64x128, false otherwise
+inline constexpr bool is_dcim_execution_mode(const ExecutionMode mode) noexcept {
+    return mode == ExecutionMode::dCIM_32x128 || mode == ExecutionMode::dCIM_64x128;
 }
 
 }  // namespace VPUNN

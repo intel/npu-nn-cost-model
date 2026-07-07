@@ -13,6 +13,7 @@
 #include <numeric>
 
 #include "sanity_report.h"
+#include "vpu/dpu_types_info.h"
 #include "vpu/types.h"
 
 // #include "device_valid_values.h"
@@ -51,9 +52,15 @@ public:
 
         const auto& config = get_config(wl.device);
 
-        // force execution mode when dCIM engine is selected
+        // Assign a default dCIM execution mode only when the engine is DCIM and
+        // the caller has not already provided a dCIM-family execution mode.
+        // Preserving an explicitly set dCIM mode (e.g. dCIM_64x128) is intentional:
+        // the two modes have different hardware behaviour and the caller must be
+        // able to select between them.
         if (wl.mpe_engine == MPEEngine::DCIM) {
-            wl.execution_order = ExecutionMode::dCIM_32x128;
+            if (!is_dcim_execution_mode(wl.execution_order)) {
+                wl.execution_order = ExecutionMode::dCIM_32x128;  // safe default
+            }
         }
 
         // check ahead

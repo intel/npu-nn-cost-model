@@ -14,14 +14,15 @@
 #include <exception>
 #include <memory>  // for std::make_shared (if used)
 #include <numeric>
-#include <optional>      // for std::optional
-#include <string>        // for std::string
-#include <tuple>         // for std::tuple_size
+#include <optional>  // for std::optional
+#include <string>    // for std::string
+#include <tuple>     // for std::tuple_size
 #include <type_traits>
-#include <variant>        // for std::visit, std::is_same_v
-#include <vector>         // for std::vector
+#include <variant>  // for std::visit, std::is_same_v
+#include <vector>   // for std::vector
 #include "core/logger.h"
 #include "vpu/device_layer_properties/device_layer_properties_holder.h"
+#include "vpu/dma_descriptor_transformers.h"
 #include "vpu/dpu_defaults.h"
 #include "vpu/optimization/dpu_tiler_factory.h"
 #include "vpu/performance.h"
@@ -68,7 +69,8 @@ CyclesInterfaceType VPULayerCostModel::Layer(DPULayer& layer, VPUTilingStrategy 
                         prefetching, &detailed_split);
 }
 
-BatchCostResult VPULayerCostModel::LayerBatched(const std::vector<std::reference_wrapper<LayerBatchElementInfo>>& layers) const {
+BatchCostResult VPULayerCostModel::LayerBatched(
+        const std::vector<std::reference_wrapper<LayerBatchElementInfo>>& layers) const {
     BatchCostResult result;
 
     if (layers.empty()) {
@@ -77,19 +79,19 @@ BatchCostResult VPULayerCostModel::LayerBatched(const std::vector<std::reference
 
     result.costs.resize(layers.size());
     std::transform(layers.begin(), layers.end(), result.costs.begin(),
-        [this](const std::reference_wrapper<LayerBatchElementInfo>& layer_ref) {
-            try {
-                auto& cfg = layer_ref.get();
-                return cfg.detailed_split != nullptr
-                    ? Layer(cfg.layer, cfg.strategy, *cfg.detailed_split)
-                    : Layer(cfg.layer, cfg.strategy);
-            } catch (const std::exception& e) {
-                Logger::warning() << "Exception in LayerBatched element: " << e.what();
-                return static_cast<CyclesInterfaceType>(Cycles::ERROR_TILE_SPLIT_EXCEPTION);
-            }
-        });
-    result.isValid = std::none_of(result.costs.begin(), result.costs.end(),
-        [](CyclesInterfaceType c) { return Cycles::isErrorCode(c); });
+                   [this](const std::reference_wrapper<LayerBatchElementInfo>& layer_ref) {
+                       try {
+                           auto& cfg = layer_ref.get();
+                           return cfg.detailed_split != nullptr ? Layer(cfg.layer, cfg.strategy, *cfg.detailed_split)
+                                                                : Layer(cfg.layer, cfg.strategy);
+                       } catch (const std::exception& e) {
+                           Logger::warning() << "Exception in LayerBatched element: " << e.what();
+                           return static_cast<CyclesInterfaceType>(Cycles::ERROR_TILE_SPLIT_EXCEPTION);
+                       }
+                   });
+    result.isValid = std::none_of(result.costs.begin(), result.costs.end(), [](CyclesInterfaceType c) {
+        return Cycles::isErrorCode(c);
+    });
     return result;
 }
 
@@ -98,7 +100,8 @@ BatchCostResult VPULayerCostModel::LayerBatched(std::vector<LayerBatchElementInf
     return LayerBatched(refs);
 }
 
-BatchCostResult VPULayerCostModel::LayersPreSplitBatched(const std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>>& layers_pre_split) const {
+BatchCostResult VPULayerCostModel::LayersPreSplitBatched(
+        const std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>>& layers_pre_split) const {
     BatchCostResult result;
 
     if (layers_pre_split.empty()) {
@@ -107,30 +110,34 @@ BatchCostResult VPULayerCostModel::LayersPreSplitBatched(const std::vector<std::
 
     result.costs.resize(layers_pre_split.size());
     std::transform(layers_pre_split.begin(), layers_pre_split.end(), result.costs.begin(),
-        [this](const std::reference_wrapper<LayersPreSplitBatchElementInfo>& presplit_ref) {
-            try {
-                auto& info = presplit_ref.get();
-                return info.detailed_split != nullptr
-                    ? LayersPreSplit(info.layer_splits, info.strategy.nDPUs,
-                                     info.strategy.input_fetching, info.strategy.output_spilling,
-                                     info.strategy.prefetching, *info.detailed_split,
-                                     info.fullLayerHash.value_or(0), info.strategy.tiling_strategy)
-                    
-                    : LayersPreSplit(info.layer_splits, info.strategy.nDPUs,
-                                     info.strategy.input_fetching, info.strategy.output_spilling,
-                                     info.strategy.prefetching);
-            } catch (const std::exception& e) {
-                Logger::warning() << "Exception in LayersPreSplitBatched element: " << e.what();
-                return static_cast<CyclesInterfaceType>(Cycles::ERROR_TILE_SPLIT_EXCEPTION);
-            }
-        });
-    result.isValid = std::none_of(result.costs.begin(), result.costs.end(),
-        [](CyclesInterfaceType c) { return Cycles::isErrorCode(c); });
+                   [this](const std::reference_wrapper<LayersPreSplitBatchElementInfo>& presplit_ref) {
+                       try {
+                           auto& info = presplit_ref.get();
+                           return info.detailed_split != nullptr
+                                          ? LayersPreSplit(info.layer_splits, info.strategy.nDPUs,
+                                                           info.strategy.input_fetching, info.strategy.output_spilling,
+                                                           info.strategy.prefetching, *info.detailed_split,
+                                                           info.fullLayerHash.value_or(0),
+                                                           info.strategy.tiling_strategy)
+
+                                          : LayersPreSplit(info.layer_splits, info.strategy.nDPUs,
+                                                           info.strategy.input_fetching, info.strategy.output_spilling,
+                                                           info.strategy.prefetching);
+                       } catch (const std::exception& e) {
+                           Logger::warning() << "Exception in LayersPreSplitBatched element: " << e.what();
+                           return static_cast<CyclesInterfaceType>(Cycles::ERROR_TILE_SPLIT_EXCEPTION);
+                       }
+                   });
+    result.isValid = std::none_of(result.costs.begin(), result.costs.end(), [](CyclesInterfaceType c) {
+        return Cycles::isErrorCode(c);
+    });
     return result;
 }
 
-BatchCostResult VPULayerCostModel::LayersPreSplitBatched(std::vector<LayersPreSplitBatchElementInfo>& pre_split_layers) const {
-    std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>> refs(pre_split_layers.begin(), pre_split_layers.end());
+BatchCostResult VPULayerCostModel::LayersPreSplitBatched(
+        std::vector<LayersPreSplitBatchElementInfo>& pre_split_layers) const {
+    std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>> refs(pre_split_layers.begin(),
+                                                                             pre_split_layers.end());
     return LayersPreSplitBatched(refs);
 }
 
@@ -168,7 +175,18 @@ CyclesInterfaceType VPULayerCostModel::compute_dma_cycles(const DMATransfer1D& d
 
     if (!is_dma_model_variant()) {
         Logger::warning() << "\n No DmaCostModel is initialized, fallback to theoretical model. \n";
-        cost = get_TheoreticalDMA_cost_model().DMA(convert_dma1d_2_dmawl(dwl));
+
+        // When no DMA NN cost provider is available, fall back to a theoretical DMA model.
+        // The selection between the classic flat DMAWorkload model and the stride-aware VPUDMADescriptor model
+        // is controlled by set_DMATheoreticalMathModel_enabled() (default: classic DMAWorkload model).
+        if (is_DMATheoreticalMathModel_enabled()) {  // Use VPUDMADescriptor-based stride-aware theoretical model for
+                                                     // newer devices
+            cost = get_TheoreticalDMA_cost_model().DMA(
+                    DMADescriptorTransformer::fromDMATransfer1D_to_VPUDMADescriptor(dwl));
+        } else {  // Use classic DMAWorkload-based theoretical model for older devices (DEFAULT)
+            cost = get_TheoreticalDMA_cost_model().DMA(DMADescriptorTransformer::fromDMATransfer1D_to_DMAWorkload(dwl));
+        }
+
     } else {
         cost = std::visit(
                 [dwl](const auto& dma_model) -> CyclesInterfaceType {

@@ -17,6 +17,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <set>
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -51,6 +52,12 @@ protected:
 
     SHAVEWorkload unknown_swwl{"unknown_op", VPUDevice::VPU_4_0, {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)},
                         {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)}};
+
+    static void expectSameSupportedOps(const std::vector<std::string>& lhs, const std::vector<std::string>& rhs) {
+        const std::set<std::string> lhs_set(lhs.begin(), lhs.end());
+        const std::set<std::string> rhs_set(rhs.begin(), rhs.end());
+        EXPECT_EQ(lhs_set, rhs_set);
+    }
 };
 
 TEST_F(ShaveCostProviderTests, ProvidersTestNewOp) {
@@ -107,7 +114,7 @@ TEST_F(ShaveCostProviderTests, CheckMultipleProvidersTestSoftMax) {
     EXPECT_TRUE(it != list_of_supported_ops.end());
 
     // Works only 5.0 +
-    auto composite_provider = ShaveCostProviderBundles::createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU5();
+    auto composite_provider = ShaveCostProviderBundles::createCompositeBasedOnHeuristicWithOldNameMappingExtendedOps();
     list_of_supported_ops = composite_provider->get_shave_supported_ops(device);
     it = std::find(list_of_supported_ops.begin(), list_of_supported_ops.end(), "SoftMax");
     EXPECT_TRUE(it == list_of_supported_ops.end());
@@ -116,6 +123,25 @@ TEST_F(ShaveCostProviderTests, CheckMultipleProvidersTestSoftMax) {
     list_of_supported_ops = device_based_provider->get_shave_supported_ops(device);
     it = std::find(list_of_supported_ops.begin(), list_of_supported_ops.end(), "SoftMax");
     EXPECT_TRUE(it != list_of_supported_ops.end());
+}
+
+TEST_F(ShaveCostProviderTests, LightweightQuerySupportedOperationsMatchesDeviceMappedProvider) {
+    auto expected_provider = ShaveCostProviderBundles::createDeviceMappedProvider();
+
+    std::vector<VPUDevice> devices = {
+            VPUDevice::VPU_2_0,
+            VPUDevice::VPU_2_7,
+            VPUDevice::VPU_4_0,
+            VPUDevice::NPU_5_0,
+    };
+    devices.push_back(VPUDevice::NPU_5_0_W);
+
+    for (const auto device : devices) {
+        VPUDevice mutable_device = device;
+        const auto expected_ops = expected_provider->get_shave_supported_ops(mutable_device);
+        const auto queried_ops = ShaveCostProviderBundles::queryDeviceMappedSupportedOperations(device);
+        expectSameSupportedOps(expected_ops, queried_ops);
+    }
 }
 
 // ============================================================================

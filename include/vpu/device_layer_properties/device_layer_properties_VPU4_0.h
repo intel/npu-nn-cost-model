@@ -45,6 +45,8 @@ struct VPU4_0_LayerPropertiesData {
              {ExecutionMode::CUBOID_16x16, ExecutionMode::CUBOID_8x16,
               ExecutionMode::CUBOID_4x16}}};  ///< map of operation to valid execution modes
 
+    inline static const std::vector<ExecutionMode> dcim_exec_modes{};  ///< no dCIM support for VPU 4.0
+
     inline static const ExecutionMode default_execution_mode{
             ExecutionMode::CUBOID_16x16};  ///< default execution mode for layers
 };

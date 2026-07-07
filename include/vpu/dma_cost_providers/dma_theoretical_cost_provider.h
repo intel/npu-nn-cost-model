@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef DMA_THEORETICAL_COST_PROVIDER_H
-#define DMA_THEORETICAL_COST_PROVIDER_H
+#ifndef VPUNN_DMA_THEORETICAL_COST_PROVIDER_H
+#define VPUNN_DMA_THEORETICAL_COST_PROVIDER_H
 
 #include <algorithm>                      // for std::min, std::max
 #include <cmath>                          // for std::floor
@@ -16,10 +16,14 @@
 #include "dma_cost_provider_interface.h"  // for IDMACostProvider
 #include "performance_mode.h"
 #include "vpu/cycles_interface_types.h"                           // for CyclesInterfaceType, Cycles
+#include "vpu/dma_workload.h"                                     // for DMAWorkloadTransformer, DMANNWorkload_NPU40_50
 #include "vpu/dpu_types_info.h"                                   // for dtype_to_bytes
 #include "vpu/hw_characteristics/HW_characteristics_supersets.h"  // for HWCharacteristicsSet
 #include "vpu/hw_characteristics/itf_HW_characteristics_set.h"    // for IHWCharacteristicsSet
 #include "vpu/types.h"
+
+// #include "vpu/dma_cost_providers/dma_strided_math_cost_provider.h"  // for experimenting
+// #include "vpu/dma_descriptor_transformers.h"  // for create_workload<VPUDMADescriptor, DMAWorkload>
 
 namespace VPUNN {
 /**
@@ -141,6 +145,10 @@ public:
     }
 
 protected:
+    const IDeviceHWCharacteristics& get_hw_characteristics(const VPUDevice device) const {
+        return hw_info.device(device);
+    }
+
     int compute_DRAM_bandwith_BytesPerCyc(const VPUDevice& device) const {
         const auto& hw{hw_info.device(device)};  // device characteristics
         // DRAM bw is given in MBps
@@ -211,14 +219,59 @@ protected:
 
 public:
     /**
-     * @brief Estimates the theoretical DMA execution cycles for PTL or newer devices => DMATheoreticalCyclesPTL_ON
+     * @brief Estimates the theoretical DMA execution cycles for PTL or newer devices.
      *
-     * This method calculates the number of execution cycles required for a DMA
-     * operation using the updated PTL theoretical model
+     * This method calculates the number of execution cycles required for a DMA operation
+     * using the updated PTL theoretical model.  The cost is:
      *
+     *   cycles = latency + max(input_cycles, output_cycles)
      *
-     * @param wl The DMAWorkload describing the DMA operation
-     * @return The estimated number of DPU cycles required to complete the DMA operation.
+     * where latency, bandwidth, and clock ratios are all device-specific.
+     *
+     * ---
+     * **CMX→CMX layout permutation**
+     *
+     * A DMA between two CMX tensors whose layouts differ (e.g. NHWC→NCHW) is a
+     * *permutation*: the DMA engine must scatter/gather individual elements rather
+     * than copying a contiguous byte stream.
+     *
+     * This is detected when **all three** conditions hold:
+     *   - `wl.input.get_layout() != wl.output.get_layout()`
+     *   - `wl.input_location  == MemoryLocation::CMX`
+     *   - `wl.output_location == MemoryLocation::CMX`
+     *
+     * When triggered, the write-side bandwidth drops to `dtype_to_bytes(dtype)` per
+     * cycle (one element per cycle) instead of the nominal CMX word width (~32 B/cycle).
+     * This can be up to 32× slower than a plain CMX copy.
+     *
+     * Layout differences on any other transfer direction (e.g. DDR→CMX) do **not**
+     * trigger the permutation penalty — the flag remains false.
+     *
+     * ---
+     * **DDR→CMX hardware decompression**
+     *
+     * The NPU DMA engine supports in-flight decompression of compressed activation
+     * tensors stored in DRAM.  In this mode the source tensor (compressed, in DDR) is
+     * smaller than the destination tensor (expanded, in CMX):
+     *   `wl.input.size() < wl.output.size()`
+     *
+     * This is detected when **all three** conditions hold:
+     *   - `wl.input.size()    < wl.output.size()`   (compressed src, expanded dst)
+     *   - `wl.input_location  == MemoryLocation::DRAM`
+     *   - `wl.output_location == MemoryLocation::CMX`
+     *
+     * When triggered a `decompression_ratio = output_bytes / input_bytes` is computed
+     * (ratio > 1).  The decompressor can write to CMX faster than data arrives from
+     * DRAM, so the *effective* CMX write bandwidth is scaled up by this ratio, capped
+     * at 2× the nominal SRAM bandwidth:
+     *   `effective_write_bw = min(raw_bw * decompression_ratio, 2 * nominal_cmx_bw)`
+     *
+     * For ordinary (non-compressed) transfers `input.size() == output.size()`, the
+     * ratio is 1.0 and the decompression path is a no-op.
+     *
+     * ---
+     * @param wl The DMAWorkload describing the DMA operation.
+     * @return   The estimated number of DPU cycles required to complete the DMA operation.
      */
     unsigned long int DMATheoreticalCyclesPTL_ON(const DMAWorkload& wl) const {
         // device is presumed to be at least LNL
@@ -275,12 +328,14 @@ public:
  */
 template <typename WlT = DMAWorkload>
 class BaseDMATheoreticalCostProvider : public IDMACostProvider<WlT> {
+protected:
+    DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_LNL;  // legacy one
+    DMATheoreticalCostProvider_PTL dma_theoretical_PTL{
+            HWCharacteristicsSuperSets::get_mainConfigurationRef()};  // evoluated one, default config
+    // DMAStridedMathCostProvider_DescIntf dma_strided_math;             // strided Math DMA
+
 public:
     CyclesInterfaceType get_cost(const WlT& wl, std::string* cost_source = nullptr) const override {
-        DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_LNL;  // legacy one
-        DMATheoreticalCostProvider_PTL dma_theoretical_PTL(
-                HWCharacteristicsSuperSets::get_mainConfigurationRef());  // new one, default config
-
         if (cost_source) {
             *cost_source = "theoretical";
         }
@@ -294,6 +349,19 @@ public:
                 return dma_theoretical_LNL.DMATheoreticalCyclesLegacyLNL(wl);
             }
             return dma_theoretical_PTL.DMATheoreticalCyclesPTL_ON(wl);  // Updated theoretical model
+
+            // experiment: use strided math model for NPU_RESERVED
+            // if (wl.device < VPUDevice::NPU_RESERVED) {
+            //    return dma_theoretical_PTL.DMATheoreticalCyclesPTL_ON(wl);  // classical theoretical model for
+            //    // PTL / NPU_RESERVED
+            //} else {
+            //    // convert from WlT to DMANNWorkload_NPU40_50, the strided math model is only for this workload type,
+            //    // so we need to do the conversion
+            //    // convert from WlT to the workload type expected by dma_strided_math, generically deduced
+            //    using StridedWlT = typename decltype(dma_strided_math)::workload_type;
+            //    StridedWlT wl_nn{DMAWorkloadTransformer::template create_workload<StridedWlT>(wl)};
+            //    return dma_strided_math.get_cost(wl_nn, cost_source);
+            //}
         }
     }
 };

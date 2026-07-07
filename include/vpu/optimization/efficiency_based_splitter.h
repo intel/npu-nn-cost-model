@@ -22,7 +22,7 @@ namespace VPUNN {
  * The cost model provides the actual hardware execution time for each block size.
  */
 struct SplitBlock {
-    int size;                  ///< Block size in channels (must be multiple of 16)
+    int size;                  ///< Block size in channels
     CyclesInterfaceType time;  ///< Hardware execution time in cycles for this block size
     double efficiency;         ///< Cost per channel: time / size (smaller = more efficient)
 
@@ -48,6 +48,9 @@ struct SplitBlock {
  * - Space complexity: O(target/16)
  */
 class EfficiencyBasedSplitter {
+public:
+    using SplitContainer = std::vector<int>;
+
 private:
     /**
      * @brief DP state tracking optimal cost and block count for a given channel count
@@ -64,12 +67,11 @@ private:
         DynProgState(double cost, int cnt);
     };
 
-    std::vector<SplitBlock> blocks;  ///< Available block sizes with their costs
-    double block_overhead;           ///< Fixed per-block overhead (e.g., scheduling, context switch)
+    std::vector<SplitBlock> blocks;              ///< Available regular block sizes (multiples of 16)
+    std::vector<SplitBlock> remainder_blocks;     ///< Blocks usable only as the final block of an unaligned split
+    double block_overhead;                     ///< Fixed per-block overhead (e.g., scheduling, context switch)
 
 public:
-    using SplitContainer = std::vector<int>;
-
     /**
      * @brief Construct splitter with available block options and optional per-block overhead
      * @param blocks_ Vector of available block sizes with execution costs
@@ -78,22 +80,32 @@ public:
     EfficiencyBasedSplitter(const std::vector<SplitBlock>& blocks_, double overhead = 0.0);
 
     /**
+     * @brief Construct splitter with regular blocks, remainder blocks, and optional overhead
+     *
+     * Use this constructor when the target channel count may NOT be a multiple of 16.
+     * The splitter will find the optimal regular prefix split and append one remainder block
+     * as the final element.
+     *
+     * @param blocks_     Aligned block sizes for the main partition (multiples of 16)
+     * @param rem_blocks_ Remainder block sizes that may appear only at the end of a split
+     * @param overhead    Fixed cost added per block
+     */
+    EfficiencyBasedSplitter(const std::vector<SplitBlock>& blocks_,
+                            const std::vector<SplitBlock>& rem_blocks_,
+                            double overhead = 0.0);
+
+    /**
      * @brief Find optimal partition of targetSize channels using dynamic programming
      *
-     * Algorithm phases:
-     * 1. Validation: Check targetSize is positive and multiple of 16
-     * 2. Initialization: Scale target by dividing by 16 to reduce state space
-     * 3. Dynamic Programming forward pass: Build optimal solutions for all sizes from 0 to target
-     * 4. Solution reconstruction: Backtrack through choices to build result
+     * For aligned targets (targetSize % 16 == 0) the original DP over regular blocks runs unchanged.
      *
-     * Dynamic Programming recurrence relation:
-     *   dynProg[i + block.size/16] = min over all blocks of:
-     *     dynProg[i].cost + (block.efficiency * block.size + overhead)
-     *   with tie-breaking: prefer solution with fewer blocks if costs are equal
+     * For unaligned targets (targetSize % 16 != 0) the algorithm tries each compatible remainder block
+     * R (where R % 16 == targetSize % 16 and R <= targetSize) as the final piece, solves the aligned
+     * prefix (targetSize - R) via recursion into the aligned path, and picks the lowest total cost.
      *
-     * @param targetSize Total channels to partition (must be multiple of 16)
-     * @param result Output vector filled with optimal block sizes (sum = targetSize)
-     * @return true if valid partition found, false if impossible or invalid input
+     * @param targetSize Total channels to partition
+     * @param result     Output vector filled with optimal block sizes (sum == targetSize)
+     * @return true if valid partition found, false otherwise
      */
     bool divideEfficiency(int targetSize, SplitContainer& result) const;
 };

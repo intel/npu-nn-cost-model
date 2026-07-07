@@ -83,6 +83,18 @@ public:
     void setBlocks(const std::vector<SplitBlock>& basic_blocks);
 
     /**
+     * @brief Set remainder blocks for unaligned output channel splits
+     *
+     * Remainder blocks are candidate sizes whose lower bits (size % 16) match
+     * the unaligned residue.  They may only appear as the last element of a
+     * split.  Each block should carry a measured execution cost so the DP can
+     * pick the cheapest combination of prefix + remainder.
+     *
+     * @param remainder_blocks Vector of measured remainder block sizes with costs
+     */
+    void setRemainderBlocks(const std::vector<SplitBlock>& remainder_blocks);
+
+    /**
      * @brief Check if building blocks are available
      *
      * @return true if blocks have been set and are ready for use
@@ -127,8 +139,9 @@ protected:
                                const ExecutionMode mode);
 
 private:
-    std::vector<SplitBlock> basic_blocks_;  ///< Available building blocks with costs
-    double block_overhead_;           ///< Per-block overhead cost
+    std::vector<SplitBlock> basic_blocks_;      ///< Available building blocks with costs (multiples of 16)
+    std::vector<SplitBlock> remainder_blocks_;  ///< Remainder blocks for unaligned splits (size % 16 != 0)
+    double block_overhead_;                     ///< Per-block overhead cost
 };
 
 }  // namespace VPUNN

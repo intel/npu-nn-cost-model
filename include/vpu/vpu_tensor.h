@@ -131,6 +131,7 @@ public:
         case DataType::BFLOAT16:
         case DataType::BF8:
         case DataType::HF8:
+        case DataType::FLOAT4:
             return true;
         default:
             return false;
@@ -166,6 +167,20 @@ public:
     }
 
     /**
+     * @brief Determines if tensor data type is 16-bit integer family.
+     * Used for power factor lookup where INT16/UINT16 have separate coefficients.
+     */
+    bool is_i16family() const noexcept {
+        switch (dtype) {
+        case DataType::UINT16:
+        case DataType::INT16:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /**
      * @brief Determines if tensor data type activates power circuits for int8 or not. Is used for adjustment factors of power
      * modeling and performance prediction etc.
      */
@@ -183,9 +198,7 @@ public:
         // No support for operations in DPU with these types yet
         case DataType::INT32:
 
-        case DataType::UINT16:
-        case DataType::INT16:
-
+        // Note: UINT16/INT16 are excluded here - they use is_i16family() for power factor lookup
             return true;
         default:
             return false;

@@ -18,6 +18,7 @@
 #include <vpu/compatibility/types14.h>  // detailed implementations
 #include <vpu/compatibility/types15.h>  // detailed implementations
 #include <vpu/compatibility/types16.h>  //
+#include <vpu/compatibility/types17.h>
 #include <vpu/types.h>
 #include <sstream>  // for error formating
 #include <stdexcept>
@@ -51,6 +52,7 @@ private:
     Preprocessing_Interface15911<float> pp_v89_11;  // special v159
     Preprocessing_Interface15<float> pp_v15;
     Preprocessing_Interface16<float> pp_v16;
+    Preprocessing_Interface17<float> pp_v17;
 
     /// @brief the map of versions mapped to preprocessing concrete objects
     const PreprocessingMap pp_map{
@@ -66,6 +68,7 @@ private:
             {pp_v14.getInterfaceVersion(), pp_v14},            //
             {pp_v15.getInterfaceVersion(), pp_v15},            //
             {pp_v16.getInterfaceVersion(), pp_v16},            //
+            {pp_v17.getInterfaceVersion(), pp_v17}             //
     };
 
 public:

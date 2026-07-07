@@ -203,6 +203,11 @@ struct DPUWorkload {
         return output_autopad.value_or(false);
     }
 
+    /// check if workload is unaligned
+    bool is_output_unaligned() const {
+        return (outputs[0].channels() % 16 != 0) && is_output_autopad();
+    }
+
     /// in autopad setter
     void set_input_autopad(bool autopad) {
         input_autopad = autopad;

@@ -13,7 +13,7 @@
 
 #include "core/utils.h"
 #include <iostream>
-#include <sstream>  
+#include <sstream>
 
 namespace VPUNN {
 

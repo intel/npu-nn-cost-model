@@ -220,6 +220,11 @@ struct DMANNWorkload_NPU27 {
         return (num_planes + 1) * length;
     }
 
+    /// Transfer direction accessor for compatibility with VPUDMADescriptor interface
+    MemoryDirection getDirection() const {
+        return transfer_direction;
+    }
+
     // -- Serialization --
 
     static const std::string get_wl_name() {
@@ -271,8 +276,19 @@ private:
 
 public:
     static const std::vector<std::string> _get_member_names() {
-        return {"device",     "num_planes",       "length",           "src_width",          "dst_width", "src_stride",
-                "dst_stride", "src_plane_stride", "dst_plane_stride", "transfer_direction", "loc_name"};
+        return {
+                "device",              //
+                "num_planes",          //
+                "length",              //
+                "src_width",           //
+                "dst_width",           //
+                "src_stride",          //
+                "dst_stride",          //
+                "src_plane_stride",    //
+                "dst_plane_stride",    //
+                "transfer_direction",  //
+                "loc_name",            //
+        };
     }
 
     DMANNWorkload_NPU27() = default;
@@ -379,7 +395,8 @@ struct DMANNWorkload_NPU40_50 {
     ProfilingServiceBackend profiling_service_backend_hint{
             ProfilingServiceBackend::__size};  ///< hint about what profiling service backend to use
 
-    /// How many bytes are being transferred read and written
+    /// How many bytes are being read from the source in total, considering all dimensions
+    /// stride is irrelevant, no gaps due to stride are considered
     int getAccessedBytes() const {
         const auto unitBlock{src_width};
         int bytes_accessed{unitBlock};  // innermost dim as initialization (1D)
@@ -387,6 +404,98 @@ struct DMANNWorkload_NPU40_50 {
             bytes_accessed = bytes_accessed * (e_dim[i].src_dim_size + 1);
         }
         return bytes_accessed;
+    }
+
+    /// Alternative name for getAccessedBytes - returns total bytes read from source
+    /// stride is irrelevant, no gaps due to stride are considered
+    int getReadBytes() const {
+        return getAccessedBytes();
+    }
+
+    /// how many bytes are being written to the destination in total, considering all dimensions
+    /// stride is irrelevant, no gaps due to stride are considered
+    int getWrittenBytes() const {
+        const auto unitBlock{dst_width};
+        int bytes_written{unitBlock};  // innermost dim as initialization (1D)
+        for (int i = 0; i < num_dim; i++) {
+            bytes_written = bytes_written * (e_dim[i].dst_dim_size + 1);
+        }
+        return bytes_written;
+    }
+
+    /// how many contiguous bytes are read, this considers the strides of the present dimensions.
+    /// It is not only the dim of first(innermost) dimension, if there is no gap between the elements of the next
+    /// dimension then the memory is contiguous
+    /// the contiguous chunk stops when there is a gap in reading the source
+    int getContiguousBytesSrc() const {
+        int contiguous_bytes = src_width;
+
+        for (int i = 0; i < num_dim; i++) {
+            const auto& dim = e_dim[i];
+
+            if (dim.src_dim_size == 0) {
+                // Only 1 element: stride is never used to reach a next element,
+                // so it is irrelevant — do not break the contiguity chain.
+                continue;
+            }
+
+            if (dim.src_stride != contiguous_bytes) {
+                break;  // Real gap found — stop here
+            }
+
+            contiguous_bytes = contiguous_bytes * (dim.src_dim_size + 1);
+        }
+
+        return contiguous_bytes;
+    }
+
+    /// how many contiguous bytes are written, this considers the strides of the present dimensions.
+    int getContiguousBytesDst() const {
+        int contiguous_bytes = dst_width;
+
+        for (int i = 0; i < num_dim; i++) {
+            const auto& dim = e_dim[i];
+
+            if (dim.dst_dim_size == 0) {
+                // Only 1 element: stride is never used to reach a next element,
+                // so it is irrelevant — do not break the contiguity chain.
+                continue;
+            }
+
+            if (dim.dst_stride != contiguous_bytes) {
+                break;  // Real gap found — stop here
+            }
+
+            contiguous_bytes = contiguous_bytes * (dim.dst_dim_size + 1);
+        }
+
+        return contiguous_bytes;
+    }
+
+    /// computes how many contiguous chunks of source data are needed to fulfill the transfer
+    /// Note: one chunk means it has no stride
+    int getNumContiguousChunksSrc() const {
+        const int total_bytes = getAccessedBytes();
+        const int contiguous_bytes = getContiguousBytesSrc();
+        if (contiguous_bytes == 0) {
+            return 0;  // Avoid division by zero
+        }
+        return (total_bytes + contiguous_bytes - 1) / contiguous_bytes;  // Ceiling division
+    }
+
+    /// computes how many contiguous chunks of destination data are needed to fulfill the transfer
+    int getNumContiguousChunksDst() const {
+        const int total_bytes = getWrittenBytes();
+        const int contiguous_bytes = getContiguousBytesDst();
+        if (contiguous_bytes == 0) {
+            return 0;  // Avoid division by zero
+        }
+        return (total_bytes + contiguous_bytes - 1) / contiguous_bytes;  // Ceiling division
+    }
+
+    /// Transfer direction accessor for compatibility with VPUDMADescriptor interface
+    MemoryDirection getDirection() const {
+        return transfer_direction;
     }
 
     // -- Serialization --

@@ -6,21 +6,21 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#include "vpu/shave/shave_op_executors.h"
-#include "vpu/shave/shave_instance_holder_factors.h"
 #include <gtest/gtest.h>
+#include "vpu/shave/shave_instance_holder_factors.h"
+#include "vpu/shave/shave_op_executors.h"
 
 #include "common/common_helpers.h"
 #include "vpu/shave/shave_collection.h"
+#include "vpu/shave/shave_cost_providers/shave_cost_providers.h"
 #include "vpu/shave/shave_devices.h"
 #include "vpu/types.h"
 #include "vpu_cost_model.h"
 #include "vpu_shave_cost_model.h"
-#include "vpu/shave/shave_cost_providers/shave_cost_providers.h"
 
 // include generated factors population
-#include "vpu/shave/generated_shave_factors_population_npu5.h"
 #include "vpu/shave/generated_shave_factors_population_heuristic.h"
+#include "vpu/shave/generated_shave_factors_population_npu5.h"
 
 #include <fstream>
 #include <iostream>
@@ -295,9 +295,8 @@ TEST_F(ComplexOpsCollectionTestsNPU40, NormL2CCheckForLayoutError) {
             {{shaveOp, swl_1},
              {V(Cycles::ERROR_SHAVE_LAYOUT), V(Cycles::ERROR_SHAVE_LAYOUT)},
              "Error layout"},  // 195.9558724 *1700 ~= 331500
-            {{shaveOp, swl_2},
-             {V(Cycles::ERROR_SHAVE_LAYOUT), V(Cycles::ERROR_SHAVE_LAYOUT)},
-             "Error layout"}  // 17.37302728 * 1700 ~= 29534
+            {{shaveOp, swl_2}, {V(Cycles::ERROR_SHAVE_LAYOUT), V(Cycles::ERROR_SHAVE_LAYOUT)}, "Error layout"}
+            // 17.37302728 * 1700 ~= 29534
     };
 
     executeTests(tests);
@@ -325,9 +324,8 @@ TEST_F(ComplexOpsCollectionTestsNPU40, NormL2CCheckForInvalidParamsError) {
             {{shaveOp, swl_2},
              {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
              "Error more than one params"},  // 17.37302728 * 1700 ~= 29534
-            {{shaveOp, swl_3},
-             {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)},
-             "Error different param"}  // 17.37302728 * 1700 ~= 29534
+            {{shaveOp, swl_3}, {V(Cycles::ERROR_SHAVE_PARAMS), V(Cycles::ERROR_SHAVE_PARAMS)}, "Error different param"}
+            // 17.37302728 * 1700 ~= 29534
     };
 
     executeTests(tests);
@@ -653,14 +651,15 @@ TEST_F(ShaveCollectionTest, DefaultCaseTestNPU50) {
 TEST_F(ShaveCollectionTest, InstanceHolderWithFloatFactors) {
     // Thread-local storage for test factors (to avoid static member issues in local class)
     thread_local std::unordered_map<std::string, ShaveSpeedUpFactorType> g_test_factors;
-    
+
     // Define a custom PopulatedFactorsLUT class for testing with specific factors
     class CustomTestPopulatedFactorsLUT : public FactorsLookUpTable {
     public:
         CustomTestPopulatedFactorsLUT() {
             populate();
         }
-    private:        
+
+    private:
         void populate() {
             // Populate with the thread-local test factors
             for (const auto& [name, factor] : g_test_factors) {
@@ -672,13 +671,12 @@ TEST_F(ShaveCollectionTest, InstanceHolderWithFloatFactors) {
     ShaveInstanceHolder_Mock_NPU50 ih;
     const DeviceShaveContainer& list_without_factors = ih.getContainer();
     // add a set of functions to test
-    const std::vector<std::string> functions = {
-        "add", "sub", "sigmoid", "abs", "clamp", "cos", "cumsum", 
-        "hsigmoid", "elu", "mish", "floor", "erf", "exp", "sqrt", "ceiling",
-        "logicalnot", "log", "acos", "acosh", "asin", "asinh", "atan", "atanh"
-    };
+    const std::vector<std::string> functions = {"add",    "sub",      "sigmoid", "abs",        "clamp", "cos",
+                                                "cumsum", "hsigmoid", "elu",     "mish",       "floor", "erf",
+                                                "exp",    "sqrt",     "ceiling", "logicalnot", "log",   "acos",
+                                                "acosh",  "asin",     "asinh",   "atan",       "atanh"};
 
-    //filter functions that actually exist (just in case)
+    // filter functions that actually exist (just in case)
     std::vector<std::string> existing_functions;
     for (const auto& fn : functions) {
         if (list_without_factors.existsShave(fn)) {
@@ -690,15 +688,16 @@ TEST_F(ShaveCollectionTest, InstanceHolderWithFloatFactors) {
 
     size_t nr_functions_with_factors = functions.size() / 2;
     const float speedup = 2.0f;
-    
+
     // Set up the test factors
     g_test_factors.clear();
     for (size_t i = 0; i < nr_functions_with_factors; i++) {
         g_test_factors.emplace(functions[i], speedup);
     }
-    
+
     // use ShaveInstanceHolderWithFactors with the custom populate class
-    ShaveInstanceHolderWithFactors<CustomTestPopulatedFactorsLUT, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0> fih;
+    ShaveInstanceHolderWithFactors<CustomTestPopulatedFactorsLUT, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0>
+            fih;
     const DeviceShaveContainer& list_with_factors = fih.getContainer();
 
     for (const std::string& fn : existing_functions) {
@@ -717,12 +716,14 @@ TEST_F(ShaveCollectionTest, InstanceHolderWithFloatFactors) {
         ASSERT_NO_THROW(cycles = shaveOp.dpuCycles(swl)) << "Failed to get cycles for function: " << fn;
         ASSERT_NO_THROW(factor_cycles = factor_shaveOp.dpuCycles(swl))
                 << "Failed to get factor cycles for function: " << fn;
-        
+
         // Check if this function should have speedup applied
-        auto end_of_list_with_factors = existing_functions.begin() + nr_functions_with_factors; // iterator to the end of the functions with factors
+        auto end_of_list_with_factors = existing_functions.begin() +
+                                        nr_functions_with_factors;  // iterator to the end of the functions with factors
         // check if fn is in the boundaries of list with factors
-        bool should_have_speedup = std::find(existing_functions.begin(), end_of_list_with_factors, fn) != end_of_list_with_factors;
-        
+        bool should_have_speedup =
+                std::find(existing_functions.begin(), end_of_list_with_factors, fn) != end_of_list_with_factors;
+
         // For functions with speedup factor, expect reduced cycles
         if (should_have_speedup) {
             // This function should have speedup applied
@@ -745,7 +746,8 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
     using ShaveInstanceHolder_NPU40_WithFactors =
             ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_NPU40, VPUDevice::VPU_4_0>;
     using ShaveInstanceHolder_NPU50_WithFactors =
-            ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_Mock_NPU50, VPUDevice::NPU_5_0>;
+            ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_Mock_NPU50,
+                                           VPUDevice::NPU_5_0>;
 
     // Test NPU 4.0 with factors - check which functions have non-default factors
     {
@@ -816,7 +818,9 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
 
     // Test that ShaveInstanceHolderWithFactors constructor doesn't throw
     {
-        using TestHolderType = ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_NPU50, VPUDevice::NPU_5_0>; // avoid treating template comma as macro arguments
+        using TestHolderType =
+                ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_NPU5, ShaveInstanceHolder_NPU50,
+                                               VPUDevice::NPU_5_0>;  // avoid treating template comma as macro arguments
         EXPECT_NO_THROW(TestHolderType test_holder = TestHolderType{})
                 << "ShaveInstanceHolderWithFactors constructor should not throw";
     }
@@ -841,183 +845,163 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
 
     // Test that ShaveInstanceHolderWithFactors for heuristic models can be instantiated
     {
-        using TestHolderType = ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50, VPUDevice::NPU_5_0>;
+        using TestHolderType = ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic,
+                                                              ShaveInstanceHolder_HeuristicNPU50, VPUDevice::NPU_5_0>;
         EXPECT_NO_THROW(TestHolderType test_holder = TestHolderType{})
                 << "ShaveInstanceHolderWithFactors for heuristic models should not throw";
     }
 }
 
 TEST_F(ShaveCollectionTest, HeuristicNPU50FactorsDifferenceDirectComparison) {
-    // Test that directly compares ShaveInstanceHolder_HeuristicNPU50 with 
-    // ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50, VPUDevice::NPU_5_0>
-    // to verify speed-up factors are correctly applied
-    
+    // Test that directly compares ShaveInstanceHolder_HeuristicNPU50 with
+    // ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50,
+    // VPUDevice::NPU_5_0> to verify speed-up factors are correctly applied
+
     ShaveInstanceHolder_HeuristicNPU50 holder_no_factors;
-    ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50, VPUDevice::NPU_5_0> holder_with_factors;
-    
+    ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50,
+                                   VPUDevice::NPU_5_0>
+            holder_with_factors;
+
     EXPECT_EQ(holder_no_factors.getDevice(), VPUDevice::NPU_5_0);
     EXPECT_EQ(holder_with_factors.getDevice(), VPUDevice::NPU_5_0);
-    
+
     const DeviceShaveContainer& container_no_factors = holder_no_factors.getContainer();
     const DeviceShaveContainer& container_with_factors = holder_with_factors.getContainer();
-    
+
     // Get the factors lookup table to verify expected values
     PopulatedFactorsLUT_Heuristic factors_lut;
-    
+
     // Test operations from the CSV with their expected speed-up factors
     struct TestCase {
         std::string operation;
         float expected_factor;
     };
-    
-    std::vector<TestCase> test_cases = {
-        {"Convert", 0.08166034723608062f},
-        {"Cos", 1.1482554014355923f},
-        {"Divide", 0.5077813213239347f},
-        {"GridSample", 7.727271210663582f},
-        {"MVN", 1.2743491540214282f},
-        {"Multiply", 0.31000275558004964f},
-        {"Power", 0.6637379189155266f},
-        {"SDPAExtended", 1.529963043406371f},
-        {"Select", 1.9981458187103271f},
-        {"Sin", 1.1723659585399842f},
-        {"Softmax", 3.033128212865472f},
-        {"Sqrt", 0.8798144593730005f},
-        {"Subtract", 0.9027251763200862f},
-        {"Swish", 1.3244884910485935f},
-        {"TopK", 0.08432105639965f}
-    };
-    
+
+    std::vector<TestCase> test_cases = {{"Convert", 0.08166034723608062f}, {"Cos", 1.1482554014355923f},
+                                        {"Divide", 0.5077813213239347f},   {"GridSample", 7.727271210663582f},
+                                        {"MVN", 1.2743491540214282f},      {"Multiply", 0.31000275558004964f},
+                                        {"Power", 0.6637379189155266f},    {"SDPAExtended", 1.529963043406371f},
+                                        {"Select", 1.9981458187103271f},   {"Sin", 1.1723659585399842f},
+                                        {"Softmax", 3.033128212865472f},   {"Sqrt", 0.8798144593730005f},
+                                        {"Subtract", 0.9027251763200862f}, {"Swish", 1.3244884910485935f},
+                                        {"TopK", 0.08432105639965f}};
+
     // Create test workloads with different sizes
-    std::vector<std::tuple<int, int, int, int>> test_shapes = {
-        {10, 100, 5, 1},
-        {100, 100, 50, 1},
-        {1024, 1, 256, 1},
-        {7, 29, 3, 1}
-    };
-    
+    std::vector<std::tuple<int, int, int, int>> test_shapes = {{10, 100, 5, 1},
+                                                               {100, 100, 50, 1},
+                                                               {1024, 1, 256, 1},
+                                                               {7, 29, 3, 1}};
+
     size_t tests_executed = 0;
     size_t tests_with_difference = 0;
-    
+
     for (const auto& test_case : test_cases) {
         const std::string& op_name = test_case.operation;
-        
+
         // Check if operation exists in both containers
         if (!container_no_factors.existsShave(op_name)) {
             continue;
         }
-        
+
         if (!container_with_factors.existsShave(op_name)) {
             continue;
         }
-        
+
         const auto& shave_no_factors = container_no_factors.getShaveExecutor(op_name);
         const auto& shave_with_factors = container_with_factors.getShaveExecutor(op_name);
-        
+
         // Verify the factor from the LUT matches expected
         float lut_factor = factors_lut.getOperatorFactor(op_name);
-        EXPECT_NEAR(lut_factor, test_case.expected_factor, 0.01f) 
-            << "LUT factor for " << op_name << " doesn't match expected CSV value";
-        
+        EXPECT_NEAR(lut_factor, test_case.expected_factor, 0.01f)
+                << "LUT factor for " << op_name << " doesn't match expected CSV value";
+
         for (const auto& [w, h, c, b] : test_shapes) {
             try {
-                SHAVEWorkload swl(op_name, VPUDevice::NPU_5_0, 
-                                {VPUTensor(w, h, c, b, DataType::FLOAT16)},
-                                {VPUTensor(w, h, c, b, DataType::FLOAT16)});
-                
+                SHAVEWorkload swl(op_name, VPUDevice::NPU_5_0, {VPUTensor(w, h, c, b, DataType::FLOAT16)},
+                                  {VPUTensor(w, h, c, b, DataType::FLOAT16)});
+
                 CyclesInterfaceType cycles_no_factors = shave_no_factors.dpuCycles(swl);
                 CyclesInterfaceType cycles_with_factors = shave_with_factors.dpuCycles(swl);
-                
+
                 tests_executed++;
-                
-                
-                
+
                 if (cycles_no_factors != cycles_with_factors) {
                     tests_with_difference++;
                 }
-                
+
                 // Calculate the actual speed-up ratio
-                float actual_ratio = (cycles_with_factors > 0) 
-                    ? static_cast<float>(cycles_no_factors) / static_cast<float>(cycles_with_factors)
-                    : 0.0f;
-                
+                float actual_ratio = (cycles_with_factors > 0) ? static_cast<float>(cycles_no_factors) /
+                                                                         static_cast<float>(cycles_with_factors)
+                                                               : 0.0f;
+
                 // The actual ratio should be close to the expected factor
                 // Allow 1% tolerance for rounding in the factor application
                 EXPECT_NEAR(actual_ratio, test_case.expected_factor, test_case.expected_factor * 0.01f)
-                    << "Operation: " << op_name 
-                    << ", Shape: [" << w << ", " << h << ", " << c << ", " << b << "]"
-                    << ", Expected factor: " << test_case.expected_factor
-                    << ", Actual ratio: " << actual_ratio;
-                
+                        << "Operation: " << op_name << ", Shape: [" << w << ", " << h << ", " << c << ", " << b << "]"
+                        << ", Expected factor: " << test_case.expected_factor << ", Actual ratio: " << actual_ratio;
+
             } catch (const std::exception&) {
                 // Some operations might not support all workload shapes
                 continue;
             }
         }
     }
-    
+
     EXPECT_GT(tests_executed, 0) << "No valid tests were executed";
-    EXPECT_GT(tests_with_difference, 0) << "Expected at least some operations to have different costs with factors applied";
+    EXPECT_GT(tests_with_difference, 0)
+            << "Expected at least some operations to have different costs with factors applied";
 }
 
 TEST_F(ShaveCollectionTest, NPU5FactorsEquivalentToGetSelector) {
     // Test that for PTL (PopulatedFactorsLUT_NPU5), the ShaveInstanceHolderWithFactors
     // produces the same results as getSelector since all factors are 1.0f (mocked)
-    
+
     // Get the two selectors from ShaveConfiguration
     ShaveConfiguration shave_config;
-    
+
     // selector_50 uses mock_shaves_50 (all factors implicitly 1.0f)
     const ShaveSelector& selector_no_factors = shave_config.getSelector(VPUDevice::NPU_5_0);
-    
+
     // selector_50_with_factors uses ShaveInstanceHolder_NPU50_WithFactors (PTL with all factors = 1.0f)
     const ShaveSelector& selector_with_factors = shave_config.getSelectorWithFactors(VPUDevice::NPU_5_0);
-    
+
     // Get list of available functions from the selector without factors
     std::vector<std::string> available_functions = selector_no_factors.getShaveList();
     ASSERT_GT(available_functions.size(), 0) << "No shave functions available for NPU_5_0";
-    
+
     // Test a variety of workloads for each function
     std::vector<SHAVEWorkload> test_workloads;
-    
+
     // Create diverse test workloads with different tensor shapes
     const std::vector<std::tuple<int, int, int, int>> test_shapes = {
-        {10, 100, 5, 1},
-        {1, 1, 5, 1},
-        {100, 100, 50, 1},
-        {7, 29, 3, 1},
-        {344, 1, 250, 1},
-        {36, 1, 25, 1}
-    };
-    
+            {10, 100, 5, 1}, {1, 1, 5, 1}, {100, 100, 50, 1}, {7, 29, 3, 1}, {344, 1, 250, 1}, {36, 1, 25, 1}};
+
     size_t tests_passed = 0;
     size_t tests_total = 0;
-    
-    for (const auto& fn : available_functions) {        
+
+    for (const auto& fn : available_functions) {
         const auto& shave_op_no_factors = selector_no_factors.getShaveFuntion(fn);
         const auto& shave_op_with_factors = selector_with_factors.getShaveFuntion(fn);
-        
+
         for (const auto& [w, h, c, b] : test_shapes) {
-            SHAVEWorkload swl(fn, VPUDevice::NPU_5_0, 
-                            {VPUTensor(w, h, c, b, DataType::FLOAT16)},
-                            {VPUTensor(w, h, c, b, DataType::FLOAT16)});
-            
+            SHAVEWorkload swl(fn, VPUDevice::NPU_5_0, {VPUTensor(w, h, c, b, DataType::FLOAT16)},
+                              {VPUTensor(w, h, c, b, DataType::FLOAT16)});
+
             CyclesInterfaceType cycles_no_factors = 0;
             CyclesInterfaceType cycles_with_factors = 0;
-            
+
             try {
                 cycles_no_factors = shave_op_no_factors.dpuCycles(swl);
                 cycles_with_factors = shave_op_with_factors.dpuCycles(swl);
-                
+
                 tests_total++;
-                
+
                 // Since all PTL factors are 1.0f (mocked), results should be identical
                 EXPECT_EQ(cycles_no_factors, cycles_with_factors)
-                    << "Function: " << fn 
-                    << ", Shape: [" << w << ", " << h << ", " << c << ", " << b << "]"
-                    << ", cycles_no_factors: " << cycles_no_factors
-                    << ", cycles_with_factors: " << cycles_with_factors;
-                
+                        << "Function: " << fn << ", Shape: [" << w << ", " << h << ", " << c << ", " << b << "]"
+                        << ", cycles_no_factors: " << cycles_no_factors
+                        << ", cycles_with_factors: " << cycles_with_factors;
+
                 if (cycles_no_factors == cycles_with_factors) {
                     tests_passed++;
                 }
@@ -1027,7 +1011,7 @@ TEST_F(ShaveCollectionTest, NPU5FactorsEquivalentToGetSelector) {
             }
         }
     }
-    
+
     EXPECT_GT(tests_passed, 0) << "No valid tests were executed";
     EXPECT_EQ(tests_passed, tests_total) << "Some tests failed the equivalence check";
 }
@@ -1036,109 +1020,94 @@ TEST_F(ShaveCollectionTest, HeuristicNPU50FactorsDifference) {
     // Test that PopulatedFactorsLUT_Heuristic applies speed-up factors correctly
     // by comparing costs between ShaveInstanceHolder_HeuristicNPU50 (no factors)
     // and ShaveInstanceHolder_HeuristicNPU50_WithFactors (with speed-up factors from CSV)
-    
+
     ShaveInstanceHolder_HeuristicNPU50 holder_no_factors;
     ShaveInstanceHolder_HeuristicNPU50_WithFactors holder_with_factors;
-    
+
     EXPECT_EQ(holder_no_factors.getDevice(), VPUDevice::NPU_5_0);
     EXPECT_EQ(holder_with_factors.getDevice(), VPUDevice::NPU_5_0);
-    
+
     const DeviceShaveContainer& container_no_factors = holder_no_factors.getContainer();
     const DeviceShaveContainer& container_with_factors = holder_with_factors.getContainer();
-    
+
     // Get the factors lookup table to know expected speed-up values
     PopulatedFactorsLUT_Heuristic factors_lut;
-    
+
     // Test operations that are in the CSV with non-1.0 factors
     struct TestCase {
         std::string operation;
         float expected_factor;
     };
-    
-    std::vector<TestCase> test_cases = {
-        {"Convert", 0.08166034723608062f},
-        {"Cos", 1.1482554014355923f},
-        {"Divide", 0.5077813213239347f},
-        {"GridSample", 7.727271210663582f},
-        {"MVN", 1.2743491540214282f},
-        {"Multiply", 0.31000275558004964f},
-        {"Power", 0.6637379189155266f},
-        {"SDPAExtended", 1.529963043406371f},
-        {"Select", 1.9981458187103271f},
-        {"Sin", 1.1723659585399842f},
-        {"Softmax", 3.033128212865472f},
-        {"Sqrt", 0.8798144593730005f},
-        {"Subtract", 0.9027251763200862f},
-        {"Swish", 1.3244884910485935f},
-        {"TopK", 0.08432105639965f}
-    };
-    
+
+    std::vector<TestCase> test_cases = {{"Convert", 0.08166034723608062f}, {"Cos", 1.1482554014355923f},
+                                        {"Divide", 0.5077813213239347f},   {"GridSample", 7.727271210663582f},
+                                        {"MVN", 1.2743491540214282f},      {"Multiply", 0.31000275558004964f},
+                                        {"Power", 0.6637379189155266f},    {"SDPAExtended", 1.529963043406371f},
+                                        {"Select", 1.9981458187103271f},   {"Sin", 1.1723659585399842f},
+                                        {"Softmax", 3.033128212865472f},   {"Sqrt", 0.8798144593730005f},
+                                        {"Subtract", 0.9027251763200862f}, {"Swish", 1.3244884910485935f},
+                                        {"TopK", 0.08432105639965f}};
+
     // Create diverse test workloads
-    std::vector<std::tuple<int, int, int, int>> test_shapes = {
-        {10, 100, 5, 1},
-        {100, 100, 50, 1},
-        {1024, 1, 256, 1},
-        {7, 29, 3, 1}
-    };
-    
+    std::vector<std::tuple<int, int, int, int>> test_shapes = {{10, 100, 5, 1},
+                                                               {100, 100, 50, 1},
+                                                               {1024, 1, 256, 1},
+                                                               {7, 29, 3, 1}};
+
     size_t tests_executed = 0;
     size_t tests_with_difference = 0;
-    
+
     for (const auto& test_case : test_cases) {
         const std::string& op_name = test_case.operation;
-        
+
         // Check if operation exists in both containers
         if (!container_no_factors.existsShave(op_name) || !container_with_factors.existsShave(op_name)) {
             continue;
         }
-        
+
         const auto& shave_no_factors = container_no_factors.getShaveExecutor(op_name);
         const auto& shave_with_factors = container_with_factors.getShaveExecutor(op_name);
-        
+
         // Verify the factor from the LUT matches expected
         float lut_factor = factors_lut.getOperatorFactor(op_name);
-        EXPECT_NEAR(lut_factor, test_case.expected_factor, 0.01f) 
-            << "LUT factor for " << op_name << " doesn't match expected CSV value";
-        
+        EXPECT_NEAR(lut_factor, test_case.expected_factor, 0.01f)
+                << "LUT factor for " << op_name << " doesn't match expected CSV value";
+
         for (const auto& [w, h, c, b] : test_shapes) {
             try {
-                SHAVEWorkload swl(op_name, VPUDevice::NPU_5_0, 
-                                {VPUTensor(w, h, c, b, DataType::FLOAT16)},
-                                {VPUTensor(w, h, c, b, DataType::FLOAT16)});
-                
+                SHAVEWorkload swl(op_name, VPUDevice::NPU_5_0, {VPUTensor(w, h, c, b, DataType::FLOAT16)},
+                                  {VPUTensor(w, h, c, b, DataType::FLOAT16)});
+
                 CyclesInterfaceType cycles_no_factors = shave_no_factors.dpuCycles(swl);
                 CyclesInterfaceType cycles_with_factors = shave_with_factors.dpuCycles(swl);
-                
+
                 tests_executed++;
-                
-                
-                
+
                 if (cycles_no_factors != cycles_with_factors) {
                     tests_with_difference++;
                 }
-                
+
                 // Calculate the actual speed-up ratio
-                float actual_ratio = (cycles_no_factors > 0) 
-                    ? static_cast<float>(cycles_no_factors) / static_cast<float>(cycles_with_factors)
-                    : 0.0f;
-                
+                float actual_ratio = (cycles_no_factors > 0) ? static_cast<float>(cycles_no_factors) /
+                                                                       static_cast<float>(cycles_with_factors)
+                                                             : 0.0f;
+
                 // The actual ratio should be close to the expected factor
                 // Allow 1% tolerance for rounding in the factor application
                 EXPECT_NEAR(actual_ratio, test_case.expected_factor, test_case.expected_factor * 0.01f)
-                    << "Operation: " << op_name 
-                    << ", Shape: [" << w << ", " << h << ", " << c << ", " << b << "]"
-                    << ", Expected factor: " << test_case.expected_factor
-                    << ", Actual ratio: " << actual_ratio;
-                
+                        << "Operation: " << op_name << ", Shape: [" << w << ", " << h << ", " << c << ", " << b << "]"
+                        << ", Expected factor: " << test_case.expected_factor << ", Actual ratio: " << actual_ratio;
+
             } catch (const std::exception&) {
                 // Some operations might not support all workload shapes
                 continue;
             }
         }
     }
-    
+
     EXPECT_GT(tests_executed, 0) << "No valid tests were executed";
-    EXPECT_GT(tests_with_difference, 0) << "Expected at least some operations to have different costs with factors applied";
+    EXPECT_GT(tests_with_difference, 0)
+            << "Expected at least some operations to have different costs with factors applied";
 }
 
 TEST_F(ShaveCollectionTest, EqualSpecialCase) {
@@ -1380,6 +1349,7 @@ TEST_F(ShaveCollectionTest, instanceHolder27_Classic_Smoke) {
     }
 }
 
+
 class ShaveDevicesTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -1429,11 +1399,12 @@ protected:
     }
 
     ShaveModelSweepTest()
-        : modelUnroll16(VPUNN::DataType::FLOAT16, 0.00030019021391918926f, 5.661592644465712f, 0.0259999999999998f,
-                        3.18080481815654f, 8, 16, 1300, 975),
-          modelUnroll8(VPUNN::DataType::FLOAT16, 0.0001398f, 2.740062f, 0.208f, 0.590509f, 8, 8, 1300, 975),
-          modelNoUnroll(VPUNN::DataType::FLOAT16, 0.000579f, 2.395082f, 0.078f, 0.0f, 8, 1, 1300, 975),
-          model() {}
+            : modelUnroll16(VPUNN::DataType::FLOAT16, 0.00030019021391918926f, 5.661592644465712f, 0.0259999999999998f,
+                            3.18080481815654f, 8, 16, 1300, 975),
+              modelUnroll8(VPUNN::DataType::FLOAT16, 0.0001398f, 2.740062f, 0.208f, 0.590509f, 8, 8, 1300, 975),
+              modelNoUnroll(VPUNN::DataType::FLOAT16, 0.000579f, 2.395082f, 0.078f, 0.0f, 8, 1, 1300, 975),
+              model() {
+    }
 
     ShaveModel1to1 modelUnroll16;
     ShaveModel1to1 modelUnroll8;

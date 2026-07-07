@@ -48,7 +48,6 @@ target_sources(npu_costmodel
         vpu_cost_model.cpp
         vpu_layer_cost_model.cpp
         vpu_dma_cost_model.cpp
-        vpu_network_cost_model.cpp
         vpu_shave_cost_model.cpp
 )
 

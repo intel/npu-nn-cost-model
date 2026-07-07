@@ -10,6 +10,7 @@
 #ifndef DMA_COST_SERIALIZATION_WRAPPER_H
 #define DMA_COST_SERIALIZATION_WRAPPER_H
 
+#include "vpu/dma_descriptors.h"
 #include "vpu/serialization/serialization_wrapper.h"
 namespace VPUNN {
 template <class DMADesc>
@@ -27,6 +28,30 @@ private:
                 serializer.serialize(SerializableField{"src_plane_stride", wl.src_plane_stride});
                 serializer.serialize(SerializableField{"dst_plane_stride", wl.dst_plane_stride});
                 serializer.serialize(SerializableField{"transfer_direction", wl.transfer_direction});
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                serializer.clean_buffers();
+            }
+        }
+    }
+
+    void serialize_workload(const VPUDMADescriptor& desc) {
+        if (serializer.is_serialization_enabled()) {
+            try {
+                auto serializeTensor = [&](const std::string& prefix, const VPUDMATensor& t) {
+                    serializer.serialize(SerializableField<DataType>{prefix + "dtype", t.dtype});
+                    serializer.serialize(SerializableField<int>{prefix + "num_dims", t.num_dims});
+                    for (int d = 0; d < VPU_DMA_MAX_DIMS; ++d)
+                        serializer.serialize(SerializableField<int32_t>{
+                                prefix + "shape_" + std::to_string(d), t.shape[d]});
+                    for (int d = 0; d < VPU_DMA_MAX_DIMS; ++d)
+                        serializer.serialize(SerializableField<int32_t>{
+                                prefix + "stride_" + std::to_string(d), t.byte_strides[d]});
+                };
+                serializeTensor("src_", desc.src);
+                serializeTensor("dst_", desc.dst);
+                serializer.serialize(SerializableField<MemoryLocation>{"src_location", desc.src_location});
+                serializer.serialize(SerializableField<MemoryLocation>{"dst_location", desc.dst_location});
             } catch (const std::exception& e) {
                 Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
                 serializer.clean_buffers();

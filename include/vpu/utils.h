@@ -13,6 +13,7 @@
 #define UNUSED(expr) (void)(expr)
 
 #include <vpu/cycles_interface_types.h>
+#include <vpu/dpu_types.h>
 #include <algorithm>
 #include <cassert>
 #include <functional>
@@ -125,6 +126,49 @@ T ceil_division(T a, T b) {
 template <class T>
 T round_up(T a, T b) {
     return ((a + b - 1) / b) * b;
+}
+
+/**
+ * @brief Depthwise-style channel alignment for DW_CONVOLUTION, MAXPOOL and AVEPOOL.
+ *
+ * Maps an output channel count to the required input channel count:
+ *   - channels <= 16  → 16          (minimum DW channel alignment)
+ *   - channels >  16  → round_up(channels, 32)  (next multiple of 32)
+ *
+ * @param channels output channel count (unsigned)
+ * @return unsigned int aligned input channel count
+ */
+inline unsigned int dw_channel_align(unsigned int channels) {
+    if (channels <= 16u)
+        return 16u;
+    return round_up(channels, 32u);
+}
+
+/**
+ * @brief ELTWISE-style channel alignment.
+ *
+ * Rounds up the output channel count to the next multiple of 16.
+ * Used for ELTWISE (and CONVOLUTION descriptor) autopad channel coupling.
+ *
+ * @param channels output channel count (unsigned)
+ * @return unsigned int aligned channel count (next multiple of 16)
+ */
+inline unsigned int eltwise_channel_align(unsigned int channels) {
+    return round_up(channels, 16u);
+}
+
+/**
+ * @brief Checks if the operation belongs to the depthwise convolution family (DW_CONVOLUTION, AVEPOOL, MAXPOOL)
+ */
+inline bool is_dwconv_family_operation(Operation op) {
+    return op == Operation::DW_CONVOLUTION || op == Operation::AVEPOOL || op == Operation::MAXPOOL;
+}
+
+/// @brief Checks if the operation requires channel alignment
+/// @param op The operation to check
+/// @return true if the operation requires channel alignment, false otherwise
+inline bool is_alignment_required_operation(Operation op) {
+    return is_dwconv_family_operation(op) || op == Operation::ELTWISE;
 }
 
 /**

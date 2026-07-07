@@ -453,8 +453,12 @@ public:
                                        unsigned int rounding /*= 16*/) const {
         const unsigned int output_size = outputs[0].channels();
 
-        // Round up to a multiple of 16(rounding) channels
-        const unsigned int max_tile_channels{round_up(ceil_division(output_size, nTiles), rounding)};
+        // When output_autopad is set, any channel count is valid (ODU handles unaligned channels), so no rounding is
+        // needed. Using rounding=1 gives the most balanced split for unaligned total channel counts.
+        const unsigned int effective_rounding = is_output_autopad() ? 1U : rounding;
+
+        // Round up to a multiple of effective_rounding channels
+        const unsigned int max_tile_channels{round_up(ceil_division(output_size, nTiles), effective_rounding)};
 
         const auto& shape = outputs[0].get_shape();
 

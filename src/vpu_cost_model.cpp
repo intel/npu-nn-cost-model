@@ -10,14 +10,16 @@
 #include "vpu_cost_model.h"
 
 #include <algorithm>
-#include <memory>  // for std::make_shared, std::make_unique
+#include <memory>
 #include <mutex>
-#include <optional>   // for std::optional (if needed)
-#include <stdexcept>  // for std::runtime_error
-#include <string>     // for std::string, std::stoi
-#include <tuple>      // for std::tuple, std::make_tuple
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <tuple>
 #include "core/logger.h"
 #include "core/utils.h"
+#include "vpu/dma_descriptor_transformers.h"
+#include "vpu/serialization/dma_cost_serialization_wrapper.h"
 #include "vpu/serialization/l1_cost_serialization_wrapper.h"
 #include "vpu/shave/shave_collection.h"
 #include "vpu/types.h"
@@ -29,8 +31,7 @@
 namespace VPUNN {
 
 void VPUCostModel::channels_preserving_operations_consistency_check(DPUWorkload& workload) const {
-    if (workload.op == Operation::ELTWISE || workload.op == Operation::DW_CONVOLUTION ||
-        workload.op == Operation::MAXPOOL || workload.op == Operation::AVEPOOL) {
+    if (is_alignment_required_operation(workload.op)) {
         if (!workload.is_output_autopad() && workload.outputs[0].channels() >= 16) {
             if (workload.inputs[0].channels() != workload.outputs[0].channels()) {
                 Logger::warning() << "Changed channels from " << workload.inputs[0].channels() << " to "
@@ -88,13 +89,14 @@ VPUCostModel::VPUCostModel(const std::string& filename, bool profile, const unsi
           ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_filename, cache_size)),
           http_dpu_cost_provider(HttpCostProviderFactory::create()) {
     Logger::initialize();
+    dma_descriptor_serializer.initialize(VPUDMADescriptor::get_wl_name(), FileMode::READ_WRITE,
+                                         VPUDMADescriptor::get_names_for_serializer());
 
     if (!dpu_nn_cost_provider.is_initialized()) {
         return;
     }
 
-    serializer.initialize("l1_dpu_workloads", FileMode::READ_WRITE,
-                          dpu_nn_cost_provider.get_names_for_serializer());
+    serializer.initialize("l1_dpu_workloads", FileMode::READ_WRITE, dpu_nn_cost_provider.get_names_for_serializer());
 }
 
 VPUCostModel::VPUCostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile,
@@ -106,6 +108,8 @@ VPUCostModel::VPUCostModel(const char* model_data, size_t model_data_length, boo
                   std::make_shared<SHAVECostModel>(shave_cache_data, shave_cache_data_length, cache_size)),
           http_dpu_cost_provider(HttpCostProviderFactory::create()) {
     Logger::initialize();
+    dma_descriptor_serializer.initialize(VPUDMADescriptor::get_wl_name(), FileMode::READ_WRITE,
+                                         VPUDMADescriptor::get_names_for_serializer());
 
     if (!dpu_nn_cost_provider.is_initialized()) {
         return;
@@ -177,8 +181,8 @@ CyclesInterfaceType VPUCostModel::run_cost_providers(const DPUWorkload& workload
     const auto try_profiling = [&]() -> CyclesInterfaceType {
         if (http_dpu_cost_provider) {
             if (cost_source) {
-                *cost_source =
-                        "profiling_service_" + http_dpu_cost_provider->profilingBackendToString(workload.profiling_service_backend_hint);
+                *cost_source = "profiling_service_" + http_dpu_cost_provider->profilingBackendToString(
+                                                              workload.profiling_service_backend_hint);
             }
 
             auto dpu_op = DPUOperation(workload, sanitizer.getDeviceConfiguration(workload.device));
@@ -305,6 +309,12 @@ CyclesInterfaceType VPUCostModel::DPU(DPUWorkload wl, std::string& info) const {
 CyclesInterfaceType VPUCostModel::DPU_and_sanitize(DPUWorkload& wl, std::string& info) const {
     swizzling_turn_OFF(wl);  // swizz guard sanitization
 
+    // force this consistency here, before serialization, so we serialize a more normal workload.
+    if (wl.mpe_engine == MPEEngine::DCIM) {
+        if (!is_dcim_execution_mode(wl.execution_order)) {
+            wl.execution_order = ExecutionMode::dCIM_32x128;  // safe default
+        }
+    }
 
     L1CostSerializationWrap serialization_handler(serializer);
 
@@ -388,11 +398,37 @@ unsigned int VPUCostModel::DMA(VPUDevice device, const VPUTensor& input, const V
                                MemoryLocation input_location, MemoryLocation output_location,
                                unsigned int output_write_tiles) const {
     // Call the helper function. TO DO Adjust theoretical based on some measured data!
-    return dma_theoretical.get_cost({device, input, output, input_location, output_location, output_write_tiles});
+    return dma_1D_theoretical.get_cost({device, input, output, input_location, output_location, output_write_tiles});
 }
 
 unsigned int VPUCostModel::DMA(const DMAWorkload& wl) const {
     return DMA(wl.device, wl.input, wl.output, wl.input_location, wl.output_location, wl.output_write_tiles);
+}
+
+CyclesInterfaceType VPUCostModel::DMA(const VPUDMADescriptor& desc) const {
+    DMACostSerializationWrap<VPUDMADescriptor> serialization_handler(dma_descriptor_serializer);
+    serialization_handler.serializeDMAWorkload(desc);
+
+    std::string cost_source = "unknown";
+    bool is_cost_relevant = true;  // relevant to run the model, no errors yet
+    CyclesInterfaceType cycles{Cycles::ERROR_INVALID_INPUT_CONFIGURATION};
+    try {
+        desc.checkDescriptorSanity();  // throws for now, in the future maybe we want to handle it more contained
+    } catch (const std::exception& e) {
+        Logger::warning() << "Invalid VPUDMADescriptor passed to VPUCostModel::DMA: " << e.what();
+        cycles = Cycles::ERROR_INVALID_INPUT_CONFIGURATION;
+        is_cost_relevant = false;  // not relevant to run the model, we already have an error to report
+    }
+    if (is_cost_relevant) {
+        // const DMAWorkload wl = DMADescriptorTransformer::fromVPUDMADescriptor_to_DMAWorkload(desc);
+        cycles = dma_strided_theoretical.get_cost(desc, &cost_source);
+    }
+
+    // build an info text based on cycles
+    std::string info = Cycles::toErrorText(cycles);
+
+    serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(cost_source), info);
+    return cycles;
 }
 
 CyclesInterfaceType VPUCostModel::SHAVE(const SHAVEWorkload& shave_wl, std::string& infoOut) const {
@@ -405,6 +441,10 @@ CyclesInterfaceType VPUCostModel::SHAVE(const SHAVEWorkload& shave_wl) const {
 
 std::vector<std::string> VPUCostModel::getShaveSupportedOperations(VPUDevice device) const {
     return internal_shave_cost_model.getShaveSupportedOperations(device);
+}
+
+std::vector<std::string> VPUCostModel::queryDeviceMappedSupportedOperations(VPUDevice device) {
+    return SHAVECostModel::queryDeviceMappedSupportedOperations(device);
 }
 
 const ShaveOpExecutor& VPUCostModel::getShaveInstance(std::string name, VPUDevice device) const {
@@ -439,8 +479,7 @@ DPUInfoPack VPUCostModel::DPUInfo(const DPUWorkload& workload) const {
 }
 
 bool VPUCostModel::is_linearly_extrapolation_necessary(const DPUWorkload& wl) const {
-    const bool is_intratile_like_op{wl.op == Operation::AVEPOOL || wl.op == Operation::DW_CONVOLUTION ||
-                                    wl.op == Operation::MAXPOOL};
+    const bool is_intratile_like_op{is_dwconv_family_operation(wl.op)};
 
     const bool is_ch_greater_than_64{wl.inputs[0].channels() > 64};
 

@@ -31,11 +31,7 @@ DPUWorkload TilingPrimitives::createIncompleteTile(const DPULayer& layer, const 
 
 bool TilingPrimitives::requireMaxZTile(const DPULayer& layer) {
     if (layer.device >= VPUDevice::VPU_2_7) {
-        if (                                          /*layer.op == Operation::CM_CONVOLUTION || */
-            layer.op == Operation::MAXPOOL ||         //
-            layer.op == Operation::DW_CONVOLUTION ||  //
-            layer.op == Operation::AVEPOOL            //
-        ) {
+        if (is_dwconv_family_operation(layer.op)) {
             return true;
         }
     }

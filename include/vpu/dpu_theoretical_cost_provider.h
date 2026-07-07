@@ -190,7 +190,9 @@ public:
             cycles = ceil_division(multiply_vector(wl.inputs[0].get_shape()), (nr_ppe / mt));
         }
         // For CONV, we multiply over the input channels and remove padding, always treated as sparse
-        if (wl.op == Operation::CONVOLUTION || wl.op == Operation::CM_CONVOLUTION) {
+        if (wl.op == Operation::CONVOLUTION || wl.op == Operation::CM_CONVOLUTION      //
+            || wl.op == Operation::REDUCE_MS || wl.op == Operation::REDUCE_SUMSQUARES  // same as conv 1x1.
+        ) {
             cycles *= (unsigned long int)inp_channels;
             cycles -= PaddingSkipCycles(wl);
         } else {

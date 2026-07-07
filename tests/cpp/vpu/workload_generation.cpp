@@ -58,23 +58,22 @@ protected:
         );
     }
 
-    // std::vector<std::tuple<maxWorkloads, maxLatencyUs, nDPU, runtimeOverheat, VPUNN::VPUOptimizationTarget,
-    // VPUNN::VPUSplitStrategy, VPUNN::VPUSplitStrategy>>
-    typedef std::vector<std::tuple<unsigned int, unsigned int, unsigned int, unsigned int, VPUNN::VPUOptimizationTarget,
-                                   VPUNN::VPUSplitStrategy, VPUNN::VPUSplitStrategy>>
+    // std::vector<std::tuple<maxWorkloads, maxLatencyUs, nDPU, runtimeOverhead, VPUNN::VPUSplitStrategy, VPUNN::VPUSplitStrategy>>
+    typedef std::vector<std::tuple<unsigned int, unsigned int, unsigned int, unsigned int, VPUNN::VPUSplitStrategy,
+                                   VPUNN::VPUSplitStrategy>>
             list;
 
     list createCombinations() {
         list tuple_list;
 
-        for (const VPUNN::VPUOptimizationTarget target :
-             {VPUNN::VPUOptimizationTarget::POWER, VPUNN::VPUOptimizationTarget::LATENCY,
-              VPUNN::VPUOptimizationTarget::EFFICIENCY}) {
-            for (const VPUNN::VPUSplitStrategy strategy :
-                 {VPUNN::VPUSplitStrategy::HW_TILING, VPUNN::VPUSplitStrategy::Z_TILING,
-                  VPUNN::VPUSplitStrategy::H_TILING, VPUNN::VPUSplitStrategy::W_TILING}) {
-                tuple_list.push_back(std::make_tuple(1, 1000, 100, 0, target, strategy, strategy));
-                tuple_list.push_back(std::make_tuple(64, 1000, 4, 10, target, strategy, strategy));
+        const std::vector<VPUNN::VPUSplitStrategy> strategies = {
+                VPUNN::VPUSplitStrategy::HW_TILING, VPUNN::VPUSplitStrategy::Z_TILING,
+                VPUNN::VPUSplitStrategy::H_TILING, VPUNN::VPUSplitStrategy::W_TILING};
+
+        for (const VPUNN::VPUSplitStrategy s1 : strategies) {
+            for (const VPUNN::VPUSplitStrategy s2 : strategies) {
+                tuple_list.push_back(std::make_tuple(1, 1000, 100, 0, s1, s2));
+                tuple_list.push_back(std::make_tuple(64, 1000, 4, 10, s1, s2));
             }
         }
 
@@ -173,8 +172,7 @@ TEST_F(WorkloadGeneration, WorkloadGenerationCreateTilerMultipleWLs) {
         options.maxLatencyUs = std::get<1>(i);
         options.maxWorkloads = std::get<0>(i);
         options.runtimeOverhead = std::get<3>(i);
-        options.target = std::get<4>(i);
-        options.availableStrategies = {std::get<5>(i), std::get<6>(i)};
+        options.availableStrategies = {std::get<4>(i), std::get<5>(i)};
 
         for (auto model : {&model_theoretical, &model_2_0, &model_2_7}) {
             // Get the tiler
@@ -182,78 +180,22 @@ TEST_F(WorkloadGeneration, WorkloadGenerationCreateTilerMultipleWLs) {
             auto layer = generate_helper_layer(make_compatible_device(model), 56, 64);
 
             std::unique_ptr<VPUNN::IDPUTiler> tiler = VPUNN::DPUTilerFactory::getDPUTiler(*model);
-
-            if (options.target == VPUNN::VPUOptimizationTarget::POWER) {
-                EXPECT_THROW(
-                        {  // block to throw
-                            try {
-                                tiler->intraTileSplit(layer, options);
-                            } catch (std::runtime_error const& err) {
-                                // and this tests that it has the correct message
-                                EXPECT_STREQ("generateSplits: not Handling VPUOptimizationTarget::POWER", err.what())
-                                        << " \n target:" << (int)options.target
-                                        << " \n availableStrategies:" << (int)options.availableStrategies[0]
-                                        << " \n maxWorkloads:" << options.maxWorkloads
-                                        << " \n maxLatencyUs:" << options.maxLatencyUs << " \n nDPU:" << options.nDPU
-                                        << " \n runtimeOverhead:" << options.runtimeOverhead << std::endl
-                                        << " \n Model: " << what_model_is(model) << std::endl
-                                        << layer << std::endl;
-                                throw;
-                            } catch (std::out_of_range const& err) {
-                                // this is here to catch the situation when the WL is not usable with this NN
-                                //@todo: rewrite the test to consider the VPUNNmodel particularities.
-                                std::cout << "\n OUT of RANGE (target=POWER(1)) exception when intraTileSplit(), "
-                                             "probably bad WL input for the VPUNN \n ERR: "
-                                          << err.what() << std::endl
-                                          << layer << std::endl
-                                          << " \n target:" << (int)options.target
-                                          << " \n availableStrategies:" << (int)options.availableStrategies[0]
-                                          << " \n maxWorkloads:" << options.maxWorkloads
-                                          << " \n maxLatencyUs:" << options.maxLatencyUs << " \n nDPU:" << options.nDPU
-                                          << " \n runtimeOverhead:" << options.runtimeOverhead << std::endl
-                                          << " \n Model: " << what_model_is(model) << std::endl
-                                          << " \n Throwing a runtime error \"Force Valid\": " << std::endl
-                                          << std::endl;
-                                throw std::runtime_error("Force Valid!");
-                            } catch (...) {
-                                FAIL() << "Expected std::runtime_error"
-                                       << " \n target:" << (int)options.target
-                                       << " \n availableStrategies:" << (int)options.availableStrategies[0]
-                                       << " \n maxWorkloads:" << options.maxWorkloads
-                                       << " \n maxLatencyUs:" << options.maxLatencyUs << " \n nDPU:" << options.nDPU
-                                       << " \n runtimeOverhead:" << options.runtimeOverhead << std::endl
-                                       << " \n Model: " << what_model_is(model) << std::endl
-                                       << std::endl;
-                            }
-                        },  // end of block to throw
-                        std::runtime_error)
-                        << "\n NOT THROWING properly (target=POWER(1))"
-                        << " \n target:" << (int)options.target
-                        << " \n availableStrategies:" << (int)options.availableStrategies[0]
-                        << " \n maxWorkloads:" << options.maxWorkloads << " \n maxLatencyUs:" << options.maxLatencyUs
-                        << " \n nDPU:" << options.nDPU << " \n runtimeOverhead:" << options.runtimeOverhead
-                        << " \n Model: " << what_model_is(model) << std::endl
-                        << std::endl;
-            } else {
-                // Split the layer into multiple workloads
-                try {
-                    auto workloads = tiler->intraTileSplit(layer, options);
-                    // Validate workloads
-                    validate_wl(layer, workloads.second);
-                } catch (std::out_of_range const& err) {
-                    // this is here to catch the situation when the WL is not usable with this NN
-                    //@todo: rewrite the test to consider the VPUNNmodel particularities.
-                    std::cout << "\n  OUT of RANGE (target= rest (0,2) exception when intraTileSplit(), probably bad "
-                                 "WL input for the VPUNN \n ERR: "
-                              << err.what() << std::endl
-                              << layer << " \n target:" << (int)options.target
-                              << " \n availableStrategies:" << (int)options.availableStrategies[0]
-                              << " \n maxWorkloads:" << options.maxWorkloads
-                              << " \n maxLatencyUs:" << options.maxLatencyUs << " \n nDPU:" << options.nDPU
-                              << " \n runtimeOverhead:" << options.runtimeOverhead
-                              << " \n Model: " << what_model_is(model) << std::endl
-                              << std::endl;
-                }
+            // Split the layer into multiple workloads
+            try {
+                auto workloads = tiler->intraTileSplit(layer, options);
+                // Validate workloads
+                validate_wl(layer, workloads.second);
+            } catch (std::out_of_range const& err) {
+                // this is here to catch the situation when the WL is not usable with this NN
+                //@todo: rewrite the test to consider the VPUNNmodel particularities.
+                std::cout << "\n  OUT of RANGE exception when intraTileSplit(), probably bad "
+                             "WL input for the VPUNN \n ERR: "
+                          << err.what() << std::endl
+                          << layer << " \n availableStrategies:" << (int)options.availableStrategies[0]
+                          << " \n maxWorkloads:" << options.maxWorkloads << " \n maxLatencyUs:" << options.maxLatencyUs
+                          << " \n nDPU:" << options.nDPU << " \n runtimeOverhead:" << options.runtimeOverhead
+                          << " \n Model: " << what_model_is(model) << std::endl
+                          << std::endl;
             }
         }
     }

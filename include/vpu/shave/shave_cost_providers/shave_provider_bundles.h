@@ -58,6 +58,42 @@ private:
         };
     }
 
+    /// @brief  Creates the default route provider for devices that do not have a specific provider defined.
+    /// @return std::shared_ptr<IShaveCostProvider> The default route provider instance
+    static std::shared_ptr<IShaveCostProvider> createDefaultRouteProvider() {
+        return createOldSelectorWithNameMappingProvider();
+    }
+
+    /// @brief Creates the provider used for one device in the device-mapped composition.
+    static std::shared_ptr<IShaveCostProvider> createProviderForDevice(VPUDevice device) {
+        switch (device) {
+        case VPUDevice::NPU_5_0:
+            return createCompositeBasedOnHeuristicWithOldNameMappingExtendedOps();
+        case VPUDevice::NPU_5_0_W:
+            return createCompositeBasedOnHeuristicWithOldNameMappingExtendedOps();
+
+        default:
+            return createDefaultRouteProvider();
+        }
+    }
+
+    /// @brief Helper function to create a composite provider with name mapping for specific operations
+    /// @param ops List of operation names to route through the name mapping provider
+    /// @return std::shared_ptr<IShaveCostProvider> The configured composite provider
+    static std::shared_ptr<IShaveCostProvider> createCompositeWithNameMappingForOps(
+            std::initializer_list<const char*> ops) {
+        const auto base_provider = createHeuristicWithFactorsOnlyProvider();
+        const auto name_mapping_provider = createNameMappingOldProvider();
+
+        std::unordered_map<std::string, std::shared_ptr<IShaveCostProvider>> op_to_provider_map;
+        op_to_provider_map.reserve(ops.size());
+        for (const auto* op : ops) {
+            op_to_provider_map.emplace(op, name_mapping_provider);
+        }
+
+        return std::make_shared<CompositeShaveCostProvider>(base_provider, std::move(op_to_provider_map));
+    }
+
 public:
     /**
      * @brief Create the default SHAVE cost provider with priority-based fallback
@@ -133,42 +169,14 @@ public:
      * 
      * @return std::shared_ptr<IShaveCostProvider> Configured composite provider
      */
-    static std::shared_ptr<IShaveCostProvider> createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU_RESERVED() {
-        const auto base_provider = createHeuristicWithFactorsOnlyProvider();
-        const auto name_mapping_provider = createNameMappingOldProvider();
-
-        // Map specific operations to use the name mapping provider
-        const std::unordered_map<std::string, std::shared_ptr<IShaveCostProvider>> op_to_provider_map = {
-            {"DepthToSpace", name_mapping_provider},
-            {"MVN", name_mapping_provider},
-            {"SoftMax", name_mapping_provider}
-        };
-
-        return std::make_shared<CompositeShaveCostProvider>(
-            base_provider, 
-            op_to_provider_map
-        );
+    static std::shared_ptr<IShaveCostProvider> createCompositeBasedOnHeuristicWithOldNameMappingCoreOps() {
+        return createCompositeWithNameMappingForOps({"DepthToSpace", "MVN", "SoftMax"});
     }
 
-    static std::shared_ptr<IShaveCostProvider> createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU5() {
-        const auto base_provider = createHeuristicWithFactorsOnlyProvider();
-        const auto name_mapping_provider = createNameMappingOldProvider();
-
-        // Map specific operations to use the name mapping provider
-        const std::unordered_map<std::string, std::shared_ptr<IShaveCostProvider>> op_to_provider_map = {
-            {"DepthToSpace", name_mapping_provider},
-            {"MVN", name_mapping_provider},
-            {"SoftMax", name_mapping_provider},
-            {"Gelu", name_mapping_provider},
-            {"Multiply", name_mapping_provider},
-            {"Cos", name_mapping_provider},
-            {"Sin", name_mapping_provider}
-        };
-
-        return std::make_shared<CompositeShaveCostProvider>(
-            base_provider, 
-            op_to_provider_map
-        );
+    static std::shared_ptr<IShaveCostProvider> createCompositeBasedOnHeuristicWithOldNameMappingExtendedOps() {
+        return createCompositeWithNameMappingForOps({
+            "DepthToSpace", "MVN", "SoftMax", "Gelu", "Multiply", "Cos", "Sin"
+        });
     }
 
     /**
@@ -197,11 +205,9 @@ public:
      * @return std::shared_ptr<IShaveCostProvider> Device-mapped provider
      */
     static std::shared_ptr<IShaveCostProvider> createDeviceMappedProvider() {
-        // Provider for newer devices (NPU 5.0+)
-        const auto new_device_provider_npu5 = createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU5();
-        const auto new_device_provider_NPU_RESERVED = createCompositeBasedOnHeuristicWithOldNameMappingProviderNPU_RESERVED();
-        // Default provider for older devices
-        const auto default_provider = createOldSelectorWithNameMappingProvider();
+        // Shared providers for route classes used by the device map.
+        const auto default_provider = createDefaultRouteProvider();
+        const auto new_device_provider_npu5 = createProviderForDevice(VPUDevice::NPU_5_0);
 
         // Map devices to specific providers
         std::unordered_map<VPUDevice, std::shared_ptr<IShaveCostProvider>> device_to_provider_map = {
@@ -216,6 +222,20 @@ public:
             default_provider, 
             device_to_provider_map
         );
+    }
+
+    /**
+     * @brief Lightweight capability query that does not require cost model construction.
+     *
+     * Returns supported SHAVE operation names for the requested device using
+     * the device-mapped provider composition (matching default VPUCostModel behavior).
+     *
+     * @param device Device to query
+     * @return std::vector<std::string> Supported operation names
+     */
+    static std::vector<std::string> queryDeviceMappedSupportedOperations(VPUDevice device) {
+        const auto provider = createProviderForDevice(device);
+        return provider->get_shave_supported_ops(device);
     }
 };
 }  // namespace VPUNN

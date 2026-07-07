@@ -52,8 +52,8 @@ private:
      * @brief Creates the default SHAVE cost provider
      *
      * This static method centralizes the logic for creating the default cost provider.
-     * Currently returns the old SHAVE-only provider, but can be easily modified to
-     * switch to device-mapped provider or other implementations.
+     * Currently returns the device-mapped provider, but can be easily modified to
+     * switch to old SHAVE-only provider or other implementations.
      *
      * @return std::shared_ptr<IShaveCostProvider> The created cost provider
      */
@@ -102,6 +102,17 @@ public:
     std::vector<std::string> getShaveSupportedOperations(VPUDevice device) const {
         return shave_cost_provider.get_shave_supported_ops(device);
     }
+
+    /**
+     * @brief Lightweight capability query that does not require SHAVECostModel construction.
+     *
+     * Returns supported SHAVE operation names for the requested device using the
+     * default device-mapped provider composition.
+     *
+     * @param device Device to query
+     * @return std::vector<std::string> Supported operation names
+     */
+    static std::vector<std::string> queryDeviceMappedSupportedOperations(VPUDevice device);
 
     std::optional<std::reference_wrapper<const ShaveOpExecutor>> getShaveInstance(std::string name,
                                                                                   VPUDevice device) const {

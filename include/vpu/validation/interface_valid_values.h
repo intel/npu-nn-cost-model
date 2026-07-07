@@ -100,6 +100,20 @@ public:
 protected:
     const IContainer_OperationsDynamicBehavior& operations_dynamic_behavior;  ///< externally attached dynamic behavior
     /// @brief non public constructor for initializing the reference
+    ///
+    /// @warning STATIC INITIALIZATION ORDER HAZARD — WPO+LTCG risk.
+    /// Every argument passed here is expected to be an inline static member of a derived class
+    /// (e.g. VPU2_0_WorkloadValidValues::valid_swizzlings_def, devices_def, etc.).
+    /// Each argument is copied by value into the corresponding member of this class (see data members below).
+    /// Under WPO+LTCG (whole-program optimization + link-time code generation), MSVC reorders the dynamic
+    /// initialization of those inline static members relative to the construction of the derived class instance. If the
+    /// inline statics have not been populated yet when this constructor runs, all the copied members (valid_swizzlings,
+    /// devices, valid_operations, etc.) will be silently initialized as empty containers. No crash occurs here (the
+    /// copy of an empty container is valid) but every subsequent call to get_valid_swizzlings(), get_devices(),
+    /// get_valid_execution_order(), etc. will return empty ranges, causing silent wrong validation results or
+    /// out_of_range crashes at use time, far from this constructor.
+    ///
+    /// See also: apps/SIOFtest/ and apps/SmallTest/ for a self-contained reproduction and explanation.
     IDeviceValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,     //
                        const IDeviceValidValues::ValidExecutionModes& valid_execution_order_,  //
                        const Values<Swizzling>& valid_swizzlings_,                             //
@@ -152,6 +166,12 @@ public:
     /// be checked (they do not really exists in that context). e.g. stencil. true: low level checks to be executed
     virtual bool mustExecuteHWLowLevelChecks(const DPUOperation& /*dpu*/) const noexcept {
         return true;  // check all by default
+    }
+
+    /// @brief Whether autopad channel coupling constraints should be enforced.
+    /// True for some generations at workload-level validation; false for older devices and at layer level.
+    virtual bool has_autopad_channel_coupling() const noexcept {
+        return false;
     }
 
     virtual const IDeviceValidValues::ValidDatatypes& get_valid_datatypes_map(const MPEEngine& /*engine*/) const {
@@ -341,6 +361,15 @@ protected:
     }
 
     // restrictions described as data, set in derived classes
+    //
+    // @warning STATIC INITIALIZATION ORDER HAZARD — WPO+LTCG risk.
+    // These members are copy-initialized from inline static members of the derived class
+    // (e.g. VPU2_0_WorkloadValidValues::valid_swizzlings_def -> valid_swizzlings, devices_def -> devices, etc.)
+    // in the IDeviceValidValues constructor above. If the constructor runs before the derived class's inline
+    // statics have been dynamically initialized (possible under WPO+LTCG - see constructor warning), every
+    // member below will be a silently empty container. There is no crash at construction time; the failure
+    // surfaces later as empty ranges returned by get_valid_swizzlings(), get_devices(), etc., or as
+    // std::out_of_range from map lookups in get_valid_execution_order() and get_input_valid_datatypes().
 protected:
     const ValidExecutionModes valid_execution_order_map;  ///< what executions order are permitted for each operation
     const Values<Swizzling> valid_swizzlings;  ///< what swizzlings are permitted, ordered from least to most swizzling

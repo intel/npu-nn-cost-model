@@ -11,6 +11,7 @@
 #define VPUNN_DPU_OPERATIONS_VALID_BEHAVIOURS_H
 
 #include "vpu/types.h"
+#include "vpu/utils.h"
 
 #include "checker_utils.h"
 #include "data_dpu_operation.h"
@@ -223,6 +224,63 @@ public:
         const long long size_nonaligned{tensor_size_B + sparsity_map_bytes};
         // let's sum in bytes'
         return size_nonaligned;
+    }
+
+protected:
+    /// @brief Checks depthwise-style channel coupling rules when output_autopad is active on devices
+    ///
+    /// For DW_CONVOLUTION, MAXPOOL, and AVEPOOL, IC and OC are tightly coupled (one input channel per
+    /// output channel). When output_autopad relaxes the OC alignment requirement, the hardware still
+    /// sets IC to a specific aligned value derived from OC:
+    ///   - OC < 16  → IC must be 16          (minimum sub-16 DW channel alignment)
+    ///   - OC >= 16 → IC must be round_up(OC, 32)  (next multiple of 32 above OC)
+    /// Additionally, OC must never exceed IC.
+    ///
+    /// This mirrors the input-channel alignment applied in WorkloadCostEvaluator::createTestLayer.
+    static void check_dw_autopad_channel_coupling(const DPUOperation& dpu, Checker& checker) {
+        // Note: see check_eltwise_autopad_channel_coupling for the ELTWISE variant (always round to 16)
+        const auto oc = dpu.output_0.channels;
+        const auto ic = dpu.input_0.channels;
+
+        // DW-style alignment rule: sub-16 rounds to 16; >16 rounds up to the next multiple of 32
+        const auto dw_aligned_oc = dw_channel_align(static_cast<unsigned int>(oc));
+
+        if (oc > ic) {
+            checker.add_check_failed(
+                    "output_autopad active: output_0.channels (" + std::to_string(oc) +
+                    ") must not exceed input_0.channels (" + std::to_string(ic) + ")");
+        }
+        if (ic != dw_aligned_oc) {
+            checker.add_check_failed(
+                    "output_autopad active: input_0.channels (" + std::to_string(ic) +
+                    ") must equal DW-aligned OC (expected=" + std::to_string(dw_aligned_oc) +
+                    " for OC=" + std::to_string(oc) + ")");
+        }
+    }
+
+    /// @brief Checks ELTWISE channel coupling rules when output_autopad is active on devices.
+    ///
+    /// For ELTWISE, IC and OC must be related as follows:
+    ///   - OC must not exceed IC
+    ///   - IC must equal round_up(OC, 16)  (ELTWISE always aligns to multiples of 16)
+    static void check_eltwise_autopad_channel_coupling(const DPUOperation& dpu, Checker& checker) {
+        const auto oc = dpu.output_0.channels;
+        const auto ic = dpu.input_0.channels;
+
+        // ELTWISE always rounds up to the next multiple of 16
+        const auto eltwise_aligned_oc = eltwise_channel_align(static_cast<unsigned int>(oc));
+
+        if (oc > ic) {
+            checker.add_check_failed(
+                    "output_autopad active: output_0.channels (" + std::to_string(oc) +
+                    ") must not exceed input_0.channels (" + std::to_string(ic) + ")");
+        }
+        if (ic != eltwise_aligned_oc) {
+            checker.add_check_failed(
+                    "output_autopad active: input_0.channels (" + std::to_string(ic) +
+                    ") must equal round_up(OC,16) (expected=" + std::to_string(eltwise_aligned_oc) +
+                    " for OC=" + std::to_string(oc) + ")");
+        }
     }
 };
 
@@ -437,13 +495,18 @@ protected:
 
         dpu.input_1.batch = dpu.output_0.channels;
     }
-    bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
+    bool check_input_output_tensor_corelation(const IDeviceValidValues& config, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
 
-        if (!dpu.output_autopad) {
+        // input autopad may be active for <16 wls and it needs to match the autopad of output
+        if (!dpu.output_autopad || (dpu.output_autopad && dpu.input_autopad)) {
+            // Without autopad/both autopads active: OC must equal IC exactly
             checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
                                      "output_0.channels == input_0.channels");
+        } else if (config.has_autopad_channel_coupling()) {
+            // With output_autopad: apply DW channel coupling constraints
+            check_dw_autopad_channel_coupling(dpu, checker);
         }
 
         info = checker.findings();
@@ -571,12 +634,16 @@ protected:
         dpu.input_1.width = dpu.input_0.height;
     }
 
-    bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
+    bool check_input_output_tensor_corelation(const IDeviceValidValues& config, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
-        if (!dpu.output_autopad) {
+        if (!dpu.output_autopad  || (dpu.output_autopad && dpu.input_autopad)) {
+            // Without autopad: OC must equal IC exactly
             checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
                                      "output_0.channels == input_0.channels");
+        } else if (config.has_autopad_channel_coupling()) {
+            // With output_autopad: IC must equal round_up(OC, 16), and OC <= IC
+            check_eltwise_autopad_channel_coupling(dpu, checker);
         }
 
         info = checker.findings();
@@ -695,13 +762,17 @@ protected:
         dpu.input_1.width = 0;
     }
 
-    bool check_input_output_tensor_corelation(const IDeviceValidValues&, const DPUOperation& dpu,
+    bool check_input_output_tensor_corelation(const IDeviceValidValues& config, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
 
-        if (!dpu.output_autopad) {
+        if (!dpu.output_autopad || (dpu.output_autopad && dpu.input_autopad)) {
+            // Without autopad: OC must equal IC exactly
             checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
                                      "output_0.channels == input_0.channels");
+        } else if (config.has_autopad_channel_coupling()) {
+            // With output_autopad: same DW channel coupling constraints as DW_CONVOLUTION
+            check_dw_autopad_channel_coupling(dpu, checker);
         }
 
         info = checker.findings();

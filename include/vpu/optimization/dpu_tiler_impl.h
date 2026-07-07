@@ -38,14 +38,12 @@ private:
     /// count derived from @p options.nDPU. For each candidate split the cost is computed via
     /// computeSplitCycles(). Both valid costs and error codes are retained in the returned
     /// list so that the caller can pick the optimal result. Evaluation stops early when the
-    /// elapsed time exceeds @p options.maxLatencyUs (if set). POWER optimisation target is
-    /// not supported and will throw.
+    /// elapsed time exceeds @p options.maxLatencyUs (if set).
     ///
     /// @param algorithms     container of tiling algorithm instances to evaluate
     /// @param valid_execution_modes execution modes accepted by the layer (e.g. CUBOID_16x16)
     /// @param options        split options controlling nDPU, runtime overhead, timeout, etc.
     /// @returns a list of (cycle-cost, workloads-split) pairs for every evaluated candidate
-    /// @throws std::runtime_error if @p options.target is VPUOptimizationTarget::POWER
     std::list<DPUWorkloadsWithCycleCost> generateSplits(const TilingAlgorithmsContainer& algorithms,
                                                         const std::vector<ExecutionMode>& valid_execution_modes,
                                                         const SplitOptions& options) const;

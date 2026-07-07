@@ -36,7 +36,6 @@ struct HttpWorkloadVariant {
     HttpWorkloadVariant(T&& val): data(std::forward<T>(val)) {
     }
 };
-
 }  // namespace VPUNN
 
 #endif  // HTTP_WORKLOAD_VARIANT_H_

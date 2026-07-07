@@ -16,12 +16,12 @@
 #include <limits>
 #include <numeric>
 #include <vector>
-#include "../dma_types.h"
-#include "../utils.h"
 #include "inference/dma_preprocessing.h"
-#include "inference/dma_preprocessing_inserter_basics.h"
 #include "inference/dma_preprocessing_inserter.h"
+#include "inference/dma_preprocessing_inserter_basics.h"
 #include "inference/nn_descriptor_versions.h"
+#include "vpu/dma_types.h"
+#include "vpu/utils.h"
 
 #include <cmath>
 #include <iostream>
@@ -173,7 +173,7 @@ protected:
      */
     template <bool only_simulate>
     void transformOnly(const DMANNWorkload_NPU27& workload, size_t& debug_offset,
-    std::vector<T>& dest_descriptor) const {
+                       std::vector<T>& dest_descriptor) const {
         Inserter_Interface_DMA<T> ins(dest_descriptor);
         // Build the vector from the inputs
         size_t offset = 0;
@@ -204,7 +204,8 @@ public:
     }
 
     ///@brief Ctor , inits the content with expected size
-    Preprocessing_Interface01_DMA() : PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>, DMANNWorkload_NPU27>(size_of_descriptor) {};
+    Preprocessing_Interface01_DMA()
+            : PreprocessingInserterDMA<T, Preprocessing_Interface01_DMA<T>, DMANNWorkload_NPU27>(size_of_descriptor) {};
 
     ///@brief default virtual destructor
     virtual ~Preprocessing_Interface01_DMA() = default;
@@ -231,8 +232,8 @@ protected:
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    void transformOnly(const DMANNWorkload_NPU40_50& workload, size_t& debug_offset, 
-                                        std::vector<T>& dest_descriptor) const {
+    void transformOnly(const DMANNWorkload_NPU40_50& workload, size_t& debug_offset,
+                       std::vector<T>& dest_descriptor) const {
         Inserter_Interface_DMA<T> ins(dest_descriptor);
 
         // Build the vector from the inputs
@@ -270,8 +271,9 @@ public:
     }
 
     ///@brief Ctor , inits the content with expected size
-    Preprocessing_Interface02_DMA() : PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40_50>(size_of_descriptor){
-    };
+    Preprocessing_Interface02_DMA()
+            : PreprocessingInserterDMA<T, Preprocessing_Interface02_DMA<T>, DMANNWorkload_NPU40_50>(
+                      size_of_descriptor) {};
 
     ///@brief default virtual destructor
     virtual ~Preprocessing_Interface02_DMA() = default;
@@ -325,8 +327,8 @@ protected:
      * @return std::vector<T>& a DPUWorkload descriptor
      */
     template <bool only_simulate>
-    void transformOnly(const DMANNWorkload_NPU40_50& workload, size_t& debug_offset, 
-                                        std::vector<T>& dest_descriptor) const {
+    void transformOnly(const DMANNWorkload_NPU40_50& workload, size_t& debug_offset,
+                       std::vector<T>& dest_descriptor) const {
         Inserter_Interface_DMA<T> ins(dest_descriptor);
 
         // Build the vector from the inputs
@@ -370,8 +372,9 @@ public:
     }
 
     ///@brief Ctor , inits the content with expected size
-    Preprocessing_Interface03_DMA() : PreprocessingInserterDMA<T, Preprocessing_Interface03_DMA<T>, DMANNWorkload_NPU40_50>(size_of_descriptor) {
-    };
+    Preprocessing_Interface03_DMA()
+            : PreprocessingInserterDMA<T, Preprocessing_Interface03_DMA<T>, DMANNWorkload_NPU40_50>(
+                      size_of_descriptor) {};
 
     ///@brief default virtual destructor
     virtual ~Preprocessing_Interface03_DMA() = default;

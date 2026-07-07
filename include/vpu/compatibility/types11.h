@@ -15,11 +15,11 @@
 #include <cstdlib>
 #include <numeric>
 #include <vector>
-#include "../types.h"  // need to know the present day types for conversion
-#include "../utils.h"
 #include "inference/nn_descriptor_versions.h"
 #include "inference/preprocessing_inserter.h"
-#include "preprocessing_adapters.h"
+#include "preprocessing_adapters_bundle.h"
+#include "vpu/types.h"  // need to know the present day types for conversion
+#include "vpu/utils.h"
 
 #include <map>
 #include <sstream>

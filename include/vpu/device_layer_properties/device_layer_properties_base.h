@@ -30,6 +30,9 @@ private:
     inline static const std::unordered_map<Operation, std::vector<ExecutionMode>> op_to_exec_mode{
             V::op_to_exec_mode};  ///< map of operation to valid execution modes
 
+    inline static const std::vector<ExecutionMode> dcim_exec_modes{
+            V::dcim_exec_modes};  ///< valid execution modes when mpe_engine == DCIM
+
 public:
     TilingExecutionMode() = default;
     TilingExecutionMode(const TilingExecutionMode&) = delete;
@@ -43,7 +46,8 @@ public:
     /// @return A vector of supported ExecutionMode values
     const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const {
         if (wl.mpe_engine == MPEEngine::DCIM) {
-            return {ExecutionMode::dCIM_32x128};
+            // Return device-specific dCIM modes
+            return dcim_exec_modes;
         }
         auto it = op_to_exec_mode.find(wl.op);
         if (it != op_to_exec_mode.end()) {
@@ -133,15 +137,15 @@ public:
     // using TilingExecutionModeX::getValidTilingExecutionMode;
     // using TilingStrategiesX::getValidTilingStrategies;
 
-   ExecutionMode getValidDefaultExecutionMode(const VPUTensor& tensor) const override {
-       return DefaultExecutionModeX::getValidDefaultExecutionMode(tensor);
-   }
-   const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const override {
-       return TilingExecutionModeX::getValidTilingExecutionMode(wl);
-   }
-   const std::vector<VPUTilingStrategy> getValidTilingStrategies() const override {
-       return TilingStrategiesX::getValidTilingStrategies();
-   }
+    ExecutionMode getValidDefaultExecutionMode(const VPUTensor& tensor) const override {
+        return DefaultExecutionModeX::getValidDefaultExecutionMode(tensor);
+    }
+    const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const override {
+        return TilingExecutionModeX::getValidTilingExecutionMode(wl);
+    }
+    const std::vector<VPUTilingStrategy> getValidTilingStrategies() const override {
+        return TilingStrategiesX::getValidTilingStrategies();
+    }
 };
 
 /// @brief Device-specific layer property implementation for VPU 2.0/2.1.

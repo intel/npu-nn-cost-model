@@ -18,14 +18,16 @@
 #include "core/dma_map_type_selector.h"  // need this to instantiate the template with specifics like DMANNWorkload_NPU27 and other...
 #include "core/serializer.h"
 #include "vpu/cycles_interface_types.h"
+#include "vpu/dma_cost_providers/dma_strided_math_cost_provider.h"
 #include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
 #include "vpu/dma_cost_providers/dmann_cost_provider.h"
 #include "vpu/dma_cost_providers/priority_dma_cost_provider.h"
+#include "vpu/dma_descriptors.h"
 #include "vpu/dma_workload.h"
+#include "vpu/http_cost_provider_factory.h"
+#include "vpu/http_cost_provider_intf.h"
 #include "vpu/types.h"
 #include "vpu/validation/sanity_report.h"  // For SanityReport
-#include "vpu/http_cost_provider_intf.h"
-#include "vpu/http_cost_provider_factory.h"
 
 namespace VPUNN {
 
@@ -37,7 +39,8 @@ namespace VPUNN {
  */
 class VPUNN_API DMATheoreticalCostModel {
 private:
-    const DMATheoreticalCostProvider dma_theoretical{};
+    const DMATheoreticalCostProvider dma_1D_theoretical{};                // classic theoretical
+    const DMAStridedMathCostProvider_DescIntf dma_strided_theoretical{};  // strided theoretical
 
 public:
     explicit DMATheoreticalCostModel();
@@ -65,6 +68,15 @@ protected:
      * @return unsigned int the number of cycles of the DMA transfer
      */
     unsigned int DMA(const DMAWorkload& wl) const;
+
+    /**
+     * @brief Return the number of cycles needed to compute a DMA transfer
+     *
+     * @param desc a VPUDMADescriptor with source/destination tensor descriptions and memory locations
+     * @return CyclesInterfaceType the number of cycles of the DMA transfer, or any error/status value
+     *         represented by CyclesInterfaceType for this API
+     */
+    CyclesInterfaceType DMA(const VPUDMADescriptor& desc) const;
 };
 
 /**
@@ -72,6 +84,8 @@ protected:
  *
  * Has behind a loaded DMACostModel neural network that infers cycle times for DMA
  * /tparam DMADesc  the actual type of DMADescriptor that will be used
+ * TODO before actual usage: make it compatible with VPUDMADescriptor. the NN has a different descriptor type , not the
+ * DMADesc tparam. This might influence caching, for example.
  *
  */
 template <class DMADesc>

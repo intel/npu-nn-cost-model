@@ -46,6 +46,7 @@ static_assert(false, "NPU_5_0_MODEL_PATH is not defined, please define it in CMa
 #endif
 
 
+
 // default path to DMA NN Models
 #ifndef VPU_DMA_2_7_MODEL_PATH
 #define VPU_DMA_2_7_MODEL_PATH "../../../models/dma_2_7.vpunn"
@@ -66,7 +67,7 @@ static_assert(false, "NPU_DMA_5_0_MODEL_PATH is not defined, please define it in
 #endif
 
 #ifndef NPU_DMA_5_0_V1_MODEL_PATH
-// #define NPU_DMA_5_0_V1_MODEL_PATH "../../../../models/dmann_5_0.vpunn"
+// #define NPU_DMA_5_0_V1_MODEL_PATH "../../../../models/dma_5_0.vpunn"
 static_assert(false, "NPU_DMA_5_0_V1_MODEL_PATH is not defined, please define it in CMakeLists.txt");
 #endif
 
@@ -113,6 +114,13 @@ public:
             {NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH), VPUNN::VPUDevice::VPU_2_7}};
 
     const std::vector<ModelDescriptor> all_model_paths{concat(standard_model_paths, fast_model_paths)};
+
+    const std::vector<ModelDescriptor> profilable_model_paths{
+            {VPU_2_0_MODEL_PATH, VPUNN::VPUDevice::VPU_2_0},  //
+            {VPU_2_7_MODEL_PATH, VPUNN::VPUDevice::VPU_2_7},  //
+            {VPU_4_0_MODEL_PATH, VPUNN::VPUDevice::VPU_4_0},  //
+            {NPU_5_0_MODEL_PATH, VPUNN::VPUDevice::NPU_5_0},
+    };
 
     /// DMA models
     const std::vector<ModelDescriptor> all_DMA_model_paths{

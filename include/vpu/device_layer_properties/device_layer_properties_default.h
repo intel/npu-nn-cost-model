@@ -32,6 +32,8 @@ struct Default_LayerPropertiesData {
 
     inline static const std::unordered_map<Operation, std::vector<ExecutionMode>> op_to_exec_mode{};  ///< map of operation to valid execution modes
 
+    inline static const std::vector<ExecutionMode> dcim_exec_modes{};  ///< no dCIM support for default/fallback
+
     inline static const ExecutionMode default_execution_mode{
             ExecutionMode::CUBOID_16x16};  ///< default execution mode for layers
 };

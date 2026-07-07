@@ -19,6 +19,8 @@
 #include "vpu_shave_cost_model.h"
 
 #include <filesystem>
+#include <memory>
+#include <set>
 #include <unordered_map>
 
 /// @brief namespace for Unit tests of the C++ library
@@ -379,7 +381,7 @@ TEST_F(TestSHAVE, SHAVE_v2_Cache_InvalidOperatorName_HitAndMiss) {
 
     const ScopedFileCleanup cleanup{temp_cache_file};
 
-    // Ensure the temp cache file does not exist before the test, and if it exists remove it 
+    // Ensure the temp cache file does not exist before the test, and if it exists remove it
     std::error_code ec;
     std::filesystem::remove(temp_cache_file, ec);  // never throws
 
@@ -410,6 +412,24 @@ TEST_F(TestSHAVE, SHAVE_v2_Cache_InvalidOperatorName_HitAndMiss) {
         std::string info;
         const auto cycles = model_with_custom_cache.computeCycles(swl_invalid_not_in_cache, info);
         EXPECT_EQ(cycles, V(Cycles::ERROR_SHAVE_OPERATOR_MISSING)) << swl_invalid_not_in_cache << info;
+    }
+}
+
+TEST_F(TestSHAVE, StaticQueryMatchesInstanceQueryForDefaultModel) {
+    std::vector<VPUDevice> devices = {
+            VPUDevice::VPU_2_7,
+            VPUDevice::VPU_4_0,
+            VPUDevice::NPU_5_0,
+    };
+    devices.push_back(VPUDevice::NPU_5_0_W);
+
+    for (const auto d : devices) {
+        const auto instance_ops = empty_model.getShaveSupportedOperations(d);
+        const auto static_ops = VPUCostModel::queryDeviceMappedSupportedOperations(d);
+
+        const std::set<std::string> instance_set(instance_ops.begin(), instance_ops.end());
+        const std::set<std::string> static_set(static_ops.begin(), static_ops.end());
+        EXPECT_EQ(instance_set, static_set) << "Mismatch for device: " << VPUDevice_ToText.at((int)d);
     }
 }
 

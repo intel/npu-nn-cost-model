@@ -10,12 +10,12 @@
 #ifndef VPUNN_LAYER_COST_MODEL_H
 #define VPUNN_LAYER_COST_MODEL_H
 
+#include <functional>
+#include <memory>
+#include <optional>
 #include <string>  // for std::string
 #include <variant>
-#include <vector>                        // for std::vector
-#include <functional>
-#include <optional>
-#include <memory>
+#include <vector>  // for std::vector
 
 #include "core/dma_map_type_selector.h"  // need this to instantiate the template with specifics like DMANNWorkload_NPU27
 #include "core/serializer.h"
@@ -27,8 +27,8 @@
 #include "vpu/vpu_tiling_strategy.h"
 #include "vpu_cost_model.h"
 #include "vpu_dma_cost_model_variant.h"
-#include "vpu_layer_strategy.h"
 #include "vpu_layer_pre_split_strategy.h"
+#include "vpu_layer_strategy.h"
 
 namespace VPUNN {
 
@@ -42,9 +42,10 @@ namespace VPUNN {
  * to evaluate multiple layer/strategy combinations in a single call.
  */
 struct LayerBatchElementInfo {
-    DPULayer layer;                                 ///< The DPU workload to evaluate
-    VPULayerStrategy strategy;                      ///< Execution strategy (tiling, DPU count, memory placement, prefetching)
-    std::unique_ptr<LayerSplitInfo> detailed_split{nullptr}; ///< Optional detailed split info for the layer, used for serialization and analysis
+    DPULayer layer;             ///< The DPU workload to evaluate
+    VPULayerStrategy strategy;  ///< Execution strategy (tiling, DPU count, memory placement, prefetching)
+    std::unique_ptr<LayerSplitInfo> detailed_split{
+            nullptr};  ///< Optional detailed split info for the layer, used for serialization and analysis
 };
 
 /** @brief Input descriptor for a single entry in a batched pre-split layer cost estimation.
@@ -60,10 +61,11 @@ struct LayerBatchElementInfo {
  * configurations in a single call.
  */
 struct LayersPreSplitBatchElementInfo {
-    std::vector<DPULayer> layer_splits;             ///< Per-tile DPU layers (one element per CMX tile)
-    VPULayersPreSplitStrategy strategy;             ///< Execution strategy (DPU count, memory placement, prefetching)
-    std::optional<size_t> fullLayerHash{};          ///< Optional hash of the original unsplit layer; empty when unavailable
-    std::unique_ptr<LayerSplitInfo> detailed_split{nullptr}; ///< Optional detailed split info for the original layer, used for serialization and analysis
+    std::vector<DPULayer> layer_splits;     ///< Per-tile DPU layers (one element per CMX tile)
+    VPULayersPreSplitStrategy strategy;     ///< Execution strategy (DPU count, memory placement, prefetching)
+    std::optional<size_t> fullLayerHash{};  ///< Optional hash of the original unsplit layer; empty when unavailable
+    std::unique_ptr<LayerSplitInfo> detailed_split{
+            nullptr};  ///< Optional detailed split info for the original layer, used for serialization and analysis
 };
 
 /** @brief Result of a batched cost estimation call.
@@ -80,8 +82,9 @@ struct LayersPreSplitBatchElementInfo {
  * (@c isValid = false, @c costs empty).
  */
 struct BatchCostResult {
-    bool isValid{false};                        ///< @c true when all entries computed without errors
-    std::vector<CyclesInterfaceType> costs{};   ///< Per-entry cost (one element per input descriptor); may contain error codes
+    bool isValid{false};  ///< @c true when all entries computed without errors
+    std::vector<CyclesInterfaceType>
+            costs{};  ///< Per-entry cost (one element per input descriptor); may contain error codes
 };
 
 /// @brief The VPUNN layer cost model (also called VPUNN Level2 API)
@@ -103,8 +106,18 @@ private:
     mutable CSVSerializer serializer{};  ///< Serializer for the VPULayerCostModel, has its own file as output
     mutable CSVSerializer
             presplit_serializer{};  ///< Serializer for the VPULayerCostModel (presplit api), has its own file as output
-
+    bool use_StridedMathModelForDMA{
+            false};  ///< Discriminates between using the classic theoretical DMA model and the new strided MathModel
+                     ///< when computing DMA. This happens only if no DMA NN provider is available.
 public:
+    /// sets the Theoretical DMA Mode for internal usage
+    void set_DMATheoreticalMathModel_enabled() {
+        use_StridedMathModelForDMA = true;
+    }
+    bool is_DMATheoreticalMathModel_enabled() const {
+        return use_StridedMathModelForDMA;
+    }
+
     /// @brief Get the CM, either base or a contained object or maybe a parametric attribute
     VPUCostModel& get_cost_model() noexcept {
         return internal_dpu_cost_provider;
@@ -117,6 +130,8 @@ public:
         const VPUCostModel& retv{internal_dpu_cost_provider};
         return retv;
     }
+
+protected:
     const VPUCostModel& get_TheoreticalDMA_cost_model() const noexcept {
         const VPUCostModel& retv{internal_dpu_cost_provider};
         return retv;
@@ -126,6 +141,7 @@ public:
         return internal_dpu_cost_provider.getPerformanceModel();
     }
 
+public:
     // sharing the internal  shared pointers for a temporary easier integration in VPUX
     std::shared_ptr<VPUCostModel> get_cost_model_shared() noexcept {
         return ptr_internal_dpu_cost_provider;
@@ -351,7 +367,6 @@ public:
      *         @c isValid = true when none of the entries is an error code.
      */
     BatchCostResult LayerBatched(std::vector<LayerBatchElementInfo>& layers) const;
-    
 
     /**
      * @brief Compute the optimal cost of a DPULayer using a specific strategy and context
@@ -395,7 +410,8 @@ public:
      * @return measured best cycles or error code . \see Cycles for error codes
      */
     CyclesInterfaceType Layer(DPULayer& layer, VPUTilingStrategy strategy, unsigned int nDPU, unsigned int nTiles,
-                              bool input_in_ddr, bool output_in_ddr, bool prefetching, LayerSplitInfo& detailed_split) const;
+                              bool input_in_ddr, bool output_in_ddr, bool prefetching,
+                              LayerSplitInfo& detailed_split) const;
 
     /**
      * @brief Compute the optimal cost of a pre split layer. Layer is already split on tiles, only the intratile split
@@ -441,7 +457,6 @@ public:
     CyclesInterfaceType LayersPreSplit(const std::vector<SHAVEWorkload>& layers_pre_split, unsigned int nSHV,
                                        bool input_in_ddr, bool output_in_ddr) const;
 
-
     /**
      * @brief Evaluate the cost of multiple pre-split layer configurations in a single batched call.
      *
@@ -464,7 +479,8 @@ public:
      *         @c isValid = true when none of the entries is an error code.
      *         \see Cycles for error codes
      */
-    BatchCostResult LayersPreSplitBatched(const std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>>& pre_split_layers) const;
+    BatchCostResult LayersPreSplitBatched(
+            const std::vector<std::reference_wrapper<LayersPreSplitBatchElementInfo>>& pre_split_layers) const;
 
     /**
      * @brief Convenience overload that accepts a mutable vector of @ref LayersPreSplitBatchElementInfo directly.

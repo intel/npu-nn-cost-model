@@ -15,11 +15,6 @@
 namespace VPUNN {
 
 /**
- * @brief Available VPU workload generation optimization targets
- *
- */
-enum class VPUOptimizationTarget { LATENCY, POWER, EFFICIENCY };
-/**
  * @brief Available VPU splitting strategies
  *
  */
@@ -36,8 +31,6 @@ struct SplitOptions {
                            ///< based on the device
     unsigned int runtimeOverhead{0};  ///<  Per workload runtime overhead in cycles
 
-    VPUOptimizationTarget target{VPUOptimizationTarget::LATENCY};  ///< Optimization target. Default is LATENCY,USED
-                                                                   ///< only for LATENCY for the moment
     std::vector<VPUSplitStrategy> availableStrategies{
             VPUSplitStrategy::HW_TILING,
             VPUSplitStrategy::Z_TILING};  ///<  Valid strategies for splitting a layer into multiple workloads. Default

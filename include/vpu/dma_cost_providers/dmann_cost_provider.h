@@ -10,14 +10,14 @@
 #ifndef DMANN_COST_PROVIDER_H_
 #define DMANN_COST_PROVIDER_H_
 
+#include "core/cache.h"
+#include "dma_cost_provider_interface.h"
 #include "inference/dma_post_process.h"
 #include "inference/dma_postprocessing_factory.h"
 #include "inference/dma_preprocessing.h"
 #include "inference/dma_preprop_factory.h"
 #include "inference/vpunn_runtime.h"
 #include "vpu/cycles_interface_types.h"
-#include "dma_cost_provider_interface.h"
-#include "core/cache.h"
 
 #include <thread>
 #include <unordered_map>
@@ -31,9 +31,9 @@ namespace VPUNN {
 template <typename WlT>
 class DMANNCostProvider : public IDMACostProvider<WlT> {
 public:
-    DMANNCostProvider(const std::string& filename = "",
-                   const unsigned int batch_size = 1, bool profile = false, const unsigned int cache_size = 16384,
-                   const std::string& dma_cache_filename = "", bool tryToLoadPairedCache = false)
+    DMANNCostProvider(const std::string& filename = "", const unsigned int batch_size = 1, bool profile = false,
+                      const unsigned int cache_size = 16384, const std::string& dma_cache_filename = "",
+                      bool tryToLoadPairedCache = false)
             : vpunn_runtime(filename, profile),
               preprocessing_factory{},
               postprocessing_factory{},
@@ -51,14 +51,12 @@ public:
 
         check_post_config(vpunn_runtime.model_version_info());
         correlate_preprocessor_with_model_inputs();
-        cache_miss_serializer.initialize(cache_miss_file_naming(), FileMode::READ_WRITE,
-                                         get_names_for_serializer());
+        cache_miss_serializer.initialize(cache_miss_file_naming(), FileMode::READ_WRITE, get_names_for_serializer());
     };
 
     DMANNCostProvider(const char* model_data, size_t model_data_length, const unsigned int batch_size,
-                   bool copy_model_data, bool profile = false,
-                   const unsigned int cache_size = 16384, const char* dma_cache_data = nullptr,
-                   size_t dma_cache_data_length = 0)
+                      bool copy_model_data, bool profile = false, const unsigned int cache_size = 16384,
+                      const char* dma_cache_data = nullptr, size_t dma_cache_data_length = 0)
             : vpunn_runtime(model_data, model_data_length, copy_model_data, profile),
               preprocessing_factory{},
               postprocessing_factory{},
@@ -112,7 +110,7 @@ protected:
 
         // Check for cache hit
         const auto cached_value = cache.get(descriptor);
-        
+
         if (!cached_value) {
             const auto infered_value{vpunn_runtime.predict<float>(descriptor, ctx.runtime_buffer_data)[0]};
             cache.add(descriptor, infered_value);
@@ -210,7 +208,6 @@ public:
         return ctx.workloads_results_buffer;
     }
 
-
     const std::vector<CyclesInterfaceType> infer(const std::vector<WlT>& workloads) const {
         const auto number_of_workloads{workloads.size()};  ///< fixed value remembered here, workloads is non const
         std::vector<CyclesInterfaceType> cycles_vector(number_of_workloads);
@@ -222,7 +219,8 @@ public:
             if (post_processing.is_NN_value_invalid(nn_output_cycles)) {
                 cycles_vector[idx] = Cycles::ERROR_INVALID_OUTPUT_RANGE;
             } else {
-                cycles_vector[idx] = static_cast<CyclesInterfaceType>(std::ceil(post_processing.process(workloads[idx], nn_output_cycles)));
+                cycles_vector[idx] = static_cast<CyclesInterfaceType>(
+                        std::ceil(post_processing.process(workloads[idx], nn_output_cycles)));
             }
         }
 
@@ -267,7 +265,7 @@ public:
         }
         const CyclesInterfaceType infered_value{infer(workload)};
 
-        if(cost_source) {
+        if (cost_source) {
             *cost_source = "nn_" + get_model_nickname();
         }
 
@@ -317,7 +315,6 @@ public:
         return std::make_tuple(version.get_input_interface_version(), version.get_output_interface_version());
     }
 
-
     static const std::vector<std::string> get_names_for_serializer() {
         std::vector<std::string> names;
 
@@ -325,12 +322,13 @@ public:
             names.push_back(name);
         }
 
-        names.push_back("cycles");
-        names.push_back("info");
+        names.emplace_back("vpunn_cycles");
+        names.emplace_back("cost_source");
+        names.emplace_back("error_info");
 
         return names;
     }
-    
+
     /// @brief provides the value interval where the NN raw outputs are considered valid and will be used to further
     /// compute information
     ///
@@ -343,16 +341,17 @@ private:
     const Runtime vpunn_runtime;  ///< the loaded inference model is here, used for FW propagation
     const DMARuntimeProcessingFactory<WlT> preprocessing_factory;  ///< provides Preprocessing objects
     const DMAPostProcessingFactory<WlT> postprocessing_factory;
-    const IPreprocessingDMA<float, WlT>& preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
-    const DMAPostProcessSupport results_config; ///< should be part of provider?
+    const IPreprocessingDMA<float, WlT>&
+            preprocessing;                       ///< prepares the input vector for the runtime, configured at ctor
+    const DMAPostProcessSupport results_config;  ///< should be part of provider?
     const IPostProcessDMA<WlT>& post_processing;
 
     mutable LRUCache<std::vector<float>, float>
             cache;  ///< cache for inferred values, used only for single workload, not for batches
-    mutable CSVSerializer cache_miss_serializer;            ///< serializer for missed cache
+    mutable CSVSerializer cache_miss_serializer;              ///< serializer for missed cache
     const std::string model_nickname{make_model_nickname()};  ///< nickname for the model, used for cache and serializer
-    const float default_NN_output{-1.0F};     ///< this is the value used in no NN output is present (like not loaded).
-    const unsigned int batch_size{1};         ///< the batch size used for the inference, set at ctor, used for context
+    const float default_NN_output{-1.0F};  ///< this is the value used in no NN output is present (like not loaded).
+    const unsigned int batch_size{1};      ///< the batch size used for the inference, set at ctor, used for context
     // Map of (thread ID, instance ID) to execution contexts
     mutable std::map<std::thread::id, std::shared_ptr<NNExecutionContext>> context_map;
     mutable std::shared_mutex context_map_mutex;  ///< Mutex to protect the context map
@@ -360,7 +359,7 @@ private:
     /// @brief obtains the actual preprocessing instance from factory. The factory must live longer than the instance
     /// created. warning: Throws if not possible
     static IPreprocessingDMA<float, WlT>& init_preproc(const DMARuntimeProcessingFactory<WlT>& factory,
-                                                           const ModelVersion& version_service, std::string_view filename) {
+                                                       const ModelVersion& version_service, std::string_view filename) {
         // let's initialize the preproc aspects based on input version
         const int input_version = version_service.get_input_interface_version();
         //  checking if either we have some preprocess or we have a unsupported version
@@ -379,8 +378,8 @@ private:
         }
     }
 
-    static const IPostProcessDMA<WlT>& init_postproc(const DMAPostProcessingFactory<WlT>& factory, const ModelVersion& version_service,
-                                                         std::string_view filename) {
+    static const IPostProcessDMA<WlT>& init_postproc(const DMAPostProcessingFactory<WlT>& factory,
+                                                     const ModelVersion& version_service, std::string_view filename) {
         const int version = version_service.get_output_interface_version();
         //  checking if either we have some process or we have a unsupported version
         if (factory.exists(version)) {

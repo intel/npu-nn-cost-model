@@ -45,13 +45,19 @@ DPULayer WorkloadCostEvaluator::createTestLayer(const DPULayer& base_layer, unsi
 
     // For DW_CONVOLUTION (and similar operations), input and output channels must match
     // Update input channels to match output channels
-    if (base_layer.op == Operation::DW_CONVOLUTION || 
-        base_layer.op == Operation::AVEPOOL ||
-        base_layer.op == Operation::MAXPOOL) {
+    if (is_dwconv_family_operation(base_layer.op)) {
+        auto in_channels = channels;  // Default to matching output channels
+        if (channels % 16 != 0) {
+            if (channels < 16 && base_layer.is_input_autopad()) {
+                // Sub-16 with input autopad: keep exact channel count
+            } else {
+                in_channels = dw_channel_align(channels);
+            }
+        }
         test_layer.inputs[0] = VPUTensor(
             {base_layer.inputs[0].width(), 
              base_layer.inputs[0].height(), 
-             channels,  // Match output channels
+             in_channels,  // Match output channels
              base_layer.inputs[0].batches()},
             base_layer.inputs[0]);
     }
@@ -68,11 +74,8 @@ std::vector<SplitBlock> WorkloadCostEvaluator::measureCandidateBlocks(
 
     std::string info;
     for (auto size : candidate_sizes) {
-        // Create a test layer with this channel count
-        DPULayer test_layer = createTestLayer(base_layer, size);
-
-        // Create workload from test layer
-        DPUWorkload test_wl(test_layer);
+        // Create workload from a channel count layer
+        DPUWorkload test_wl(createTestLayer(base_layer, size));
         test_wl.execution_order = mode;
 
         // Measure the cost

@@ -24,6 +24,7 @@
 #include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
 #include "vpu/dma_cost_providers/dmann_cost_provider.h"
 #include "vpu/dma_cost_providers/priority_dma_cost_provider.h"
+#include "vpu/dma_descriptor_transformers.h"
 #include "vpu/dma_types.h"
 #include "vpu/dma_workload.h"
 #include "vpu/serialization/dma_cost_serialization_wrapper.h"
@@ -40,11 +41,23 @@ DMATheoreticalCostModel::DMATheoreticalCostModel() {
 unsigned int DMATheoreticalCostModel::DMA(VPUDevice device, const VPUTensor& input, const VPUTensor& output,
                                           MemoryLocation input_location, MemoryLocation output_location,
                                           unsigned int output_write_tiles) const {
-    return dma_theoretical.get_cost({device, input, output, input_location, output_location, output_write_tiles});
+    return dma_1D_theoretical.get_cost({device, input, output, input_location, output_location, output_write_tiles});
 }
 
 unsigned int DMATheoreticalCostModel::DMA(const DMAWorkload& wl) const {
-    return dma_theoretical.get_cost(wl);
+    return dma_1D_theoretical.get_cost(wl);
+}
+
+CyclesInterfaceType DMATheoreticalCostModel::DMA(const VPUDMADescriptor& desc) const {
+    try {
+        desc.checkDescriptorSanity();  // throws for now, in the future maybe we want to handle it more contained
+    } catch (const std::exception& e) {
+        Logger::warning() << "Invalid VPUDMADescriptor passed to DMATheoreticalCostModel::DMA: " << e.what();
+        return Cycles::ERROR_INVALID_INPUT_CONFIGURATION;
+    }
+
+    // const DMAWorkload wl = DMADescriptorTransformer::fromVPUDMADescriptor_to_DMAWorkload(desc);
+    return dma_strided_theoretical.get_cost(desc);
 }
 
 // Template class implementations
@@ -55,21 +68,23 @@ DMACostModel<DMADesc>::DMACostModel(const std::string& filename, bool profile, c
                   DMACostProviderBundles::createDefaultDMACostProviders<DMADesc>(filename, batch_size, profile))),
           cache(cache_size, cache_filename),
           http_dma_cost_provider(HttpCostProviderFactory::create()) {
-        Logger::initialize();
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, DMANNCostProvider<DMADesc>::get_names_for_serializer());
+    Logger::initialize();
+    interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE,
+                                       DMANNCostProvider<DMADesc>::get_names_for_serializer());
 }
 
 template <class DMADesc>
 DMACostModel<DMADesc>::DMACostModel(const char* model_data, size_t model_data_length, bool copy_model_data,
-                                     bool profile, const unsigned int cache_size, const unsigned int batch_size,
-                                     const char* cache_data, size_t cache_data_length)
-       : ptr_internal_dma_cost_provider(std::make_shared<PriorityDMACostProvider<DMADesc>>(
+                                    bool profile, const unsigned int cache_size, const unsigned int batch_size,
+                                    const char* cache_data, size_t cache_data_length)
+        : ptr_internal_dma_cost_provider(std::make_shared<PriorityDMACostProvider<DMADesc>>(
                   DMACostProviderBundles::createDefaultDMACostProviders<DMADesc>(
-                      model_data, model_data_length, batch_size, copy_model_data, profile))),
-         cache(cache_size, cache_data, cache_data_length), 
-         http_dma_cost_provider(HttpCostProviderFactory::create()) {
-        Logger::initialize();
-        interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE, DMANNCostProvider<DMADesc>::get_names_for_serializer());
+                          model_data, model_data_length, batch_size, copy_model_data, profile))),
+          cache(cache_size, cache_data, cache_data_length),
+          http_dma_cost_provider(HttpCostProviderFactory::create()) {
+    Logger::initialize();
+    interogation_serializer.initialize(DescType::get_wl_name(), FileMode::READ_WRITE,
+                                       DMANNCostProvider<DMADesc>::get_names_for_serializer());
 }
 
 template <class DMADesc>
@@ -138,63 +153,63 @@ CyclesInterfaceType DMACostModel<DMADesc>::get_cost(const DMADesc& workload, std
 
 template <class DMADesc>
 CyclesInterfaceType DMACostModel<DMADesc>::run_cost_providers(const DMADesc& workload, std::string& info,
-                                                               std::string* cost_source) const {
+                                                              std::string* cost_source) const {
     auto cycles{Cycles::NO_ERROR};
 
-        const auto try_cache = [&]() -> CyclesInterfaceType {
-            const auto cached_cost = cache.get(workload, cost_source);
-            if(cached_cost) {
-                return static_cast<CyclesInterfaceType>(std::floor(*cached_cost));
-            }
-            else {
-                return Cycles::ERROR_CACHE_MISS;
-            }
-        };
+    const auto try_cache = [&]() -> CyclesInterfaceType {
+        const auto cached_cost = cache.get(workload, cost_source);
+        if (cached_cost) {
+            return static_cast<CyclesInterfaceType>(std::floor(*cached_cost));
+        } else {
+            return Cycles::ERROR_CACHE_MISS;
+        }
+    };
 
-        const auto try_profiling = [&]() -> CyclesInterfaceType {
-            // Check if the provided DMA Descriptor is of NN type
-            if constexpr (std::is_same_v<DMADesc, DMAWorkload>) {
-                // Profiling service is not applicable for DMAWorkload
-                return Cycles::ERROR_PROFILING_SERVICE;
-            } else {
-                if (http_dma_cost_provider) {
-                    if (cost_source) {
-                        *cost_source = "profiling_service_" + http_dma_cost_provider->profilingBackendToString(workload.profiling_service_backend_hint);
-                    }
-                    return http_dma_cost_provider->getCost(workload, info);
-                } else {
-                    return Cycles::ERROR_PROFILING_SERVICE;
+    const auto try_profiling = [&]() -> CyclesInterfaceType {
+        // Check if the provided DMA Descriptor is of NN type
+        if constexpr (std::is_same_v<DMADesc, DMAWorkload>) {
+            // Profiling service is not applicable for DMAWorkload
+            return Cycles::ERROR_PROFILING_SERVICE;
+        } else {
+            if (http_dma_cost_provider) {
+                if (cost_source) {
+                    *cost_source = "profiling_service_" + http_dma_cost_provider->profilingBackendToString(
+                                                                  workload.profiling_service_backend_hint);
                 }
+                return http_dma_cost_provider->getCost(workload, info);
+            } else {
+                return Cycles::ERROR_PROFILING_SERVICE;
             }
-        };
-
-        const auto try_priority_provider = [&]() -> CyclesInterfaceType {
-            info = "";  // Avoid unreferenced var warning
-            // Use priority-based provider (NN with fallback to theoretical)
-            cycles = dma_cost_provider.get_cost(workload, cost_source);
-
-            // Add valid cycles to cache for future lookups
-            if (!Cycles::isErrorCode(cycles)) {
-                cache.add(workload, static_cast<float>(cycles));
-            }
-            return cycles;
-        };
-
-        // 1. Cache lookup
-        const auto cached_cost = try_cache();
-        if(!Cycles::isErrorCode(cached_cost)) {
-            return cached_cost;
         }
+    };
 
-        // 2. Profiling service
-        cycles = try_profiling();
+    const auto try_priority_provider = [&]() -> CyclesInterfaceType {
+        info = "";  // Avoid unreferenced var warning
+        // Use priority-based provider (NN with fallback to theoretical)
+        cycles = dma_cost_provider.get_cost(workload, cost_source);
 
-        // 3. Priority-based provider (fallback if profiling fails)
-        if (Cycles::isErrorCode(cycles)) {
-            return try_priority_provider();
+        // Add valid cycles to cache for future lookups
+        if (!Cycles::isErrorCode(cycles)) {
+            cache.add(workload, static_cast<float>(cycles));
         }
-
         return cycles;
+    };
+
+    // 1. Cache lookup
+    const auto cached_cost = try_cache();
+    if (!Cycles::isErrorCode(cached_cost)) {
+        return cached_cost;
+    }
+
+    // 2. Profiling service
+    cycles = try_profiling();
+
+    // 3. Priority-based provider (fallback if profiling fails)
+    if (Cycles::isErrorCode(cycles)) {
+        return try_priority_provider();
+    }
+
+    return cycles;
 }
 
 // Explicit template instantiations for known DMANN workload types

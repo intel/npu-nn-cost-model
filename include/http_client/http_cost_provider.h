@@ -110,7 +110,7 @@ public:
 class HttpCostProvider : public IHttpCostProvider {
 public:
     HttpCostProvider(const std::string& host = default_host, int port = default_port, bool debug = false,
-                     std::string profiling_backend_ = default_backend);
+                     const std::string& profiling_backend_ = default_backend);
 
     /**
      * @brief Factory static function that initializes HttpCostProvider from environment variables.
@@ -171,15 +171,6 @@ private:
     static constexpr const char* default_host = "irlccggpu04.ir.intel.com";
     static constexpr int default_port = 5000;
     static constexpr const char* default_backend = "silicon";
-
-    /**
-     * @brief Converts a DMANNWorkload type to its JSON representation.
-     * @tparam WlT The type of the workload operation.
-     * @param op The DMANNWorkload to convert.
-     * @return A JSON object representing the DMANNWorkload type.
-     */
-    template <typename WlT>
-    const nlohmann::json toJson(const WlT& wl) const;
 };
 }  // namespace VPUNN
 #endif  // HTTP_COST_PROVIDER_H_

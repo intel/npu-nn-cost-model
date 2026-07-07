@@ -134,9 +134,19 @@ public:
     unsigned long int compute_Ideal_MAC_operations_cnt(const DPUWorkload& wl) const {
         // Compute the MACs needed to generate the output tensor
         unsigned long int operations_cnt{0};
-        if (wl.op == Operation::CONVOLUTION || wl.op == Operation::CM_CONVOLUTION) {
-            const unsigned long int operations_cnt_base = (unsigned long int)multiply_vector(wl.kernels) *
-                                                          (unsigned long int)multiply_vector(wl.outputs[0].get_shape());
+        if ((wl.op == Operation::CONVOLUTION || wl.op == Operation::CM_CONVOLUTION)  //
+            || (wl.op == Operation::REDUCE_MS ||
+                wl.op == Operation::REDUCE_SUMSQUARES)  // these are like CONV 1x1 with some special aspects but the
+                                                        // same execution pattern, so we can use the same formula.
+        ) {
+            const unsigned long int operations_cnt_base{
+                    (wl.op == Operation::REDUCE_MS || wl.op == Operation::REDUCE_SUMSQUARES)
+                            ? (unsigned long int)multiply_vector(
+                                      wl.outputs[0].get_shape())  // reduce ops have equivalent kernel 1x1, and
+                                                                  // collapses all outputs channels into one
+                            : ((unsigned long int)multiply_vector(wl.kernels) *
+                               (unsigned long int)multiply_vector(wl.outputs[0].get_shape()))};
+
             const auto channels{wl.inputs[0].channels()};
             if (wl.device < VPUDevice::VPU_2_7) {
                 operations_cnt = operations_cnt_base * channels;
@@ -229,6 +239,15 @@ public:
         // to do  redesign xx family methods to be based on Datatype operations
         const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
         return wl.inputs[0].is_fp8family() && (!wts.is_fp16family());
+    }
+
+    inline bool native_comp_on_i16(const DPUWorkload& wl) const {
+        static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+
+        // Check if input is 16-bit integer family and weights are not floating point
+        const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
+
+        return wl.inputs[0].is_i16family() && (!wts.is_any_float());
     }
 
     inline bool native_comp_on_i8(const DPUWorkload& wl) const {

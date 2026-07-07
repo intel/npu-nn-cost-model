@@ -18,7 +18,7 @@ include(FetchContent)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG release-1.12.1
+    GIT_TAG v1.17.0
 )
 
 # Prevent GoogleTest from being installed with VPUNN
@@ -80,7 +80,6 @@ file(GLOB_RECURSE test_src
     "${CMAKE_CURRENT_SOURCE_DIR}/inference/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/kernels/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/layer/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/optimization/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/shave/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/vpu/*.cpp"
 )
@@ -105,8 +104,8 @@ target_compile_definitions(test_cost_model
         VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn"
         VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn"
         VPU_DMA_4_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_4_0.vpunn"
-        NPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn" 
-        NPU_DMA_5_0_V1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dmann_5_0.vpunn"
+        NPU_DMA_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_5_0.vpunn" 
+        NPU_DMA_5_0_V1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_5_0.vpunn"
 )
 
 # Link libraries 

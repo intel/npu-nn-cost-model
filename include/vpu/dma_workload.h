@@ -104,38 +104,41 @@ private:
         if ((in.size() != out.size()) || (in.get_dtype() != out.get_dtype()) || (in.get_layout() != out.get_layout())) {
             throw std::runtime_error("Cannot create DMANNWorkload_NPU27: size/datatype/layout changing!");
         }
-        
+
         const MemoryDirection memory_direction{create_direction(dma.input_location, dma.output_location)};
         if (memory_direction == MemoryDirection::__size) {
             throw std::runtime_error("Cannot create DMANNWorkload_NPU27: unknown memory direction");
         }
 
         const int dim_in_bytes{static_cast<int>(dma.input.size())};
-        return DMANNWorkload_NPU27{
-                dma.device, 0, dim_in_bytes, dim_in_bytes, dim_in_bytes,
-                0, 0, 0, 0, memory_direction
-        };
+        return DMANNWorkload_NPU27{dma.device, 0, dim_in_bytes,    dim_in_bytes, dim_in_bytes, 0, 0,
+                                   0,          0, memory_direction};
     }
 
     /// Helper: DMAWorkload -> DMANNWorkload_NPU40_50
     static inline DMANNWorkload_NPU40_50 DMAWorkload_to_NPU40_50(const DMAWorkload& dma) {
-        const auto& in{dma.input};
-        const auto& out{dma.output};
-        if ((in.size() != out.size()) || (in.get_dtype() != out.get_dtype()) || (in.get_layout() != out.get_layout())) {
-            throw std::runtime_error("Cannot create DMANNWorkload_NPU40_50: size/datatype/layout changing!");
-        }
-        
+        // const auto& in{dma.input};
+        // const auto& out{dma.output};
+        //  remove for the moment the sanity check. might come back later under new rules.
+        //  if ((in.size() != out.size()) || (in.get_dtype() != out.get_dtype()) || (in.get_layout() !=
+        //  out.get_layout())) {
+        //      throw std::runtime_error("Cannot create DMANNWorkload_NPU40_50: size/datatype/layout changing!");
+        //  }
+
         const MemoryDirection memory_direction{create_direction(dma.input_location, dma.output_location)};
         if (memory_direction == MemoryDirection::__size) {
             throw std::runtime_error("Cannot create DMANNWorkload_NPU40_50: unknown memory direction");
         }
 
-        const int dim_in_bytes{static_cast<int>(dma.input.size())};
-        return DMANNWorkload_NPU40_50{
-                dma.device, dim_in_bytes, dim_in_bytes, 0,
-                {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
-                Num_DMA_Engine::Num_Engine_1, memory_direction
-        };
+        const int dim_src_bytes{static_cast<int>(dma.input.size())};
+        const int dim_dst_bytes{static_cast<int>(dma.output.size())};
+        return DMANNWorkload_NPU40_50{dma.device,
+                                      dim_src_bytes,
+                                      dim_dst_bytes,
+                                      0,
+                                      {{{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}},
+                                      Num_DMA_Engine::Num_Engine_1,
+                                      memory_direction};
     }
 
     /// Helper: DMANNWorkload -> DMAWorkload (generic for all DMANN types)
@@ -155,12 +158,12 @@ private:
         }
 
         const int dim_in_bytes{dma_nn.getAccessedBytes()};
-        return DMAWorkload{
-                dma_nn.device,
-                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8, Layout::ZXY),
-                VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8, Layout::ZXY),
-                input_location, output_location, 1
-        };
+        return DMAWorkload{dma_nn.device,
+                           VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8, Layout::ZXY),
+                           VPUTensor({static_cast<unsigned int>(dim_in_bytes), 1, 1, 1}, DataType::UINT8, Layout::ZXY),
+                           input_location,
+                           output_location,
+                           1};
     }
 
     /// Helper: DMANNWorkload_NPU27 -> DMANNWorkload_NPU40_50
@@ -173,7 +176,7 @@ public:
     /**
      * Generic create_workload<To, From> - Main conversion interface
      */
-    
+
     /// Generic conversion from any workload type to any other workload type
     /// Use like: create_workload<DMAWorkload, DMANNWorkload_NPU27>(workload)
     /// @tparam To Target workload type
@@ -181,7 +184,7 @@ public:
     /// @param from Source workload
     /// @returns Workload of type To
     template <typename To, typename From>
-    static inline To create_workload(const From& from);
+    static inline To create_workload(const From& from) = delete;
 
 public:
     using LocationKey = std::pair<MemoryLocation, MemoryLocation>;  // DRAM, CMX, CSRAM, UPA
@@ -207,7 +210,7 @@ public:
         }
     };
 
-    static inline LocationKey create_locations(const MemoryDirection& direction){
+    static inline LocationKey create_locations(const MemoryDirection& direction) {
         static const LocationMap locMap{
                 {MemoryDirection::DDR2DDR, {MemoryLocation::DRAM, MemoryLocation::DRAM}},  //
                 {MemoryDirection::DDR2CMX, {MemoryLocation::DRAM, MemoryLocation::CMX}},   //
@@ -251,7 +254,7 @@ public:
                 0,                     // dst_plane_stride;
                 dma.memory_direction,  // transfer_direction
         };
-        // clang and gcc does not support to use std::move here, so we need suppression 
+        // clang and gcc does not support to use std::move here, so we need suppression
         /* coverity[copy_instead_of_move] */
         return equivalentWorkload;  // hoping for ReturnValueOptimisation
     }
@@ -264,12 +267,14 @@ public:
 // --- Identity conversions (same type) ---
 
 template <>
-inline DMANNWorkload_NPU27 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27, DMANNWorkload_NPU27>(const DMANNWorkload_NPU27& from) {
+inline DMANNWorkload_NPU27 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27, DMANNWorkload_NPU27>(
+        const DMANNWorkload_NPU27& from) {
     return from;
 }
 
 template <>
-inline DMANNWorkload_NPU40_50 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU40_50, DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50& from) {
+inline DMANNWorkload_NPU40_50 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU40_50, DMANNWorkload_NPU40_50>(
+        const DMANNWorkload_NPU40_50& from) {
     return from;
 }
 
@@ -281,24 +286,28 @@ inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMAWorkl
 // --- DMAWorkload -> DMANN conversions ---
 
 template <>
-inline DMANNWorkload_NPU27 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27, DMAWorkload>(const DMAWorkload& from) {
+inline DMANNWorkload_NPU27 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27, DMAWorkload>(
+        const DMAWorkload& from) {
     return DMAWorkloadTransformer::DMAWorkload_to_NPU27(from);
 }
 
 template <>
-inline DMANNWorkload_NPU40_50 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU40_50, DMAWorkload>(const DMAWorkload& from) {
+inline DMANNWorkload_NPU40_50 DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU40_50, DMAWorkload>(
+        const DMAWorkload& from) {
     return DMAWorkloadTransformer::DMAWorkload_to_NPU40_50(from);
 }
 
 // --- DMANN -> DMAWorkload conversions ---
 
 template <>
-inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMANNWorkload_NPU27>(const DMANNWorkload_NPU27& from) {
+inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMANNWorkload_NPU27>(
+        const DMANNWorkload_NPU27& from) {
     return DMAWorkloadTransformer::DMANNWorkload_to_DMAWorkload(from);
 }
 
 template <>
-inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50& from) {
+inline DMAWorkload DMAWorkloadTransformer::create_workload<DMAWorkload, DMANNWorkload_NPU40_50>(
+        const DMANNWorkload_NPU40_50& from) {
     return DMAWorkloadTransformer::DMANNWorkload_to_DMAWorkload(from);
 }
 
@@ -372,45 +381,6 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::DMANNWorkload
 
            << out_terminator() << "DMANNWorkload_NPU40_50 ";  // terminator
     return stream;
-}
-
-/// @brief Convert a DMATransfer1D to a DMAWorkload to be used by DMA theoretical model.
-/// @deprecated will be removed with DMAWorkload
-static inline DMAWorkload convert_dma1d_2_dmawl(const DMATransfer1D& dma) {
-    const VPUTensor ten{{static_cast<unsigned int>(dma.transfer_length_bytes), 1, 1, 1}, DataType::UINT8};
-
-    MemoryLocation from{MemoryLocation::__size};
-    MemoryLocation to{MemoryLocation::__size};
-
-    switch (dma.memory_direction) {
-    case MemoryDirection::DDR2DDR:
-        from = MemoryLocation::DRAM;
-        to = MemoryLocation::DRAM;
-        break;
-    case MemoryDirection::DDR2CMX:
-        from = MemoryLocation::DRAM;
-        to = MemoryLocation::CMX;
-        break;
-    case MemoryDirection::CMX2DDR:
-        from = MemoryLocation::CMX;
-        to = MemoryLocation::DRAM;
-        break;
-    case MemoryDirection::CMX2CMX:
-        from = MemoryLocation::CMX;
-        to = MemoryLocation::CMX;
-        break;
-    default:
-        throw std::runtime_error("Cannot create a DMAWorkload from a DMATransfer1D : unknown memory direction");
-        break;
-    }
-
-    return DMAWorkload{
-            dma.device,  // device
-            ten,         // input
-            ten,         // output
-            from,        // input_location
-            to,          // output_location
-    };
 }
 
 }  // namespace VPUNN

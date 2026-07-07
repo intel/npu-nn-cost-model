@@ -17,10 +17,12 @@
 #include "core/persistent_cache.h"
 #include "core/serializer.h"
 #include "vpu/cycles_interface_types.h"
+#include "vpu/dma_cost_providers/dma_strided_math_cost_provider.h"
 #include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
+#include "vpu/dma_descriptors.h"
 #include "vpu/dpu_info_pack.h"
 #include "vpu/dpu_theoretical_cost_provider.h"
-#include "vpu/energy_interface.h"
+#include "vpu/energy/energy_interface.h"
 #include "vpu/nn_cost_provider.h"
 #include "vpu/performance.h"
 #include "vpu/shave/shave_devices.h"
@@ -29,9 +31,9 @@
 #include "vpu/vpu_performance_model.h"
 #include "vpu_shave_cost_model.h"
 
-#include "vpu/profiling_service.h"
-#include "vpu/http_cost_provider_intf.h"
 #include "vpu/http_cost_provider_factory.h"
+#include "vpu/http_cost_provider_intf.h"
+#include "vpu/profiling_service.h"
 
 namespace VPUNN {
 
@@ -45,7 +47,8 @@ namespace VPUNN {
 /* coverity[rule_of_three_violation:FALSE] */
 class VPUNN_API VPUCostModel {
 private:
-    mutable CSVSerializer serializer{};  ///< serializer for workloads, has its own file to save data
+    mutable CSVSerializer serializer{};                 ///< serializer for DPU workloads
+    mutable CSVSerializer dma_descriptor_serializer{};  ///< serializer for VPUDMADescriptor workloads
 
     const HWPerformanceModel performance{};  // performance instance, not used here
 
@@ -56,7 +59,8 @@ protected:
 
     // DMA cost providers
     // No NN or measured DMA cost provider available
-    const DMATheoreticalCostProvider dma_theoretical{};  ///< theoretical cost provider for DMA
+    const DMATheoreticalCostProvider dma_1D_theoretical{};  ///< theoretical (classic) cost provider for DMA
+    const DMAStridedMathCostProvider_DescIntf dma_strided_theoretical{};  // strided theoretical
 
     // SHAVE cost providers
     std::shared_ptr<SHAVECostModel> ptr_internal_shave_cost_model;  ///< shared ownership of SHAVE cost model
@@ -66,8 +70,8 @@ protected:
     const IEnergy my_energy{*this, internal_shave_cost_model,
                             performance};  ///< energy aspects, not used here but instantiated
 
-    const std::unique_ptr<const IHttpCostProvider> http_dpu_cost_provider; ///< HTTP cost provider for DPU
-    
+    const std::unique_ptr<const IHttpCostProvider> http_dpu_cost_provider;  ///< HTTP cost provider for DPU
+
     const DPU_OperationSanitizer sanitizer;  ///< sanitizer mechanisms
 
 private:
@@ -425,6 +429,14 @@ public:
     unsigned int DMA(const DMAWorkload& wl) const;
 
     /**
+     * @brief Return the number of cycles needed to compute a DMA transfer
+     *
+     * @param desc a VPUDMADescriptor with source/destination tensor descriptions and memory locations
+     * @return CyclesInterfaceType the number of cycles of the DMA transfer
+     */
+    CyclesInterfaceType DMA(const VPUDMADescriptor& desc) const;
+
+    /**
      * @brief Return the number of cycles needed to compute a Shave kernel
      *
      * @param shave_wl a Shave workload contains: name of kernel, device, in out tensor. PLus optional parameters of the
@@ -441,6 +453,17 @@ public:
     /// @param device  for what device?
     /// @returns container with the name of operators
     std::vector<std::string> getShaveSupportedOperations(VPUDevice device) const;
+
+    /**
+     * @brief Lightweight capability query that does not require VPUCostModel construction.
+     *
+     * Returns supported SHAVE operation names for the requested device using the
+     * default device-mapped provider composition.
+     *
+     * @param device Device to query
+     * @return std::vector<std::string> Supported operation names
+     */
+    static std::vector<std::string> queryDeviceMappedSupportedOperations(VPUDevice device);
 
     /// provides a reference to the operator executor specified by name
     /// The executor can be used to execute (run) the runtime prediction on different tensors/parameters

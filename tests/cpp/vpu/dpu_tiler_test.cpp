@@ -475,7 +475,6 @@ TEST_F(ZTilingTest, splitInNOverZOffset_Test) {
                                0,  ///< Number of DPU to optimize for. Setting nDPU = 0 VPUNN auto-detects the number of
                                    ///< DPUs based on the device
                                0,  ///< Per workload runtime overhead in cycles
-                               VPUOptimizationTarget::LATENCY,
                                {VPUSplitStrategy::Z_TILING}};
 
     auto exec_tests = [&options, modeInternal = mode](TestVector& tests) {

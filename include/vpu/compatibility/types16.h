@@ -16,12 +16,13 @@
 #include <limits>
 #include <numeric>
 #include <vector>
-#include "../types.h"  // need to know the present day types for conversion
-#include "../utils.h"
+#include "inference/nn_descriptor_capabilities.h"
 #include "inference/nn_descriptor_versions.h"
 #include "inference/preprocessing_inserter.h"
+#include "vpu/types.h"  // need to know the present day types for conversion
+#include "vpu/utils.h"
 
-#include "preprocessing_adapters.h"
+#include "preprocessing_adapters_bundle.h"
 
 #include <map>
 #include <set>
@@ -243,14 +244,6 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 
 }  // namespace intf_16
 
-// Capabilities provider trait
-struct DefaultCapabilities {
-    static inline const std::set<std::string> capabilities = {};
-    static const std::set<std::string>& get() {
-        return capabilities;
-    }
-};
-
 struct NPU_RESERVED2Capabilities {
     static inline const std::set<std::string> capabilities = {"DW_MXP_AVP_SupportsMoreThan64Ch", "dcim", "uint16"};
     static const std::set<std::string>& get() {
@@ -288,7 +281,7 @@ public:
  * DATA CHANGES:
  *
  */
-template <class T, typename DeviceAdapter, NNVersions V, typename CapabilitiesProvider = DefaultCapabilities>
+template <class T, typename DeviceAdapter, NNVersions V, typename CapabilitiesProvider>
 class Preprocessing_Interface16_Archetype :
         public PreprocessingInserter<T,
                                      Preprocessing_Interface16_Archetype<T, DeviceAdapter, V, CapabilitiesProvider>> {
@@ -317,8 +310,8 @@ protected:
 
         // for enums we must put here the equivalent version  from the target interface, not latest types
 
+        const auto operation{DeviceAdapter::mock_replace_operations(workload.op, workload)};
         {
-            const auto operation{DeviceAdapter::mock_replace_operations(workload.op, workload)};
             offset = ins.template insert<only_simulate>(intf_16::convert<intf_16::Operation>(operation), offset);
 
             if (operation == Operation::REDUCE_MS || operation == Operation::REDUCE_SUMSQUARES) {
@@ -336,10 +329,13 @@ protected:
                 intf_16::convert<intf_16::DataType>(workload.weight_type.value_or(workload.inputs[0].get_dtype())),
                 offset);
 
-        offset = ins.template insert<only_simulate>(workload.outputs[0],
-                                                    offset);  // not to adjust based on output_autopad
-        // also the training space should have data where channels are not padded (because they will be autopadded in
-        // DPU in HW)
+        {  // desc_output0: descriptor-only adjusted output tensor (channels aligned), DPUWorkload is not touched
+            const VPUTensor desc_output0 = DeviceAdapter::adjust_output_for_descriptor(operation, workload);
+            offset = ins.template insert<only_simulate>(desc_output0,
+                                                        offset);  // not to adjust based on output_autopad
+            // also the training space should have data where channels are not padded (because they will be autopadded in
+            // DPU in HW)
+        }
 
         offset = ins.template insert<only_simulate>(workload.kernels[0], offset);
         offset = ins.template insert<only_simulate>(workload.kernels[1], offset);

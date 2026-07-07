@@ -106,6 +106,7 @@ private:
         const ShaveInstanceHolder_HeuristicNPU50_WithFactors heuristic_shaves_50_with_factors{}; // heuristic models with speed-up factors
 
 
+
     } collections{};
 
     // selectors know on what collections to look (they are properly configured for each device)
@@ -126,6 +127,7 @@ private:
     const ShaveSelector selector_50_heuristic_with_factors{collections.heuristic_shaves_50_with_factors};
 
     const ShaveSelector selector_50_with_factors{collections.shave_50_with_factors};
+
 
 
 public:

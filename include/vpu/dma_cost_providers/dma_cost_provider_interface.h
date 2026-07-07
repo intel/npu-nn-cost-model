@@ -6,8 +6,8 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#ifndef DMA_COST_PROVIDER_INTERFACE_H
-#define DMA_COST_PROVIDER_INTERFACE_H
+#ifndef VPUNN_DMA_COST_PROVIDER_INTERFACE_H
+#define VPUNN_DMA_COST_PROVIDER_INTERFACE_H
 
 #include "vpu/dma_types.h"
 
@@ -24,6 +24,8 @@ namespace VPUNN {
 template <typename WlT>
 class IDMACostProvider {
 public:
+    using workload_type = WlT;  // expose workload type for deduction
+
     virtual ~IDMACostProvider() = default;
     /**
      * @brief Calculate the cost of a given DMA workload

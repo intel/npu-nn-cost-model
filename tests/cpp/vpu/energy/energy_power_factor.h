@@ -6,7 +6,7 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#include "vpu/power.h"
+#include "vpu/energy/power.h"
 #include "vpu_cost_model.h"
 
 #include <gtest/gtest.h>

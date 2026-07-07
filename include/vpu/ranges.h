@@ -40,7 +40,7 @@ namespace VPUNN {
 /// - Negative bounds are normalized to 0 at construction time via clamp_negative_to_zero().
 /// - Negative divisors are normalized to their absolute value at construction (divisibility is sign-independent).
 
-/* coverity[rule_of_zero_three_five_violation:FALSE] */
+/* coverity[rule_of_five_violation:FALSE] */
 class SmartRanges {
 private:
     const int lowerBound;  ///<  has to be smaller or equal to upperBound. Always >= 0 (clamped at construction).
@@ -429,6 +429,7 @@ public:
         /// operator= suppresses the implicit move constructor, and we want both to remain available.
         const_iterator(const const_iterator&) = default;
         const_iterator(const_iterator&&) = default;
+        ~const_iterator() = default;
 
         /// @brief Copy assignment that only updates position, never reseats the range reference.
         /// @throws std::logic_error if the source iterator refers to a different SmartRanges instance.
@@ -437,6 +438,9 @@ public:
         /// range (begin/end of the same SmartRanges), this same-range precondition is naturally satisfied
         /// in correct usage. Cross-range assignment is a programming error surfaced as an exception.
         const_iterator& operator=(const const_iterator& other) {
+            if (this == &other) {
+                return *this;
+            }
             if (&range != &(other.range)) {
                 throw std::logic_error("Cannot assign iterators from different SmartRanges instances");
             }
@@ -447,6 +451,9 @@ public:
         /// @brief Move assignment that only updates position, never reseats the range reference.
         /// @throws std::logic_error if the source iterator refers to a different SmartRanges instance.
         const_iterator& operator=(const_iterator&& other) {
+            if (this == &other) {
+                return *this;
+            }
             if (&range != &(other.range)) {
                 throw std::logic_error("Cannot assign iterators from different SmartRanges instances");
             }

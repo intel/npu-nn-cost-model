@@ -35,41 +35,99 @@ TEST_F(RuntimeProcessingFactoryTest, SimpleChecks) {
         int v = -1;
         //EXPECT_EQ(factory.exists_preprocessing(v = 0), true) << "Must be present v: " << v;
         EXPECT_EQ(factory.exists_preprocessing(v = 1), true) << "Must be present v: " << v;
-        EXPECT_EQ(factory.exists_preprocessing(v = (int)VPUNN::NNVersions::VERSION_10_ENUMS_SAME), true)
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_10_ENUMS_SAME)), true)
                 << "Must be present v: " << v;
-        EXPECT_EQ(factory.exists_preprocessing(v = (int)VPUNN::NNVersions::VERSION_11_NPU40), true)
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_11_NPU40)), true)
                 << "Must be present v: " << v;
-        EXPECT_EQ(factory.exists_preprocessing(v = (int)VPUNN::NNVersions::VERSION_11_VPU27_BETA), true)
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_11_VPU27_BETA)), true)
                 << "Must be present v: " << v;
 
+        // newly added interfaces — verify they are registered
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_11_NPU41)), true)
+                << "Must be present v: " << v;
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_12_NPU51)), true)
+                << "Must be present v: " << v;
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_13_NPU51)), true)
+                << "Must be present v: " << v;
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_14_NPU51)), true)
+                << "Must be present v: " << v;
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_15_NPU_RESERVED1)), true)
+                << "Must be present v: " << v;
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_16_NPU_RESERVED2)), true)
+                << "Must be present v: " << v;
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_17_NPU_RESERVED_10)), true)
+                << "Must be present v: " << v;
+
+        // negative / unsupported checks
         EXPECT_EQ(factory.exists_preprocessing(v = 2), false) << "Must be NOT present v: " << v;
-
         EXPECT_EQ(factory.exists_preprocessing(v = -5), false) << "Must be NOT present v: " << v;
     }
 
     {
-        int v = (int)VPUNN::NNVersions::VERSION_01_BASE;
-        ASSERT_NO_THROW(factory.make_preprocessing(v););
-        auto& pp = factory.make_preprocessing(v);
-        EXPECT_EQ(pp.interface_version(), v);
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_01_BASE);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
     }
     {
-        int v = (int)VPUNN::NNVersions::VERSION_10_ENUMS_SAME;
-        ASSERT_NO_THROW(factory.make_preprocessing(v););
-        auto& pp = factory.make_preprocessing(v);
-        EXPECT_EQ(pp.interface_version(), v);
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_10_ENUMS_SAME);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
     }
     {
-        int v = (int)VPUNN::NNVersions::VERSION_11_VPU27_BETA;
-        ASSERT_NO_THROW(factory.make_preprocessing(v););
-        auto& pp = factory.make_preprocessing(v);
-        EXPECT_EQ(pp.interface_version(), v);
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_11_VPU27_BETA);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
     }
     {
-        int v = (int)VPUNN::NNVersions::VERSION_11_NPU40;
-        ASSERT_NO_THROW(factory.make_preprocessing(v););
-        auto& pp = factory.make_preprocessing(v);
-        EXPECT_EQ(pp.interface_version(), v);
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_11_NPU40);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
+    }
+    {
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_11_NPU41);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
+    }
+    {
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_12_NPU51);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
+    }
+    {
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_13_NPU51);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
+    }
+    {
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_14_NPU51);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
+    }
+    {
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_15_NPU_RESERVED1);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
+    }
+    {
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_16_NPU_RESERVED2);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
+    }
+    {
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_17_NPU_RESERVED_10);
+        VPUNN::Preprocessing<float>* pp = nullptr;
+        ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
+        EXPECT_EQ(pp->interface_version(), v);
     }
 
     {

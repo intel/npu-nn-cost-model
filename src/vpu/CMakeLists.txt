@@ -27,7 +27,8 @@ target_sources(vpunn_vpu
         validation/checker_utils.cpp 
         validation/data_dpu_operation.cpp
         validation/serializable_shave.cpp
-        energy_impl.cpp
+        energy/energy_impl.cpp
+        energy/power.cpp
         layer.cpp
         dpu_workload.cpp
         serialization_wrapper.cpp
@@ -35,7 +36,6 @@ target_sources(vpunn_vpu
         shave_workload.cpp
         http_cost_provider_factory.cpp
         http_cost_provider_intf.cpp
-        power.cpp
         workload_hash.cpp
 )
 

@@ -121,7 +121,7 @@ private:
  * @brief Test case: Detects if any data type in the workload is floating point
  *
  * Tests the native_comp_is_any_fp() function which should return true if:
- * - Input tensor is any floating point type (FLOAT16, BFLOAT16, FLOAT32, HF8, BF8)
+ * - Input tensor is any floating point type (FLOAT16, BFLOAT16, FLOAT32, HF8, BF8, FLOAT4)
  * - Output tensor is any floating point type
  * - Weight tensor is any floating point type
  *
@@ -144,7 +144,10 @@ TEST_F(NativeComputationTest, DetectAnyFloatingPointInputType) {
             {{DataType::UINT8, DataType::BF8, DataType::UINT8},
              false},  // UINT8 -> BF8 (UINT8 weights): Input is not FP
             {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8},
-             true},  // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP
+             true},                                        // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP
+            {{DataType::FLOAT4, DataType::UINT8}, true},   // FLOAT4 -> UINT8: Input is FP
+            {{DataType::UINT8, DataType::FLOAT4}, false},  // UINT8 -> FLOAT4: Input is not FP
+            {{DataType::FLOAT4, DataType::FLOAT4}, true},  // FLOAT4 -> FLOAT4: Input is FP
 
     };
     check_types(any_fp, [&](const DPUWorkload& wl) {
@@ -157,7 +160,7 @@ TEST_F(NativeComputationTest, DetectAnyFloatingPointInputType) {
  *
  * Tests the native_comp_on_fp16() function which should return true for:
  * - FLOAT16, BFLOAT16, FLOAT32 input types (16-bit or higher precision FP)
- * - Should return false for FP8 types (HF8, BF8) as they use different precision
+ * - Should return false for FP8 types (HF8, BF8) and FP4 types (FLOAT4) as they use different precision
  */
 TEST_F(NativeComputationTest, DetectFP16FamilyInputTypes) {
     TestVector fp16 = {
@@ -178,7 +181,10 @@ TEST_F(NativeComputationTest, DetectFP16FamilyInputTypes) {
             {{DataType::UINT8, DataType::BF8, DataType::UINT8},
              false},  // UINT8 -> BF8 (UINT8 weights): Input is not FP
             {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8},
-             true},  // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP16
+             true},                                         // FLOAT16 -> BFLOAT16 (HF8 weigts): Input is FP16
+            {{DataType::FLOAT4, DataType::UINT8}, false},   // FLOAT4 -> UINT8: Input is FP4, not FP16
+            {{DataType::UINT8, DataType::FLOAT4}, false},   // UINT8 -> FLOAT4: Input is not FP16
+            {{DataType::FLOAT4, DataType::FLOAT4}, false},  // FLOAT4 -> FLOAT4: Input is FP4, not FP16
     };
 
     check_types(fp16, [&](const DPUWorkload& wl) {
@@ -192,7 +198,7 @@ TEST_F(NativeComputationTest, DetectFP16FamilyInputTypes) {
  * Tests the native_comp_on_fp8() function which should return true for:
  * - HF8 (Half-precision Float 8-bit) input types
  * - BF8 (Brain Float 8-bit) input types
- * - Should return false for higher precision FP types
+ * - Should return false for higher precision FP types and FP4 types
  */
 TEST_F(NativeComputationTest, DetectFP8InputWithNonFP16Weights) {
     TestVector fp8 = {
@@ -215,7 +221,10 @@ TEST_F(NativeComputationTest, DetectFP8InputWithNonFP16Weights) {
             {{DataType::BF8, DataType::INT8, DataType::BF8},
              true},  // BF8 -> INT8 (BF8 weights): Input FP8 and weights BF8
             {{DataType::BF8, DataType::INT8, DataType::UINT2},
-             true},  // BF8 -> INT8 (UINT2 weights): Input FP8 and weights UINT2
+             true},                                         // BF8 -> INT8 (UINT2 weights): Input FP8 and weights UINT2
+            {{DataType::FLOAT4, DataType::UINT8}, false},   // FLOAT4 -> UINT8: Input is FP4, not FP8
+            {{DataType::UINT8, DataType::FLOAT4}, false},   // UINT8 -> FLOAT4: Input is not FP8
+            {{DataType::FLOAT4, DataType::FLOAT4}, false},  // FLOAT4 -> FLOAT4: Input is FP4, not FP8
     };
 
     check_types(fp8, [&](const DPUWorkload& wl) {
@@ -229,6 +238,7 @@ TEST_F(NativeComputationTest, DetectFP8InputWithNonFP16Weights) {
  * Tests the native_comp_on_i8() function which should return true for:
  * - Operations where both input and output are 8-bit integer types
  * - Should consider weight types for mixed-precision scenarios
+ * - INT16/UINT16 are now checked separately via native_comp_on_i16()
  *
  * Note: The corrected expectation for case 1 (UINT8->UINT8) should be true.
  */
@@ -248,11 +258,15 @@ TEST_F(NativeComputationTest, DetectI8InputWithNonFloatWeights) {
              false},                                    // HF8 -> UINT8 (FP16 weights): Input is FP8, not I8
             {{DataType::BF8, DataType::UINT8}, false},  // BF8 -> UINT8: Input is FP8, not I8
             {{DataType::INT4, DataType::BF8, DataType::FLOAT4},
-             true},  // INT4 -> BF8 (FLOAT4 weights): Input I4, weights FP
+             false},  // INT4 -> BF8 (FLOAT4 weights): Input I4, weights FP4
             {{DataType::UINT2, DataType::BFLOAT16, DataType::HF8},
              false},  // UINT2 -> BFLOAT16 (HF8 weights): Input I2, weights FP
             {{DataType::INT1, DataType::INT32, DataType::UINT4},
-             true}  // INT1 -> INT32 (UINT4 weights): Input I1, weights UINT4
+             true},                                        // INT1 -> INT32 (UINT4 weights): Input I1, weights UINT4
+            {{DataType::FLOAT4, DataType::UINT8}, false},  // FLOAT4 -> UINT8: Input is FP4, not I8
+            {{DataType::UINT8, DataType::FLOAT4}, true},   // UINT8 -> FLOAT4: Input is I8
+            {{DataType::UINT16, DataType::UINT8}, false},  // UINT16 -> UINT8: Input is I16, not I8
+            {{DataType::INT16, DataType::UINT8}, false},   // INT16 -> UINT8: Input is I16, not I8
     };
 
     check_types(i8, [&](const DPUWorkload& wl) {
@@ -264,26 +278,32 @@ TEST_F(NativeComputationTest, DetectI8InputWithNonFloatWeights) {
  * @brief Test case: Validates I8 family data type classification for tensors
  *
  * Tests the `is_i8family()` method which determines if a tensor's data type belongs
- * to the integer family (I8, I4, I2, I1, etc.) vs floating-point types (FP16, FP8).
+ * to the integer family (I8, I4, I2, I1, etc.) vs floating-point types (FP16, FP8, FP4).
  * This classification affects VPU hardware execution path selection and memory optimization.
+ *
+ * Note: INT16/UINT16 are now excluded from is_i8family() as they have their own is_i16family() classification
+ * for power factor lookup purposes.
  *
  * Validates classification for input, output, and weight tensors across various integer
  * and floating-point data types.
  */
 TEST_F(NativeComputationTest, DetectI8ForTensors) {
     TestVector test_input_output = {
-            {{DataType::BF8, DataType::BF8}, false},       // BF8 input is not I8
-            {{DataType::UINT8, DataType::UINT8}, true},    // UINT8 input is I8
-            {{DataType::INT8, DataType::INT8}, true},      // INT8 input is I8
-            {{DataType::UINT4, DataType::UINT4}, true},    // UINT4 input is I8
-            {{DataType::INT4, DataType::INT4}, true},      // INT4 input is I8
-            {{DataType::UINT2, DataType::UINT2}, true},    // UINT2 input is I8
-            {{DataType::INT2, DataType::INT2}, true},      // INT2 input is I8
-            {{DataType::UINT1, DataType::UINT1}, true},    // UINT1 input is I8
-            {{DataType::INT1, DataType::INT1}, true},      // INT1 input is I8
-            {{DataType::INT32, DataType::INT32}, true},    // INT32 input is considered I8 family here
-            {{DataType::UINT16, DataType::UINT16}, true},  // UINT16 input is considered I8 family here
-            {{DataType::INT16, DataType::INT16}, true}     // INT16 input is considered I8 family here
+            {{DataType::BF8, DataType::BF8}, false},            // BF8 input is not I8
+            {{DataType::UINT8, DataType::UINT8}, true},         // UINT8 input is I8
+            {{DataType::INT8, DataType::INT8}, true},           // INT8 input is I8
+            {{DataType::UINT4, DataType::UINT4}, true},         // UINT4 input is I8
+            {{DataType::INT4, DataType::INT4}, true},           // INT4 input is I8
+            {{DataType::UINT2, DataType::UINT2}, true},         // UINT2 input is I8
+            {{DataType::INT2, DataType::INT2}, true},           // INT2 input is I8
+            {{DataType::UINT1, DataType::UINT1}, true},         // UINT1 input is I8
+            {{DataType::INT1, DataType::INT1}, true},           // INT1 input is I8
+            {{DataType::INT32, DataType::INT32}, true},         // INT32 input is considered I8 family here
+            {{DataType::UINT16, DataType::UINT16}, false},      // UINT16 input is NOW I16 family, not I8
+            {{DataType::INT16, DataType::INT16}, false},        // INT16 input is NOW I16 family, not I8
+            {{DataType::FLOAT4, DataType::FLOAT4}, false},      // FLOAT4 input is FP, not I8
+            {{DataType::FLOAT16, DataType::FLOAT16}, false},    // FLOAT16 input is FP, not I8
+            {{DataType::BFLOAT16, DataType::BFLOAT16}, false},  // BFLOAT16 input is FP, not I8
     };
 
     // Test I8 family classification for input tensors
@@ -298,21 +318,85 @@ TEST_F(NativeComputationTest, DetectI8ForTensors) {
 
     // Test I8 family classification for weight tensors (with explicit weight types)
     TestVector test_weights = {
-            {{DataType::BF8, DataType::BF8, DataType::BF8}, false},       // BF8 weights is not I8
-            {{DataType::UINT8, DataType::UINT8, DataType::UINT8}, true},  // UINT8 weights is I8
-            {{DataType::INT8, DataType::INT8, DataType::INT8}, true},     // INT8 weights is I8
-            {{DataType::UINT4, DataType::UINT4, DataType::UINT4}, true},  // UINT4 weights is I8
-            {{DataType::INT4, DataType::INT4, DataType::INT4}, true},     // INT4 weights is I8
-            {{DataType::UINT2, DataType::UINT2, DataType::UINT2}, true},  // UINT2 weights is I8
-            {{DataType::INT2, DataType::INT2, DataType::INT2}, true},     // INT2 weights is I8
-            {{DataType::UINT1, DataType::UINT1, DataType::UINT1}, true},  // UINT1 weights is I8
-            {{DataType::INT1, DataType::INT1, DataType::INT1}, true},     // INT1 weights is I8
+            {{DataType::BF8, DataType::BF8, DataType::BF8}, false},           // BF8 weights is not I8
+            {{DataType::UINT8, DataType::UINT8, DataType::UINT8}, true},      // UINT8 weights is I8
+            {{DataType::INT8, DataType::INT8, DataType::INT8}, true},         // INT8 weights is I8
+            {{DataType::UINT4, DataType::UINT4, DataType::UINT4}, true},      // UINT4 weights is I8
+            {{DataType::INT4, DataType::INT4, DataType::INT4}, true},         // INT4 weights is I8
+            {{DataType::UINT2, DataType::UINT2, DataType::UINT2}, true},      // UINT2 weights is I8
+            {{DataType::INT2, DataType::INT2, DataType::INT2}, true},         // INT2 weights is I8
+            {{DataType::UINT1, DataType::UINT1, DataType::UINT1}, true},      // UINT1 weights is I8
+            {{DataType::INT1, DataType::INT1, DataType::INT1}, true},         // INT1 weights is I8
+            {{DataType::UINT16, DataType::UINT16, DataType::UINT16}, false},  // UINT16 weights is I16, not I8
+            {{DataType::INT16, DataType::INT16, DataType::INT16}, false},     // INT16 weights is I16, not I8
+            {{DataType::FLOAT4, DataType::FLOAT4, DataType::FLOAT4}, false},  // FLOAT4 weights is FP, not I8
     };
 
     // Test I8 family classification for dynamically created weight tensors
     check_types(test_weights, [](const DPUWorkload& wl) {
         const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
         return wts.is_i8family();
+    });
+}
+
+/**
+ * @brief Test case: Validates I16 family data type classification for tensors
+ *
+ * Tests the `is_i16family()` method which determines if a tensor's data type is
+ * 16-bit integer (INT16/UINT16). This classification is used for power factor lookup
+ * where INT16 has separate coefficients from INT8.
+ *
+ * Validates classification for input, output, and weight tensors across various data types.
+ */
+TEST_F(NativeComputationTest, DetectI16ForTensors) {
+    TestVector test_input_output = {
+            {{DataType::BF8, DataType::BF8}, false},            // BF8 input is not I16
+            {{DataType::UINT8, DataType::UINT8}, false},        // UINT8 input is not I16
+            {{DataType::INT8, DataType::INT8}, false},          // INT8 input is not I16
+            {{DataType::UINT4, DataType::UINT4}, false},        // UINT4 input is not I16
+            {{DataType::INT4, DataType::INT4}, false},          // INT4 input is not I16
+            {{DataType::UINT2, DataType::UINT2}, false},        // UINT2 input is not I16
+            {{DataType::INT2, DataType::INT2}, false},          // INT2 input is not I16
+            {{DataType::UINT1, DataType::UINT1}, false},        // UINT1 input is not I16
+            {{DataType::INT1, DataType::INT1}, false},          // INT1 input is not I16
+            {{DataType::INT32, DataType::INT32}, false},        // INT32 input is not I16
+            {{DataType::UINT16, DataType::UINT16}, true},       // UINT16 input is I16
+            {{DataType::INT16, DataType::INT16}, true},         // INT16 input is I16
+            {{DataType::FLOAT16, DataType::FLOAT16}, false},    // FLOAT16 is FP, not I16
+            {{DataType::BFLOAT16, DataType::BFLOAT16}, false},  // BFLOAT16 is FP, not I16
+            {{DataType::FLOAT4, DataType::FLOAT4}, false},      // FLOAT4 is FP, not I16
+            {{DataType::HF8, DataType::HF8}, false},            // HF8 is FP, not I16
+    };
+
+    // Test I16 family classification for input tensors
+    check_types(test_input_output, [](const DPUWorkload& wl) {
+        return wl.inputs[0].is_i16family();
+    });
+
+    // Test I16 family classification for output tensors
+    check_types(test_input_output, [](const DPUWorkload& wl) {
+        return wl.outputs[0].is_i16family();
+    });
+
+    // Test I16 family classification for weight tensors (with explicit weight types)
+    TestVector test_weights = {
+            {{DataType::BF8, DataType::BF8, DataType::BF8}, false},          // BF8 weights is not I16
+            {{DataType::UINT8, DataType::UINT8, DataType::UINT8}, false},    // UINT8 weights is not I16
+            {{DataType::INT8, DataType::INT8, DataType::INT8}, false},       // INT8 weights is not I16
+            {{DataType::UINT4, DataType::UINT4, DataType::UINT4}, false},    // UINT4 weights is not I16
+            {{DataType::INT4, DataType::INT4, DataType::INT4}, false},       // INT4 weights is not I16
+            {{DataType::UINT2, DataType::UINT2, DataType::UINT2}, false},    // UINT2 weights is not I16
+            {{DataType::INT2, DataType::INT2, DataType::INT2}, false},       // INT2 weights is not I16
+            {{DataType::UINT1, DataType::UINT1, DataType::UINT1}, false},    // UINT1 weights is not I16
+            {{DataType::INT1, DataType::INT1, DataType::INT1}, false},       // INT1 weights is not I16
+            {{DataType::UINT16, DataType::UINT16, DataType::UINT16}, true},  // UINT16 weights is I16
+            {{DataType::INT16, DataType::INT16, DataType::INT16}, true},     // INT16 weights is I16
+    };
+
+    // Test I16 family classification for dynamically created weight tensors
+    check_types(test_weights, [](const DPUWorkload& wl) {
+        const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
+        return wts.is_i16family();
     });
 }
 

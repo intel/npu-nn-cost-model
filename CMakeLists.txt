@@ -32,7 +32,7 @@ message(STATUS "-- Building for ${CMAKE_BUILD_TYPE}")
 # (for vector instructions if runtime is important) at least for blas
 option(VPUNN_ENABLE_VECTOR_INSTRUCTIONS "use vector instructions" ON)
 option(VPUNN_BUILD_SHARED_LIB "build shared library" OFF)
-option(VPUNN_BUILD_EXAMPLES "build examples" ON)
+option(VPUNN_BUILD_EXAMPLES "build examples" OFF)
 option(VPUNN_BUILD_APPS "build apps" OFF)
 option(VPUNN_BUILD_TESTS "build tests" ON)
 option(VPUNN_ENABLE_LOGGING "enable logging" OFF)

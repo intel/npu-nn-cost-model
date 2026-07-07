@@ -128,4 +128,8 @@ bool SHAVECostModel::sanitize_workload(const SHAVEWorkload& swl, SanityReport& r
     return true;
 }
 
+std::vector<std::string> SHAVECostModel::queryDeviceMappedSupportedOperations(VPUDevice device) {
+    return ShaveCostProviderBundles::queryDeviceMappedSupportedOperations(device);
+}
+
 }  // namespace VPUNN

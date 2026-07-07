@@ -24,7 +24,8 @@ PYBIND11_MODULE(_VPUNN, m) {
         .value("VPU_4_0", VPUNN::VPUDevice::VPU_4_0)
         .value("NPU_5_0", VPUNN::VPUDevice::NPU_5_0)
         .value("NPU_5_0_W", VPUNN::VPUDevice::NPU_5_0_W)
-        .value("NPU_RESERVED", VPUNN::VPUDevice::NPU_RESERVED);
+        .value("NPU_RESERVED", VPUNN::VPUDevice::NPU_RESERVED)
+        .value("NPU_RESERVED_1", VPUNN::VPUDevice::NPU_RESERVED_1);
 
     py::enum_<VPUNN::DataType>(m, "DataType")
         .value("UINT8", VPUNN::DataType::UINT8)
@@ -70,7 +71,8 @@ PYBIND11_MODULE(_VPUNN, m) {
         .value("CUBOID_16x16", VPUNN::ExecutionMode::CUBOID_16x16)
         .value("CUBOID_8x16", VPUNN::ExecutionMode::CUBOID_8x16)
         .value("CUBOID_4x16", VPUNN::ExecutionMode::CUBOID_4x16)
-        .value("dCIM_32x128", VPUNN::ExecutionMode::dCIM_32x128);
+        .value("dCIM_32x128", VPUNN::ExecutionMode::dCIM_32x128)
+        .value("dCIM_64x128", VPUNN::ExecutionMode::dCIM_64x128);
 
     py::enum_<VPUNN::Layout>(m, "Layout")
         .value("ZMAJOR", VPUNN::Layout::ZMAJOR)

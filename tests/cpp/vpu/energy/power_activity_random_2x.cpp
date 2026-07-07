@@ -10,7 +10,7 @@
 
 #include <gtest/gtest.h>
 #include "core/logger.h"
-#include "vpu/power.h"
+#include "vpu/energy/power.h"
 #include "vpu/types.h"
 
 #include "common/common_helpers.h"

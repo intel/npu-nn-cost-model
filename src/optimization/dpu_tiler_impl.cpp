@@ -66,6 +66,55 @@ std::list<DPUWorkloadsWithCycleCost> DPUTilerImplementation::generateSplits_proc
         SmartRanges candidate_range(16, std::min(256u, effective_max_block_size), 16, 32);
         const auto candidate_channels_sizes = candidate_range.transformSmartRangetoVector<unsigned int>();
 
+        std::vector<unsigned int> remainder_block_sizes;
+        if (output_channels % 16 != 0 && layer.is_output_autopad()) {
+            // Directly enumerate all valid remainder sizes with the correct residue.
+            // Each candidate R satisfies R % 16 == (output_channels % 16) and 0 < R <= output_channels.
+            // This avoids the gaps that arise from the SmartRanges(16, X, 16, 32) -> adjust approach,
+            // which skips raw sizes not divisible by 32 (e.g. raw=48 never appears, so adjusted=33 was missing).
+            const unsigned int residue = output_channels % 16;
+            for (unsigned int r = residue; r <= output_channels; r += 16) {
+                remainder_block_sizes.push_back(r);
+            }
+
+            // For depthwise-style ops (DW_CONVOLUTION, AVEPOOL, MAXPOOL), input and output channels
+            // are tightly coupled: each output channel slice requires a matching input channel slice.
+            // The prefix tiles (aligned, multiples of 16) each consume exactly their output channel
+            // count from the layer's input channels. The remainder tile may require more input channels
+            // than its output count because createTestLayer applies alignment:
+            //   - remainder < 16, no autopad  => padded up to 16 input channels
+            //   - remainder < 16, autopad      => exactly r input channels (no padding needed)
+            //   - remainder >= 16              => rounded up to the next multiple of 32 being 
+            //                                    the only valid alignment for dwconv family over 16 channels
+            // Total input channels needed = (output_channels - r)   [prefix tiles]
+            //                             + in_ch_for_remainder      [remainder tile]
+            // Filter out any remainder size r where this total exceeds the layer's actual input channels.
+            if (is_dwconv_family_operation(layer.op)) {
+                const unsigned int layer_in_ch = layer.inputs[0].channels();
+
+                // Mirrors the input-channel alignment applied in createTestLayer.
+                auto input_channels_for_remainder = [&](unsigned int r) -> unsigned int {
+                    if (r < 16u && layer.is_input_autopad()) {
+                        // Sub-16 remainder with autopad: keep exact channel count
+                        return r;
+                    }
+                    // Apply DW-style alignment: <=16 → 16, >16 → round_up(r, 32)
+                    return dw_channel_align(r);
+                };
+
+                // Remove any remainder block size r where the total input channels needed exceeds the 
+                // layer's input channels. This check ensures we only consider valid tiling configurations 
+                // that respect the tight coupling of input and output channels for these ops.
+                remainder_block_sizes.erase(
+                        std::remove_if(remainder_block_sizes.begin(), remainder_block_sizes.end(),
+                                       [&](unsigned int r) {
+                                           const unsigned int prefix_in_ch = output_channels - r;
+                                           const unsigned int remainder_in_ch = input_channels_for_remainder(r);
+                                           return (prefix_in_ch + remainder_in_ch) > layer_in_ch;
+                                       }),
+                        remainder_block_sizes.end());
+            }
+        }
         for (const auto& mode : valid_execution_modes) {
             // Generate splits will make sure that we avoid cases of autopad and invalid ops that should not be runned
             const auto nWorkloads = *(zeff_algo->generateSplitPool(options.nDPU, mode)).begin();
@@ -79,6 +128,14 @@ std::list<DPUWorkloadsWithCycleCost> DPUTilerImplementation::generateSplits_proc
                     continue;
 
                 zeff_algo->setBlocks(blocks_of_channels);
+
+                if(output_channels % 16 != 0 && layer.is_output_autopad()) {
+                    const auto remainder_blocks = evaluator_.measureCandidateBlocks(layer, mode, remainder_block_sizes);
+                    if (remainder_blocks.empty())
+                        continue;
+
+                    zeff_algo->setRemainderBlocks(remainder_blocks);
+                }
             }
 
             // If the nWls is 1 it means it should simply infer and skip,otherwise if it is on 0 it will search for best split.
@@ -100,10 +157,6 @@ std::list<DPUWorkloadsWithCycleCost> DPUTilerImplementation::generateSplits(
     auto timeout = SyncStopWatch<std::micro>();
     if (options.maxLatencyUs > 0)
         timeout.start();
-
-    if (options.target == VPUOptimizationTarget::POWER) {
-        throw_error<std::runtime_error>("generateSplits: not Handling VPUOptimizationTarget::POWER");
-    }
 
     for (auto& algo : algorithms) {
         for (auto& mode : valid_execution_modes) {
