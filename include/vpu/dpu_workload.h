@@ -17,11 +17,13 @@
 #include <string>
 
 #include "dpu_defaults.h"
+#include "dpu_dtypes_dimension_info.h"
 #include "dpu_halo.h"
 #include "dpu_types.h"
+#include "profiling_service.h"
 #include "sep_mode.h"
 #include "vpu_tensor.h"
-#include "profiling_service.h"
+#include "workload_semantics_info.h"
 
 namespace VPUNN {
 
@@ -108,7 +110,7 @@ struct DPUWorkload {
     CostSourceHint cost_source_hint{CostSourceHint::AUTO};
 
     /// hint about what profiling service backend to use
-    /// Hints should not be included in the hash computation or the cout operator, 
+    /// Hints should not be included in the hash computation or the cout operator,
     /// as they do not define the workload itself and are highly likely to change without affecting the actual workload.
     ProfilingServiceBackend profiling_service_backend_hint{ProfilingServiceBackend::__size};
 
@@ -179,8 +181,7 @@ struct DPUWorkload {
 
     /// detect if operation is elementwise fammily
     bool is_elementwise_like_operation() const {
-        return ((op == Operation::ELTWISE) ||  //
-                (op == Operation::ELTWISE_MUL));
+        return WorkloadSemanticsInfo::is_elementwise_like_operation(op);
     }
 
     /// superdense setter. becomes with value
@@ -248,13 +249,8 @@ protected:
     bool is_preconditions_for_inplace_output() const {
         const VPUTensor& in{inputs[0]};
         const VPUTensor& out{outputs[0]};
-        if ((in.get_layout() == out.get_layout())                             // same layout
-            && (is_same_datatype_footprint(in.get_dtype(), out.get_dtype()))  // same type size
-        ) {
-            return true;
-        } else {
-            return false;
-        }
+        return WorkloadSemanticsInfo::is_preconditions_for_inplace_output(in.get_layout(), in.get_dtype(),
+                                                                           out.get_layout(), out.get_dtype());
     }
 
     /// @brief finds out if (assuming elementwise situation) the input_1 is not existing, no weighs
@@ -269,14 +265,8 @@ protected:
         // this is a temporary speculative(contextual) implementation. The final solution will have a explicit field in
         // the workload specifying that the weights are not present
 
-        if ((in.get_layout() != out.get_layout())  // layout change
-            || (!is_same_datatype_footprint(in.get_dtype(),
-                                            out.get_dtype()))  // from a type size to another, not only F16 to [u]int8
-        ) {
-            return true;
-        } else {
-            return false;
-        }
+        return WorkloadSemanticsInfo::is_special_no_weights_situation(in.get_layout(), in.get_dtype(),
+                                                                       out.get_layout(), out.get_dtype());
     }
 
     // operations/methods

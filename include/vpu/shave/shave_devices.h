@@ -198,6 +198,10 @@ public:
             case VPUDevice::NPU_5_0:
                 return selector_50_heuristic;
                 break;
+            case VPUDevice::NPU_5_0_W:
+                // for compatibility reasons, we need to use old selector for WCL
+                return getOldSelector(desired_device);
+                break;
             default:
                 // if there is no heuristic selector for the device, return the regular selector
                 return getOldSelector(desired_device);

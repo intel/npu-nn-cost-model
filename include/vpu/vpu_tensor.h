@@ -16,6 +16,7 @@
 #include <sstream>  //
 #include <string>
 
+#include "dpu_dtypes_dimension_info.h"
 #include "dpu_types.h"
 #include "dpu_types_info.h"
 #include "utils.h"
@@ -122,95 +123,6 @@ public:
         return multiply_vector(shape);
     }
 
-    /// @brief Check if the tensor is floating point
-    /// @return true if floating point type
-    bool is_any_float() const noexcept {
-        switch (dtype) {
-        case DataType::FLOAT32:
-        case DataType::FLOAT16:
-        case DataType::BFLOAT16:
-        case DataType::BF8:
-        case DataType::HF8:
-        case DataType::FLOAT4:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    /**
-     * @brief Determines if tensor data type activates power circuits for fp16 or not. Is used for adjustment factors of power modeling
-     * and performance prediction etc.
-     * @todo: make more robust mechanism to check for data types coverage, where each key of DataType have properties that 
-     *        give more insights about the type, like: is_float, is_integer, is_signed, size_in_bytes, is_fp16family,
-     *        is_fp8family, is_i8family
-     */
-    bool is_fp16family() const noexcept {
-        switch (dtype) {
-        case DataType::FLOAT32:     // not supported, but kept to have all types coverage
-        case DataType::FLOAT16:
-        case DataType::BFLOAT16:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    bool is_fp8family() const noexcept {
-        switch (dtype) {
-        case DataType::BF8:
-        case DataType::HF8:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    /**
-     * @brief Determines if tensor data type is 16-bit integer family.
-     * Used for power factor lookup where INT16/UINT16 have separate coefficients.
-     */
-    bool is_i16family() const noexcept {
-        switch (dtype) {
-        case DataType::UINT16:
-        case DataType::INT16:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    /**
-     * @brief Determines if tensor data type activates power circuits for int8 or not. Is used for adjustment factors of power
-     * modeling and performance prediction etc.
-     */
-    bool is_i8family() const noexcept {
-        switch (dtype) {
-        case DataType::UINT8:
-        case DataType::INT8:
-        case DataType::UINT4:
-        case DataType::INT4:
-        case DataType::UINT2:
-        case DataType::INT2:
-        case DataType::UINT1:
-        case DataType::INT1:
-
-        // No support for operations in DPU with these types yet
-        case DataType::INT32:
-
-        // Note: UINT16/INT16 are excluded here - they use is_i16family() for power factor lookup
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    /// @brief Check if the tensor is integer
-    /// @return true if integer type
-    bool is_any_int() const noexcept {
-        return !is_any_float();
-    }
-
     /// @brief Get the shape
     /// @return a 4 vector containing the shape in convention XYZB
     const std::array<unsigned int, 4>& get_shape() const noexcept {
@@ -231,7 +143,7 @@ public:
     /// @brief changes the underlying data type only if same size new vs old
     /// @returns newly set type.
     DataType change_datatype_superficial(DataType new_datatype) {
-        if (is_same_datatype_footprint(new_datatype, get_dtype())) {
+        if (DTypeDimensionInfo::is_same_datatype_footprint(new_datatype, get_dtype())) {
             dtype = new_datatype;
         }
         return get_dtype();
@@ -335,12 +247,12 @@ private:
      */
     std::pair<const int, const int> computeContiguousElementCountAndSize() const {
         // the minimum number of bytes in which we can store the dtype
-        const int type_dimension_B = static_cast<int>(dtype_to_bytes(dtype));
+        const int type_dimension_B = static_cast<int>(DTypeDimensionInfo::dtype_to_bytes(dtype));
 
         // number of bits occupied in the last byte of the type dimension
         // example: if type_dim=1 and dtype=INT3 => there is 1 byte and only 3 bits occupied
         //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
-        const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension_B - 1);
+        const int overflowBits = DTypeDimensionInfo::dtype_to_bits(dtype) - 8 * (type_dimension_B - 1);
 
         if (!isOverflowBitsValid(overflowBits))
             return std::make_pair(-1, -1);
@@ -401,7 +313,7 @@ private:
     int sizeOfRemaininElem_B(const int elem, const int contiguousSeq_elm) const {
         const int remainingElem = elem % contiguousSeq_elm;
         const int size_of_remainingElem_Bytes =
-                ((remainingElem == 0) ? (0) : ((remainingElem * dtype_to_bits(dtype)) / 8 + 1));
+                ((remainingElem == 0) ? (0) : ((remainingElem * DTypeDimensionInfo::dtype_to_bits(dtype)) / 8 + 1));
 
         return size_of_remainingElem_Bytes;
     }
@@ -447,7 +359,7 @@ private:
     }
 
     int transform_bits_to_bytes(const int elem) const {
-        const int type_in_bits = static_cast<int>(dtype_to_bits(dtype));
+        const int type_in_bits = static_cast<int>(DTypeDimensionInfo::dtype_to_bits(dtype));
 
         const int size_in_bits = elem * type_in_bits;
         const int size = (size_in_bits % 8 == 0) ? size_in_bits / 8 : (size_in_bits / 8) + 1;
@@ -508,7 +420,7 @@ private:
         // INT12 occupies 12 bits out of 2 bytes, leaving 6 bits free, but another element of this type cannot fit
         // =>types larger than 8 bits will always occupy 2 bytes in memory
         const auto innermost_dimension{shape[order[0]]};
-        const int type_dimension{dtype_to_bytes(dtype)};
+        const int type_dimension{DTypeDimensionInfo::dtype_to_bytes(dtype)};
 
         if (type_dimension < 1)
             return false;
@@ -516,7 +428,7 @@ private:
         // number of bits occupied in the last byte of the type dimension
         // example: if type_dim=1 and dtype=INT3 => there is 1 byte and only 3 bits occupied
         //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
-        const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension - 1);
+        const int overflowBits = DTypeDimensionInfo::dtype_to_bits(dtype) - 8 * (type_dimension - 1);
 
         if (!isOverflowBitsValid(overflowBits))
             return false;
@@ -551,7 +463,7 @@ private:
     // throw an exception in the constructor if the condition is not met
     bool is_tensor_valid_packmode_1() const {
         const auto elements_count = multiply_vector(shape);
-        const int type_dimension = dtype_to_bytes(dtype);
+        const int type_dimension = DTypeDimensionInfo::dtype_to_bytes(dtype);
 
         if (type_dimension == -1)
             return false;
@@ -559,7 +471,7 @@ private:
         // number of bits occupied in the last byte of the type dimension
         // example: if type_dim=1 and dtype=INT3 => there is 1 byte and only 3 bits occupied
         //          if type_dim=2 and dtype=INT12 => there is 2 bytes and only 4 bits occupied from the second byte
-        const int overflowBits = dtype_to_bits(dtype) - 8 * (type_dimension - 1);
+        const int overflowBits = DTypeDimensionInfo::dtype_to_bits(dtype) - 8 * (type_dimension - 1);
 
         if (!isOverflowBitsValid(overflowBits))
             return false;
@@ -596,13 +508,13 @@ private:
         const auto order = layout_to_order(layout);
         const auto innermost_dimension{shape[order[0]]};
 
-        const auto occupied_bits =
-                (innermost_dimension * dtype_to_bits(dtype)) % 8;  // occupied bits from the last byte
+        const auto occupied_bits = (innermost_dimension * DTypeDimensionInfo::dtype_to_bits(dtype)) %
+                                   8;  // occupied bits from the last byte
         const auto unoccupied_bits =
                 (occupied_bits == 0) ? 0 : (8 - occupied_bits);  // unoccupied bits from the last byte
 
         // we verify if there is still enough space in the last byte to put another element
-        if ((unoccupied_bits / dtype_to_bits(dtype)) != 0) {
+        if ((unoccupied_bits / DTypeDimensionInfo::dtype_to_bits(dtype)) != 0) {
             return false;
         }
 
@@ -612,12 +524,13 @@ private:
     bool is_tensor_valid_packmode_3() const {
         const auto elements_count = multiply_vector(shape);
 
-        const auto occupied_bits = (elements_count * dtype_to_bits(dtype)) % 8;  // occupied bits from the last byte
+        const auto occupied_bits =
+                (elements_count * DTypeDimensionInfo::dtype_to_bits(dtype)) % 8;  // occupied bits from the last byte
         const auto unoccupied_bits =
                 (occupied_bits == 0) ? 0 : (8 - occupied_bits);  // unoccupied bits from the last byte
 
         // we verify if there is still enough space in the last byte to put another element
-        if ((unoccupied_bits / dtype_to_bits(dtype)) != 0) {
+        if ((unoccupied_bits / DTypeDimensionInfo::dtype_to_bits(dtype)) != 0) {
             return false;
         }
 

@@ -13,6 +13,7 @@
 #include "performance_mode.h"
 #include "vpu/serialization/serialization_wrapper.h"
 #include "vpu/validation/dpu_operations_validator.h"
+#include "vpu/validation/serializable_dpu.h"
 
 namespace VPUNN {
 
@@ -37,12 +38,12 @@ private:
     }
 
     void serialize_info_and_compute_workload_uid(const DPUWorkload& wl) {
-        auto wl_op = DPUOperation(wl, ops_context().get_config(wl.device));
-        serializer_operation_uid = wl.hash();
+        auto serializable_wl = SerializableDPU(wl, ops_context().get_config(wl.device));
+        // Keep workload_uid aligned with the serialized SerializableDPU payload.
+        serializer_operation_uid = serializable_wl.hash();
         serializer.serialize(
-                wl_op, SerializableField<std::string>{"workload_uid", std::to_string(serializer_operation_uid)},
-                SerializableField<std::string>{"info", wl.get_layer_info()},
-                SerializableField<std::string>{"mpe_engine", MPEEngine_ToText.at(static_cast<int>(wl_op.mpe_engine))});
+                serializable_wl, SerializableField<std::string>{"workload_uid", std::to_string(serializer_operation_uid)},
+            SerializableField<std::string>{"info", wl.get_layer_info()});
     }
 
 public:
@@ -100,10 +101,11 @@ public:
         for (unsigned int idx = 0; idx < serializer_orig_wls.size(); ++idx) {
             try {
                 swizzling_turn_OFF(serializer_orig_wls[idx]);  // swizz guard sanitization
-                auto wl_op = DPUOperation(serializer_orig_wls[idx],
-                                          ops_context().get_config(serializer_orig_wls[idx].device));
-                serializer_operation_uid = wl_op.hash();
-                serializer.serialize(wl_op, SerializableField<std::string>{"workload_uid",
+                auto serializable_wl = SerializableDPU(serializer_orig_wls[idx],
+                                             ops_context().get_config(serializer_orig_wls[idx].device));
+                // Use the same UID policy as the single-workload path for consistency.
+                serializer_operation_uid = serializable_wl.hash();
+                serializer.serialize(serializable_wl, SerializableField<std::string>{"workload_uid",
                                                                            std::to_string(serializer_operation_uid)});
 
                 serializer.serialize(SerializableField<decltype(cycles_vector[idx])>{dpu_nickname, cycles_vector[idx]});

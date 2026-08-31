@@ -26,6 +26,8 @@ target_sources(vpunn_vpu
     PRIVATE 
         validation/checker_utils.cpp 
         validation/data_dpu_operation.cpp
+        validation/serializable_dma_descriptor.cpp
+        validation/serializable_dpu.cpp
         validation/serializable_shave.cpp
         energy/energy_impl.cpp
         energy/power.cpp
@@ -37,6 +39,7 @@ target_sources(vpunn_vpu
         http_cost_provider_factory.cpp
         http_cost_provider_intf.cpp
         workload_hash.cpp
+        vpu_performance_model.cpp
 )
 
 target_link_libraries(vpunn_vpu
@@ -44,7 +47,7 @@ target_link_libraries(vpunn_vpu
         vpunn_common_settings
         flatbuffers
         vpunn_inference
-        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
+        $<$<BOOL:${VPUNN_HTTP_CLIENT_AVAILABLE}>:vpunn_http_client>
 )
 
 add_dependencies(vpunn_vpu vpunn_cpp_schema)

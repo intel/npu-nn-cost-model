@@ -18,10 +18,10 @@ class HttpCostProviderFactory {
 public:
     /**
      * @brief Factory method to create an instance of IHttpCostProvider.
-     * 
-     * If the VPUNN_BUILD_HTTP_CLIENT flag is set, it creates an instance of HttpCostProvider,
-     * otherwise returns nullptr. That's why after using create one should always check for nullptr.
-     * 
+     *
+     * Creates an HttpCostProvider configured from environment variables. The returned
+     * pointer may be null if creation fails, so callers should always check for nullptr.
+     *
      * @return A unique pointer to the created IHttpCostProvider instance.
      */
     static std::unique_ptr<const IHttpCostProvider> create();

@@ -10,6 +10,7 @@
 #ifndef L2_COST_SERIALIZATION_WRAPPER_H
 #define L2_COST_SERIALIZATION_WRAPPER_H
 #include "vpu/serialization/serialization_wrapper.h"
+#include "vpu/validation/serializable_dpu.h"
 #include "vpu_cost_model.h"
 
 namespace VPUNN {
@@ -134,10 +135,10 @@ public:
             return;
         try {
             auto& cfg = layer_validator.getDeviceConfiguratorForTiles(context.device);
-            const auto op = DPUOperation(layer, cfg);  // not all wl details are relevant at layer
-            serializer_operation_uid = op.hash() ^ std::hash<unsigned int>{}(context.nTiles);
+            const auto serializable_layer_wl = SerializableDPU(layer, cfg);  // not all wl details are relevant at layer
+            serializer_operation_uid = serializable_layer_wl.hash() ^ std::hash<unsigned int>{}(context.nTiles);
 
-            serializer.serialize(op, SerializableField<decltype(context.nTiles)>{"n_requested_tiles", context.nTiles},
+            serializer.serialize(serializable_layer_wl, SerializableField<decltype(context.nTiles)>{"n_requested_tiles", context.nTiles},
                                  SerializableField<decltype(context.nDPU)>{"n_dpu", context.nDPU},
                                  SerializableField<decltype(context.strategy)>{"tiling_strategy", context.strategy},
                                  SerializableField<std::string>{"level", "layer"},
@@ -187,9 +188,9 @@ private:
     /// vpunn_cycle
     void serializeOneTileLayerInfo_genericInfo(const OneTileLayerInfo& split, const IDeviceValidValues& cfg,
                                                const size_t computed_tiles, int idx) {
-        const auto op = DPUOperation(split.inter_tile_split_layer, cfg);
+        const auto serializable_split_wl = SerializableDPU(split.inter_tile_split_layer, cfg);
 
-        serializer.serialize(op, SerializableField<decltype(context.nTiles)>{"n_requested_tiles", context.nTiles},
+        serializer.serialize(serializable_split_wl, SerializableField<decltype(context.nTiles)>{"n_requested_tiles", context.nTiles},
                              SerializableField{"n_computed_tiles", computed_tiles},
                              SerializableField<decltype(context.nDPU)>{"n_dpu", context.nDPU},
                              SerializableField<decltype(context.strategy)>{"tiling_strategy", context.strategy},
@@ -216,15 +217,12 @@ private:
             for (size_t wl_idx = 0; wl_idx < wls.workloads.size(); wl_idx++) {
                 const auto& wl = wls.workloads[wl_idx];
                 const auto& wl_cost = wls.cycles[wl_idx];
-                auto wl_op = DPUOperation(wl, cost_model.getSanitizerDeviceConfiguration(wl.device));
+                auto serializable_wl = SerializableDPU(wl, cost_model.getSanitizerDeviceConfiguration(wl.device));
 
-                auto ss = std::stringstream();
-                ss << wl_op;
-                std::hash<std::string> hasher;
-                const size_t wl_uid = hasher(ss.str());
+                const size_t wl_uid = serializable_wl.hash();
 
                 serializer.serialize(
-                        wl_op, SerializableField<decltype(context.nTiles)>{"n_requested_tiles", context.nTiles},
+                        serializable_wl, SerializableField<decltype(context.nTiles)>{"n_requested_tiles", context.nTiles},
                         SerializableField{"n_computed_tiles", computed_tiles},
                         SerializableField<decltype(context.nDPU)>{"n_dpu", context.nDPU},
                         SerializableField<decltype(context.strategy)>{"tiling_strategy", context.strategy},

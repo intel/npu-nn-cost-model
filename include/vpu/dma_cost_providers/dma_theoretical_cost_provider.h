@@ -17,7 +17,7 @@
 #include "performance_mode.h"
 #include "vpu/cycles_interface_types.h"                           // for CyclesInterfaceType, Cycles
 #include "vpu/dma_workload.h"                                     // for DMAWorkloadTransformer, DMANNWorkload_NPU40_50
-#include "vpu/dpu_types_info.h"                                   // for dtype_to_bytes
+#include "vpu/dpu_dtypes_dimension_info.h"                        // for dtype_to_bytes
 #include "vpu/hw_characteristics/HW_characteristics_supersets.h"  // for HWCharacteristicsSet
 #include "vpu/hw_characteristics/itf_HW_characteristics_set.h"    // for IHWCharacteristicsSet
 #include "vpu/types.h"
@@ -66,7 +66,7 @@ protected:
         if (!permute) {
             return std::min(tensor.size(), get_sram_word_sizeLegacy(compression, half_duplex));
         } else {
-            auto number_of_bytes = dtype_to_bytes(tensor.get_dtype());
+            auto number_of_bytes = DTypeDimensionInfo::dtype_to_bytes(tensor.get_dtype());
             return ((number_of_bytes <= 0) ? 1 : number_of_bytes);
         }
     }
@@ -167,7 +167,7 @@ protected:
                                          float decompression_ratio = 1.0F, int compressed_BW_BytesPerCycle = 1) const {
         // permute limits the bw to one element per cycle
         if (permute) {
-            return dtype_to_bytes(tensor.get_dtype());
+            return DTypeDimensionInfo::dtype_to_bytes(tensor.get_dtype());
         }
 
         const auto nominal_bw = cmx_raw_word_size(device);  // nominal

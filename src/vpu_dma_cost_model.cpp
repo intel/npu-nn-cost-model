@@ -19,6 +19,7 @@
 #include "core/dma_map_type_selector.h"  // need this to instantiate the template with specifics like DMANNWorkload_NPU27
 #include "core/logger.h"
 #include "core/serializer.h"
+#include "core/utils.h"  // for get_env_vars
 #include "vpu/cycles_interface_types.h"
 #include "vpu/dma_cost_providers/dma_cost_provider_bundles.h"
 #include "vpu/dma_cost_providers/dma_theoretical_cost_provider.h"
@@ -123,24 +124,34 @@ std::tuple<CyclesInterfaceType, std::string> DMACostModel<DMADesc>::computeCycle
 }
 
 template <class DMADesc>
+CyclesInterfaceType DMACostModel<DMADesc>::computeCyclesSource(const DMADesc& wl, std::string& info,
+                                                               std::string* cost_source) {
+    return Execute_and_sanitize(wl, info, cost_source);
+}
+template <class DMADesc>
 CyclesInterfaceType DMACostModel<DMADesc>::computeCycles(const DMADesc& wl, std::string& info) {
     return Execute_and_sanitize(wl, info);
 }
 
 template <class DMADesc>
-CyclesInterfaceType DMACostModel<DMADesc>::Execute_and_sanitize(const DMADesc& wl, std::string& info) {
+CyclesInterfaceType DMACostModel<DMADesc>::Execute_and_sanitize(const DMADesc& wl, std::string& info,
+                                                                std::string* cost_source) {
     DMACostSerializationWrap<DMADesc> serialization_handler(interogation_serializer);
     serialization_handler.serializeDMAWorkload(wl);
 
     SanityReport problems{};
     info = problems.info;
 
-    std::string cost_source = "unknown";
+    std::string local_cost_source = "unknown";
     CyclesInterfaceType cycles{problems.value()};
 
-    cycles = get_cost(wl, info, &cost_source);
+    cycles = get_cost(wl, info, &local_cost_source);
 
-    serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(cost_source), info);
+    if (cost_source) {
+        *cost_source = local_cost_source;
+    }
+
+    serialization_handler.serializeCyclesAndCostInfo_closeLine(cycles, std::move(local_cost_source), info);
 
     return cycles;
 }
@@ -201,8 +212,8 @@ CyclesInterfaceType DMACostModel<DMADesc>::run_cost_providers(const DMADesc& wor
         return cached_cost;
     }
 
-    // 2. Profiling service
-    cycles = try_profiling();
+    // 2. Profiling service, if enabled
+    cycles = profilingAutoHintGate.isEnabled() ? try_profiling() : Cycles::ERROR_PROFILING_SERVICE;
 
     // 3. Priority-based provider (fallback if profiling fails)
     if (Cycles::isErrorCode(cycles)) {

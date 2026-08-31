@@ -107,6 +107,11 @@ private:
 
     const std::unique_ptr<const IHttpCostProvider> http_dma_cost_provider;  ///< HTTP cost provider for DMA
     mutable CSVSerializer interogation_serializer;  ///< serializes DMADesc workloads to csv file.
+
+    /// @brief Gate for whether a cache-miss DMA workload query may use the online profiling service. Defaults
+    /// from the environment; runtime overrides apply only when the environment did not force a value.
+    ProfilingAutoHintGate profilingAutoHintGate;
+
 public:
     /**
      * @brief Construct a new DMACostModel object
@@ -153,6 +158,16 @@ public:
      * @return const AccessCounter& Reference to the cache counter
      */
     const AccessCounter& getPreloadedCacheCounter() const;
+
+    /// @brief Enables/disables the online profiling service for cache-miss queries, unless the environment
+    /// forced a value (which takes precedence).
+    void setProfilingEnabledForAutoHint(bool value) noexcept {
+        profilingAutoHintGate.set(value);
+    }
+
+    bool isProfilingEnabledForAutoHint() const noexcept {
+        return profilingAutoHintGate.isEnabled();
+    }
 
 protected:
     ///@ brief checks some validity criteria and performs sanitization that does not alter relevance
@@ -217,11 +232,14 @@ public:
     /// @param wl the workload to infer on
     /// @param info [out] will collect error info regarding wl checking.
     CyclesInterfaceType computeCycles(const DMADesc& wl, std::string& info);
+    /// @brief Like computeCycles(const DMADesc&, std::string&), but also returns the selected cost provider source.
+    /// @param cost_source [out, optional] if non-null, receives the cost source label (e.g. "cache", "profiling_service_*").
+    CyclesInterfaceType computeCyclesSource(const DMADesc& wl, std::string& info, std::string* cost_source);
 
 private:
     /* @brief Execution
      */
-    CyclesInterfaceType Execute_and_sanitize(const DMADesc& wl, std::string& info);
+    CyclesInterfaceType Execute_and_sanitize(const DMADesc& wl, std::string& info, std::string* cost_source = nullptr);
 
     /**
      * @brief Wrapper over run_cost_providers for handling situations where a workload cannot be resolved with only one

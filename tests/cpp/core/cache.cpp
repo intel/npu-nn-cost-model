@@ -20,6 +20,7 @@
 #include "core/serializer.h"
 #include "vpu/compatibility/types11.h"
 #include "vpu/compatibility/types14.h"
+#include "vpu/validation/serializable_dpu.h"
 #include "vpu_cost_model.h"
 
 /// @brief namespace for Unit tests of the C++ library
@@ -689,7 +690,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
     serializer_IN.initialize(clean_csv_exension(test_config.csv_file), FileMode::READONLY);  // open file, basic fields
     EXPECT_TRUE(serializer_IN.is_initialized());
 
-    DPUOperation wl_buff;
+    SerializableDPU wl_buff;
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
@@ -800,7 +801,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
     serializer_IN.initialize(clean_csv_exension(normalConfig.csv_file), FileMode::READONLY);  // open file, basic fields
     EXPECT_TRUE(serializer_IN.is_initialized());
 
-    DPUOperation wl_buff;
+    SerializableDPU wl_buff;
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
@@ -914,7 +915,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
         serializer_IN.initialize(clean_csv_exension(i_csv_file), FileMode::READONLY);  // open file, basic fields
         EXPECT_TRUE(serializer_IN.is_initialized());
 
-        DPUOperation wl_buff;
+        SerializableDPU wl_buff;
         SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
         Series readFieldsAll{};
 
@@ -1052,7 +1053,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
         serializer_IN.initialize(clean_csv_exension(i_csv_file), FileMode::READONLY);  // open file, basic fields
         EXPECT_TRUE(serializer_IN.is_initialized());
 
-        DPUOperation wl_buff;
+        SerializableDPU wl_buff;
         SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
         Series readFieldsAll{};
 
@@ -1181,7 +1182,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
     serializer_IN.initialize(clean_csv_exension(normalConfig.csv_file), FileMode::READONLY);  // open file, basic fields
     EXPECT_TRUE(serializer_IN.is_initialized());
 
-    DPUOperation wl_buff;
+    SerializableDPU wl_buff;
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
@@ -1270,7 +1271,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
     serializer_IN.initialize(clean_csv_exension(normalConfig.csv_file), FileMode::READONLY);  // open file, basic fields
     EXPECT_TRUE(serializer_IN.is_initialized());
 
-    DPUOperation wl_buff;
+    SerializableDPU wl_buff;
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
@@ -1369,7 +1370,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
     serializer_IN.initialize(clean_csv_exension(csv_cache_misses), FileMode::READONLY);  // open file, basic fields
     EXPECT_TRUE(serializer_IN.is_initialized());
 
-    DPUOperation wl_buff;
+    SerializableDPU wl_buff;
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 

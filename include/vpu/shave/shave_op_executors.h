@@ -654,6 +654,7 @@ public:
 
         return stream.str();
     }
+
 };
 
 ////////////////////////////////////////////////
@@ -700,6 +701,7 @@ public:
 
         return stream.str();
     }
+
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -718,9 +720,9 @@ public:
         return dpuCycles(w);
     };
 
-    ShaveSimpleHeuristicModelActivation(const std::string& name, float elements_per_cycle, float code_derate, float bw_derate, float entry_cost_cycles)
-            : ShaveOpExecutor(name),
-              model(elements_per_cycle, code_derate, bw_derate, entry_cost_cycles) {
+    ShaveSimpleHeuristicModelActivation(const std::string& name, float elements_per_cycle, float code_derate,
+                                        float bw_derate, float entry_cost_cycles)
+            : ShaveOpExecutor(name), model(elements_per_cycle, code_derate, bw_derate, entry_cost_cycles) {
     }
 
     std::string toString() const override {
@@ -754,9 +756,13 @@ public:
         return dpuCycles(w);
     };
 
-    ShaveRooflineHeuristicModelActivation(const std::string& name, float arithmetic_ops_per_32_outputs, float memory_ops_per_32_outputs, bool unaligned_by_nature, float bw_derate, float code_derate, float entry_cost_cycles, float scalar_cost_per_channel, float unalignment_derate)
+    ShaveRooflineHeuristicModelActivation(const std::string& name, float arithmetic_ops_per_32_outputs,
+                                          float memory_ops_per_32_outputs, bool unaligned_by_nature, float bw_derate,
+                                          float code_derate, float entry_cost_cycles, float scalar_cost_per_channel,
+                                          float unalignment_derate)
             : ShaveOpExecutor(name),
-              model(arithmetic_ops_per_32_outputs, memory_ops_per_32_outputs, unaligned_by_nature, bw_derate, code_derate, entry_cost_cycles, scalar_cost_per_channel, unalignment_derate) {
+              model(arithmetic_ops_per_32_outputs, memory_ops_per_32_outputs, unaligned_by_nature, bw_derate,
+                    code_derate, entry_cost_cycles, scalar_cost_per_channel, unalignment_derate) {
     }
 
     std::string toString() const override {

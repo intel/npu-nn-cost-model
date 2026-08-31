@@ -10,6 +10,7 @@
 #ifndef VPUNN_DPU_OPERATIONS_VALID_BEHAVIOURS_H
 #define VPUNN_DPU_OPERATIONS_VALID_BEHAVIOURS_H
 
+#include "vpu/dpu_dtypes_dimension_info.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
 
@@ -246,15 +247,13 @@ protected:
         const auto dw_aligned_oc = dw_channel_align(static_cast<unsigned int>(oc));
 
         if (oc > ic) {
-            checker.add_check_failed(
-                    "output_autopad active: output_0.channels (" + std::to_string(oc) +
-                    ") must not exceed input_0.channels (" + std::to_string(ic) + ")");
+            checker.add_check_failed("output_autopad active: output_0.channels (" + std::to_string(oc) +
+                                     ") must not exceed input_0.channels (" + std::to_string(ic) + ")");
         }
         if (ic != dw_aligned_oc) {
-            checker.add_check_failed(
-                    "output_autopad active: input_0.channels (" + std::to_string(ic) +
-                    ") must equal DW-aligned OC (expected=" + std::to_string(dw_aligned_oc) +
-                    " for OC=" + std::to_string(oc) + ")");
+            checker.add_check_failed("output_autopad active: input_0.channels (" + std::to_string(ic) +
+                                     ") must equal DW-aligned OC (expected=" + std::to_string(dw_aligned_oc) +
+                                     " for OC=" + std::to_string(oc) + ")");
         }
     }
 
@@ -271,15 +270,13 @@ protected:
         const auto eltwise_aligned_oc = eltwise_channel_align(static_cast<unsigned int>(oc));
 
         if (oc > ic) {
-            checker.add_check_failed(
-                    "output_autopad active: output_0.channels (" + std::to_string(oc) +
-                    ") must not exceed input_0.channels (" + std::to_string(ic) + ")");
+            checker.add_check_failed("output_autopad active: output_0.channels (" + std::to_string(oc) +
+                                     ") must not exceed input_0.channels (" + std::to_string(ic) + ")");
         }
         if (ic != eltwise_aligned_oc) {
-            checker.add_check_failed(
-                    "output_autopad active: input_0.channels (" + std::to_string(ic) +
-                    ") must equal round_up(OC,16) (expected=" + std::to_string(eltwise_aligned_oc) +
-                    " for OC=" + std::to_string(oc) + ")");
+            checker.add_check_failed("output_autopad active: input_0.channels (" + std::to_string(ic) +
+                                     ") must equal round_up(OC,16) (expected=" + std::to_string(eltwise_aligned_oc) +
+                                     " for OC=" + std::to_string(oc) + ")");
         }
     }
 };
@@ -388,7 +385,7 @@ protected:
         dpu.output_0.channels = sampler.sample_list_decrease_prob(out_channels_range);  //  non uniform
 
         // this rule is here only for Fathom compliance, must be clarified in the future what's actually required
-        const auto is_16_align = dtype_to_bytes(dpu.input_1.datatype) > 1 || dpu.device == VPUDevice::VPU_2_7 ||
+        const auto is_16_align = DTypeDimensionInfo::dtype_to_bytes(dpu.input_1.datatype) > 1 || dpu.device == VPUDevice::VPU_2_7 ||
                                  dpu.input_1.sparsity_enabled;
         dpu.input_1.channels =
                 config.align_to(dpu.input_0.channels * (long long)dpu.kernel.height * (long long)dpu.kernel.width,
@@ -462,7 +459,7 @@ protected:
         const int multiple = [&] {
             return (is_samples_alignment_on)
                            // legacy alignment on samples
-                           ? ((w.sparsity_enabled || (dtype_to_bytes(w.datatype) > 1))          // if multibyte
+                           ? ((w.sparsity_enabled || (DTypeDimensionInfo::dtype_to_bytes(w.datatype) > 1))          // if multibyte
                                       ? 16                                                      // 16 samples(eg fp16)
                                       : config.get_specific_legacy_weights_alignment_Samples()  // specific alignment in
                                                                                                 // samples
@@ -488,7 +485,7 @@ protected:
         dpu.output_0.channels = dpu.input_0.channels;  // keep channels
         // this rule is here only for Fathom compliance, must be clarified in the future what's actually required.
         // Especially device dependency is a design break
-        const auto is_16_align = dtype_to_bytes(dpu.input_1.datatype) > 1 || dpu.device == VPUDevice::VPU_2_7;
+        const auto is_16_align = DTypeDimensionInfo::dtype_to_bytes(dpu.input_1.datatype) > 1 || dpu.device == VPUDevice::VPU_2_7;
         dpu.input_1.channels =
                 config.align_to(static_cast<long long>(dpu.kernel.height) * static_cast<long long>(dpu.kernel.width),
                                 is_16_align ? 16 : 32);
@@ -531,7 +528,7 @@ protected:
         const int multiple = [&] {
             return (is_samples_alignment_on)
                            // legacy alignment on samples
-                           ? ((dtype_to_bytes(w.datatype) > 1)                                  // if multibyte types
+                           ? ((DTypeDimensionInfo::dtype_to_bytes(w.datatype) > 1)                                  // if multibyte types
                                       ? 16                                                      // 16 samples(eg fp16)
                                       : config.get_specific_legacy_weights_alignment_Samples()  // specific alignment in
                                                                                                 // samples
@@ -610,7 +607,7 @@ protected:
     ///@brief wts masks must be aligned to minimum 16 bytes!
     /// @returns the alignment in elements
     int wts_mask_alignment_samples(const DataType dtype) const noexcept {
-        if (dtype_to_bytes(dtype) > 1) {
+        if (DTypeDimensionInfo::dtype_to_bytes(dtype) > 1) {
             return 8;  // 8 elmnts alignment, => at least 16 bytes alignment
         } else {
             return 16;  // 16 elmnts alignment, => at least 16 bytes alignment
@@ -637,7 +634,7 @@ protected:
     bool check_input_output_tensor_corelation(const IDeviceValidValues& config, const DPUOperation& dpu,
                                               std::string& info) const override {
         Checker checker;
-        if (!dpu.output_autopad  || (dpu.output_autopad && dpu.input_autopad)) {
+        if (!dpu.output_autopad || (dpu.output_autopad && dpu.input_autopad)) {
             // Without autopad: OC must equal IC exactly
             checker.check_is_in_list((int)dpu.output_0.channels, {(int)dpu.input_0.channels},
                                      "output_0.channels == input_0.channels");
@@ -695,7 +692,7 @@ protected:
         if (is_device_older_than_PTL) {
             // this permutation is caused by some particular approach in older NN Descriptors
             // that contained the input1 shape and had to match the training set  approach
-            // descriptors for NPU5 and newer devices do not contain input1 shape anymore 
+            // descriptors for NPU5 and newer devices do not contain input1 shape anymore
             w.channels = in_0.width;
             w.height = in_0.channels;
             w.width = in_0.height;

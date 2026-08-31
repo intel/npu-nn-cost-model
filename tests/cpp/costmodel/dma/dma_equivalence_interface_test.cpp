@@ -56,6 +56,7 @@
 #include "vpu/dma_descriptors.h"
 #include "vpu/dma_types.h"
 #include "vpu/dma_workload.h"
+#include "vpu/dpu_dtypes_dimension_info.h"
 #include "vpu/types.h"
 #include "vpu_cost_model.h"
 
@@ -80,7 +81,7 @@ protected:
     static DMAWorkload makeDMAWorkload(const VPUDevice device, const unsigned int size_bytes,
                                        const MemoryLocation src_loc, const MemoryLocation dst_loc,
                                        const DataType dtype = DataType::UINT8) {
-        const unsigned int elem_bytes = static_cast<unsigned int>(dtype_to_bytes(dtype));
+        const unsigned int elem_bytes = static_cast<unsigned int>(DTypeDimensionInfo::dtype_to_bytes(dtype));
         const unsigned int num_elems = (elem_bytes > 0) ? (size_bytes / elem_bytes) : size_bytes;
         const VPUTensor tensor(num_elems, 1u, 1u, 1u, dtype);
         return DMAWorkload{device, tensor, tensor, src_loc, dst_loc, 1u};
@@ -90,7 +91,7 @@ protected:
     static VPUDMADescriptor makeContiguousDescriptor(const VPUDevice device, const unsigned int size_bytes,
                                                      const MemoryLocation src_loc, const MemoryLocation dst_loc,
                                                      const DataType dtype = DataType::UINT8) {
-        const int32_t elem_bytes = static_cast<int32_t>(dtype_to_bytes(dtype));
+        const int32_t elem_bytes = static_cast<int32_t>(DTypeDimensionInfo::dtype_to_bytes(dtype));
         const int32_t num_elems =
                 (elem_bytes > 0) ? (static_cast<int32_t>(size_bytes) / elem_bytes) : static_cast<int32_t>(size_bytes);
         const int32_t stride = (elem_bytes > 0) ? elem_bytes : 1;

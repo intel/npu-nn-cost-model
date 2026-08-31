@@ -12,6 +12,8 @@
 
 #include "vpu/dma_descriptors.h"
 #include "vpu/serialization/serialization_wrapper.h"
+#include "vpu/validation/serializable_dma_descriptor.h"
+
 namespace VPUNN {
 template <class DMADesc>
 class DMACostSerializationWrap : public CostSerializationWrap {
@@ -19,6 +21,7 @@ private:
     void serialize_workload(const DMANNWorkload_NPU27& wl) {
         if (serializer.is_serialization_enabled()) {
             try {
+                serializer.serialize(SerializableField<VPUDevice>{"device", wl.device});
                 serializer.serialize(SerializableField{"num_planes", wl.num_planes});
                 serializer.serialize(SerializableField{"length", wl.length});
                 serializer.serialize(SerializableField{"src_width", wl.src_width});
@@ -35,33 +38,10 @@ private:
         }
     }
 
-    void serialize_workload(const VPUDMADescriptor& desc) {
-        if (serializer.is_serialization_enabled()) {
-            try {
-                auto serializeTensor = [&](const std::string& prefix, const VPUDMATensor& t) {
-                    serializer.serialize(SerializableField<DataType>{prefix + "dtype", t.dtype});
-                    serializer.serialize(SerializableField<int>{prefix + "num_dims", t.num_dims});
-                    for (int d = 0; d < VPU_DMA_MAX_DIMS; ++d)
-                        serializer.serialize(SerializableField<int32_t>{
-                                prefix + "shape_" + std::to_string(d), t.shape[d]});
-                    for (int d = 0; d < VPU_DMA_MAX_DIMS; ++d)
-                        serializer.serialize(SerializableField<int32_t>{
-                                prefix + "stride_" + std::to_string(d), t.byte_strides[d]});
-                };
-                serializeTensor("src_", desc.src);
-                serializeTensor("dst_", desc.dst);
-                serializer.serialize(SerializableField<MemoryLocation>{"src_location", desc.src_location});
-                serializer.serialize(SerializableField<MemoryLocation>{"dst_location", desc.dst_location});
-            } catch (const std::exception& e) {
-                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
-                serializer.clean_buffers();
-            }
-        }
-    }
-
     void serialize_workload(const DMANNWorkload_NPU40_50& wl) {
         if (serializer.is_serialization_enabled()) {
             try {
+                serializer.serialize(SerializableField<VPUDevice>{"device", wl.device});
                 serializer.serialize(SerializableField{"src_width", wl.src_width});
                 serializer.serialize(SerializableField{"dst_width", wl.dst_width});
                 serializer.serialize(SerializableField{"num_dim", wl.num_dim});
@@ -90,6 +70,17 @@ private:
         }
     }
 
+    void serialize_workload(const VPUDMADescriptor& desc) {
+        if (serializer.is_serialization_enabled()) {
+            try {
+                serializer.serialize(SerializableVPUDMADescriptor{desc});
+            } catch (const std::exception& e) {
+                Logger::warning() << "Encountered invalid workload while serialization: " << e.what() << "\n";
+                serializer.clean_buffers();
+            }
+        }
+    }
+
 public:
     DMACostSerializationWrap(CSVSerializer& ser, bool inhibit = false, size_t the_uid = 0)
             : CostSerializationWrap(ser, inhibit, the_uid)  // initialize the base class
@@ -105,7 +96,6 @@ public:
 
         // do we need to post process?
         try {
-            serializer.serialize(SerializableField<VPUDevice>{"device", workload.device});
             serialize_workload(workload);
             serializer.end();
         } catch (const std::exception& e) {
@@ -122,7 +112,6 @@ public:
 
         // do we need to post process?
         try {
-            serializer.serialize(SerializableField<VPUDevice>{"device", workload.device});
             serialize_workload(workload);
 
         } catch (const std::exception& e) {

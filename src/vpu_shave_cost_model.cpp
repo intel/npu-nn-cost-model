@@ -12,6 +12,7 @@
 #include <cmath>
 #include <memory>  // for std::shared_ptr, std::move
 #include <string>  // for std::string
+#include "core/utils.h"  // for get_env_vars
 #include "vpu/cycles_interface_types.h"
 #include "vpu/shave/shave_cost_providers/shave_provider_bundles.h"
 
@@ -25,8 +26,17 @@ std::shared_ptr<IShaveCostProvider> SHAVECostModel::createDefaultCostProvider() 
             ;
 }
 
+std::shared_ptr<const IPrefetchCostStrategy> SHAVECostModel::createDefaultPrefetchCostStrategy() {
+    static const auto default_prefetch_strategy = std::make_shared<DeviceMappedPrefetchCostStrategy>(
+            ShaveCostProviderBundles::createDeviceMappedPrefetchStrategy());
+    //static is only to call only once the createDeviceMappedPrefetchStrategy() 
+    return default_prefetch_strategy;
+}
+
 SHAVECostModel::SHAVECostModel(const std::string& cache_filename, const unsigned int cache_size)
-        : ptr_internal_shave_cost_provider(createDefaultCostProvider()), cache(cache_size, cache_filename),
+        : ptr_internal_shave_cost_provider(createDefaultCostProvider()),
+          prefetch_cost_strategy(createDefaultPrefetchCostStrategy()),
+          cache(cache_size, cache_filename),
           http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
             "shave_workloads", FileMode::READ_WRITE,
@@ -35,6 +45,7 @@ SHAVECostModel::SHAVECostModel(const std::string& cache_filename, const unsigned
 
 SHAVECostModel::SHAVECostModel(const char* cache_data, size_t cache_data_length, const unsigned int cache_size)
         : ptr_internal_shave_cost_provider(createDefaultCostProvider()),
+          prefetch_cost_strategy(createDefaultPrefetchCostStrategy()),
           cache(cache_size, cache_data, cache_data_length),
           http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
@@ -44,7 +55,9 @@ SHAVECostModel::SHAVECostModel(const char* cache_data, size_t cache_data_length,
 
 SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider,
                                const std::string& cache_filename, const unsigned int cache_size)
-        : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)), cache(cache_size, cache_filename),
+        : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)),
+          prefetch_cost_strategy(createDefaultPrefetchCostStrategy()),
+          cache(cache_size, cache_filename),
           http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
             "shave_workloads", FileMode::READ_WRITE,
@@ -54,6 +67,7 @@ SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shav
 SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider, const char* cache_data,
                                size_t cache_data_length, const unsigned int cache_size)
         : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)),
+          prefetch_cost_strategy(createDefaultPrefetchCostStrategy()),
           cache(cache_size, cache_data, cache_data_length),
           http_cost_provider(HttpCostProviderFactory::create()) {
     serializer.initialize(
@@ -61,7 +75,8 @@ SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shav
             ShaveSerializerUtils::get_names_for_shave_serializer(shave_cost_provider.get_max_num_params()));
 }
 
-CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl, [[maybe_unused]] std::string& infoOut) const {
+CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl,
+                                                  [[maybe_unused]] std::string& infoOut) const {
     // finds func inmpl, executes it, handles errors
     SHAVECostSerializationWrap serialization_handler(serializer);
     std::string apiUsed{"unknown"};
@@ -77,26 +92,27 @@ CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl, [[ma
 
         return Cycles::ERROR_CACHE_MISS;  // if not found in cache, we return a cache miss error code
     };
-    
+
     const auto try_profiling = [&]() -> CyclesInterfaceType {
-        // now search with the http provider 
-        if(http_cost_provider) {
-            apiUsed = "profiling_service_" + http_cost_provider->profilingBackendToString(swl.get_profiling_service_backend());
-            
+        // now search with the http provider
+        if (http_cost_provider) {
+            apiUsed = "profiling_service_" +
+                      http_cost_provider->profilingBackendToString(swl.get_profiling_service_backend());
+
             auto http_cost = http_cost_provider->getCost(swl, infoOut);
-            if(!Cycles::isErrorCode(http_cost)) {
+            if (!Cycles::isErrorCode(http_cost)) {
                 return http_cost;
             }
         }
 
         return Cycles::ERROR_PROFILING_SERVICE;  // if no provider or if provider returns error, we return an error code
     };
-    
+
     // First search in the cache for a pre-computed cost. If found, return it immediately.
     cycles = try_cache();
 
-    // Second, if not found in cache, try to get the cost from the profiling service.
-    if (Cycles::isErrorCode(cycles)) {
+    // Second, if not found in cache and profiling is enabled, try to get the cost from the profiling service.
+    if (Cycles::isErrorCode(cycles) && profilingAutoHintGate.isEnabled()) {
         cycles = try_profiling();
     }
 
@@ -110,7 +126,33 @@ CyclesInterfaceType SHAVECostModel::computeCycles(const SHAVEWorkload& swl, [[ma
         cache.add(swl, static_cast<float>(cycles));
     }
 
-    serialization_handler.serializeShaveWorkloadWithCycles(swl, apiUsed, cycles);
+    // Preserve historical serialization semantics: CSV stores warm/runtime cost.
+    // Prefetch metadata columns may be added in the future to disambiguate warm vs. cold rows.
+    const auto cycles_for_serialization = cycles;
+
+    // Serialize the warm/base cost to CSV before attempting prefetch lookup.
+    // This ensures the warm cost is always recorded regardless of prefetch success/failure.
+    serialization_handler.serializeShaveWorkloadWithCycles(swl, apiUsed, cycles_for_serialization);
+
+    // Code-prefetch is an optional additive term modelling a cold (first-time) invocation.
+    // It is applied after the cache-insert step so that:
+    //  - cache entries always represent the warm base cost, and
+    //  - cache hits and cache misses add the prefetch term identically.
+    // ASSUMPTION: the base cycles value at this point is a warm execution cost that does
+    // NOT already include code-prefetch overhead.
+    //
+    // The lookup is delegated to a dedicated prefetch strategy infrastructure.
+    if (!Cycles::isErrorCode(cycles) && swl.include_code_prefetch) {
+        const auto prefetch_cost = getCodePrefetchCost(swl);
+
+        // If the prefetch cost lookup itself failed with an error, propagate that error.
+        if (Cycles::isErrorCode(prefetch_cost)) {
+            return prefetch_cost;
+        }
+
+        cycles = Cycles::cost_adder(cycles, prefetch_cost);
+    }
+
     return cycles;
 }
 

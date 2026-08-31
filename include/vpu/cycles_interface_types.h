@@ -97,6 +97,12 @@ public:
     static constexpr CyclesInterfaceType ERROR_NO_VALID_DMA_COST_PROVIDER{
             MaxV - 20};  // used when no valid dma cost provider is available
 
+    static constexpr CyclesInterfaceType ERROR_SHAVE_PREFETCH_NOT_FOUND{
+            MaxV - 21};  // requested prefetch entry is not available for op/device
+
+    static constexpr CyclesInterfaceType ERROR_SHAVE_PREFETCH_DEVICE_NOT_COVERED{
+            MaxV - 22};  // prefetch LUT has no entry for the requested device
+
     static constexpr CyclesInterfaceType START_ERROR_RANGE{MaxV - 1000};  ///< 1000 position for errors
 
     /// @brief true if v has a value that can be an error code
@@ -158,6 +164,10 @@ public:
             return "ERROR_SHAVE_OPERATOR_MISSING";
         case ERROR_NO_VALID_DMA_COST_PROVIDER:
             return "ERROR_NO_VALID_DMA_COST_PROVIDER";
+        case ERROR_SHAVE_PREFETCH_NOT_FOUND:
+            return "ERROR_SHAVE_PREFETCH_NOT_FOUND";
+        case ERROR_SHAVE_PREFETCH_DEVICE_NOT_COVERED:
+            return "ERROR_SHAVE_PREFETCH_DEVICE_NOT_COVERED";
         default:
             return "UNKNOWN";
         }
@@ -261,8 +271,8 @@ public:
     /// @param x1, y1 first point
     /// @param x2, y2 second point
     static CyclesInterfaceType extrapolate_cost(const unsigned int x, const unsigned int x1,
-                                                 const CyclesInterfaceType y1, const unsigned int x2,
-                                                 const CyclesInterfaceType y2) {
+                                                const CyclesInterfaceType y1, const unsigned int x2,
+                                                const CyclesInterfaceType y2) {
         const float slope = (static_cast<float>(y2) - static_cast<float>(y1)) / static_cast<float>(x2 - x1);
         const float intercept = static_cast<float>(y1) - slope * static_cast<float>(x1);
         const CyclesInterfaceType extrapolated_cost = Cycles::toCycleInterfaceType(slope * x + intercept);

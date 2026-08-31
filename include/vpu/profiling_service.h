@@ -10,6 +10,7 @@
 #ifndef VPUNN_PROFILING_SERVICE_H
 #define VPUNN_PROFILING_SERVICE_H
 
+#include "core/utils.h"  // for get_env_vars
 #include "dpu_types.h"
 
 namespace VPUNN {
@@ -28,6 +29,38 @@ template <>
 inline std::string enumName<ProfilingServiceBackend>() {
     return "ProfilingServiceBackend";
 }
+
+/// @brief Whether ENABLE_VPUNN_PROFILING_SERVICE forced profiling on/off, or left it unset (runtime-controlled).
+enum class EnvProfilingState { NotSet, ForcedOn, ForcedOff };
+
+inline EnvProfilingState readProfilingEnvState() {
+    const auto env_map = get_env_vars({"ENABLE_VPUNN_PROFILING_SERVICE"});
+    const auto& value = env_map.at("ENABLE_VPUNN_PROFILING_SERVICE");
+    if (value == "TRUE") {
+        return EnvProfilingState::ForcedOn;
+    }
+    if (value == "FALSE") {
+        return EnvProfilingState::ForcedOff;
+    }
+    return EnvProfilingState::NotSet;
+}
+
+/// @brief Gate for whether a cache-miss AUTO-hint query may use the online profiling service. Defaults from
+/// ENABLE_VPUNN_PROFILING_SERVICE; set() is a no-op if the environment forced a value.
+struct ProfilingAutoHintGate {
+    const EnvProfilingState envState{readProfilingEnvState()};
+    bool enabled{envState == EnvProfilingState::ForcedOn};
+
+    void set(bool value) noexcept {
+        if (envState == EnvProfilingState::NotSet) {
+            enabled = value;
+        }
+    }
+
+    bool isEnabled() const noexcept {
+        return enabled;
+    }
+};
 
 }  // namespace VPUNN
 

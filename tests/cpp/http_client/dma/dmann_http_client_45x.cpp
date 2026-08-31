@@ -7,7 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#include "http_client/http_client.h"
+#include "vpu/dma_types.h"
+#include "http_client/http_client_test.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -76,23 +77,24 @@ TEST_F(DMAHTTPClientNPU45x, DMAWlAsJsonSerialization) {
         // Parse the request JSON
         nlohmann::json request = nlohmann::json::parse(req.body);
 
-        if (HandleStatusCheck(request, res)) return;
+        if (HandleStatusCheck(request, res))
+            return;
 
         // Validate the request structure
         EXPECT_EQ(request["params"]["backend"], "silicon");
         EXPECT_EQ(request["params"]["name"], "profiling_request");
-        
+
         // Verify DMA workload uses the correct key
         EXPECT_TRUE(request.contains("dma_workload"));
         EXPECT_FALSE(request.contains("workload"));  // Should not use generic key
-        
+
         // Validate the serialized DMANNWorkload_NPU40_50 fields
         EXPECT_EQ(request["dma_workload"]["src_width"], 8192);
         EXPECT_EQ(request["dma_workload"]["num_dim"], 0);
         EXPECT_EQ(request["dma_workload"]["device"], "VPUDevice.VPU_4_0");
-        EXPECT_EQ(request["dma_workload"]["num_engine"], "Num_DMA_Engine.Num_Engine_1");
-        EXPECT_EQ(request["dma_workload"]["transfer_direction"], "MemoryDirection.CMX2CMX");
-
+        EXPECT_EQ(request["dma_workload"]["num_engine"], 1);  // 1-indexed integer
+        EXPECT_EQ(request["dma_workload"]["direction"], "Direction.CMX2CMX");
+        EXPECT_FALSE(request["dma_workload"].contains("transfer_direction"));  // legacy key must be absent
         // Send a successful response
         nlohmann::json response;
         response["info"] = "success";
@@ -119,4 +121,4 @@ TEST_F(DMAHTTPClientNPU45x, GetDMACostWithTrace) {
     GetCostWithTrace(wl_40_50);
 }
 
-} // namespace VPUNN_unit_tests
+}  // namespace VPUNN_unit_tests

@@ -93,7 +93,8 @@ public:
                 workload.get_params(),
                 workload.get_extra_params(),
                 workload.get_profiling_service_backend(),
-                workload.get_loc_name()
+                workload.get_loc_name(),
+                workload.get_include_code_prefetch()
             );
             return underlying_provider->get_cost(translated_workload, cost_source);
         }

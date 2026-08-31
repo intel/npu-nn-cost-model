@@ -11,6 +11,10 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#ifdef NO_ERROR
+#undef NO_ERROR  // winerror.h defines NO_ERROR, which is enum member for Cycles type
+#endif
+
 #include <gtest/gtest.h>
 #include <thread>
 

@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "vpu/validation/data_dpu_operation.h"
+#include "vpu/validation/serializable_dpu.h"
 #include "vpu/validation/serializable_shave.h"
 #include "vpu/vpu_tensor.h"
 #include "vpu_cost_model.h"
@@ -53,8 +54,8 @@ protected:
     }
 
     std::vector<std::string> createStandardFieldNames() const {
-        std::vector<std::string> stdfields(DPUOperation::_get_member_names().begin(),
-                                           DPUOperation::_get_member_names().end());
+        std::vector<std::string> stdfields(SerializableDPU::_get_member_names().begin(),
+                           SerializableDPU::_get_member_names().end());
         stdfields.emplace_back(info_tag);        // expected field
         stdfields.emplace_back(model_file_tag);  // optional field
 
@@ -85,7 +86,7 @@ protected:
 
 public:
     auto createStandardSerializableFields() const {
-        DPUOperation wl_buff;                                               // original structure
+        SerializableDPU wl_buff;                                               // original structure
         SerializableField<std::string> info_buff{info_tag, ""};             // from input
         SerializableField<std::string> modelfile_buff{model_file_tag, ""};  // from input
 
@@ -228,7 +229,7 @@ public:
                 },
                 readFields)) {
             {
-                const DPUOperation& wl_buff{std::get<DPUOperation>(readFields)};
+                const SerializableDPU& wl_buff{std::get<SerializableDPU>(readFields)};
                 auto dpu_wl = wl_buff.clone_as_DPUWorkload();
                 std::string info_mock, info_real;
                 const CyclesInterfaceType cycles_mock =
@@ -310,7 +311,7 @@ public:
                 },
                 readFields)) {
             {
-                const DPUOperation& wl_buff{std::get<DPUOperation>(readFields)};
+                const SerializableDPU& wl_buff{std::get<SerializableDPU>(readFields)};
                 auto dpu_wl = wl_buff.clone_as_DPUWorkload();
                 std::string info_mock, info_real;
                 const CyclesInterfaceType cycles_mock =
@@ -378,7 +379,7 @@ public:
         EXPECT_TRUE(model_4_0_Post6.nn_initialized());
         EXPECT_TRUE(model_4_0_Post8.nn_initialized());
 
-        DPUOperation wl_buff;
+        SerializableDPU wl_buff;
         SerializableField<std::string> info_buff{info_tag, ""};  // from input, read 2nd time
         // out
         SerializableField<CyclesInterfaceType> mock_cycles_buff{output0_cycles_tag, 0};  //
@@ -465,7 +466,7 @@ public:
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
-        DPUOperation wl_buff;
+        SerializableDPU wl_buff;
         SerializableField<std::string> info_buff{info_tag, ""};  // from input, read 2nd time
 
         // out over input
@@ -611,7 +612,7 @@ public:
         EXPECT_TRUE(model_4_0_Post6.nn_initialized());
         EXPECT_TRUE(model_4_0_Post8.nn_initialized());
 
-        DPUOperation wl_buff;
+        SerializableDPU wl_buff;
         SerializableField<std::string> info_buff{info_tag, ""};  // from input, read 2nd time
         // out
         SerializableField<CyclesInterfaceType> mock_cycles_buff{output0_cycles_tag, 0};   //

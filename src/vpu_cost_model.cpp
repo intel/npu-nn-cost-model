@@ -27,6 +27,7 @@
 #include "vpu/validation/checker_utils.h"
 #include "vpu/validation/data_dpu_operation.h"  // for DPUOperation
 #include "vpu/validation/sanity_report.h"       // for SanityReport
+#include "vpu/validation/serializable_dma_descriptor.h"
 
 namespace VPUNN {
 
@@ -89,8 +90,8 @@ VPUCostModel::VPUCostModel(const std::string& filename, bool profile, const unsi
           ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_filename, cache_size)),
           http_dpu_cost_provider(HttpCostProviderFactory::create()) {
     Logger::initialize();
-    dma_descriptor_serializer.initialize(VPUDMADescriptor::get_wl_name(), FileMode::READ_WRITE,
-                                         VPUDMADescriptor::get_names_for_serializer());
+    dma_descriptor_serializer.initialize(SerializableVPUDMADescriptor::get_wl_name(), FileMode::READ_WRITE,
+                                         SerializableVPUDMADescriptor::get_names_for_serializer());
 
     if (!dpu_nn_cost_provider.is_initialized()) {
         return;
@@ -108,8 +109,8 @@ VPUCostModel::VPUCostModel(const char* model_data, size_t model_data_length, boo
                   std::make_shared<SHAVECostModel>(shave_cache_data, shave_cache_data_length, cache_size)),
           http_dpu_cost_provider(HttpCostProviderFactory::create()) {
     Logger::initialize();
-    dma_descriptor_serializer.initialize(VPUDMADescriptor::get_wl_name(), FileMode::READ_WRITE,
-                                         VPUDMADescriptor::get_names_for_serializer());
+    dma_descriptor_serializer.initialize(SerializableVPUDMADescriptor::get_wl_name(), FileMode::READ_WRITE,
+                                         SerializableVPUDMADescriptor::get_names_for_serializer());
 
     if (!dpu_nn_cost_provider.is_initialized()) {
         return;
@@ -218,8 +219,10 @@ CyclesInterfaceType VPUCostModel::run_cost_providers(const DPUWorkload& workload
             return cached;
         }
 
-        // 2. Profiling service
-        cycles = try_profiling();
+        // 2. Profiling service, if enabled for AUTO
+        if (profilingAutoHintGate.isEnabled()) {
+            cycles = try_profiling();
+        }
 
         // 3. Fallbacks (NN then theoretical)
         if (Cycles::isErrorCode(cycles) || cycles == Cycles::NO_ERROR) {

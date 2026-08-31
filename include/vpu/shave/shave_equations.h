@@ -14,10 +14,10 @@
 #include <iostream>
 #include <vector>
 
-#include "vpu/vpuem_models_struct.h"
-#include "vpu/types.h"
 #include "vpu/datatype_collection_size.h"
-
+#include "vpu/dpu_dtypes_dimension_info.h"
+#include "vpu/types.h"
+#include "vpu/vpuem_models_struct.h"
 
 namespace VPUNN {
 
@@ -88,13 +88,15 @@ public:
 class VariableSlopeMiddleCommonAxesFrstDegEq {
 public:
     using Dimensions = std::array<int, 4>;  ///< size of selected dimensions;  Unused axis have to be ONE! OR ZERO!?
-    float best_case_slope;  ///< Represents base slope us/bytes or samples , (happens eg when selected axes has all
-                                ///< the tensor elements)
-    float intercept;  ///< Represents us
-    float worst_case_slope;  ///< Represents the slope for worst case, when we have volume in the outermost axe of the tensor.
-    float intermediate_case_slope; ///< Represents the slope for intermediate case, when the volume is in the middle of the tensor.
+    float best_case_slope;   ///< Represents base slope us/bytes or samples , (happens eg when selected axes has all
+                             ///< the tensor elements)
+    float intercept;         ///< Represents us
+    float worst_case_slope;  ///< Represents the slope for worst case, when we have volume in the outermost axe of the
+                             ///< tensor.
+    float intermediate_case_slope;  ///< Represents the slope for intermediate case, when the volume is in the middle of
+                                    ///< the tensor.
 
-     /**
+    /**
      * @brief Overload for operator() which calculates the time based on the first degree equation of the Shave
      * activation and the size of the output
      *
@@ -112,8 +114,6 @@ public:
         return slope * size + intercept;
     }
 
-
-
     float compute_worst_coeff(const int& outermostDim, const int& totalVolume) const {
         const float denominator{(float)(outermostDim)};
         const float numerator{(float)(totalVolume)};  // var A, Var B is total volume
@@ -123,7 +123,8 @@ public:
 
     float compute_intermediate_coeff(const Dimensions& selected_dim) const {
         const float numerator{(float)(selected_dim[1] * selected_dim[2])};
-        const float denominator{(float)(selected_dim[0] * selected_dim[3]) * numerator};  // var A, Var B is total volume
+        const float denominator{(float)(selected_dim[0] * selected_dim[3]) *
+                                numerator};  // var A, Var B is total volume
 
         return volume_ratio(numerator, denominator);
     }
@@ -185,7 +186,6 @@ public:
         return slope * size + intercept;
     }
 
-
     float compute_coef_0(const int& v_total, const int& v_selected) const {
         // the factor will be one in case of v_selected =1, avoids 0/0 situation , makes it =0;
         const float factor{(1.0F - volume_ratio(static_cast<float>(v_selected), static_cast<float>(v_total)))};
@@ -241,7 +241,6 @@ public:
 
 class VPUEMPiecewiseEq {
 public:
-
     const CostFunction3SlopesDescriptor costFunction3SlopesData_;
 
     // Constructor
@@ -252,7 +251,7 @@ public:
     int compute_shave_cycles(DataType dtype, const int output_size_bytes, const float cost_curve_ratio) const {
         // commuting from bytes to operations
         // if i have a number of bytes and we know the data type then we know how many ops we made
-        
+
         int blk_size = compute_elements_count_from_bytes(output_size_bytes, dtype);
 
         int vector_size = compute_elements_count_from_bytes(16, dtype);
@@ -265,12 +264,12 @@ public:
         int scalar_number = blk_size - unroll_location - vector_location;
 
         const auto cycles = (unroll_location / costFunction3SlopesData_.slope_[0] +
-                            vector_location / costFunction3SlopesData_.slope_[1] +
-                            scalar_number / costFunction3SlopesData_.slope_[2]) / cost_curve_ratio;
+                             vector_location / costFunction3SlopesData_.slope_[1] +
+                             scalar_number / costFunction3SlopesData_.slope_[2]) /
+                            cost_curve_ratio;
 
         return (int)cycles;
     }
-
 };
 
 class VPUEMSoftmaxEq {
@@ -280,10 +279,10 @@ public:
     VPUEMSoftmaxEq(const CostFunctionSoftmaxDescriptor& costFunctionSoftmaxData)
             : costFunctionSoftmaxData_(costFunctionSoftmaxData) {
     }
-    
-    int compute_softmax_shave_cycles(DataType dtype, const int h_output_size_bytes, const int hw_output_size_bytes, const int c_output_size_bytes,
-                                           float cost_ratio = 1.0) {
-        const int dtype_in_bytes = dtype_to_bytes(dtype);
+
+    int compute_softmax_shave_cycles(DataType dtype, const int h_output_size_bytes, const int hw_output_size_bytes,
+                                     const int c_output_size_bytes, float cost_ratio = 1.0) {
+        const int dtype_in_bytes = DTypeDimensionInfo::dtype_to_bytes(dtype);
 
         if (dtype_in_bytes <= 0)
             return -1;
@@ -312,34 +311,36 @@ public:
         int vector_num = (c_elements_size - unroll_num * unroll_size) / vector_size;
         int scalar_num = c_elements_size - unroll_num * unroll_size - vector_num * vector_size;
 
-        if (unroll_num){
+        if (unroll_num) {
             int vector_cycles, scalar_cycles;
-          
-            int unroll_cycles = (int) (costFunctionSoftmaxData_.functionParams_[0].unroll_slope_ * unroll_num / cost_ratio);
+
+            int unroll_cycles =
+                    (int)(costFunctionSoftmaxData_.functionParams_[0].unroll_slope_ * unroll_num / cost_ratio);
             if (vector_num == 0) {
                 vector_cycles = 0;
             } else {
-                vector_cycles = (int) costFunctionSoftmaxData_.functionParams_[0].vector_slope0_ +
-                                    costFunctionSoftmaxData_.functionParams_[0].vector_slope_ * (vector_num - 1);
-                vector_cycles /= (int) cost_ratio;
+                vector_cycles = (int)costFunctionSoftmaxData_.functionParams_[0].vector_slope0_ +
+                                costFunctionSoftmaxData_.functionParams_[0].vector_slope_ * (vector_num - 1);
+                vector_cycles /= (int)cost_ratio;
             }
 
             if (scalar_num == 0) {
                 scalar_cycles = 0;
             } else if (scalar_num == 1) {
-                scalar_cycles = (int) (costFunctionSoftmaxData_.functionParams_[0].scalar_slope0_ / cost_ratio);
+                scalar_cycles = (int)(costFunctionSoftmaxData_.functionParams_[0].scalar_slope0_ / cost_ratio);
             } else {
                 scalar_cycles = costFunctionSoftmaxData_.functionParams_[0].scalar_slope0_ +
-                                    costFunctionSoftmaxData_.functionParams_[0].scalar_slope_ * (scalar_num - 1);
-                scalar_cycles /= (int) cost_ratio;
+                                costFunctionSoftmaxData_.functionParams_[0].scalar_slope_ * (scalar_num - 1);
+                scalar_cycles /= (int)cost_ratio;
             }
 
             int loop_overhead = costFunctionSoftmaxData_.functionParams_[0].unroll_overhead_ * (hw_elements_size - 1);
 
             return costFunctionSoftmaxData_.functionParams_[0].unroll_offset_ +
                    (unroll_cycles + vector_cycles + scalar_cycles) * hw_elements_size + loop_overhead;
-        } else if (vector_num){
-            int vector_cycles = (int) (costFunctionSoftmaxData_.functionParams_[0].vector_slope_ * vector_num / cost_ratio);
+        } else if (vector_num) {
+            int vector_cycles =
+                    (int)(costFunctionSoftmaxData_.functionParams_[0].vector_slope_ * vector_num / cost_ratio);
             int scalar_cycles;
 
             if (scalar_num == 0) {
@@ -347,23 +348,22 @@ public:
             } else {
                 scalar_cycles = costFunctionSoftmaxData_.functionParams_[0].scalar_slope0_ +
                                 costFunctionSoftmaxData_.functionParams_[0].scalar_slope_ * (scalar_num - 1);
-                scalar_cycles /= (int) cost_ratio;
-
+                scalar_cycles /= (int)cost_ratio;
             }
 
             int loop_overhead = costFunctionSoftmaxData_.functionParams_[0].vector_overhead_ * (hw_elements_size - 1);
             return costFunctionSoftmaxData_.functionParams_[0].vector_offset_ +
                    (vector_cycles + scalar_cycles) * hw_elements_size + loop_overhead;
         } else if (scalar_num) {
-            int scalar_cycles = (int)(costFunctionSoftmaxData_.functionParams_[0].scalar_slope_ * scalar_num / cost_ratio);
-            int loop_overhead = costFunctionSoftmaxData_.functionParams_[0].scalar_overhead_*(hw_elements_size - 1);
+            int scalar_cycles =
+                    (int)(costFunctionSoftmaxData_.functionParams_[0].scalar_slope_ * scalar_num / cost_ratio);
+            int loop_overhead = costFunctionSoftmaxData_.functionParams_[0].scalar_overhead_ * (hw_elements_size - 1);
 
             return costFunctionSoftmaxData_.functionParams_[0].scalar_offset_ + scalar_cycles * hw_elements_size +
                    loop_overhead;
         }
 
         return -1;
-    
     }
 };
 
@@ -377,9 +377,9 @@ public:
     }
 
     int compute_spatial_shave_cycles(DataType dtype, const int output_size_bytes) {
-        int c_elements_size = output_size_bytes / dtype_to_bytes(dtype);
+        int c_elements_size = output_size_bytes / DTypeDimensionInfo::dtype_to_bytes(dtype);
         float slope = costFunctionSpatialData_.slope[0];
-        int cycles = (int) (1 / slope) * (c_elements_size);
+        int cycles = (int)(1 / slope) * (c_elements_size);
         return cycles;
     }
 };

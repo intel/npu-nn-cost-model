@@ -11,6 +11,7 @@
 #define LAYER_PROPERTIES_BASE_H
 
 #include "interface_device_layer_properties.h"
+#include "vpu/dpu_dtypes_category_info.h"
 #include "vpu/layer.h"
 #include "vpu/types.h"
 
@@ -164,7 +165,7 @@ public:
     /// @return std::vector<ExecutionMode>
     const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const override {
         // Float input or output -> ExecutionMode::VECTOR_FP16
-        if (wl.inputs[0].is_fp16family() || wl.outputs[0].is_fp16family())
+        if (DTypeCategoryInfo::is_fp16family_dtype(wl.inputs[0].get_dtype()) || DTypeCategoryInfo::is_fp16family_dtype(wl.outputs[0].get_dtype()))
             return {ExecutionMode::VECTOR_FP16};
         // Find the optimal Execution Mode given output tensor layout
         auto shape = wl.outputs[0].get_shape();
@@ -188,7 +189,7 @@ public:
     /// @param tensor the VPUTensor
     /// @return the default ExecutionMode
     ExecutionMode getValidDefaultExecutionMode(const VPUTensor& tensor) const override {
-        if (tensor.is_any_float()) {
+        if (DTypeCategoryInfo::is_any_float_dtype(tensor.get_dtype())) {
             return ExecutionMode::VECTOR_FP16;
         } else {
             return ExecutionMode::MATRIX;

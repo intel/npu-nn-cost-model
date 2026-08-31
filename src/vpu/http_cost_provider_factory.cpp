@@ -9,10 +9,12 @@
 
 #include "vpu/http_cost_provider_factory.h"
 
+// VPUNN_BUILD_HTTP_CLIENT is defined automatically when the HTTP client sources are present
+// (see the top-level CMakeLists.txt). The concrete implementation is stripped from
+// open-source drops, in which case create() degrades to returning nullptr.
 #ifdef VPUNN_BUILD_HTTP_CLIENT
 #include "http_client/http_cost_provider.h"
 #endif
-
 
 namespace VPUNN {
 
@@ -21,7 +23,7 @@ std::unique_ptr<const IHttpCostProvider> HttpCostProviderFactory::create() {
     return HttpCostProvider::initFromEnvironment();
 #else
     return nullptr;
-#endif // VPUNN_BUILD_HTTP_CLIENT
+#endif  // VPUNN_BUILD_HTTP_CLIENT
 }
 
 } // namespace VPUNN

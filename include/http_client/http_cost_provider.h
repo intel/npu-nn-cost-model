@@ -1,4 +1,4 @@
-// Copyright © 2025 Intel Corporation
+// Copyright © 2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -10,26 +10,16 @@
 #ifndef HTTP_COST_PROVIDER_H_
 #define HTTP_COST_PROVIDER_H_
 
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-
-#ifdef CPPHTTPLIB_ZLIB_SUPPORT
-#undef CPPHTTPLIB_ZLIB_SUPPORT
-#endif
-
 #include <nlohmann/json.hpp>
-#include "httplib.h"
+
+#include "http_client/http_client.h"
 
 #ifdef NO_ERROR
 #undef NO_ERROR  // winerror.h defines NO_ERROR, which is enum member for Cycles type
 #endif
 
-#ifdef ADD
-#undef ADD  // arpa/nameser.h defines ADD macro on Linux
-#endif
-
 #include "core/utils.h"
+
 #include "vpu/http_cost_provider_intf.h"
 #include "vpu/profiling_service.h"
 #include "vpu/types.h"
@@ -72,10 +62,10 @@ public:
     nlohmann::json sendJsonRequest(const nlohmann::json& payload, const std::string& path) const;
 
 protected:
-    const std::string _host;          ///< The hostname or IP address.
-    const int _port;                  ///< The port number.
-    mutable httplib::Client _client;  ///< The HTTP client instance.
-    const bool _debug;                ///< Debug flag for verbose output.
+    const std::string _host;     ///< The hostname or IP address.
+    const int _port;             ///< The port number.
+    mutable HttpClient _client;  ///< The HTTP client instance.
+    const bool _debug;           ///< Debug flag for verbose output.
 };
 
 /**
@@ -84,7 +74,8 @@ protected:
  */
 class HTTPProfilingClient : public HTTPClient {
 public:
-    HTTPProfilingClient(const std::string& host, int port, bool debug = false): HTTPClient(host, port, debug) {}
+    HTTPProfilingClient(const std::string& host, int port, bool debug = false): HTTPClient(host, port, debug) {
+    }
 
     /**
      * @brief Processes the profiler's JSON response.
@@ -168,8 +159,8 @@ private:
      * @brief Default values for the HttpCostProvider in case environment variables are not set.
      * or are invalid.
      */
-    static constexpr const char* default_host = "irlccggpu04.ir.intel.com";
-    static constexpr int default_port = 5000;
+    static constexpr const char* default_host = "igkvmvpunn01.igk.intel.com";
+    static constexpr int default_port = 8000;
     static constexpr const char* default_backend = "silicon";
 };
 }  // namespace VPUNN

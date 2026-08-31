@@ -11,12 +11,16 @@
 #define VPUNN_LAYER_SPLIT_INFO_H
 
 #include <cmath>
+// We do not need <fstream> here, but this is the least impactful way we can include it so it reaches a specific
+// (tangentially related) cpp file in the compiler. Should DEFINITELY remove this after current cost model is merged in
+// compiler, but ONLY AFTER including <fstream> in the cpp file that causes trouble in the compiler.
+#include <fstream>
 #include "core/logger.h"
 #include "vpu/types.h"
 #include "vpu/utils.h"
 
+#include "vpu/layer.h"  //for DPULayer
 #include "vpu/vpu_tiling_strategy.h"
-#include "vpu/layer.h" //for DPULayer 
 
 namespace VPUNN {
 
@@ -63,7 +67,6 @@ struct OneTileLayerInfo {
 /// info on how are the splits on each tile
 /// For each tile a OneTileLayerInfo is allocated.
 using LayerSplitInfo = std::vector<OneTileLayerInfo>;
-
 
 }  // namespace VPUNN
 

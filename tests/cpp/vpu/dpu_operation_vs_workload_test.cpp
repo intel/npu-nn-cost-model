@@ -30,18 +30,6 @@
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
-class Wrapper_DPUOperation : public DPUOperation {
-public:
-    using DPUOperation::is_preconditions_for_inplace_output;
-    using DPUOperation::is_special_No_weights_situation;
-    Wrapper_DPUOperation(const DPUOperation& op): DPUOperation(op) { }
-};
-class Wrapper_DPUWorkload : public DPUWorkload {
-public:
-    using DPUWorkload::is_preconditions_for_inplace_output;
-    using DPUWorkload::is_special_No_weights_situation;
-};
-
 class DPUOp_vs_DPUWl_Equivalence_Functions : public ::testing::Test {
 public:
     const DPUWorkload dpu_wl = {
@@ -65,22 +53,7 @@ public:
     };
 
     const DPUOperation dpu_op{dpu_wl};
-
-    const Wrapper_DPUWorkload _dpu_wl{dpu_wl};
-    const Wrapper_DPUOperation _dpu_op{dpu_op};
 };
-
-TEST_F(DPUOp_vs_DPUWl_Equivalence_Functions, Function_is_elementwise_like_operation_Test) {
-    EXPECT_EQ(dpu_wl.is_elementwise_like_operation(), dpu_op.is_elementwise_like_operation());
-}
-
-TEST_F(DPUOp_vs_DPUWl_Equivalence_Functions, Function_is_special_No_weights_situation_Test) {
-    EXPECT_EQ(_dpu_wl.is_special_No_weights_situation(), _dpu_op.is_special_No_weights_situation());
-}
-
-TEST_F(DPUOp_vs_DPUWl_Equivalence_Functions, Function_is_preconditions_for_inplace_output_Test) {
-    EXPECT_EQ(_dpu_wl.is_preconditions_for_inplace_output(), _dpu_op.is_preconditions_for_inplace_output());
-}
 
 TEST_F(DPUOp_vs_DPUWl_Equivalence_Functions, Autopad_Flags_Preservation_Test) {
     // Verify input_autopad and output_autopad are preserved across DPUWorkload <--> DPUOperation conversions

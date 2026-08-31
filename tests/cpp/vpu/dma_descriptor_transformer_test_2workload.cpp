@@ -30,6 +30,7 @@
 #include "vpu/dma_descriptors.h"
 #include "vpu/dma_types.h"
 #include "vpu/dma_workload.h"
+#include "vpu/dpu_dtypes_dimension_info.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -398,32 +399,27 @@ TEST_F(TestDMADescriptorTransformer_D2W, ToByteAlignedDtype_FLOAT4_PromotedTo_BF
 /// This validates the byte-footprint contract for all currently known sub-byte dtypes.
 TEST_F(TestDMADescriptorTransformer_D2W, ToByteAlignedDtype_AllSubByteTypes_ResultIs8Bits) {
     const std::vector<DataType> sub_byte_types = {
-            DataType::UINT4, DataType::UINT2, DataType::UINT1,
-            DataType::INT4,  DataType::INT2,  DataType::INT1,
-            DataType::FLOAT4,
+            DataType::UINT4, DataType::UINT2, DataType::UINT1,  DataType::INT4,
+            DataType::INT2,  DataType::INT1,  DataType::FLOAT4,
     };
     for (const DataType dt : sub_byte_types) {
         const DataType promoted = DMADescriptorTransformer::to_byte_aligned_dtype(dt);
-        const int promoted_bits = dtype_to_bits(promoted);
-        EXPECT_EQ(promoted_bits, 8)
-                << "Promoted type for " << DataType_ToText.at(static_cast<int>(dt))
-                << " must be exactly 8 bits; got " << promoted_bits;
-        EXPECT_EQ(promoted_bits % 8, 0)
-                << "Promoted type must be byte-aligned";
+        const int promoted_bits = DTypeDimensionInfo::dtype_to_bits(promoted);
+        EXPECT_EQ(promoted_bits, 8) << "Promoted type for " << DataType_ToText.at(static_cast<int>(dt))
+                                    << " must be exactly 8 bits; got " << promoted_bits;
+        EXPECT_EQ(promoted_bits % 8, 0) << "Promoted type must be byte-aligned";
     }
 }
 
 /// Every already-byte-aligned type must survive promotion unchanged (idempotency).
 TEST_F(TestDMADescriptorTransformer_D2W, ToByteAlignedDtype_ByteAlignedTypes_Idempotent) {
     const std::vector<DataType> aligned_types = {
-            DataType::UINT8,    DataType::INT8,     DataType::BF8,      DataType::HF8,
-            DataType::FLOAT16,  DataType::BFLOAT16, DataType::UINT16,   DataType::INT16,
-            DataType::FLOAT32,  DataType::INT32,
+            DataType::UINT8,    DataType::INT8,   DataType::BF8,   DataType::HF8,     DataType::FLOAT16,
+            DataType::BFLOAT16, DataType::UINT16, DataType::INT16, DataType::FLOAT32, DataType::INT32,
     };
     for (const DataType dt : aligned_types) {
         EXPECT_EQ(DMADescriptorTransformer::to_byte_aligned_dtype(dt), dt)
-                << "Already-aligned type " << DataType_ToText.at(static_cast<int>(dt))
-                << " must not be changed";
+                << "Already-aligned type " << DataType_ToText.at(static_cast<int>(dt)) << " must not be changed";
     }
 }
 

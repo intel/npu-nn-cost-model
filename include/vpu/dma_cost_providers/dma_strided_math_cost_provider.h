@@ -65,20 +65,83 @@ protected:
 
     /// Composite key for direction-aware linear model lookup: (device, transfer_direction)
     using DeviceDirectionKey = std::pair<VPUDevice, MemoryDirection>;
+    using ThresholdPair = std::pair<int, int>;  // {src/read threshold, dst/write threshold}
+
+    /**
+     * @brief Per-direction modeling entry combining linear fit and src/dst thresholds.
+     *
+     * This keeps all parameters needed by a single (device, direction) LUT row together.
+     */
+    struct DirectionModelingEntry {
+        const LinearModelingParams linear;  ///< Linear DMA model parameters (k, b) for this direction.
+        const ThresholdPair thresholds;     ///< Src/dst thresholds {src/read, dst/write} in bytes for this direction.
+
+        DirectionModelingEntry(const LinearModelingParams& linear_params, const ThresholdPair& threshold_pair)
+                : linear(linear_params), thresholds(threshold_pair) {
+        }
+    };
 
     /// Modeling function map for DMA copy compute cycles (CMX cycles).
-    /// Maps (VPUDevice, MemoryDirection) to per-direction linear parameters (k, b).
+    /// Maps (VPUDevice, MemoryDirection) to per-direction linear parameters and src/dst thresholds.
+    /// Typical src/dst threshold values are 64B for CMX and 256B for DDR.
     /// For each device there are 4 entries (DDR2CMX, CMX2DDR, CMX2CMX, DDR2DDR).
-    static const std::map<DeviceDirectionKey, LinearModelingParams>& get_modeling_function_map() {
-        static const std::map<DeviceDirectionKey, LinearModelingParams> modeling_function = {
+    static const std::map<DeviceDirectionKey, DirectionModelingEntry>& get_modeling_function_map() {
+        static const std::map<DeviceDirectionKey, DirectionModelingEntry> modeling_function = {
                 // NPU 5.0 — per-direction fits (R²=1.0000 for all)
-                {{VPUDevice::NPU_5_0, MemoryDirection::DDR2CMX}, LinearModelingParams(1.85798372e-02, 324.7775)},
-                {{VPUDevice::NPU_5_0, MemoryDirection::CMX2DDR}, LinearModelingParams(1.85884582e-02, 276.8316)},
-                {{VPUDevice::NPU_5_0, MemoryDirection::CMX2CMX}, LinearModelingParams(1.56250087e-02, 19.9909)},
-                {{VPUDevice::NPU_5_0, MemoryDirection::DDR2DDR}, LinearModelingParams(1.85798372e-02, 324.7775)
-                 /*LinearModelingParams(1.75977680e-02, 207.2000)*/},  // reuse max one from above (D2C)
+                {{VPUDevice::NPU_5_0, MemoryDirection::DDR2CMX},
+                 DirectionModelingEntry(LinearModelingParams(1.85798372e-02, 324.7775),
+                                        {256, 64})},
+                {{VPUDevice::NPU_5_0, MemoryDirection::CMX2DDR},
+                 DirectionModelingEntry(LinearModelingParams(1.85884582e-02, 276.8316),
+                                        {64, 256})},
+                {{VPUDevice::NPU_5_0, MemoryDirection::CMX2CMX},
+                 DirectionModelingEntry(LinearModelingParams(1.56250087e-02, 19.9909),
+                                        {64, 64})},
+                {{VPUDevice::NPU_5_0, MemoryDirection::DDR2DDR},
+                 DirectionModelingEntry(LinearModelingParams(1.85798372e-02, 324.7775),
+                                        {256, 256})
+                 /*DirectionModelingEntry(LinearModelingParams(1.75977680e-02, 207.2000),
+                                        {256, 256})*/},
+        // reuse max one from above (D2C)
+                // NPU 5.0W — same characteristics as NPU 5.0
+                {{VPUDevice::NPU_5_0_W, MemoryDirection::DDR2CMX},
+                 DirectionModelingEntry(LinearModelingParams(1.85798372e-02, 324.7775),
+                                        {256, 64})},
+                {{VPUDevice::NPU_5_0_W, MemoryDirection::CMX2DDR},
+                 DirectionModelingEntry(LinearModelingParams(1.85884582e-02, 276.8316),
+                                        {64, 256})},
+                {{VPUDevice::NPU_5_0_W, MemoryDirection::CMX2CMX},
+                 DirectionModelingEntry(LinearModelingParams(1.56250087e-02, 19.9909),
+                                        {64, 64})},
+                {{VPUDevice::NPU_5_0_W, MemoryDirection::DDR2DDR},
+                 DirectionModelingEntry(LinearModelingParams(1.85798372e-02, 324.7775),
+                                        {256, 256})},
+
         };
         return modeling_function;
+    }
+
+    /**
+     * @brief Get src/dst-specific stride threshold from the direction LUT.
+     *
+     * Thresholds are stored per (device, direction) entry as a {src, dst} pair.
+     * This helper selects src when @p is_source is true and dst otherwise.
+     *
+     * @param device VPU device type
+     * @param direction Transfer direction (DDR2CMX, CMX2DDR, CMX2CMX, DDR2DDR)
+     * @param is_source True for src/read, false for dst/write
+     * @return Src/dst stride threshold in bytes for the selected endpoint
+     */
+    static int get_stride_threshold_bytes(const VPUDevice& device, MemoryDirection direction, bool is_source) {
+        const auto& modeling_map = get_modeling_function_map();
+        const auto it = modeling_map.find({device, direction});
+        assert(it != modeling_map.end() && "Missing DMA stride-threshold LUT entry for (device, direction)");
+
+        if (it == modeling_map.end()) {
+            return 64;  // Safe fallback: smallest threshold used across all devices
+        }
+
+        return is_source ? it->second.thresholds.first : it->second.thresholds.second;
     }
 
     /// Stride penalty enablement map for DMA transfers
@@ -86,7 +149,8 @@ protected:
     /// Default is false (penalty disabled) if device not in map
     static const std::unordered_map<VPUDevice, bool>& get_stride_penalty_enabled_map() {
         static const std::unordered_map<VPUDevice, bool> stride_penalty_enabled = {
-                {VPUDevice::NPU_5_0, false},  // NPU 5: stride penalty disabled
+                {VPUDevice::NPU_5_0, true},  // NPU 5: stride penalty enabled
+                {VPUDevice::NPU_5_0_W, true},  // NPU 5W (WildcatLake): same as NPU 5
         };
         return stride_penalty_enabled;
     }
@@ -108,9 +172,10 @@ protected:
      *
      * continuous_n_bytes: The maximum number of bytes that can be copied contiguously in the current stride DMA task.
      *
-     * strideDMACorrectionThresholdInBytes: A threshold value set by VPUX to determine when stride DMA becomes
+     * strideDMACorrectionThresholdInBytes: A threshold value used to determine when stride DMA becomes
      * inefficient. If continuous_n_bytes is less than this threshold, a penalty factor is applied to the estimated DMA
-     * time. The threshold value is: 256 Bytes (2048 bits)
+     * time. The value is selected by caller based on transfer src/dst. Typical threshold values are
+     * 256 for DDR and 64 for CMX.
      *
      * penalty_factor: The factor by which the estimated DMA time is multiplied to account for inaccurate modeling of
      * stride DMA. The smaller the continuous_n_bytes (i.e., the more fragmented the data transfer), the larger the
@@ -120,10 +185,11 @@ protected:
      * neither input nor output tensors use stride DMA on their last axis, the penalty factor remains 1 (no penalty).
      *
      * @param continuous_n_bytes The maximum number of bytes that can be copied contiguously
-     * @param threshold_bytes Threshold value to determine when stride DMA becomes inefficient (default: 256 bytes)
+     * @param threshold_bytes Src/dst threshold value to determine when stride DMA becomes inefficient
+     *                        (typical threshold values: 256 for DDR, 64 for CMX)
      * @return penalty_factor The factor to multiply the estimated DMA time
      */
-    static float get_penalty_factor_for_stride_dma(int continuous_n_bytes, int threshold_bytes = 256) {
+    static float get_penalty_factor_for_stride_dma(int continuous_n_bytes, int threshold_bytes) {
         assert(threshold_bytes > 0 && "threshold_bytes must be >= 1 (minimum meaningful word size)");
         if (continuous_n_bytes <= 0) {
             return 1.0f;  // No penalty if invalid input
@@ -131,7 +197,7 @@ protected:
         // A = continuous_n_bytes / threshold_bytes.   >1 means larger TX than the threshold, <1 means tx(chunk) is
         // small Particular case if no stride or large chunks, continuous_n_bytes = total_bytes => A >> 1 => factor = 1
         // ceil(A)/ A
-        // if A<1 => 1/A  big number if A small, min A is 1/256 => factor 256  (typical)
+        // if A<1 => 1/A  big number if A small (scales with threshold_bytes)
         // if A > 1 =>  2/1.x => max factor 2 and decreasing towards 1
 
         float dma_block = std::ceil(static_cast<float>(continuous_n_bytes) / static_cast<float>(threshold_bytes));
@@ -155,10 +221,14 @@ protected:
      * used to compute the base cycles before penalty
      * @param device VPU device type
      * @param direction Transfer direction (DDR2CMX, CMX2DDR, CMX2CMX, DDR2DDR) — selects the per-direction (k, b)
+     * @param is_source True when called for src/read computation, false for dst/write computation
      * @return Estimated cycles (CMX) with stride penalty applied
      */
     unsigned long long computeCyclesWithStridePenalty(int contiguous_bytes, int total_bytes, const VPUDevice& device,
-                                                      MemoryDirection direction) const {
+                                                      MemoryDirection direction, bool is_source) const {
+        // Src/dst threshold comes from the LUT entry selected by (device, direction).
+        // is_source chooses src/read threshold (true) or dst/write threshold (false).
+        const int threshold_bytes = get_stride_threshold_bytes(device, direction, is_source);
         // Step 1: Get the penalty factor based on contiguous chunk size
         // Only apply penalty if:
         // - Device has stride penalty enabled
@@ -166,8 +236,7 @@ protected:
         float penalty_factor = 1.0f;
         if (is_stride_penalty_enabled(device) && (contiguous_bytes < total_bytes)) {
             // We have stride and device supports penalty - apply penalty based on chunk size
-            penalty_factor = get_penalty_factor_for_stride_dma(
-                    contiguous_bytes);  // chunk threshold is default 256 bytes = 2048 bits, HW fixed probably.
+            penalty_factor = get_penalty_factor_for_stride_dma(contiguous_bytes, threshold_bytes);
         }
 
         // Step 2: Compute the runtime using the linear formula and penalty factor
@@ -200,7 +269,9 @@ public:
         const int total_bytes_src =
                 wl.getReadBytes();  // total bytes of the transfer, all chunks summed up, regardless of stride, this is
                                     // the logical transfer size that we want to transfer
-        return computeCyclesWithStridePenalty(contiguous_bytes_src, total_bytes_src, wl.device, wl.getDirection());
+        const auto direction = wl.getDirection();
+        const bool is_source = true;
+        return computeCyclesWithStridePenalty(contiguous_bytes_src, total_bytes_src, wl.device, direction, is_source);
     }
 
     /**
@@ -221,7 +292,9 @@ public:
         const int total_bytes_dst =
                 wl.getWrittenBytes();  // total bytes of the transfer, all chunks summed up, regardless of stride, this
                                        // is the logical transfer size that we want to trans
-        return computeCyclesWithStridePenalty(contiguous_bytes_dst, total_bytes_dst, wl.device, wl.getDirection());
+        const auto direction = wl.getDirection();
+        const bool is_source = false;
+        return computeCyclesWithStridePenalty(contiguous_bytes_dst, total_bytes_dst, wl.device, direction, is_source);
     }
 
 protected:
@@ -251,7 +324,7 @@ protected:
 
         // 3. Use linear model if any entry was found (no fallback if missing)
         if (it != modeling_map.end()) {
-            const auto& params = it->second;                  // LinearModelingParams
+            const auto& params = it->second.linear;           // LinearModelingParams
             double cycles = params.compute_cycles(dma_size);  // linear, without penalty
             return static_cast<unsigned long long>(cycles);
         } else {
@@ -315,8 +388,9 @@ public:
  *      taking multi-dimensional strides into account (degenerate dimensions with dim_size==0
  *      are transparent — their stride is physically irrelevant and does not break contiguity).
  *   2. Derives a stride-penalty factor from the contiguous chunk size relative to the
- *      256-byte hardware threshold (penalty = ceil(chunk/256) / (chunk/256)).
- *      The penalty is only applied on devices that have it enabled
+ *      side-specific hardware threshold (CMX vs DDR):
+ *      penalty = ceil(chunk/threshold) / (chunk/threshold).
+ *      The penalty is only applied on devices that have it enabled.
  *   3. Evaluates a per-device linear model  cycles = k·size + b  on the total logical
  *      transfer size and multiplies by the penalty factor.
  *   4. Returns max(src_cycles, dst_cycles) converted to DPU clock domain via the

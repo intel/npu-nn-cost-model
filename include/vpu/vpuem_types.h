@@ -12,6 +12,7 @@
 
 #include <array>
 #include "types.h"
+#include "vpu/dpu_dtypes_dimension_info.h"
 #include "vpu/vpuem_models_struct.h"
 
 
@@ -49,9 +50,9 @@ public:
     }
 
     int get_output_size() const {
-        return static_cast<int>(shape_[0] * shape_[1] * shape_[2] * dtype_to_bytes(dtype_));
+        return static_cast<int>(shape_[0] * shape_[1] * shape_[2] * DTypeDimensionInfo::dtype_to_bytes(dtype_));
     };
 };
 }  // namespace VPUNN
 
-#endif  // VPUNN_TYPES_H
+#endif  // VPUNN_VPUEM_TYPES_H

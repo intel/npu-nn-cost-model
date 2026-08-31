@@ -179,10 +179,11 @@ nlohmann::json toJson<DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50& wl) 
     payload["src_dim_size_5"] = wl.e_dim[4].src_dim_size;
     payload["dst_dim_size_5"] = wl.e_dim[4].dst_dim_size;
 
-    payload["num_engine"] =
-            enumName<Num_DMA_Engine>() + "." + mapToText<Num_DMA_Engine>().at(static_cast<int>(wl.num_engine));
-    payload["transfer_direction"] = enumName<MemoryDirection>() + "." +
-                                    mapToText<MemoryDirection>().at(static_cast<int>(wl.transfer_direction));
+    // Python profiling server expects num_engine as 1-indexed (1 or 2); enum is 0-indexed.
+    payload["num_engine"] = static_cast<int>(wl.num_engine) + 1;
+    // Python profiling server expects "Direction.<value>" (e.g. "Direction.CMX2DDR")
+    payload["direction"] = "Direction." + mapToText<MemoryDirection>().at(static_cast<int>(wl.transfer_direction));
+
     return payload;
 }
 

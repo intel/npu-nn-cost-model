@@ -43,7 +43,7 @@ target_link_libraries(vpunn_optimization
     PRIVATE
         vpunn_common_settings
         flatbuffers
-        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
+        $<$<BOOL:${VPUNN_HTTP_CLIENT_AVAILABLE}>:vpunn_http_client>
 )
 
 add_dependencies(vpunn_optimization vpunn_cpp_schema)

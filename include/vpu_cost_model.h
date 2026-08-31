@@ -78,6 +78,11 @@ private:
     /// cache to store linearly extrapolation property of the NN. does not change after ctor!
     const bool is_linearly_extrapolation_necessary_cache_capability{
             dpu_nn_cost_provider.get_preprocessing().supportsProperty("DW_MXP_AVP_SupportsMoreThan64Ch")};
+
+    /// @brief Gate for whether an AUTO cost source hint may use the online profiling service (cache and
+    /// NN/theoretical fallback kept). Defaults from the environment; runtime overrides apply only when the
+    /// environment did not force a value.
+    ProfilingAutoHintGate profilingAutoHintGate;
     /**
      * @brief Ensures that input channels are equal to output channels for channel preserving operations
      *
@@ -92,6 +97,16 @@ public:
     /// if costmodel is destroyed or goes out of scope, the reference will also become invalid
     const IEnergy& getEnergyInterface() const {
         return my_energy;
+    }
+
+    /// @brief Enables/disables the online profiling service for AUTO cost source hints, unless the environment
+    /// forced a value (which takes precedence).
+    void setProfilingEnabledForAutoHint(bool value) noexcept {
+        profilingAutoHintGate.set(value);
+    }
+
+    bool isProfilingEnabledForAutoHint() const noexcept {
+        return profilingAutoHintGate.isEnabled();
     }
 
     // choose a better name

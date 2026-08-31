@@ -377,6 +377,7 @@ function(GEN_HEADER_FILE_FOR_FACTORS_POPULATE CSV_FILE CLASS_NAME output_file)
     configure_file(ShaveFactorsPopulation.h.in ${output_file})
     message(STATUS " >> Generated Shave Factors Population Header File: ${output_file} for class PopulatedFactorsLUT${CLASS_NAME} \n  >> Generated code END")
 endfunction()
+
 # --- This section should be changed in dependence of the files containing factors and the output format --- #
 
 GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
@@ -384,9 +385,110 @@ GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
     "_NPU5"         # the class name will be PopulatedFactorsLUT_NPU5
     "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_factors_population_npu5.h"
 )
+
 # Generate header file for heuristic factors
 GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
     "${CMAKE_CURRENT_SOURCE_DIR}/shave_heuristic_factors_npu5.csv"
     "_Heuristic"    # the class name will be PopulatedFactorsLUT_Heuristic
     "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_factors_population_heuristic.h"
+)
+# === Generate SHAVE Prefetch Cost Mapping from per-device CSV files === #
+
+# Returns ON only when DEVICE_VALUE exactly matches one of EXPECTED_DEVICES.
+function(IS_PREFETCH_DEVICE_ALLOWED DEVICE_VALUE OUT_MATCH)
+    set(match OFF)
+    foreach(expected_device IN LISTS ARGN)
+        if("${DEVICE_VALUE}" STREQUAL "${expected_device}")
+            set(match ON)
+            break()
+        endif()
+    endforeach()
+
+    set(${OUT_MATCH} ${match} PARENT_SCOPE)
+endfunction()
+
+# Appends generated SHAVE prefetch entries from one CSV into a named per-device content variable.
+# CSV format:
+#   operation_name,device,prefetch_cycles
+# Example row:
+#   Softmax,NPU_5_0,120
+#
+# Parameters:
+#   CSV_FILE        - path to the CSV file
+#   CONTENT_VAR_NAME - name of the parent-scope variable to append generated lines into
+#   (remaining args) - expected device name(s) for validation (e.g. "NPU_5_0")
+function(APPEND_PREFETCH_CONTENT_FROM_CSV CSV_FILE CONTENT_VAR_NAME)
+    set(expected_devices ${ARGN})
+
+    file(STRINGS "${CSV_FILE}" config)
+
+    set(SKIP_HEADER TRUE)
+    set(LOCAL_POPULATE_CONTENT "")
+
+    foreach(LINE IN LISTS config)
+        if(SKIP_HEADER)
+            set(SKIP_HEADER FALSE)
+            continue()
+        endif()
+
+        # Normalize platform-specific line endings and surrounding whitespace.
+        string(REPLACE "\r" "" LINE "${LINE}")
+        string(STRIP "${LINE}" LINE)
+
+        if(LINE STREQUAL "")
+            continue()
+        endif()
+
+        PARSE_CSV_LINE("${LINE}" parsed_fields)
+        list(LENGTH parsed_fields fields_count)
+        if(NOT fields_count EQUAL 3)
+            message(FATAL_ERROR "Malformed prefetch CSV row in ${CSV_FILE}: ${LINE}")
+        endif()
+
+        list(GET parsed_fields 0 op_name)
+        list(GET parsed_fields 1 device_name)
+        list(GET parsed_fields 2 prefetch_cycles)
+
+        # Normalize parsed fields to avoid CRLF/tooling artifacts impacting matching or codegen.
+        string(REPLACE "\r" "" op_name "${op_name}")
+        string(REPLACE "\r" "" device_name "${device_name}")
+        string(REPLACE "\r" "" prefetch_cycles "${prefetch_cycles}")
+        string(STRIP "${op_name}" op_name)
+        string(STRIP "${device_name}" device_name)
+        string(STRIP "${prefetch_cycles}" prefetch_cycles)
+
+        IS_PREFETCH_DEVICE_ALLOWED("${device_name}" is_device_allowed ${expected_devices})
+        if(NOT is_device_allowed)
+            message(FATAL_ERROR "Prefetch CSV row device '${device_name}' does not match expected devices '${expected_devices}' in ${CSV_FILE}: ${LINE}")
+            continue()
+        endif()
+
+        if(LOCAL_POPULATE_CONTENT STREQUAL "")
+            string(APPEND LOCAL_POPULATE_CONTENT
+                "        // CSV order is authoritative here: the first op name wins; later duplicates are ignored.\n")
+        endif()
+
+        string(APPEND LOCAL_POPULATE_CONTENT
+                "        lut.emplace(\"${op_name}\", static_cast<CyclesInterfaceType>(${prefetch_cycles}));\n")
+    endforeach()
+
+    set(${CONTENT_VAR_NAME} "${${CONTENT_VAR_NAME}}${LOCAL_POPULATE_CONTENT}" PARENT_SCOPE)
+    set(POPULATE_INFO "${POPULATE_INFO}// Generated from ${CSV_FILE}\n" PARENT_SCOPE)
+endfunction()
+
+# Generate one combined prefetch LUT header from all included per-device CSVs.
+# Each CSV populates a separate per-device content variable that is expanded into
+# the corresponding build_npu*_lut() function body in ShavePrefetchCostPopulation.h.in.
+function(GEN_HEADER_FILE_FOR_PREFETCH_POPULATE output_file)
+    set(POPULATE_CONTENT_NPU5 "")
+    set(POPULATE_INFO "")
+
+    # Open-source device set
+    APPEND_PREFETCH_CONTENT_FROM_CSV("${CMAKE_CURRENT_SOURCE_DIR}/shave_prefetch_costs_npu5.csv" POPULATE_CONTENT_NPU5 "NPU_5_0")
+    configure_file(ShavePrefetchCostPopulation.h.in ${output_file})
+    message(STATUS " >> Generated Shave Prefetch Population Header File: ${output_file}")
+endfunction()
+
+GEN_HEADER_FILE_FOR_PREFETCH_POPULATE(
+    "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_prefetch_cost_population.h"
 )

@@ -11,6 +11,8 @@
 #define POSTPROCESSING_MOCKS_H
 
 #include "post_process.h"
+#include "vpu/dpu_dtypes_dimension_info.h"
+#include "vpu/dpu_workload.h"
 
 namespace VPUNN {
 
@@ -100,7 +102,7 @@ private:
 
     constexpr static int kToIndex0to2(const int kw, const int kh) {
         if ((kw == 3) /* && (kh == 3) */) {  //?x3 was before discovering the Fathom issue. now is 3x?
-            return 1;                       // optimized row
+            return 1;                        // optimized row
         } else if ((kw == 1) || (kh == 1)) {
             // 3x1 yes,
             // 1x3 no, is optimized!?
@@ -182,8 +184,8 @@ private:
     };
 
     constexpr static const DWFactorsArray& getTypeBasedFactorsArray(const DataType t) {
-        if (dtype_to_bytes(t) > 1) {
-            return factor_array_16Bit;//or more than 16bit
+        if (DTypeDimensionInfo::dtype_to_bytes(t) > 1) {
+            return factor_array_16Bit;  // or more than 16bit
         } else {
             return factor_array_8Bit;
         }
@@ -222,10 +224,10 @@ public:
         // Mock implementation of the process method
         if (w.device >= VPUDevice::VPU_4_0) {
             float processed{nn_val};
-            //if ((w.op == Operation::CM_CONVOLUTION) && !is_NN_value_invalid(nn_val)) {
-            //    const float factor{getCMFactor(w)};  // neutral
-            //    processed *= factor;
-            //}
+            // if ((w.op == Operation::CM_CONVOLUTION) && !is_NN_value_invalid(nn_val)) {
+            //     const float factor{getCMFactor(w)};  // neutral
+            //     processed *= factor;
+            // }
             return processed;
         } else {
             return nn_val;
@@ -245,7 +247,7 @@ private:
         // based on output channels
         const auto oc{w.outputs[0].channels()};
         const auto ic{w.inputs[0].channels()};
-        const auto isMoreBytes{dtype_to_bytes(w.outputs[0].get_dtype()) > 1 ? true : false};
+        const auto isMoreBytes{DTypeDimensionInfo::dtype_to_bytes(w.outputs[0].get_dtype()) > 1 ? true : false};
         if (ic <= 4) {             // 1,2,3,4 input channels, apply different factors
             if (oc <= 16) {        // 16ch
                 return 1.0f;       // float or INT8
@@ -269,4 +271,4 @@ private:
 };
 
 }  // namespace VPUNN
-#endif
+#endif  // POSTPROCESSING_MOCKS_H

@@ -14,7 +14,7 @@
 #include <type_traits>
 
 #include "dpu_types.h"
-#include "dpu_types_info.h"
+#include "dpu_dtypes_dimension_info.h"
 
 namespace VPUNN {
 
@@ -30,11 +30,11 @@ template <class T>
 inline T compute_size_in_bytes(const T elements_count, const DataType& datatype) noexcept {
     static_assert(std::is_integral_v<T>);
     T size{0};
-    const int type_dimension{dtype_to_bytes(datatype)};
+    const int type_dimension{DTypeDimensionInfo::dtype_to_bytes(datatype)};
     if (elements_count > 0 && type_dimension > 0) {
         // if type is a submultiple of 8 bits multiple elements of this type can fit into one byte
         if (type_dimension == 1) {
-            const int elements_per_byte{types_per_byte(datatype)};
+            const int elements_per_byte{DTypeDimensionInfo::types_per_byte(datatype)};
             if (elements_per_byte > 0) {
                 const int reminder = elements_count % elements_per_byte;
                 const T fullBytes{(elements_count / elements_per_byte)};
@@ -55,11 +55,11 @@ inline T compute_size_in_bytes(const T elements_count, const DataType& datatype)
  * @return a long that represent number of elements
  */
 inline long compute_elements_count_from_bytes(const long size_in_bytes, const DataType& datatype) noexcept {
-    const int bytes_per_type{dtype_to_bytes(datatype)};
+    const int bytes_per_type{DTypeDimensionInfo::dtype_to_bytes(datatype)};
 
     if (size_in_bytes > 0) {
         if (bytes_per_type == 1) {
-            const int elements_per_byte{types_per_byte(datatype)};
+            const int elements_per_byte{DTypeDimensionInfo::types_per_byte(datatype)};
             return elements_per_byte * size_in_bytes;
         }
         return size_in_bytes / bytes_per_type;
@@ -70,4 +70,4 @@ inline long compute_elements_count_from_bytes(const long size_in_bytes, const Da
 
 }  // namespace VPUNN
 
-#endif  // VPUNN_TYPES_H
+#endif  // VPUNN_DATATYPE_COLLECTION_SIZE_H

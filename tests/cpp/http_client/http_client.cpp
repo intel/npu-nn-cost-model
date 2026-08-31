@@ -7,7 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#include "http_client.h"
+#include "http_client_test.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;

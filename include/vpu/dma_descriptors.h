@@ -22,6 +22,7 @@
 #include "dma_types.h"
 #include "types.h"
 #include "vpu/datatype_collection_size.h"
+#include "vpu/dpu_dtypes_dimension_info.h"
 
 namespace VPUNN {
 
@@ -182,7 +183,7 @@ struct VPUDMATensor {
             return 0;
         }
         // dtype is always byte aligned
-        const int32_t elem_bytes = static_cast<int32_t>(dtype_to_bytes(dtype));
+        const int32_t elem_bytes = static_cast<int32_t>(DTypeDimensionInfo::dtype_to_bytes(dtype));
         if (elem_bytes <= 0) {
             return 0;  // invalid or unsupported dtype => no well-defined contiguous byte size.
         }
@@ -251,7 +252,7 @@ struct VPUDMATensor {
         if (num_dims <= 0) {
             return 0;
         }
-        const int32_t elem_bytes = static_cast<int32_t>(dtype_to_bytes(dtype));
+        const int32_t elem_bytes = static_cast<int32_t>(DTypeDimensionInfo::dtype_to_bytes(dtype));
         if (elem_bytes <= 0) {
             return 0;
         }
@@ -350,7 +351,8 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUDMATensor& d) {
 /// Datatype for src and dst tensors is NOT allowed to be sub-8-bit (UINT4, INT4, UINT2, INT2, UINT1, INT1) or
 /// fractional bits (potential INT12). The stride being represented in bytes cannot model 4 bits stride, and DMA engine
 /// does not support fractional byte handling.
-/// Source and destination byte counts are typically equal, but can differ for specialized transfers (e.g. DDR→CMX decompression).
+/// Source and destination byte counts are typically equal, but can differ for specialized transfers (e.g. DDR→CMX
+/// decompression).
 ///
 ///
 struct VPUDMADescriptor {
@@ -435,7 +437,7 @@ struct VPUDMADescriptor {
     }
 
     // ======================================================================
-    //  Serialization support
+    //  Descriptor validation
     // ======================================================================
 
 public:
@@ -463,8 +465,8 @@ public:
     void checkDescriptorSanity() const {
         // --- 1. Byte-aligned data types ---
         // A type is byte-aligned when its bit width is a positive multiple of 8.
-        // dtype_to_bits() returns -1 for unknown/unsupported types, which also fails the check.
-        const int src_bits = dtype_to_bits(src.dtype);
+        // DTypeDimensionInfo::dtype_to_bits() returns -1 for unknown/unsupported types, which also fails the check.
+        const int src_bits = DTypeDimensionInfo::dtype_to_bits(src.dtype);
         if (src_bits <= 0 || (src_bits % 8) != 0) {
             const std::string dtype_name = DataType_ToText.at(static_cast<int>(src.dtype));
             throw std::invalid_argument("VPUDMADescriptor: source data type '" + dtype_name + "' has " +
@@ -472,7 +474,7 @@ public:
                                         " bit width, which is not a byte multiple."
                                         " DMA strides are byte-granular; only byte-aligned types are supported.");
         }
-        const int dst_bits = dtype_to_bits(dst.dtype);
+        const int dst_bits = DTypeDimensionInfo::dtype_to_bits(dst.dtype);
         if (dst_bits <= 0 || (dst_bits % 8) != 0) {
             const std::string dtype_name = DataType_ToText.at(static_cast<int>(dst.dtype));
             throw std::invalid_argument("VPUDMADescriptor: destination data type '" + dtype_name + "' has " +
@@ -548,32 +550,6 @@ public:
         }
     }
 
-    /// Logical name used for the CSV file produced by the serializer.
-    static std::string get_wl_name() {
-        return "l1_dma_descriptor_workloads";
-    }
-
-    /// CSV column names for all serialized fields (excluding cost output).
-    static std::vector<std::string> _get_member_names() {
-        std::vector<std::string> names = {
-                "device",       "src_dtype",    "src_num_dims", "src_shape_0",  "src_shape_1",  "src_shape_2",
-                "src_shape_3",  "src_shape_4",  "src_shape_5",  "src_stride_0", "src_stride_1", "src_stride_2",
-                "src_stride_3", "src_stride_4", "src_stride_5", "dst_dtype",    "dst_num_dims", "dst_shape_0",
-                "dst_shape_1",  "dst_shape_2",  "dst_shape_3",  "dst_shape_4",  "dst_shape_5",  "dst_stride_0",
-                "dst_stride_1", "dst_stride_2", "dst_stride_3", "dst_stride_4", "dst_stride_5", "src_location",
-                "dst_location",
-        };
-        return names;
-    }
-
-    /// CSV column names passed to CSVSerializer::initialize().
-    static std::vector<std::string> get_names_for_serializer() {
-        auto names = _get_member_names();
-        names.emplace_back("vpunn_cycles");
-        names.emplace_back("cost_source");
-        names.emplace_back("error_info");
-        return names;
-    }
 };
 
 inline std::ostream& operator<<(std::ostream& stream, const VPUDMADescriptor& d) {

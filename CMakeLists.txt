@@ -38,7 +38,6 @@ option(VPUNN_BUILD_TESTS "build tests" ON)
 option(VPUNN_ENABLE_LOGGING "enable logging" OFF)
 option(ENABLE_PYTHON_BINDING "Build the python bindings" OFF)
 option(GENERATE_PYTHON_BINDING "Generate the python bindings code" OFF)
-option(VPUNN_BUILD_HTTP_CLIENT "Build support for cost provider http service" OFF)
 option(VPUNN_OPT_LEGACY_ZTILING "Use legacy ZTiling mechanism" ON)
 option(VPUNN_OPT_LEGACY_DMA_TH_4 "Use legacy Theoretical DMA for Gen4" OFF)
 
@@ -83,12 +82,16 @@ if(VPUNN_OPT_LEGACY_DMA_TH_4)
     message(STATUS "-- Enable Legacy Gen4 DMA Theoretical")
 endif()
 
-# Conditional compile definitions
-if (VPUNN_BUILD_HTTP_CLIENT)
-    target_compile_definitions(vpunn_common_settings PUBLIC 
-        VPUNN_BUILD_HTTP_CLIENT
-    )
-    message(STATUS "-- Enable HTTP service cost provider ")
+# HTTP service cost provider is built automatically when its sources are present.
+# They are stripped from open-source drops (see apps/IPCleanVPUNNTool), in which case
+# the build transparently omits the client and HttpCostProviderFactory::create() returns nullptr.
+if(EXISTS "${COST_MODEL_ROOT_DIR}/src/http_client/CMakeLists.txt")
+    set(VPUNN_HTTP_CLIENT_AVAILABLE ON)
+    target_compile_definitions(vpunn_common_settings PUBLIC VPUNN_BUILD_HTTP_CLIENT)
+    message(STATUS "-- Enable HTTP service cost provider (sources present)")
+else()
+    set(VPUNN_HTTP_CLIENT_AVAILABLE OFF)
+    message(STATUS "-- HTTP service cost provider sources absent, skipping")
 endif()
 
 if(VPUNN_OPT_LEGACY_ZTILING)

@@ -18,7 +18,7 @@ add_subdirectory(shave)
 add_subdirectory(schema)
 add_subdirectory(vpu)
 
-if (VPUNN_BUILD_HTTP_CLIENT)
+if(VPUNN_HTTP_CLIENT_AVAILABLE)
     add_subdirectory(http_client)
 endif()
 
@@ -61,7 +61,7 @@ target_link_libraries(npu_costmodel
         vpunn_optimization
         vpunn_shave
         vpunn_vpu
-        $<$<BOOL:${VPUNN_BUILD_HTTP_CLIENT}>:vpunn_http_client>
+        $<$<BOOL:${VPUNN_HTTP_CLIENT_AVAILABLE}>:vpunn_http_client>
 )
 
 add_dependencies(npu_costmodel vpunn_cpp_schema)
@@ -100,8 +100,8 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR) # Only configure installation f
         list(APPEND VPUNN_INSTALL_TARGETS blas)
     endif()
 
-    if(VPUNN_BUILD_HTTP_CLIENT)
-        list(APPEND VPUNN_INSTALL_TARGETS vpunn_http_client httplib nlohmann_json)
+    if(VPUNN_HTTP_CLIENT_AVAILABLE)
+        list(APPEND VPUNN_INSTALL_TARGETS vpunn_http_client nlohmann_json)
     endif()
 
     if(TARGET cache_app)

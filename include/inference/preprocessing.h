@@ -132,7 +132,7 @@ public:
         const auto total_workloads{round_up(static_cast<unsigned int>(workloads.size()), pad)};
 
         std::vector<T> batch_processed_output;  ///< descriptor like processed_output, but for batch.
-        batch_processed_output.reserve(total_workloads * output_size());
+        batch_processed_output.reserve(static_cast<size_t>(total_workloads) * output_size());
 
         // zero filled variable with the same size as processed_output
         const std::vector<T> zero_vector = [](const auto elements_count) {

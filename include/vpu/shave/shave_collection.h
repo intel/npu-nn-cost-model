@@ -134,15 +134,10 @@ protected:
                           float entry_cost_cycles = 1000.f,
                           float scalar_cost_per_channel = 0.0f,
                           float unalignment_derate = 2.0f) {
-        auto p{new ShaveRooflineHeuristicModelActivation(name,
-                                                arithmetic_ops_per_32_outputs,
-                                                memory_ops_per_32_outputs,
-                                                unaligned_by_nature,
-                                                bw_derate,
-                                                code_derate,
-                                                entry_cost_cycles,
-                                                scalar_cost_per_channel,
-                                                unalignment_derate)};
+        auto p{new ShaveRooflineHeuristicModelActivation(name, arithmetic_ops_per_32_outputs,
+                                                         memory_ops_per_32_outputs, unaligned_by_nature, bw_derate,
+                                                         code_derate, entry_cost_cycles, scalar_cost_per_channel,
+                                                         unalignment_derate)};
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
 

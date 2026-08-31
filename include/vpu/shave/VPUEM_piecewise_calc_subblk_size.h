@@ -1,16 +1,17 @@
 #ifndef VPUEM_PIECEWISE_CALC_SUBBLK_SIZE_H
 #define VPUEM_PIECEWISE_CALC_SUBBLK_SIZE_H
 
-#include <array>
-#include <iostream>
-#include <vector>
 #include <algorithm>
-#include <stdexcept>
+#include <array>
 #include <cmath>
+#include <iostream>
 #include <list>
+#include <stdexcept>
 #include <tuple>
+#include <vector>
 #include "vpu/shave/VPUEM_op_base_dsp.h"
 
+#include "vpu/dpu_dtypes_dimension_info.h"
 #include "vpu/types.h"
 #include "vpu/vpuem_types.h"
 
@@ -27,8 +28,8 @@ public:
                     int dspArch)  // dspArch 128 for VPU2.7 and 512 for VPU4.0
             : adaptive_blk_num_en_(adaptive_blk_num_en),
               max_blk_num_(max_blk_num),
-              dspArch_(dspArch), 
-              simd_(dspArch/8) {
+              dspArch_(dspArch),
+              simd_(dspArch / 8) {
     }
 
     int round_dim(const int& d0, const int& d1) const {
@@ -36,7 +37,7 @@ public:
             return 1;
         } else {
             // proper implementation based on VPUEM, usage of ceil
-            return int(std::ceil(static_cast<double>(d0) /d1));
+            return int(std::ceil(static_cast<double>(d0) / d1));
         }
     }
 
@@ -57,7 +58,7 @@ public:
                 break;
             }
         }
-        
+
         if (!found) {
             throw std::runtime_error("All the dimensions are 1");
         } else {
@@ -96,21 +97,18 @@ public:
                     }
                 }
             }
-            
+
             return blk_tensor;
         }
     }
 
     VPUEM_Subblk_Tensor calc_last_subblk_size(const VPUEM_Subblk_Tensor& dim, const VPUTensor& ts) const {
-        VPUEM_Subblk_Tensor dim_last =
-                VPUEM_Subblk_Tensor({1, 1, dim.get_shape()[2]}, ts.get_dtype(), ts.get_layout());
-        dim_last.set_shape(0, int(ts.get_shape()[1]) <= dim.get_shape()[0]
-                                      ? dim.get_shape()[0]
-                                      : ts.get_shape()[1] % dim.get_shape()[0]);
+        VPUEM_Subblk_Tensor dim_last = VPUEM_Subblk_Tensor({1, 1, dim.get_shape()[2]}, ts.get_dtype(), ts.get_layout());
+        dim_last.set_shape(0, int(ts.get_shape()[1]) <= dim.get_shape()[0] ? dim.get_shape()[0]
+                                                                           : ts.get_shape()[1] % dim.get_shape()[0]);
 
-        dim_last.set_shape(1, int(ts.get_shape()[2]) <= dim.get_shape()[1]
-                                      ? dim.get_shape()[1]
-                                      : ts.get_shape()[2] % dim.get_shape()[1]);
+        dim_last.set_shape(1, int(ts.get_shape()[2]) <= dim.get_shape()[1] ? dim.get_shape()[1]
+                                                                           : ts.get_shape()[2] % dim.get_shape()[1]);
 
         if (dim_last.get_shape()[0] == 0 && dim_last.get_shape()[1] == 0) {
             dim_last = dim;
@@ -139,10 +137,10 @@ public:
 
         for (const VPUTensor& in_tensor : input_tensors) {
             VPUTensor in_ts = VPUTensor(1, 1, 1, in_tensor.volume(), in_tensor.get_dtype(),
-                                     in_tensor.get_layout());  // flatten the tensor
+                                        in_tensor.get_layout());  // flatten the tensor
 
-            //the correct implementation based on VPUEM
-            double precision_factor = dtype_to_bits(in_ts.get_dtype()) / 8.0;
+            // the correct implementation based on VPUEM
+            double precision_factor = DTypeDimensionInfo::dtype_to_bits(in_ts.get_dtype()) / 8.0;
             data_num = int(std::ceil(simd_ / precision_factor));
             max_num_data = data_num * max_blk_num;
 
@@ -157,10 +155,10 @@ public:
 
         for (const VPUTensor& out_tensor : output_tensors) {
             VPUTensor out_ts = VPUTensor(1, 1, 1, out_tensor.volume(), out_tensor.get_dtype(),
-                                     out_tensor.get_layout());  // flatten the tensor
-            
+                                         out_tensor.get_layout());  // flatten the tensor
+
             // the correct implementation based on VPUEM
-            double precision_factor = dtype_to_bits(out_ts.get_dtype()) / 8.0;
+            double precision_factor = DTypeDimensionInfo::dtype_to_bits(out_ts.get_dtype()) / 8.0;
             data_num = int(std::ceil(simd_ / precision_factor));
             max_num_data = data_num * max_blk_num;
 
@@ -172,20 +170,21 @@ public:
 
             auto it = numBlocks.begin();
             for (int i = 0; i < 3 && it != numBlocks.end(); ++i, ++it) {
-                    *it = int(std::ceil(float(out_ts.get_shape()[i + 1]) / float(odim.get_shape()[i])));
+                *it = int(std::ceil(float(out_ts.get_shape()[i + 1]) / float(odim.get_shape()[i])));
             }
 
             if (out_tensor.get_shape().size() > 4) {
-                    auto itt = numBlocks.begin();
-                for (long unsigned int i = 0; i < out_tensor.get_shape().size() - 4 && itt != numBlocks.end(); ++i, ++itt) {
-                        *itt *= out_tensor.get_shape()[i];
-                    }
+                auto itt = numBlocks.begin();
+                for (long unsigned int i = 0; i < out_tensor.get_shape().size() - 4 && itt != numBlocks.end();
+                     ++i, ++itt) {
+                    *itt *= out_tensor.get_shape()[i];
+                }
             }
         }
         return {numBlocks, isizes, isizes_last, osizes, osizes_last};
     }
 };
 
-} // namespace VPUNN
+}  // namespace VPUNN
 
-#endif // VPUEM_PIECEWISE_CALC_SUBBLK_SIZE_H
+#endif  // VPUEM_PIECEWISE_CALC_SUBBLK_SIZE_H

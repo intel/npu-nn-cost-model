@@ -9,6 +9,7 @@
 
 #include "http_client/http_cost_provider.h"
 #include "http_client/workload_json.h"
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <variant>
@@ -27,21 +28,12 @@ nlohmann::json HTTPClient::sendJsonRequest(const nlohmann::json& request, const 
     }
 
     try {
-        auto res = _client.Post(path, request.dump(), "application/json");
-        if (res) {
-            if (_debug) {
-                std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Response received, status: " << res->status
-                          << std::endl;
-                std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Response body: " << res->body << std::endl;
-            }
-            return nlohmann::json::parse(res->body);
-        } else {
-            if (_debug) {
-                std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Failed to receive response from server"
-                          << std::endl;
-            }
-            throw std::runtime_error("Failed to send request to server");
+        auto res = _client.post(path, request.dump(), "application/json");
+        if (_debug) {
+            std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Response received, status: " << res.status << std::endl;
+            std::cout << "[DEBUG] HTTPClient::sendJsonRequest - Response body: " << res.body << std::endl;
         }
+        return nlohmann::json::parse(res.body);
     } catch (const nlohmann::json::parse_error& e) {
         if (_debug) {
             std::cout << "[DEBUG] HTTPClient::sendJsonRequest - JSON parse error: " << e.what() << std::endl;

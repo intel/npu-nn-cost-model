@@ -23,6 +23,7 @@
 #include "vpu/dma_descriptors.h"
 #include "vpu/dma_types.h"
 #include "vpu/dma_workload.h"
+#include "vpu/dpu_dtypes_dimension_info.h"
 
 namespace VPUNN {
 
@@ -102,7 +103,7 @@ public:
             // The early-exit mirrors VPUDMATensor::getContiguousBytes() which also returns 0
             // for invalid dtypes, keeping both paths consistent without relying on the sanity
             // check having been called.
-            int32_t contiguous_bytes = static_cast<int32_t>(dtype_to_bytes(dtype));
+            int32_t contiguous_bytes = static_cast<int32_t>(DTypeDimensionInfo::dtype_to_bytes(dtype));
             if (contiguous_bytes <= 0) {
                 return;  // out_width=0, out_extra_count=0 already set above
             }
@@ -157,8 +158,7 @@ public:
                     // No free slot: fold element count into the last representable slot.
                     // Stride of this overflow dim is lost; accessed-bytes count is preserved.
                     const int last = e_index - 1;
-                    out_dims[last].src_dim_size =
-                            (out_dims[last].src_dim_size + 1) * static_cast<int>(shape[d]) - 1;
+                    out_dims[last].src_dim_size = (out_dims[last].src_dim_size + 1) * static_cast<int>(shape[d]) - 1;
                 }
             }
 
@@ -248,7 +248,7 @@ public:
 
             // Step 1: promote sub-byte types to the nearest byte-aligned sibling.
             const DataType effective_dtype = to_byte_aligned_dtype(t.get_dtype());
-            const int32_t elem_bytes = static_cast<int32_t>(dtype_to_bytes(effective_dtype));
+            const int32_t elem_bytes = static_cast<int32_t>(DTypeDimensionInfo::dtype_to_bytes(effective_dtype));
 
             // Step 2: derive element count.
             // Fall back to UINT8 if total_bytes is not evenly divisible (edge case).
@@ -306,8 +306,7 @@ public:
         // Helper: fill one VPUDMATensor side from width + e_dim[] arrays.
         // The HW encoding is innermost-first (width = innermost block, e_dim[0] is next, …).
         // VPUDMATensor stores outermost-first, so we reverse the dimension list.
-        auto fill_side = [](VPUDMATensor& side, int width, int num_dim,
-                            const std::function<int(int)>& get_dim_size,
+        auto fill_side = [](VPUDMATensor& side, int width, int num_dim, const std::function<int(int)>& get_dim_size,
                             const std::function<int(int)>& get_stride) {
             side.dtype = DataType::UINT8;  // byte granularity
 
@@ -318,11 +317,11 @@ public:
             std::array<int32_t, VPU_DMA_MAX_DIMS> strides{};
 
             // innermost (index 0 in our temp array)
-            shapes[0]  = static_cast<int32_t>(width);
+            shapes[0] = static_cast<int32_t>(width);
             strides[0] = 1;  // one byte per element
 
             for (int i = 0; i < num_dim; ++i) {
-                shapes[i + 1]  = static_cast<int32_t>(get_dim_size(i) + 1);  // 0-based -> count
+                shapes[i + 1] = static_cast<int32_t>(get_dim_size(i) + 1);  // 0-based -> count
                 strides[i + 1] = static_cast<int32_t>(get_stride(i));
             }
 
@@ -330,23 +329,33 @@ public:
             side.num_dims = total_dims;
             for (int i = 0; i < total_dims; ++i) {
                 const int src_idx = total_dims - 1 - i;  // reversed
-                side.shape[i]        = shapes[src_idx];
+                side.shape[i] = shapes[src_idx];
                 side.byte_strides[i] = strides[src_idx];
             }
             // zero-pad remaining slots
             for (int i = total_dims; i < VPU_DMA_MAX_DIMS; ++i) {
-                side.shape[i]        = 0;
+                side.shape[i] = 0;
                 side.byte_strides[i] = 0;
             }
         };
 
-        fill_side(desc.src, wl.src_width, wl.num_dim,
-                  [&](int i) { return wl.e_dim[i].src_dim_size; },
-                  [&](int i) { return wl.e_dim[i].src_stride; });
+        fill_side(
+                desc.src, wl.src_width, wl.num_dim,
+                [&](int i) {
+                    return wl.e_dim[i].src_dim_size;
+                },
+                [&](int i) {
+                    return wl.e_dim[i].src_stride;
+                });
 
-        fill_side(desc.dst, wl.dst_width, wl.num_dim,
-                  [&](int i) { return wl.e_dim[i].dst_dim_size; },
-                  [&](int i) { return wl.e_dim[i].dst_stride; });
+        fill_side(
+                desc.dst, wl.dst_width, wl.num_dim,
+                [&](int i) {
+                    return wl.e_dim[i].dst_dim_size;
+                },
+                [&](int i) {
+                    return wl.e_dim[i].dst_stride;
+                });
 
         return desc;
     }
@@ -380,7 +389,7 @@ public:
     /// @param dtype  Source data type, possibly non-byte-aligned.
     /// @return       Byte-aligned data type with the same or wider bit width.
     static DataType to_byte_aligned_dtype(const DataType dtype) noexcept {
-        const int bits = dtype_to_bits(dtype);
+        const int bits = DTypeDimensionInfo::dtype_to_bits(dtype);
 
         // Already byte-aligned (and a known type): return unchanged.
         if (bits > 0 && (bits % 8) == 0) {
@@ -453,7 +462,7 @@ public:
 
             // Step 1: promote sub-byte types to the nearest byte-aligned sibling.
             const DataType effective_dtype = to_byte_aligned_dtype(t.dtype);
-            const unsigned int elem_bytes = static_cast<unsigned int>(dtype_to_bytes(effective_dtype));
+            const unsigned int elem_bytes = static_cast<unsigned int>(DTypeDimensionInfo::dtype_to_bytes(effective_dtype));
 
             // Step 2: derive element count.
             // Fall back to UINT8 if the byte count is not evenly divisible by elem_bytes
@@ -509,8 +518,7 @@ public:
     static inline DMAWorkload fromDMATransfer1D_to_DMAWorkload(const DMATransfer1D& dma) {
         const auto locs = DMAWorkloadTransformer::create_locations(dma.memory_direction);
         if (locs.first == MemoryLocation::__size || locs.second == MemoryLocation::__size) {
-            throw std::runtime_error(
-                    "Cannot create a DMAWorkload from a DMATransfer1D: unknown memory direction");
+            throw std::runtime_error("Cannot create a DMAWorkload from a DMATransfer1D: unknown memory direction");
         }
 
         const VPUTensor ten{{static_cast<unsigned int>(dma.transfer_length_bytes), 1u, 1u, 1u}, DataType::UINT8};

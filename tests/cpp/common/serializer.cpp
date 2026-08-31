@@ -17,6 +17,8 @@
 #include <thread>
 
 #include <vpu/validation/data_dpu_operation.h>
+#include <vpu/validation/serializable_dpu.h>
+#include <vpu/validation/serializable_dma_descriptor.h>
 #include <vpu_cost_model.h>
 #include "vpu/vpu_tensor.h"
 #include "common_helpers.h"
@@ -141,31 +143,6 @@ TEST_F(VPUNNSerializerTest, Init_From_ExistingFileWHeader) {
     }
 }
 
-TEST_F(VPUNNSerializerTest, Serialize_DpuOperation) {
-    initialize_and_track("test_dpu_op_serialize", FileMode::READ_WRITE, DPUOperation::_get_member_names());
-
-    EXPECT_TRUE(serializer->is_initialized());
-
-    const VPUNN::DPUWorkload wl = {
-            VPUNN::VPUDevice::VPU_4_0,
-            VPUNN::Operation::ELTWISE,
-            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // input dimensions
-            {VPUNN::VPUTensor(16, 16, 64, 1, VPUNN::DataType::UINT8)},  // output dimensions
-            {1, 1},                                                     // kernels
-            {1, 1},                                                     // strides
-            {0, 0, 0, 0},                                               // padding
-            VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
-    };
-
-    serializer->serialize(DPUOperation(wl));
-    serializer->end();
-
-    auto field_names = serializer->get_field_names();
-    std::vector<std::string> expected_field_names = DPUOperation::_get_member_names();
-
-    // EXPECT_EQ(field_names, expected_field_names);
-}
-
 TEST_F(VPUNNSerializerTest, Serialize_MultipleCalls) {
     initialize_and_track("test_dpu_op_serialize", FileMode::READ_WRITE, std::vector<std::string>{"col0", "col1"});
 
@@ -186,8 +163,8 @@ TEST_F(VPUNNSerializerTest, Serialize_MultipleCalls) {
     EXPECT_EQ(field1.value, 1);
 }
 
-TEST_F(VPUNNSerializerTest, Serialize_Deserialize_DpuOperation) {
-    initialize_and_track("test_dpu_op_deserialize", FileMode::READ_WRITE, DPUOperation::_get_member_names());
+TEST_F(VPUNNSerializerTest, Deserialize_SerializableDPU_KeepsOriginalState) {
+    initialize_and_track("test_dpu_op_deserialize", FileMode::READ_WRITE, SerializableDPU::_get_member_names());
 
     EXPECT_TRUE(serializer->is_initialized());
 
@@ -202,21 +179,21 @@ TEST_F(VPUNNSerializerTest, Serialize_Deserialize_DpuOperation) {
             VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
     };
 
-    auto orig_dpu_op = DPUOperation(wl);
+    auto orig_dpu_op = SerializableDPU(wl);
     serializer->serialize(orig_dpu_op);
     serializer->end();
 
     serializer->jump_to_beginning();
 
-    DPUOperation deserialized_dpu_op;
+    SerializableDPU deserialized_dpu_op;
     serializer->deserialize(deserialized_dpu_op);
 
-    EXPECT_EQ(orig_dpu_op.device, deserialized_dpu_op.device);
-    EXPECT_EQ(orig_dpu_op.operation, deserialized_dpu_op.operation);
+    EXPECT_EQ(orig_dpu_op.dpu_operation_data().device, deserialized_dpu_op.dpu_operation_data().device);
+    EXPECT_EQ(orig_dpu_op.dpu_operation_data().operation, deserialized_dpu_op.dpu_operation_data().operation);
     // EXPECT_EQ(orig_dpu_op.input_0, deserialized_dpu_op.input_0);
     // EXPECT_EQ(orig_dpu_op.output_0, deserialized_dpu_op.output_0);
     // EXPECT_EQ(orig_dpu_op.kernel, deserialized_dpu_op.kernel);
-    EXPECT_EQ(orig_dpu_op.execution_order, deserialized_dpu_op.execution_order);
+    EXPECT_EQ(orig_dpu_op.dpu_operation_data().execution_order, deserialized_dpu_op.dpu_operation_data().execution_order);
 }
 
 TEST_F(VPUNNSerializerTest, Serialize_Deserialize_Multi_SerializableField) {
@@ -394,10 +371,12 @@ TEST_F(VPUNNSerializerTest, Has_member_map_Test) {
     EXPECT_TRUE(has_member_map_v<DMANNWorkload_NPU40>);
 
     // DPUOperation
-    EXPECT_TRUE(has_member_map_v<DPUOperation>);
+    EXPECT_TRUE(has_member_map_v<SerializableDPU>);
 
     //SerializableSHAVE
     EXPECT_TRUE(has_member_map_v<SerializableSHAVE>);
+
+    EXPECT_TRUE(has_member_map_v<SerializableVPUDMADescriptor>);
 }
 
 }  // namespace VPUNN_unit_tests

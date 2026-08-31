@@ -10,7 +10,7 @@
 #include <string>
 #include <unordered_map>
 #include "core/utils.h"
-#include "http_client/http_client.h"
+#include "http_client/http_client_test.h"
 #include "layer/layer.h"
 
 namespace VPUNN_unit_tests {

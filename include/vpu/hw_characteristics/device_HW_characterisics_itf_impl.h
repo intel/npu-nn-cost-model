@@ -54,6 +54,11 @@ public:
     unsigned int get_nr_macs() const override {
         return inner_characteristics.get_nr_macs();
     }
+
+    /// FP16 is more MAC-intensive than 8-bit.
+    /// Normally this ratio is 2: to handle the same amount of data, you need 2x more MACs when using FP16 compared to 8-bit.
+    /// For now we use it also for 16-bit vs 8-bit, but in the future if we have more data types with different ratios
+    /// we might want to make it more flexible.
     unsigned int get_fp_ratio() const override {
         return inner_characteristics.get_fp_ratio();
     }

@@ -226,6 +226,11 @@ PYBIND11_MODULE(_VPUNN, m) {
         .def("getDescriptor", &VPUNN::VPUCostModel::getDescriptor,
              "Get the DPU cost model descriptor for a given workload",
              py::arg("workload"))
+        .def("DPUIdealCycles", [](const VPUNN::VPUCostModel& self, const VPUNN::DPUWorkload& workload) {
+                 return self.getPerformanceModel().DPU_Efficency_IdealCycles(workload);
+             },
+             "Calculate DPU ideal cycles assuming 100% MAC utilization",
+             py::arg("workload"))
        ;
 
     // DMACostModel classes for different DMA workload types

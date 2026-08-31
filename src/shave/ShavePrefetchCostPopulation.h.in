@@ -1,0 +1,44 @@
+#ifndef GEN_SHAVE_PREFETCH_COST_POPULATION_H
+#define GEN_SHAVE_PREFETCH_COST_POPULATION_H
+
+@POPULATE_INFO@
+
+#include "vpu/shave/shave_prefetch_cost_strategy.h"
+
+namespace VPUNN {
+
+class PopulatedShavePrefetchCostLUT {
+private:
+    using OperationPrefetchLUT = VPUNN::OperationPrefetchLUT;
+
+    /// @brief Returns the lazily-initialized prefetch cost LUT for NPU 5.0.
+    static const OperationPrefetchLUT& get_lut_npu5() {
+        static const OperationPrefetchLUT lut_npu5 = []() {
+            OperationPrefetchLUT lut;
+@POPULATE_CONTENT_NPU5@
+            return lut;
+        }();
+        return lut_npu5;
+    }
+    
+public:
+    /// @brief Returns the per-device operation prefetch LUT for the given device.
+    ///
+    /// Adding a new device requires adding a new case here and a corresponding get_lut_npu*() function.
+    /// @return A reference to the operation prefetch LUT for the specified device,
+    /// or a reference to a shared empty LUT if the device is not supported.
+    static const OperationPrefetchLUT& get_lut_for_device(VPUDevice device) {
+        static const OperationPrefetchLUT empty_lut;
+
+        switch (device) {
+            case VPUDevice::NPU_5_0:
+                return get_lut_npu5();
+            default:
+                return empty_lut;
+        }
+    }
+};
+
+}  // namespace VPUNN
+
+#endif  // GEN_SHAVE_PREFETCH_COST_POPULATION_H

@@ -11,9 +11,9 @@
 #include "core/primitive_hash.h"
 #include "vpu/workload_hash.h"
 
-#include "core/utils.h"
 #include <iostream>
 #include <sstream>
+#include "core/utils.h"
 
 namespace VPUNN {
 
@@ -48,12 +48,12 @@ uint32_t SHAVEWorkload::hash() const {
     return h;
 }
 
-
 std::string SHAVEWorkload::toString() const {
     std::stringstream stream;
-    stream << "SHAVEWorkload: \n"                                                                                //
-           << " Operation: \t" << name << " ;\n"                                                                 //
-           << " device: \t" << (int)device << " : " << VPUDevice_ToText.at(static_cast<int>(device)) << " ;\n";  //
+    stream << "SHAVEWorkload: \n"                 //
+           << " Operation: \t" << name << " ;\n"  //
+           << " device: \t" << (int)device << " : " << VPUDevice_ToText.at(static_cast<int>(device)) << " ;\n"
+           << " include_code_prefetch: \t" << (include_code_prefetch ? "true" : "false") << " ;\n";  //
 
     // inputs and outputs tensors
     {

@@ -9,12 +9,29 @@
 
 # tests/cpp/
 
-# Build HTTP client library for tests if not already built
-if(NOT TARGET vpunn_http_client)
-    add_subdirectory(${COST_MODEL_ROOT_DIR}/src/http_client ${CMAKE_CURRENT_BINARY_DIR}/http_client)
+include(FetchContent)
+
+# Build the HTTP client library and fetch its test-only httplib dependency only when
+# the HTTP client sources are present (they are stripped from open-source drops).
+if(VPUNN_HTTP_CLIENT_AVAILABLE)
+    if(NOT TARGET vpunn_http_client)
+        add_subdirectory(${COST_MODEL_ROOT_DIR}/src/http_client ${CMAKE_CURRENT_BINARY_DIR}/http_client)
+    endif()
+
+    # httplib (header-only) is required only by the test mock server. Populate the
+    # sources and consume the header directly to avoid httplib's optional zstd/OpenSSL
+    # CMake probing, which is not needed for the plain-HTTP mock server used in tests.
+    FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG        v0.20.0
+    )
+    FetchContent_GetProperties(httplib)
+    if(NOT httplib_POPULATED)
+        FetchContent_Populate(httplib)
+    endif()
 endif()
 
-include(FetchContent)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
@@ -116,7 +133,7 @@ target_link_libraries(test_cost_model
         # Added for EMBARGO settings from root
         vpunn_common_settings
         npu_costmodel
-        vpunn_http_client
+        $<$<BOOL:${VPUNN_HTTP_CLIENT_AVAILABLE}>:vpunn_http_client>
 )
 
 # This will allow to include headers from the current directory
@@ -124,6 +141,7 @@ target_link_libraries(test_cost_model
 target_include_directories(test_cost_model
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${httplib_SOURCE_DIR}
 )
 
 # Apply warning suppression to the test target for GoogleTest headers

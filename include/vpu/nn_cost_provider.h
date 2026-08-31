@@ -33,6 +33,7 @@
 #include "vpu/nn_cost_provider_execution_context.h"
 #include "vpu/serialization/l1_cost_serialization_wrapper.h"
 #include "vpu/types.h"  // for DPUWorkload, VPUDevice
+#include "vpu/validation/serializable_dpu.h"
 
 namespace VPUNN {
 
@@ -328,8 +329,8 @@ public:
     /// @brief Provides identifiers for data to be serialized
     // template <bool B = serialization_enabled, typename std::enable_if<B, int>::type = 0>
     static const std::vector<std::string> get_names_for_serializer() {
-        auto fields = std::vector<std::string>(DPUOperation::_get_member_names().cbegin(),
-                                               DPUOperation::_get_member_names().cend());
+        auto fields = std::vector<std::string>(SerializableDPU::_get_member_names().cbegin(),
+                                               SerializableDPU::_get_member_names().cend());
         fields.emplace_back("mpe_engine");
         fields.emplace_back("vpunn_cycles");
         fields.emplace_back("cost_source");
@@ -348,7 +349,7 @@ public:
         return post_processing.get_NN_Valid_interval();
     }
 
-     // TODO: do not forget to delete this in the future, existence of this getter that exposes the guts is a smell
+    // TODO: do not forget to delete this in the future, existence of this getter that exposes the guts is a smell
     const Preprocessing<float>& get_preprocessing() const noexcept {
         return preprocessing;
     }
