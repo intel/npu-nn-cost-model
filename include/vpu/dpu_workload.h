@@ -281,9 +281,7 @@ public:
     /// Uses the same fnv1a_hash function as NNDescriptor, but without preprocessing
     uint32_t hash() const noexcept;
 
-    DPUWorkload(const DPUWorkload&) = default;
     DPUWorkload& operator=(const DPUWorkload&) = default;
-    DPUWorkload() = default;
     /// default destructor explicit stated here for gcov problems.
     ~DPUWorkload() = default;
 };
