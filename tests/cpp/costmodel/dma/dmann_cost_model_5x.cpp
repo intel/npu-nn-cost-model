@@ -107,7 +107,7 @@ TEST_F(TestDMANNCostModelNPU5x, SmokeTestDMA_50_V1) {
 
 // this test is for New/Updated theoretical model
 TEST_F(TestDMA_TH_CostModelVPU5x, DMA_Theoretical_regresion_NPU50_Default) {
-    VPUCostModel cm("empty");
+    VPUCostModel cm(VPUDevice::__size, "empty");
     ASSERT_TRUE(!cm.nn_initialized());
     const VPUDevice device{VPUDevice::NPU_5_0};
 
