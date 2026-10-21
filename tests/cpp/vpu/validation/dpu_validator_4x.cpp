@@ -255,7 +255,7 @@ TEST_F(DPU_OperationValidator_TestNPU4x, Input1_memory_computation_and_cycles_in
     EXPECT_NO_THROW(mem = operation_behaviour.input_1_contiguous_size_bytes(config, op)) << wl << std::endl;
     EXPECT_EQ(mem, 3072) << test_info(wl_ref) << "\n";
 
-    VPUCostModel model40_strict{VPU_4_0_159_STRICT_MODEL_PATH};
+    VPUCostModel model40_strict{VPUDevice::VPU_4_0, VPU_4_0_159_STRICT_MODEL_PATH};
     auto cycles = model40_strict.DPU(std::move(wl));
     EXPECT_EQ(cycles, 326) << cycles;
 }

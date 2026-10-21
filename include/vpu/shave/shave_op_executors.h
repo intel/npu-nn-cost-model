@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_OP_EXECUTORS_H
-#define SHAVE_OP_EXECUTORS_H
+#ifndef VPUNN_SHAVE_OP_EXECUTORS_H
+#define VPUNN_SHAVE_OP_EXECUTORS_H
 
 #include <type_traits>
 #include "interface_shave_op_executor.h"
@@ -21,6 +21,7 @@
 #include "elementwise.h"
 #include "poly_models.h"
 #include "shave_heuristic_models.h"
+#include "shave_model_basics.h"
 
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
@@ -168,64 +169,64 @@ public:
         return stream.str();
     }
 };
-/// Implementation for GatherModel 
+/// Implementation for GatherModel
 template <DataType dtype, unsigned int VectorSize, unsigned int DpuFreq, unsigned int ShvFreq>
 class GatherActivationExec : public ShaveOpExecutor {
 private:
-	GatherModel model;
+    const GatherModel model;
 
 public:
-        GatherActivationExec(const std::string& name, float base_slope, float base_intercept, float inter_slope, 
-                             float worst_slope, float vector_offset)
-                            : ShaveOpExecutor(name, 2),
-                              model(dtype, base_slope,base_intercept, worst_slope, inter_slope, vector_offset, 
-                              VectorSize, DpuFreq, ShvFreq){
-                              }
-        
-        CyclesInterfaceType dpuCycles(const SHAVEWorkload& w) const override {
-            return dpuCycles(w, model.getNominalDPUFrq(), model.getNominalSHVFrq());
-        };
+    GatherActivationExec(const std::string& name, float base_slope, float base_intercept, float inter_slope,
+                         float worst_slope, float vector_offset)
+            : ShaveOpExecutor(name, 2),
+              model(dtype, base_slope, base_intercept, worst_slope, inter_slope, vector_offset, VectorSize, DpuFreq,
+                    ShvFreq) {
+    }
 
-        CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
-                                      const int present_shv_frq) const override {
-            // We need to have 2 parameters, the first one is the axis and the second one is the batch dims
-            if (w.get_params().size() != getNumExpectedParams()) {
-				return Cycles::ERROR_SHAVE_PARAMS;
-			}
-            
-            const int selected_axis{std::get<int>(w.get_params()[0])};
-            const int batch_dims{std::get<int>(w.get_params()[1])};
-            
-            // The current model was trained just in this way
-            if (selected_axis != 1 || batch_dims != 1) {
-                return Cycles::ERROR_SHAVE_PARAMS;
-            }
-            const auto& out = w.get_outputs()[0];
-            const auto& out_volume = out.volume();
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w) const override {
+        return dpuCycles(w, model.getNominalDPUFrq(), model.getNominalSHVFrq());
+    };
 
-            const auto layout_dim_order{layout_to_order(out.get_layout())};  // dim from innermost to outermost
-            assert(layout_dim_order.size() == 4);
-
-            GatherModel::Dimensions dim_vector{1, 1, 1, 1};
-            for (int i = 0; i < 4; ++i) {  // take  the first DimSelected innermost dimensions, they are the selected one
-                const auto dimension_index = layout_dim_order[i];
-                const auto dimension_size{out.get_shape()[dimension_index]};
-                dim_vector[i] = dimension_size;
-            }
-
-            const auto cycles = model.getDPUCyclesAnotherFreqDPU_SHV(
-                    present_dpu_frq, present_shv_frq, out_volume, dim_vector);
-
-            return cycles;
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
+                                  const int present_shv_frq) const override {
+        // We need to have 2 parameters, the first one is the axis and the second one is the batch dims
+        if (w.get_params().size() != getNumExpectedParams()) {
+            return Cycles::ERROR_SHAVE_PARAMS;
         }
-        std::string toString() const override {
+
+        const int selected_axis{std::get<int>(w.get_params()[0])};
+        const int batch_dims{std::get<int>(w.get_params()[1])};
+
+        // The current model was trained just in this way
+        if (selected_axis != 1 || batch_dims != 1) {
+            return Cycles::ERROR_SHAVE_PARAMS;
+        }
+        const auto& out = w.get_outputs()[0];
+        const auto& out_volume = out.volume();
+
+        const auto layout_dim_order{layout_to_order(out.get_layout())};  // dim from innermost to outermost
+        assert(layout_dim_order.size() == 4);
+
+        GatherModel::Dimensions dim_vector{1, 1, 1, 1};
+        for (int i = 0; i < 4; ++i) {  // take  the first DimSelected innermost dimensions, they are the selected one
+            const auto dimension_index = layout_dim_order[i];
+            const auto dimension_size{out.get_shape()[dimension_index]};
+            dim_vector[i] = dimension_size;
+        }
+
+        const auto cycles =
+                model.getDPUCyclesAnotherFreqDPU_SHV(present_dpu_frq, present_shv_frq, out_volume, dim_vector);
+
+        return cycles;
+    }
+    std::string toString() const override {
         std::stringstream stream;
-        stream << "GatherActivationExec: \n"                                                            //
-               << " Operation: \t" << getName() << " ;\n"                                                //
-               << " Shave params: 2 int, first represents the axis(dimension index for gathering),"      //
-               << " second parameter is batch_dims(leading number of dimensions being batches)"          //
-               << " Both parameters are restricted to value 1,(the only profiled selection)"             //
-               << " Model    : \t" << model << " ;\n";                                                   //
+        stream << "GatherActivationExec: \n"                                                         //
+               << " Operation: \t" << getName() << " ;\n"                                            //
+               << " Shave params: 2 int, first represents the axis(dimension index for gathering),"  //
+               << " second parameter is batch_dims(leading number of dimensions being batches)"      //
+               << " Both parameters are restricted to value 1,(the only profiled selection)"         //
+               << " Model    : \t" << model << " ;\n";                                               //
 
         return stream.str();
     }
@@ -608,7 +609,6 @@ public:
 
         const int selected_dim_number{std::get<int>(w.get_params()[0])};
 
-
         if ((selected_dim_number <= 0) || (selected_dim_number > 4)) {
             return Cycles::ERROR_SHAVE_PARAMS;
         }
@@ -654,7 +654,6 @@ public:
 
         return stream.str();
     }
-
 };
 
 ////////////////////////////////////////////////
@@ -701,28 +700,31 @@ public:
 
         return stream.str();
     }
-
 };
 
 //////////////////////////////////////////////////////////////////////
+/// DpuFreq and ShvFreq are the nominal device frequencies used to rescale the heuristic cost.
+template <unsigned int DpuFreq, unsigned int ShvFreq>
 class ShaveSimpleHeuristicModelActivation : public ShaveOpExecutor {
 private:
     const ShaveSimpleHeuristicModel model;  ///< model instance
 
 public:
     CyclesInterfaceType dpuCycles(const SHAVEWorkload& w) const override {
-        const auto& total_num_of_elements = w.total_number_of_elements();
-        const auto cycles = model.getCycles(total_num_of_elements);
-        return cycles;
+        return dpuCycles(w, model.getNominalDPUFrq(), model.getNominalSHVFrq());
     };
 
-    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int, const int) const override {
-        return dpuCycles(w);
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
+                                  const int present_shv_frq) const override {
+        const auto total_num_of_elements = w.total_number_of_elements();
+        return model.getDPUCyclesAnotherFreqDPU_SHV(present_dpu_frq, present_shv_frq, total_num_of_elements);
     };
 
     ShaveSimpleHeuristicModelActivation(const std::string& name, float elements_per_cycle, float code_derate,
                                         float bw_derate, float entry_cost_cycles)
-            : ShaveOpExecutor(name), model(elements_per_cycle, code_derate, bw_derate, entry_cost_cycles) {
+            : ShaveOpExecutor(name),
+              // Bind the heuristic model to the nominal device DPU/SHV frequencies.
+                            model(DpuFreq, ShvFreq, elements_per_cycle, code_derate, bw_derate, entry_cost_cycles) {
     }
 
     std::string toString() const override {
@@ -735,34 +737,38 @@ public:
     }
 };
 
+/// DpuFreq and ShvFreq are the nominal device frequencies used to rescale the roofline cost.
+template <unsigned int DpuFreq, unsigned int ShvFreq>
 class ShaveRooflineHeuristicModelActivation : public ShaveOpExecutor {
 private:
     const ShaveRooflineHeuristicModel model;  ///< model instance
 public:
     CyclesInterfaceType dpuCycles(const SHAVEWorkload& w) const override {
-        const auto& total_num_of_elements = w.total_number_of_elements();
-        const auto& total_size_in_bits = w.total_size_in_bits();
-        
+        return dpuCycles(w, model.getNominalDPUFrq(), model.getNominalSHVFrq());
+    }
+
+    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int present_dpu_frq,
+                                  const int present_shv_frq) const override {
+        const auto total_num_of_elements = w.total_number_of_elements();
+        const auto total_size_in_bits = w.total_size_in_bits();
+
         int num_of_channels = 0;
         for (const auto& t : w.get_outputs()) {
             num_of_channels += t.channels();
         }
-        
-        const auto cycles = model.getCycles(total_size_in_bits, total_num_of_elements, num_of_channels);
-        return cycles;
-    }
 
-    CyclesInterfaceType dpuCycles(const SHAVEWorkload& w, const int, const int) const override {
-        return dpuCycles(w);
-    };
+        return model.getDPUCyclesAnotherFreqDPU_SHV(present_dpu_frq, present_shv_frq, total_size_in_bits,
+                                                    total_num_of_elements, num_of_channels);
+    }
 
     ShaveRooflineHeuristicModelActivation(const std::string& name, float arithmetic_ops_per_32_outputs,
                                           float memory_ops_per_32_outputs, bool unaligned_by_nature, float bw_derate,
                                           float code_derate, float entry_cost_cycles, float scalar_cost_per_channel,
                                           float unalignment_derate)
             : ShaveOpExecutor(name),
-              model(arithmetic_ops_per_32_outputs, memory_ops_per_32_outputs, unaligned_by_nature, bw_derate,
-                    code_derate, entry_cost_cycles, scalar_cost_per_channel, unalignment_derate) {
+              // Bind the roofline model to the nominal device DPU/SHV frequencies.
+              model(DpuFreq, ShvFreq, arithmetic_ops_per_32_outputs, memory_ops_per_32_outputs, unaligned_by_nature,
+                  bw_derate, code_derate, entry_cost_cycles, scalar_cost_per_channel, unalignment_derate) {
     }
 
     std::string toString() const override {
@@ -812,7 +818,7 @@ public:
     CyclesInterfaceType dpuCycles(const SHAVEWorkload&, const int, const int) const override {
         return Cycles::ERROR_SHAVE_PARAMS;  // not supported
     };
-    ShaveClassicLinear(const std::string& name): ShaveOpExecutor(name){};
+    ShaveClassicLinear(const std::string& name): ShaveOpExecutor(name) {};
     std::string toString() const override {
         std::stringstream stream;
         stream << "ShaveClassicLinear: \n"                 //
@@ -895,4 +901,4 @@ public:
 };
 
 }  // namespace VPUNN
-#endif
+#endif  // VPU_SHAVE_SHAVE_OP_EXECUTORS_H

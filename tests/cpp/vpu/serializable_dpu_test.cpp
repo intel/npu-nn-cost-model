@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 
 /// @brief namespace for Unit tests of the C++ library
@@ -34,6 +35,28 @@ public:
         (*set_get)(true, value);
     }
 };
+
+TEST_F(SerializableDPU_Test, MemberNames_MatchMemberMapKeys) {
+    SerializableDPU serializable_dpu;
+    const auto& member_names = SerializableDPU::_get_member_names();
+    const auto& member_map = serializable_dpu.get_member_map();
+
+    const std::unordered_set<std::string> unique_member_names(member_names.begin(), member_names.end());
+
+    EXPECT_EQ(unique_member_names.size(), member_names.size()) << "Member names must not contain duplicates";
+    EXPECT_EQ(unique_member_names.size(), member_map.size());
+
+    for (const auto& member_name : unique_member_names) {
+        EXPECT_NE(member_map.find(member_name), member_map.end())
+                << "Member name '" << member_name << "' is missing from the member map";
+    }
+
+    for (const auto& [member_name, member_value] : member_map) {
+        (void)member_value;
+        EXPECT_NE(unique_member_names.find(member_name), unique_member_names.end())
+                << "Member map key '" << member_name << "' is missing from the member names";
+    }
+}
 
 TEST_F(SerializableDPU_Test, InPlaceOutputMemory_SetterHeuristic_AppliesCorrectly) {
     // Elementwise + matching layout/datatype + non-numeric field => TRUE

@@ -235,29 +235,33 @@ TEST_F(TestCostModel, Compute_Input1_size_TestVPU2x) {
 TEST_F(TestCostModelVPU2x, LoadModels_BasicAssertions) {
     {  // 2_0
         const std::string model_path = VPU_2_0_MODEL_PATH;
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 
     {  // 2_7
         const std::string model_path = VPU_2_7_MODEL_PATH;
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 
     {  // 2_0 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH)};
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 
     {  // 2_7 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH)};
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
 }
@@ -276,8 +280,9 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
 
     {  // 2_0
         const std::string model_path = VPU_2_0_MODEL_PATH;
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
@@ -287,8 +292,9 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
 
     {  // 2_7
         const std::string model_path = VPU_2_7_MODEL_PATH;
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
@@ -298,8 +304,9 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
 
     {  // 2_0 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH)};
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
@@ -309,8 +316,9 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
 
     {  // 2_7 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH)};
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model_path});
-        VPUNN::VPUCostModel vpunn_model{model_path};
+        const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         auto minmax = vpunn_model.get_NN_cost_provider().get_NN_Valid_interval();
@@ -437,8 +445,8 @@ TEST_F(TestCostModelVPU2x, DISABLED_BatchTestVPUNNCostModel_VPUNN_2_0_stochastic
 
     for (unsigned int batch_size : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
         for (auto n_workloads : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
-            VPUNN::VPUCostModel batched_model{model20_path, false, 0, batch_size};
-            VPUNN::VPUCostModel vpunn_model{model20_path, false, 0, 1};
+            VPUNN::VPUCostModel batched_model{device20, model20_path, false, 0, batch_size};
+            VPUNN::VPUCostModel vpunn_model{device20, model20_path, false, 0, 1};
 
             // Generate a bunch of random workloads
             auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -486,8 +494,8 @@ TEST_F(TestCostModelVPU2x, DISABLED_BatchTestVPUNNCostModel_VPUNN_2_7F_stochasti
 
     for (unsigned int batch_size : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
         for (auto n_workloads : {1, 2, 3, 5, 8, 13, 17, 30, 40, 100}) {
-            VPUNN::VPUCostModel batched_model{model_path, false, 0, batch_size};
-            VPUNN::VPUCostModel vpunn_model{model_path, false, 0, 1};
+            VPUNN::VPUCostModel batched_model{device_version, model_path, false, 0, batch_size};
+            VPUNN::VPUCostModel vpunn_model{device_version, model_path, false, 0, 1};
 
             // Generate a bunch of random workloads
             auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -534,8 +542,8 @@ TEST_F(TestCostModelVPU2x, BatchTestVPUNNCostModel_VPUNN_2_7F_Particular1) {
     unsigned int batch_size = 1;
     const int n_workloads = 1;
 
-    VPUNN::VPUCostModel batched_model{model_path, false, 0, batch_size};
-    VPUNN::VPUCostModel vpunn_model{model_path, false, 0, 1};
+    VPUNN::VPUCostModel batched_model{device_version, model_path, false, 0, batch_size};
+    VPUNN::VPUCostModel vpunn_model{device_version, model_path, false, 0, 1};
 
     VPUNN::DPUWorkload wl_ref = {
             device_version,
@@ -667,8 +675,9 @@ TEST_F(TestCostModelVPU2x, BatchTest_SanitizedWorkloadsEquivalence) {
     auto batch_size = (unsigned int)workloads.size();
 
     const std::string model_path = the_NN_models.fast_model_paths[1].first;  // fast nn2.7
-    VPUNN::VPUCostModel batched_model{model_path, false, 0, batch_size};
-    VPUNN::VPUCostModel vpunn_model{model_path, false, 0, 1};
+    const VPUNN::VPUDevice device_version = the_NN_models.fast_model_paths[1].second;
+    VPUNN::VPUCostModel batched_model{device_version, model_path, false, 0, batch_size};
+    VPUNN::VPUCostModel vpunn_model{device_version, model_path, false, 0, 1};
 
     {  // one by one batch, so if one list throws it will not affect the rest of wl in vector
         for (unsigned int idx = 0; idx < workloads.size(); idx++) {
@@ -878,7 +887,8 @@ TEST_F(TestCostModelVPU2x, Special_Tests_DPU_MAXPOOL_VPU_2_0_1_96_96_9_9_1_2_VAL
     {
         TestCycles cycles_slow{cost_models.getModel(device20).DPU(wl), cost_models.getModel(device20).DPU(wl_smaller)};
 
-        VPUNN::VPUCostModel model_fast{the_NN_models.fast_model_paths[0].first};
+        VPUNN::VPUCostModel model_fast{the_NN_models.fast_model_paths[0].second,
+                           the_NN_models.fast_model_paths[0].first};
         TestCycles cycles_fast{model_fast.DPU(wl), model_fast.DPU(wl_smaller)};
 
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_slow.cycles_smaller))
@@ -1143,52 +1153,55 @@ TEST_F(TestCostModelVPU2x, Datatype_Sanity_test_VPU27) {
 // Demonstrate some basic assertions.
 TEST_F(TestCostModelVPU2x, InitAspects) {
     {  // 20
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x{model20_path});
-        VPUNN::VPUCostModel vpunn_model{model20_path};
+        EXPECT_NO_THROW((VPUNN::VPUCostModel(device20, model20_path)));
+        VPUNN::VPUCostModel vpunn_model{device20, model20_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
         const auto file_content{read_a_file(std::move(model20_path))};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), true));
-        VPUNN::VPUCostModel vpunn_model_buf{file_content.data(), file_content.size(), true};
+        EXPECT_NO_THROW((VPUNN::VPUCostModel(device20, file_content.data(), file_content.size(), true)));
+        VPUNN::VPUCostModel vpunn_model_buf{device20, file_content.data(), file_content.size(), true};
         EXPECT_TRUE(vpunn_model_buf.nn_initialized());
 
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), false));
-        VPUNN::VPUCostModel vpunn_model_buf_copy(file_content.data(), file_content.size(), false);
+        EXPECT_NO_THROW((VPUNN::VPUCostModel(device20, file_content.data(), file_content.size(), false)));
+        VPUNN::VPUCostModel vpunn_model_buf_copy{device20, file_content.data(), file_content.size(), false};
         EXPECT_TRUE(vpunn_model_buf_copy.nn_initialized());
     }
     {  // 27
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(model27_path));
-        VPUNN::VPUCostModel vpunn_model(model27_path);
+        EXPECT_NO_THROW((VPUNN::VPUCostModel(device27, model27_path)));
+        VPUNN::VPUCostModel vpunn_model{device27, model27_path};
         EXPECT_TRUE(vpunn_model.nn_initialized());
 
         const auto file_content{read_a_file(model27_path)};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), true));
-        VPUNN::VPUCostModel vpunn_model_buf(file_content.data(), file_content.size(), true);
+        EXPECT_NO_THROW((VPUNN::VPUCostModel(device27, file_content.data(), file_content.size(), true)));
+        VPUNN::VPUCostModel vpunn_model_buf{device27, file_content.data(), file_content.size(), true};
         EXPECT_TRUE(vpunn_model_buf.nn_initialized());
 
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), false));
-        VPUNN::VPUCostModel vpunn_model_buf_copy(file_content.data(), file_content.size(), false);
+        EXPECT_NO_THROW((VPUNN::VPUCostModel(device27, file_content.data(), file_content.size(), false)));
+        VPUNN::VPUCostModel vpunn_model_buf_copy{device27, file_content.data(), file_content.size(), false};
         EXPECT_TRUE(vpunn_model_buf_copy.nn_initialized());
     }
     {  // garbage data/no file
         const std::string model_path = "NoFileHere.vpunn";
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(model_path));
-        VPUNN::VPUCostModel vpunn_model(model_path);
+        EXPECT_NO_THROW((VPUNN::VPUCostModel(VPUNN::VPUDevice::__size, model_path)));
+        VPUNN::VPUCostModel vpunn_model{VPUNN::VPUDevice::__size, model_path};
         EXPECT_FALSE(vpunn_model.nn_initialized());
 
         const decltype(read_a_file("")) file_content{'M', 'u', 's', 't', 'h', 'a', 'v', 'e', ' ', '0', '1'};
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), true));
-        VPUNN::VPUCostModel vpunn_model_buf(file_content.data(), file_content.size(), true);
+        EXPECT_NO_THROW(
+            (VPUNN::VPUCostModel(VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), true)));
+        VPUNN::VPUCostModel vpunn_model_buf{VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), true};
         EXPECT_FALSE(vpunn_model_buf.nn_initialized());
 
-        EXPECT_NO_THROW(VPUNN::VPUCostModel x(file_content.data(), file_content.size(), false));
-        VPUNN::VPUCostModel vpunn_model_buf_copy(file_content.data(), file_content.size(), false);
+        EXPECT_NO_THROW(
+            (VPUNN::VPUCostModel(VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), false)));
+        VPUNN::VPUCostModel vpunn_model_buf_copy{VPUNN::VPUDevice::__size, file_content.data(), file_content.size(),
+                             false};
         EXPECT_FALSE(vpunn_model_buf_copy.nn_initialized());
 
         auto cycles_20 = vpunn_model_buf.DPU(wl_glob_20);
@@ -1203,8 +1216,8 @@ TEST_F(TestCostModelVPU2x, InitAspects) {
 }
 
 TEST_F(TestCostModelVPU2x, ComaparativeRuns) {
-    auto modelRun = [](const std::string& model_path, VPUNN::DPUWorkload& wld) {
-        VPUNN::VPUCostModel vpunn_model(model_path);
+    auto modelRun = [](VPUNN::VPUDevice device, const std::string& model_path, VPUNN::DPUWorkload& wld) {
+        VPUNN::VPUCostModel vpunn_model{device, model_path};
         const IEnergy& my_energy = vpunn_model.getEnergyInterface();
         std::cout << model_path << " : initialized: " << vpunn_model.nn_initialized() << std::endl;
 
@@ -1214,17 +1227,17 @@ TEST_F(TestCostModelVPU2x, ComaparativeRuns) {
     };
 
     std::cout << "----------------------------------------------------------\n";
-    modelRun(model20_path, wl_glob_20);
-    // modelRun(VPU_2_0_MODEL_PATH, wl_glob_20);
+    modelRun(device20, model20_path, wl_glob_20);
+    // modelRun(VPU_2_0_MODEL_PATH, device20, wl_glob_20);
     std::cout << "----------------------------------------------------------\n";
-    modelRun(model27_path, wl_glob_27);
-    // modelRun(VPU_2_7_MODEL_PATH, wl_glob_27);
+    modelRun(device27, model27_path, wl_glob_27);
+    // modelRun(VPU_2_7_MODEL_PATH, device27, wl_glob_27);
     std::cout << "----------------------------------------------------------\n";
-    modelRun(NameHelperNN::make_fast_version(model20_path), wl_glob_20);
-    // modelRun(NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH), wl_glob_20);
+    modelRun(device20, NameHelperNN::make_fast_version(model20_path), wl_glob_20);
+    // modelRun(NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH), device20, wl_glob_20);
     std::cout << "----------------------------------------------------------\n";
-    modelRun(NameHelperNN::make_fast_version(model27_path), wl_glob_27);
-    // modelRun(NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH), wl_glob_27);
+    modelRun(device27, NameHelperNN::make_fast_version(model27_path), wl_glob_27);
+    // modelRun(NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH), device27, wl_glob_27);
     std::cout << "----------------------------------------------------------\n";
 }
 

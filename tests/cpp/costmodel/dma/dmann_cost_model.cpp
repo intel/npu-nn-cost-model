@@ -118,7 +118,7 @@ TEST_F(TestDMANNCostModel, Mock_40_vs_VPU27_DPU) {
 }
 
 TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
-    VPUCostModel cm("empty");
+    VPUCostModel cm(VPUDevice::__size, "empty");
     ASSERT_TRUE(!cm.nn_initialized());
     auto check = [&](const TestCase& tc) {
         auto dma_cyc = cm.DMA(tc.t_in);
@@ -264,7 +264,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
 }
 
 TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
-    VPUCostModel cm("empty");
+    VPUCostModel cm(VPUDevice::__size, "empty");
     DMATheoreticalCostProvider_LNL_Legacy dma_theoretical_lnl;
     DMATheoreticalCostProvider_PTL dma_theoretical_ptl(HWCharacteristicsSuperSets::get_mainConfigurationRef());
 
@@ -351,7 +351,7 @@ TEST_F(TestDMA_TH_CostModel, DMATheoreticalPTL_ON_function_Test) {
     };
 
     DMATheoreticalCostProvider_PTL dma_theoretical_ptl(HWCharacteristicsSuperSets::get_mainConfigurationRef());
-    VPUCostModel cm("empty");
+    VPUCostModel cm(VPUDevice::__size, "empty");
     ASSERT_TRUE(!cm.nn_initialized());
 
     {  // valid cases

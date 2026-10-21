@@ -46,7 +46,7 @@ protected:
 
 
 
-    VPUCostModel empty_model{};
+    VPUCostModel empty_model{VPUNN::VPUDevice::__size, ""};
     ModelMap<VPUCostModel> cost_models{""};
 
     TestCostModel() {
@@ -211,10 +211,8 @@ protected:
         std::string test_info_str = test_case;
         std::replace(test_info_str.begin(), test_info_str.end(), ',', '_');
         test_info_str.erase(std::remove(test_info_str.begin(), test_info_str.end(), '\n'), test_info_str.end());
-        // TO BE REFACTORED
         const std::string info_layer{current_test_fixture_name() + "::" + current_test_name() + "::" + test_info_str +
                                      "::" + std::to_string(t_in.GT_val)};
-        cost_models.getModel(w1.device).get_serializer().serialize(SerializableField<std::string>("info", info_layer));
 
         w1.set_layer_info(info_layer);
         unsigned cost_cyc{};

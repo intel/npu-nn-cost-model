@@ -580,7 +580,7 @@ TEST_F(TestDMANNCostModelNPU4x, SweepGT_DMATime_40_Theoretical) {
 
     // DMACostModel<DMANNWorkload_NPU40> model_4_0{VPU_DMA_4_0_MODEL_PATH};
     // EXPECT_TRUE(model_4_0.nn_initialized());
-    VPUCostModel old_model{"dummy"};
+    VPUCostModel old_model{VPUNN::VPUDevice::__size, "dummy"};
 
     constexpr int abs_err_negligible{200};  // cycles
     constexpr float rel_err_max{0.8f};      // rel to GT  HUGE for now!!!!!!!!!!!!!!!!!!
@@ -647,7 +647,7 @@ TEST_F(TestDMANNCostModelNPU4x, SweepGT_DMATime_40_Theoretical) {
 
 // this test is for New/Updated theoretical model
 TEST_F(TestDMA_TH_CostModelNPU4x, DMA_Theoretical_regresion_NPU40) {
-    VPUCostModel cm("empty");
+    VPUCostModel cm(VPUDevice::__size, "empty");
     ASSERT_TRUE(!cm.nn_initialized());
     VPUDevice device{VPUDevice::VPU_4_0};
     const int p = (50 * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::VPU_4_0)) /

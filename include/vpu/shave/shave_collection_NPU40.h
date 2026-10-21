@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_COLLECTION_NPU40_H
-#define SHAVE_COLLECTION_NPU40_H
+#ifndef VPUNN_SHAVE_COLLECTION_NPU40_H
+#define VPUNN_SHAVE_COLLECTION_NPU40_H
 
 // #include "shave_collection.h"
 
@@ -45,4 +45,4 @@ public:
 
 
 }  // namespace VPUNN
-#endif
+#endif  // VPUNN_SHAVE_COLLECTION_NPU40_H

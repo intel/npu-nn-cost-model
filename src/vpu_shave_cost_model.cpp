@@ -18,7 +18,7 @@
 
 namespace VPUNN {
 
-std::shared_ptr<IShaveCostProvider> SHAVECostModel::createDefaultCostProvider() {
+Shared_IShaveCostProvider SHAVECostModel::createDefaultCostProvider() {
     return  // select by commenting or un-commenting the desired provider
             ShaveCostProviderBundles::createDeviceMappedProvider()  // for updated approach
             // ShaveCostProviderBundles::createOldShaveOnlyProvider()  // activate this for legacy non heuristic
@@ -53,7 +53,7 @@ SHAVECostModel::SHAVECostModel(const char* cache_data, size_t cache_data_length,
             ShaveSerializerUtils::get_names_for_shave_serializer(shave_cost_provider.get_max_num_params()));
 }
 
-SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider,
+SHAVECostModel::SHAVECostModel(Shared_IShaveCostProvider external_shave_cost_provider,
                                const std::string& cache_filename, const unsigned int cache_size)
         : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)),
           prefetch_cost_strategy(createDefaultPrefetchCostStrategy()),
@@ -64,7 +64,7 @@ SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shav
             ShaveSerializerUtils::get_names_for_shave_serializer(shave_cost_provider.get_max_num_params()));
 }
 
-SHAVECostModel::SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider, const char* cache_data,
+SHAVECostModel::SHAVECostModel(Shared_IShaveCostProvider external_shave_cost_provider, const char* cache_data,
                                size_t cache_data_length, const unsigned int cache_size)
         : ptr_internal_shave_cost_provider(std::move(external_shave_cost_provider)),
           prefetch_cost_strategy(createDefaultPrefetchCostStrategy()),

@@ -8,8 +8,8 @@
 // Software Package for additional details.
 
 
-#ifndef SHAVE_FACTORS_MAPPING_H
-#define SHAVE_FACTORS_MAPPING_H
+#ifndef VPUNN_SHAVE_FACTORS_MAPPING_H
+#define VPUNN_SHAVE_FACTORS_MAPPING_H
 
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
@@ -81,4 +81,4 @@ private:
 
 } // namespace VPUNN
 
-#endif
+#endif // VPUNN_SHAVE_FACTORS_MAPPING_H

@@ -256,7 +256,8 @@ TEST_F(TestResnet50_3Layers, DPUInfo_DPU_ResNet50F3_EISXW_91782) {
 
     // 27
     const std::string modelFile{VPU_2_7_MODEL_PATH};
-    VPUCostModel test_model{modelFile};
+    const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+    VPUCostModel test_model{device, modelFile};
     EXPECT_TRUE(test_model.nn_initialized());
 
     // EXPECT_EQ(1, 0);  // force fail, uncomment to have the log in tests
@@ -320,7 +321,8 @@ TEST_F(TestResnet50_3Layers, DMA_ResNet50F3_EISXW_91782) {
 
     // 27
     const std::string modelFile{VPU_2_7_MODEL_PATH};
-    VPUCostModel test_model{modelFile};
+    const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+    VPUCostModel test_model{device, modelFile};
     EXPECT_TRUE(test_model.nn_initialized());
 
     DMACostModel<DMANNWorkload_NPU27> dma_model_2_7{VPU_DMA_2_7_MODEL_PATH};
@@ -377,7 +379,8 @@ TEST_F(TestResnet50_3Layers, Energy_ResNet50F3_EISXW_101805) {
     }
 
     const std::string modelFile{VPU_2_7_MODEL_PATH};
-    VPUCostModel test_model{modelFile};
+    const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+    VPUCostModel test_model{device, modelFile};
     EXPECT_TRUE(test_model.nn_initialized());
 
     struct TestInput {

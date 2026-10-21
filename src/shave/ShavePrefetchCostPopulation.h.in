@@ -20,7 +20,7 @@ private:
         }();
         return lut_npu5;
     }
-    
+
 public:
     /// @brief Returns the per-device operation prefetch LUT for the given device.
     ///

@@ -22,6 +22,10 @@
 namespace VPUNN {
 
 /// @brief specific NPU 5.0 HW characteristics values
+// dpu_freq_clk and cmx_freq_clk must match the DPU_frequency and
+// SHV_frequency passed to PARSE_HEURISTIC_CSV for NPU5 in src/shave/CMakeLists.txt. Update both
+// locations in the same change and reconfigure to regenerate the heuristic .inl. Verify with
+// ShaveDevicesTest.HeuristicSelectorNominalFrequenciesMatchHWCharacteristics, which checks all mapped devices.
 class VPU5_0_HWCharacteristics_v0 : public DeviceHWCharacteristicsBase {
 public:
     constexpr VPU5_0_HWCharacteristics_v0(): DeviceHWCharacteristicsBase(hw_characteristics_def, latency_values_def) {};

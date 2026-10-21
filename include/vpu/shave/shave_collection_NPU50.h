@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_COLLECTION_NPU50_H
-#define SHAVE_COLLECTION_NPU50_H
+#ifndef VPUNN_SHAVE_COLLECTION_NPU50_H
+#define VPUNN_SHAVE_COLLECTION_NPU50_H
 
 // #include "shave_collection.h"
 
@@ -88,4 +88,4 @@ using ShaveInstanceHolder_NPU50_WithFactors =
 using ShaveInstanceHolder_HeuristicNPU50_WithFactors =
             ShaveInstanceHolderWithFactors<PopulatedFactorsLUT_Heuristic, ShaveInstanceHolder_HeuristicNPU50, VPUDevice::NPU_5_0>;
 }  // namespace VPUNN
-#endif
+#endif  // VPUNN_SHAVE_COLLECTION_NPU50_H

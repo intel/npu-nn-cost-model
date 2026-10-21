@@ -25,7 +25,7 @@ protected:
     void SetUp() override {
     }
 
-    VPUNN::VPUCostModel model{VPU_2_7_MODEL_PATH};
+    VPUNN::VPUCostModel model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
     const IEnergy& my_energy = model.getEnergyInterface();
     const HWPerformanceModel& performance{model.getPerformanceModel()};
     const DPUTheoreticalCostProvider dpu_theoretical{performance};

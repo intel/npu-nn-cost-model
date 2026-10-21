@@ -390,7 +390,7 @@ public:
  *   2. Derives a stride-penalty factor from the contiguous chunk size relative to the
  *      side-specific hardware threshold (CMX vs DDR):
  *      penalty = ceil(chunk/threshold) / (chunk/threshold).
- *      The penalty is only applied on devices that have it enabled.
+ *      The penalty is only applied on devices that have it enabled
  *   3. Evaluates a per-device linear model  cycles = k·size + b  on the total logical
  *      transfer size and multiplies by the penalty factor.
  *   4. Returns max(src_cycles, dst_cycles) converted to DPU clock domain via the

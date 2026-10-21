@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef POLY_MODELS_H
-#define POLY_MODELS_H
+#ifndef VPUNN_POLY_MODELS_H
+#define VPUNN_POLY_MODELS_H
 
 #include <cmath>
 #include <iostream>
@@ -64,4 +64,4 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::InterpolateWH
 
 }  // namespace VPUNN
 
-#endif /* SHAVEMODEL1to1_H*/
+#endif  // VPUNN_POLY_MODELS_H

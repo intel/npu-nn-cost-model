@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_EQUATIONS_H
-#define SHAVE_EQUATIONS_H
+#ifndef VPUNN_SHAVE_EQUATIONS_H
+#define VPUNN_SHAVE_EQUATIONS_H
 
 #include <array>
 #include <iostream>
@@ -398,4 +398,4 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::VariableSlope
 
 }  // namespace VPUNN
 
-#endif /* SHAVEMODEL1to1_H*/
+#endif // VPUNN_SHAVE_EQUATIONS_H

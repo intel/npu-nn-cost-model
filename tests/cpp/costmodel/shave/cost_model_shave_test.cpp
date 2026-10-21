@@ -34,12 +34,12 @@ protected:
     VPUNN::SHAVECostModel empty_model{};
     VPUNN::SHAVECostModel model_with_cache{std::string{"../../../models/shave_5_1.cachebin"}, 16384};
 
-    std::shared_ptr<VPUNN::IShaveCostProvider> only_new_provider{
+    Shared_IShaveCostProvider only_new_provider{
             ShaveCostProviderBundles::createNewShaveOnlyProvider()};
 
     class SHAVECostModelTest : public VPUNN::SHAVECostModel {
     public:
-        SHAVECostModelTest(std::shared_ptr<IShaveCostProvider> provider): VPUNN::SHAVECostModel(std::move(provider)) {
+        SHAVECostModelTest(Shared_IShaveCostProvider provider): VPUNN::SHAVECostModel(std::move(provider)) {
         }
     };
 

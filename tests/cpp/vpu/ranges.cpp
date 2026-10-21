@@ -844,6 +844,19 @@ TEST_F(MultiSmartRangesTest, IsInWithMask) {
     EXPECT_FALSE(msr.is_in(25, std::move(mask3)));  // none enabled
 }
 
+TEST_F(MultiSmartRangesTest, IsInWithoutApplicableRangesProvidesReason) {
+    std::string text;
+    MultiSmartRanges empty_ranges;
+
+    EXPECT_FALSE(empty_ranges.is_in(4, text));
+    EXPECT_EQ(text, "No ranges specified");
+
+    SmartRanges range(0, 10, 2);
+    MultiSmartRanges masked_ranges({range});
+    EXPECT_FALSE(masked_ranges.is_in(4, text, {false}));
+    EXPECT_EQ(text, "No ranges specified");
+}
+
 TEST_F(MultiSmartRangesTest, MaskAutoResize) {
     SmartRanges r1(0, 10, 2);
     SmartRanges r2(20, 30, 5);

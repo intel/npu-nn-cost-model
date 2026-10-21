@@ -43,7 +43,10 @@ protected:
 
 TEST_F(TestDMANNCostModelVPU2x, LoadModels_BasicAssertions) {
     {  // 2_7
-        const std::string model_path = the_NN_models.all_DMA_model_paths[index_DMA_path_27].first;
+        const auto& model_info = the_NN_models.all_DMA_model_paths[index_DMA_path_27];
+        const std::string model_path = model_info.first;
+        const VPUNN::VPUDevice model_device = model_info.second;
+        EXPECT_EQ(model_device, VPUNN::VPUDevice::VPU_2_7);
         EXPECT_NO_THROW(DMACostModel<DMANNWorkload_NPU27> x{model_path});
         DMACostModel<DMANNWorkload_NPU27> vpunn_model{model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
@@ -64,7 +67,10 @@ TEST_F(TestDMANNCostModelVPU2x, LoadModels_NN_Valid_Interval) {
     }
 
     {  // 2_7
-        const std::string model_path = the_NN_models.all_DMA_model_paths[index_DMA_path_27].first;
+        const auto& model_info = the_NN_models.all_DMA_model_paths[index_DMA_path_27];
+        const std::string model_path = model_info.first;
+        const VPUNN::VPUDevice model_device = model_info.second;
+        EXPECT_EQ(model_device, VPUNN::VPUDevice::VPU_2_7);
         DMANNCostProvider<DMANNWorkload_NPU27> vpunn_model{model_path};
         EXPECT_NO_THROW(DMACostModel<DMANNWorkload_NPU27> x{model_path});
         ASSERT_TRUE(vpunn_model.is_initialized());
@@ -149,7 +155,8 @@ TEST_F(TestDMANNCostModelVPU2x, DISABLED_SweepDMATime_27) {
     EXPECT_TRUE(model_2_7.nn_initialized());
 
     const std::string modelFile{VPU_2_7_MODEL_PATH};
-    VPUCostModel old_model{modelFile};
+    const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
+    VPUCostModel old_model{device, modelFile};
 
     auto measureDMA = [&model_2_7, &old_model](const int bytes) {
         const DMAWorkload dmaOld_DC{
@@ -544,7 +551,7 @@ TEST_F(TestDMANNCostModelVPU2x, SweepGT_DMATime_27_GEAR4) {
 }
 
 TEST_F(TestDMA_TH_CostModelVPU2x, DMA_Theoretical_experiments) {
-    VPUCostModel cm("empty");
+    VPUCostModel cm(VPUDevice::__size, "empty");
     ASSERT_TRUE(!cm.nn_initialized());
     VPUDevice device{VPUDevice::VPU_2_7};
 
@@ -557,7 +564,7 @@ TEST_F(TestDMA_TH_CostModelVPU2x, DMA_Theoretical_experiments) {
 }
 
 TEST_F(TestDMA_TH_CostModelVPU2x, DMA_Theoretical_regresion_NPU27) {
-    VPUCostModel cm("empty");
+    VPUCostModel cm(VPUDevice::__size, "empty");
     ASSERT_TRUE(!cm.nn_initialized());
     VPUDevice device{VPUDevice::VPU_2_7};
 

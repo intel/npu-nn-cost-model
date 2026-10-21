@@ -17,9 +17,9 @@ namespace VPUNN_unit_tests {
 class WorkloadGeneration : public testing::Test {
 public:
 protected:
-    VPUNN::VPUCostModel model_theoretical{};
-    VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
-    VPUNN::VPUCostModel model_2_0{VPU_2_0_MODEL_PATH};
+    VPUNN::VPUCostModel model_theoretical{VPUNN::VPUDevice::__size, ""};
+    VPUNN::VPUCostModel model_2_7{VPUNN::VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
+    VPUNN::VPUCostModel model_2_0{VPUNN::VPUDevice::VPU_2_0, VPU_2_0_MODEL_PATH};
 
     std::string what_model_is(const VPUNN::VPUCostModel* const theModel) {
         if (theModel == &model_theoretical) {

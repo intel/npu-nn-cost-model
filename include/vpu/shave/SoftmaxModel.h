@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SOFTMAXMODEL_H
-#define SOFTMAXMODEL_H
+#ifndef VPUNN_SOFTMAXMODEL_H
+#define VPUNN_SOFTMAXMODEL_H
 
 #include <iostream>
 #include <list>
@@ -163,6 +163,6 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::SoftmaxModel&
 
 
 
-}
+} // namespace VPUNN
 
-#endif /*SOFTMAXMODEL_H*/
+#endif // VPUNN_SOFTMAXMODEL_H

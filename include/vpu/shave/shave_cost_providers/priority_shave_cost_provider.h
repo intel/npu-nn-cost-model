@@ -6,18 +6,18 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#ifndef PRIORITY_SHAVE_COST_PROVIDER_H
-#define PRIORITY_SHAVE_COST_PROVIDER_H
+#ifndef VPUNN_PRIORITY_SHAVE_COST_PROVIDER_H
+#define VPUNN_PRIORITY_SHAVE_COST_PROVIDER_H
 
 #include <vpu/shave/shave_cost_providers/shave_cost_provider_interface.h>
 #include <vpu/shave/shave_cost_providers/shave_cost_providers.h>
-#include <vector>
 #include <memory>
+#include <vector>
 
 namespace VPUNN {
 /**
  * @brief Priority-based SHAVE cost provider that tries multiple providers in order
- * 
+ *
  * This class implements a priority-based approach to SHAVE cost calculation by
  * maintaining a list of cost providers and trying them in order until one succeeds,
  * otherwise proper error code is returned.
@@ -29,20 +29,20 @@ private:
 public:
     /**
      * @brief Construct a new Priority Shave Cost Provider
-     * 
+     *
      * @param providers Vector of shared pointers to IShaveCostProvider instances,
      *                  ordered by priority (first provider has highest priority)
      */
-    explicit PriorityShaveCostProvider(const ShaveCostProviderList& providers)
-        : cost_providers(providers) {}
+    explicit PriorityShaveCostProvider(const ShaveCostProviderList& providers): cost_providers(providers) {
+    }
 
     /**
      * @brief Calculate the execution cost for a SHAVE workload using priority-based providers
-     * 
+     *
      * This function tries each cost provider in the priority list until one succeeds
      * (returns a value other than error codes). If all providers fail, it returns
      * the last error encountered.
-     * 
+     *
      * @param workload The SHAVE workload for which to calculate the cost
      * @param cost_source Optional pointer to store the source of the cost. This is an output parameter only
      * @return CyclesInterfaceType The estimated execution cost/cycles for the workload,
@@ -53,7 +53,8 @@ public:
         CyclesInterfaceType cycles = Cycles::ERROR_SHAVE_OPERATOR_MISSING;
 
         for (const auto& prov_ref : cost_providers) {
-            if (!prov_ref) continue;
+            if (!prov_ref)
+                continue;
 
             CyclesInterfaceType result = prov_ref->get_cost(workload, cost_source);
 
@@ -62,7 +63,7 @@ public:
                 return result;
             }
         }
-        
+
         // All providers failed, return the last error
         if (cost_source) {
             *cost_source = "unknown";
@@ -70,13 +71,14 @@ public:
         return cycles;
     }
 
-    /// @brief Get the maximum number of parameters across all SHAVE functions and all CostProviders 
+    /// @brief Get the maximum number of parameters across all SHAVE functions and all CostProviders
     /// @return the max number found
     int get_max_num_params() const override {
         std::vector<int> all_num_params{};
 
         for (const auto& prov_reference : cost_providers) {
-            if (!prov_reference) continue;
+            if (!prov_reference)
+                continue;
 
             all_num_params.push_back(prov_reference->get_max_num_params());
         }
@@ -93,7 +95,8 @@ public:
         std::set<std::string> unique_ops_set;
 
         for (const auto& prov_ref : cost_providers) {
-            if (!prov_ref) continue;
+            if (!prov_ref)
+                continue;
 
             auto ops = prov_ref->get_shave_supported_ops(device);
             unique_ops_set.insert(ops.begin(), ops.end());
@@ -103,7 +106,7 @@ public:
         return std::vector<std::string>(unique_ops_set.begin(), unique_ops_set.end());
     };
 
-    /** 
+    /**
      * @brief provides a reference to the operator executor specified by name
      * The executor can be used to execute (run) the runtime prediction on different tensors/parameters
      * Or can be asked to print information about its implementation parameters
@@ -112,9 +115,11 @@ public:
      * @param device name
      * @returns a ref (no ownership transfered. exists as long as this VPUCostModel instance exists)
      */
-    std::optional<std::reference_wrapper<const ShaveOpExecutor>> get_shave_instance(const std::string& name, VPUDevice& device) const override {
+    std::optional<std::reference_wrapper<const ShaveOpExecutor>> get_shave_instance(const std::string& name,
+                                                                                    VPUDevice& device) const override {
         for (const auto& prov_reference : cost_providers) {
-            if (!prov_reference) continue;
+            if (!prov_reference)
+                continue;
 
             auto result = prov_reference->get_shave_instance(name, device);
             if (result.has_value()) {
@@ -124,8 +129,7 @@ public:
 
         return std::nullopt;
     };
-
 };
 
 }  // namespace VPUNN
-#endif  // PRIORITY_SHAVE_COST_PROVIDER_H
+#endif  // VPUNN_PRIORITY_SHAVE_COST_PROVIDER_H

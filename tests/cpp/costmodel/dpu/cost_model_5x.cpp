@@ -184,14 +184,14 @@ private:
 };
 
 TEST_F(TestCostModelNPU5x, NPU5_1_Loaded) {
-    VPUCostModel crt_model{NPU_5_0_MODEL_PATH};
+    VPUCostModel crt_model{device, NPU_5_0_MODEL_PATH};
 
     // is loaded OK
     EXPECT_TRUE(crt_model.nn_initialized());
 }
 
 TEST_F(TestCostModelNPU5x, All_Operations_INT8) {
-    VPUCostModel crt_model{NPU_5_0_MODEL_PATH};
+    VPUCostModel crt_model{device, NPU_5_0_MODEL_PATH};
 
     {
         DPUWorkload wl{wl_conv};
@@ -203,7 +203,7 @@ TEST_F(TestCostModelNPU5x, All_Operations_INT8) {
     }
 }
 TEST_F(TestCostModelNPU5x, All_Operations_FP16) {
-    VPUCostModel crt_model{NPU_5_0_MODEL_PATH};
+    VPUCostModel crt_model{device, NPU_5_0_MODEL_PATH};
 
     {
         DPUWorkload wl{wl_conv_FP};
@@ -216,7 +216,7 @@ TEST_F(TestCostModelNPU5x, All_Operations_FP16) {
 }
 
 TEST_F(TestCostModelNPU5x, All_Operations_INT2_Weights) {
-    VPUCostModel crt_model{NPU_5_0_MODEL_PATH};
+    VPUCostModel crt_model{device, NPU_5_0_MODEL_PATH};
 
     {
         wl_conv_FP.weight_type = DataType::INT2;
@@ -240,7 +240,7 @@ TEST_F(TestCostModelNPU5x, All_Operations_INT2_Weights) {
 }
 
 TEST_F(TestCostModelNPU5x, FP32_output_basic) {
-    VPUCostModel crt_model{NPU_5_0_MODEL_PATH};
+    VPUCostModel crt_model{device, NPU_5_0_MODEL_PATH};
 
     const DPUWorkload wl_ref_less{
             device,
@@ -451,7 +451,7 @@ TEST_F(TestCostModel, Acceptance_DataTypes_Test) {
     };
 
     for (auto& test_in : tst) {
-        VPUNN::VPUCostModel model_file{test_in.model_path};
+        VPUNN::VPUCostModel model_file{test_in.device, test_in.model_path};
         // invalid data type cases
         for (const auto& wl : test_in.workloads_invalid_dtypes()) {
             auto cycles = model_file.DPU(wl);
@@ -468,9 +468,9 @@ TEST_F(TestCostModel, Acceptance_DataTypes_Test) {
 
 TEST_F(TestCostModel, Basic_NPU50_vs_VPU40_DPU) {
     {  // 50 and 40
-        VPUNN::VPUCostModel model_4_0{VPU_4_0_MODEL_PATH};
+        VPUNN::VPUCostModel model_4_0{VPUDevice::VPU_4_0, VPU_4_0_MODEL_PATH};
         EXPECT_TRUE(model_4_0.nn_initialized());
-        VPUNN::VPUCostModel model_5_0{NPU_5_0_MODEL_PATH};
+        VPUNN::VPUCostModel model_5_0{VPUDevice::NPU_5_0, NPU_5_0_MODEL_PATH};
         EXPECT_TRUE(model_5_0.nn_initialized());
 
         // Operation::CONVOLUTION,
@@ -485,11 +485,11 @@ TEST_F(TestCostModel, Basic_NPU50_vs_VPU40_DPU) {
     }
     {  // garbage data/no file
         const std::string model_path = "NoFileHere.vpunn";
-        VPUNN::VPUCostModel model_2_7{model_path};
+        VPUNN::VPUCostModel model_2_7{VPUNN::VPUDevice::__size, model_path};
         EXPECT_FALSE(model_2_7.nn_initialized());
-        VPUNN::VPUCostModel model_4_0{model_path};
+        VPUNN::VPUCostModel model_4_0{VPUNN::VPUDevice::__size, model_path};
         EXPECT_FALSE(model_4_0.nn_initialized());
-        VPUNN::VPUCostModel model_5_0{model_path};
+        VPUNN::VPUCostModel model_5_0{VPUNN::VPUDevice::__size, model_path};
         EXPECT_FALSE(model_5_0.nn_initialized());
 
         auto cycles_27 = model_2_7.DPU(wl_glob_27);

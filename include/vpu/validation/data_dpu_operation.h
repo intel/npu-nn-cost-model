@@ -203,7 +203,7 @@ struct DPUOperation {
         const TensorInfo& in{input_0};
         const TensorInfo& out{output_0};
         return WorkloadSemanticsInfo::is_preconditions_for_inplace_output(in.layout, in.datatype, out.layout,
-                                                                           out.datatype);
+                                                                          out.datatype);
     }
 
     /// @brief determines if the operation can be treated as weightless in elementwise-like cases.
@@ -211,8 +211,7 @@ struct DPUOperation {
         const TensorInfo& in{input_0};
         const TensorInfo& out{output_0};
 
-        return WorkloadSemanticsInfo::is_special_no_weights_situation(in.layout, in.datatype, out.layout,
-                                                                       out.datatype);
+        return WorkloadSemanticsInfo::is_special_no_weights_situation(in.layout, in.datatype, out.layout, out.datatype);
     }
 
     /// @brief checks if the operation is elementwise-like (ELTWISE or ELTWISE_MUL).

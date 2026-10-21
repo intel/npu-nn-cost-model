@@ -7,16 +7,22 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_MODEL_BASICS_H
-#define SHAVE_MODEL_BASICS_H
+#ifndef VPUNN_SHAVE_MODEL_BASICS_H
+#define VPUNN_SHAVE_MODEL_BASICS_H
 
 #include <iostream>
+#include <limits>
 
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
 
 namespace VPUNN {
-/// converts to Cycles knowing frequencies (at acquisition and at present intended  target)
+/// Conversion helpers between time (microseconds), SHAVE-cycle counts and DPU-cycle counts.
+///
+/// The `ShaveConverter` holds the nominal profiling frequencies and provides
+/// conversion routines used by the provider adapters below. Conversions are
+/// careful about integer overflow and expose standardized `CyclesInterfaceType`
+/// error codes on invalid inputs.
 class ShaveConverter {
 public:
     const unsigned int dpu_freq_;  ///< Measured in MHz, the Frequency at which the profiling was made.
@@ -55,10 +61,17 @@ public:
         return cycles;
     }
 
-    CyclesInterfaceType toDPUCyclesFromShaveCycles(const int shaveCycles, const int present_dpu_frq, const int present_shv_frq) const {
-        const int raw_cycles = (shaveCycles * present_dpu_frq) / present_shv_frq;
-        const auto cycles = Cycles::toCycleInterfaceType(raw_cycles);
-        return cycles;
+    CyclesInterfaceType toDPUCyclesFromShaveCycles(const long long shaveCycles, const int present_dpu_frq,
+                                                   const int present_shv_frq) const {
+        if ((shaveCycles < 0) || (present_dpu_frq <= 0) || (present_shv_frq <= 0) ||
+            (shaveCycles > static_cast<long long>(std::numeric_limits<CyclesInterfaceType>::max()))) {
+            return Cycles::ERROR_INVALID_CONVERSION_TO_CYCLES;
+        }
+
+        // narrowing is safe here: shaveCycles was just bounded to the CyclesInterfaceType range above
+        return Cycles::multiply_by_ratio(static_cast<CyclesInterfaceType>(shaveCycles),
+                                         static_cast<long long>(present_dpu_frq),
+                                         static_cast<long long>(present_shv_frq));
     }
 };
 
@@ -69,8 +82,14 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::ShaveConverte
     return stream;
 }
 
-/// provides a  template interface for obtaining DPU cycles transparent of signature for  getMicroSeconds
-/// @tapara, Derived, the derived Class of this  one. Must have a float getMicroSeconds(...) signature
+/// Template provider for models that estimate runtime in microseconds.
+///
+/// Contract for `Derived`:
+/// - Must provide a `float getMicroSeconds(...)` method that returns the model
+///   execution time in microseconds for the given arguments.
+/// - The provider converts that microsecond value to DPU cycles using the
+///   `ShaveConverter` instance (nominal DPU/SHV frequencies configured at
+///   construction).
 template <typename Derived>
 class ShaveCyclesProvider {
 protected:
@@ -90,13 +109,14 @@ public:
         return converter.toDPUCycles(us);
     }
     ///**
-    // * @brief Determines the number of cycles related to the input value of a DPU freq given as a parameter based on the
+    // * @brief Determines the number of cycles related to the input value of a DPU freq given as a parameter based on
+    // the
     // * size of output
     // *
     // * @return the number of cycles required based on CyclesInterfaceType
     // */
-    //template <typename... Ts>
-    //CyclesInterfaceType getDPUCyclesAnotherFreqDPU(const int present_dpu_frq, Ts... args) const {
+    // template <typename... Ts>
+    // CyclesInterfaceType getDPUCyclesAnotherFreqDPU(const int present_dpu_frq, Ts... args) const {
     //    const float us = static_cast<const Derived*>(this)->getMicroSeconds(args...);
     //    return converter.toDPUCycles(us, present_dpu_frq);
     //}
@@ -122,9 +142,14 @@ public:
     }
 };
 
-
-/// provides a  template interface for obtaining DPU cycles transparent of signature for  getMicroSeconds
-/// @tapara, Derived, the derived Class of this  one. Must have a float getMicroSeconds(...) signature
+/// Adapter for VPUEM models that produce SHAVE-cycle counts.
+///
+/// Contract for `Derived`:
+/// - Must provide an `int getShaveCycles(...)` method returning SHAVE cycles for
+///   the given inputs.
+/// - This provider converts those SHAVE-cycle counts to DPU cycles for a
+///   requested DPU/SHV operating point using
+///   `ShaveConverter::toDPUCyclesFromShaveCycles`.
 template <typename Derived>
 class VPUEMShaveCyclesProvider {
 protected:
@@ -133,7 +158,6 @@ protected:
     }
 
 public:
-   
     ///**
     // * @brief Determines the number of cycles related to the input value of a DPU freq given as a parameter based on
     // the
@@ -155,9 +179,51 @@ public:
      */
     template <typename... Ts>
     /* coverity[pass_by_value] */
-    CyclesInterfaceType getDPUCyclesAnotherFreqDPU_SHV(const int present_dpu_frq, const int present_shv_frq,
-                                                      Ts... args) const {  //disabled coverity pass by value finding for Ts.. args because we don't want to force arguments to be const or/and references
+    CyclesInterfaceType getDPUCyclesAnotherFreqDPU_SHV(
+            const int present_dpu_frq, const int present_shv_frq,
+            Ts... args) const {  // disabled coverity pass by value finding for Ts.. args because we don't want to force
+                                 // arguments to be const or/and references
         const int shaveCycles = static_cast<const Derived*>(this)->getShaveCycles(args...);
+        return converter.toDPUCyclesFromShaveCycles(shaveCycles, present_dpu_frq, present_shv_frq);
+    }
+
+    int getNominalDPUFrq() const {
+        return converter.dpu_freq_;
+    }
+    int getNominalSHVFrq() const {
+        return converter.shv_freq_;
+    }
+};
+
+/// Adapter for heuristic-style models that return SHAVE cycles via
+/// `getCycles(...)`.
+///
+/// Contract for `Derived`:
+/// - Must expose `CyclesInterfaceType getCycles(...)` returning the SHAVE-cycle
+///   cost for the given inputs.
+/// - The adapter provides `getDPUCyclesAnotherFreqDPU_SHV(...)` which converts
+///   those SHAVE cycles into DPU cycles for a requested DPU/SHV frequency.
+template <typename Derived>
+class HeuristicShaveCyclesProvider {
+protected:
+    const ShaveConverter converter;
+    HeuristicShaveCyclesProvider(unsigned int DpuFreq, unsigned int ShvFreq): converter{DpuFreq, ShvFreq} {
+    }
+
+public:
+    /**
+     * @brief Determines the number of cycles for a given DPU/SHV operating point,
+     * based on SHAVE cycles returned by Derived::getCycles(...)
+     *
+     * @return the number of cycles required based on CyclesInterfaceType
+     */
+    template <typename... Ts>
+    CyclesInterfaceType getDPUCyclesAnotherFreqDPU_SHV(const int present_dpu_frq, const int present_shv_frq,
+                                                       Ts... args) const {
+        const CyclesInterfaceType shaveCycles = static_cast<const Derived*>(this)->getCycles(args...);
+        if (Cycles::isErrorCode(shaveCycles)) {
+            return shaveCycles;
+        }
         return converter.toDPUCyclesFromShaveCycles(shaveCycles, present_dpu_frq, present_shv_frq);
     }
 
@@ -171,4 +237,4 @@ public:
 
 }  // namespace VPUNN
 
-#endif
+#endif // VPUNN_SHAVE_MODEL_BASICS_H

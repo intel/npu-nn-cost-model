@@ -163,20 +163,13 @@ public:
         return get_cost_model().getPreloadedCacheCounter();
     }
 
-    /// @brief Get a reference to the serializer.
-    /// temporary only for testing aspects (extra save ). TO BE REFACTORED
-    CSVSerializer& get_serializer() noexcept {
-        // here we return a reference, we do not need to protect the serializer => suppression
-        /* coverity[missing_lock:FALSE] */
-        return serializer;
-    }
-
     //////////////////// Constructors section
 
     /// In order to inject a DMACostModel, need to extend base constructor
     /**
      * @brief Construct a new VPULayerCostModel object,  DPUL1 from File, DMA from outside
      *
+     * @param device target device bound to the internal L1 DPU model; use VPUDevice::__size for empty/non-bound
      * @param dma_cost_model Pointer to a valid DMACostModel - see DMACostModelVariant for available types
      * @param filename the name of the .vpunn model
      * @param profile enable/disable profiling
@@ -184,18 +177,19 @@ public:
      * @param batch_size model batch size
      */
     explicit VPULayerCostModel(
-            const DMACostModelVariant dma_cost_model,      ///< dma from outside, as pointer, non owning
-            const std::string& filename = "",              ///< *.vpunn file for DPU model
-            bool profile = false,                          ///< enable/disable profiling (DPU?), LEGACY
-            const unsigned int cache_size = 16384,         ///< the size of the dynamic cache for DPU model
-            const unsigned int batch_size = 1,             ///< model batch size for DPU
-            const std::string& dpu_cache_filename = "",    /// < the name of the preloaded cache file for DPU model
-            const std::string& shave_cache_filename = "",  /// < the name of the preloaded cache file for SHAVE
-            bool tryToLoadPairedCache = false              ///< see L1 DPU constructor details for this
+            VPUDevice device,                               ///< target device for the internal L1 model
+            const DMACostModelVariant dma_cost_model = {},  ///< dma from outside, as pointer, non owning
+            const std::string& filename = "",               ///< *.vpunn file for DPU model
+            bool profile = false,                           ///< enable/disable profiling (DPU?), LEGACY
+            const unsigned int cache_size = 16384,          ///< the size of the dynamic cache for DPU model
+            const unsigned int batch_size = 1,              ///< model batch size for DPU
+            const std::string& dpu_cache_filename = "",     /// < the name of the preloaded cache file for DPU model
+            const std::string& shave_cache_filename = "",   /// < the name of the preloaded cache file for SHAVE
+            bool tryToLoadPairedCache = false               ///< see L1 DPU constructor details for this
             )
-            : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(filename, profile, cache_size, batch_size,
-                                                                            dpu_cache_filename, shave_cache_filename,
-                                                                            tryToLoadPairedCache)},
+            : ptr_internal_dpu_cost_provider{
+                      std::make_shared<VPUCostModel>(device, filename, profile, cache_size, batch_size,
+                                                     dpu_cache_filename, shave_cache_filename, tryToLoadPairedCache)},
               the_dma_cost_model(dma_cost_model) {
         initialize_serializers();
     }
@@ -203,6 +197,7 @@ public:
     /**
      * @brief Construct a new VPULayerCostModel object,  DPUL1 from buffer, DMA from outside
      *
+     * @param device target device bound to the internal L1 DPU model; use VPUDevice::__size for empty/non-bound
      * @param model_data a buffer containing a .vpunn model
      * @param model_data_length the size of the model_data buffer
      * @param copy_model_data enable/disable the memcopy of the buffer
@@ -212,6 +207,7 @@ public:
      * @param batch_size model batch size
      */
     explicit VPULayerCostModel(
+            VPUDevice device,                          ///< target device for the internal L1 model
             const char* model_data,                    ///> a buffer containing a .vpunn model
             size_t model_data_length,                  ///< the size of the model_data buffer
             bool copy_model_data,                      ///> enable/disable the memcopy of the buffer
@@ -225,8 +221,8 @@ public:
             size_t shave_cache_data_length = 0         /// < the size of the shave_cache_data buffer
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(
-                      model_data, model_data_length, copy_model_data, profile, cache_size, batch_size, dpu_cache_data,
-                      dpu_cache_data_length, shave_cache_data, shave_cache_data_length)},
+                      device, model_data, model_data_length, copy_model_data, profile, cache_size, batch_size,
+                      dpu_cache_data, dpu_cache_data_length, shave_cache_data, shave_cache_data_length)},
               the_dma_cost_model(dma_cost_model) {
         initialize_serializers();
     }
@@ -237,12 +233,14 @@ public:
      * @brief Construct a new VPULayerCostModel object,   DPU L1 from File, DMA from outsideNULL, use theoretical
      * model
      *
+     * @param device target device bound to the internal L1 DPU model; use VPUDevice::__size for empty/non-bound
      * @param filename the name of the .vpunn model
      * @param profile enable/disable profiling
      * @param cache_size the size of the LRUCache
      * @param batch_size model batch size
      */
     explicit VPULayerCostModel(
+            VPUDevice device,                              ///< target device for the internal L1 model
             const std::string& filename = "",              ///< *.vpunn file for DPU model
             bool profile = false,                          ///< enable/disable profiling (DPU?), LEGACY
             const unsigned int cache_size = 16384,         ///< the size of the dynamic cache for DPU model
@@ -251,9 +249,9 @@ public:
             const std::string& shave_cache_filename = "",  /// < the name of the preloaded cache file for SHAVE
             bool tryToLoadPairedCache = false              ///< see L1 DPU constructor details for this
             )
-            : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(filename, profile, cache_size, batch_size,
-                                                                            dpu_cache_filename, shave_cache_filename,
-                                                                            tryToLoadPairedCache)} {
+            : ptr_internal_dpu_cost_provider{
+                      std::make_shared<VPUCostModel>(device, filename, profile, cache_size, batch_size,
+                                                     dpu_cache_filename, shave_cache_filename, tryToLoadPairedCache)} {
         initialize_serializers();
     }
 
@@ -261,6 +259,7 @@ public:
      * @brief Construct a new VPULayerCostModel object ,   DPU L1 from buffer, DMA from outsideNULL, use theoretical
      * model
      *
+     * @param device target device bound to the internal L1 DPU model; use VPUDevice::__size for empty/non-bound
      * @param model_data a buffer containing a .vpunn model
      * @param model_data_length the size of the model_data buffer
      * @param copy_model_data enable/disable the memcopy of the buffer
@@ -269,6 +268,7 @@ public:
      * @param batch_size model batch size
      */
     explicit VPULayerCostModel(
+            VPUDevice device,                        ///< target device for the internal L1 model
             const char* model_data,                  ///> a buffer containing a .vpunn model
             size_t model_data_length,                ///< the size of the model_data buffer
             bool copy_model_data,                    ///> enable/disable the memcopy of the buffer
@@ -281,8 +281,8 @@ public:
             size_t shave_cache_data_length = 0       /// < the size of the shave_cache_data buffer
             )
             : ptr_internal_dpu_cost_provider{std::make_shared<VPUCostModel>(
-                      model_data, model_data_length, copy_model_data, profile, cache_size, batch_size, dpu_cache_data,
-                      dpu_cache_data_length, shave_cache_data, shave_cache_data_length)} {
+                      device, model_data, model_data_length, copy_model_data, profile, cache_size, batch_size,
+                      dpu_cache_data, dpu_cache_data_length, shave_cache_data, shave_cache_data_length)} {
         initialize_serializers();
     }
 

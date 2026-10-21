@@ -9,6 +9,7 @@
 
 #include "vpu/validation/serializable_dpu.h"
 
+#include "core/primitive_hash.h"
 #include "vpu/dpu_dtypes_dimension_info.h"
 
 namespace VPUNN {
@@ -327,28 +328,57 @@ const std::vector<std::string>& SerializableDPU::_get_member_names() {
 }
 
 size_t SerializableDPU::hash() const {
-    size_t combined_hash = 0;
-    for (const auto& [key, value] : get_member_map()) {
-        static_cast<void>(key);
+    uint32_t combined_hash = fnv_offset_basis;
+    const auto& member_map = get_member_map();
+
+    // Keep this visitor in sync with SerializableDPU::_ref_supported_type and populate_member_map().
+    // If a new member value type is added, it must be explicitly hashed here as well.
+    for (const auto& key : _get_member_names()) {
+        const auto it = member_map.find(key);
+        if (it == member_map.end()) {
+            continue;
+        }
+
+        // Include field name so the hash remains tied to SerializableDPU's schema and order.
+        combined_hash = PrimitiveHash::hash_string(combined_hash, key);
 
         std::visit(
                 [&combined_hash](auto&& arg) {
-                    if constexpr (std::is_same_v<std::decay_t<std::remove_reference_t<decltype(arg)>>,
-                                                 VPUNN::SetGet_MemberMapValues>) {
+                    using ArgType = std::decay_t<decltype(arg)>;
+
+                    if constexpr (std::is_same_v<ArgType, VPUNN::SetGet_MemberMapValues>) {
                         // SetGet_MemberMapValues uses (set_mode, value). For hashing we need read-only behavior,
                         // so call get-mode: set_mode=false. The second argument is ignored in this mode.
-                        combined_hash ^= std::hash<int>{}(arg(false, "")) + 0x9e3779b9 + (combined_hash << 6) +
-                                         (combined_hash >> 2);
+                        combined_hash =
+                                PrimitiveHash::hash_uint32(combined_hash, static_cast<uint32_t>(arg(false, "")));
                     } else {
-                        using argtype = std::decay_t<std::remove_reference_t<decltype(arg.get())>>;
-                        combined_hash ^=
-                                std::hash<argtype>{}(arg) + 0x9e3779b9 + (combined_hash << 6) + (combined_hash >> 2);
+                        using ValueType = std::decay_t<decltype(arg.get())>;
+                        const ValueType& value = arg.get();
+
+                        if constexpr (std::is_enum_v<ValueType>) {
+                            combined_hash = PrimitiveHash::hash_enum(combined_hash, value);
+                        } else if constexpr (std::is_same_v<ValueType, bool>) {
+                            combined_hash = PrimitiveHash::hash_bool(combined_hash, value);
+                        } else if constexpr (std::is_same_v<ValueType, float>) {
+                            combined_hash = PrimitiveHash::hash_float(combined_hash, value);
+                        } else if constexpr (std::is_integral_v<ValueType> && sizeof(ValueType) <= 4U) {
+                            combined_hash = PrimitiveHash::hash_uint32(combined_hash, static_cast<uint32_t>(value));
+                        } else if constexpr (std::is_integral_v<ValueType> && sizeof(ValueType) > 4U) {
+                            const auto uvalue = static_cast<unsigned long long>(value);
+                            combined_hash = PrimitiveHash::hash_uint32(combined_hash,
+                                                                       static_cast<uint32_t>(uvalue & 0xFFFFFFFFU));
+                            combined_hash = PrimitiveHash::hash_uint32(
+                                    combined_hash, static_cast<uint32_t>((uvalue >> 32U) & 0xFFFFFFFFU));
+                        } else {
+                            static_assert(std::is_same_v<ValueType, void>,
+                                          "Unsupported SerializableDPU member type for hashing");
+                        }
                     }
                 },
-                value);
+                it->second);
     }
 
-    return combined_hash;
+    return static_cast<size_t>(combined_hash);
 }
 
 bool SerializableDPU::is_unsigned_int(const std::string& s, VPUNN::DimType& result) {

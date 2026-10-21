@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVEMODEL1to1_H
-#define SHAVEMODEL1to1_H
+#ifndef VPUNN_SHAVEMODEL1to1_H
+#define VPUNN_SHAVEMODEL1to1_H
 
 #include <iostream>
 #include <list>
@@ -332,4 +332,4 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::ShaveModel1to
 
 }  // namespace VPUNN
 
-#endif /* SHAVEMODEL1to1_H*/
+#endif // VPUNN_SHAVEMODEL1to1_H

@@ -146,7 +146,7 @@ private:
 };
 
 TEST_F(TestEnergyandPF_CostModelVPU2x, BasicEnergy_INT8) {
-    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+    VPUCostModel crt_model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
     {
         DPUWorkload wl{wl_conv};
         basicTest(wl, crt_model);
@@ -157,7 +157,7 @@ TEST_F(TestEnergyandPF_CostModelVPU2x, BasicEnergy_INT8) {
     }
 }
 TEST_F(TestEnergyandPF_CostModelVPU2x, BasicEnergy_FP16) {
-    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+    VPUCostModel crt_model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
 
     for (const auto& wl : wl_list_FP) {
         basicTest(wl, crt_model, "All FP16:");
@@ -165,7 +165,7 @@ TEST_F(TestEnergyandPF_CostModelVPU2x, BasicEnergy_FP16) {
 }
 
 TEST_F(TestEnergyandPF_CostModelVPU2x, DPUInfoBasics) {
-    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+    VPUCostModel crt_model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
 
     for (const auto& wl : wl_list) {
         basicDPUPackEquivalenceTest(wl, crt_model, "All int8:");
@@ -175,7 +175,7 @@ TEST_F(TestEnergyandPF_CostModelVPU2x, DPUInfoBasics) {
     }
 }
 TEST_F(TestEnergyandPF_CostModelVPU2x, DPUInfoBasicsSparse) {
-    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+    VPUCostModel crt_model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
 
     for (const auto& wl : wl_list_sparse) {
         basicDPUPackEquivalenceTest(wl, crt_model, "All int8 sparse:");
@@ -186,14 +186,14 @@ TEST_F(TestEnergyandPF_CostModelVPU2x, DPUInfoBasicsSparse) {
 }
 
 TEST_F(TestEnergyandPF_CostModelVPU2x, SparseEnergy_INT8) {
-    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+    VPUCostModel crt_model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
 
     for (const auto& wl : wl_list_sparse) {
         basicSparseTest(wl, crt_model, "All int8 sparse:");
     }
 }
 TEST_F(TestEnergyandPF_CostModelVPU2x, SparseEnergy_FP16) {
-    VPUCostModel crt_model{VPU_2_7_MODEL_PATH};
+    VPUCostModel crt_model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
 
     for (const auto& wl : wl_list_FP_sparse) {
         basicSparseTest(wl, crt_model, "All FP16 sparse:");

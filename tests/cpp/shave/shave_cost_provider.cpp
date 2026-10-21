@@ -10,6 +10,7 @@
 #include "common/common_helpers.h"
 
 #include "vpu/shave/shave_cost_providers/name_mapping_shave_cost_provider.h"
+#include "vpu/shave/shave_cost_providers/op_set_override_shave_cost_provider.h"
 #include "vpu/shave/shave_cost_providers/priority_shave_cost_provider.h"
 #include "vpu/shave/shave_cost_providers/shave_cost_providers.h"
 #include "vpu/shave/shave_cost_providers/shave_provider_bundles.h"
@@ -22,19 +23,50 @@
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
+class FixedCostProvider final : public IShaveCostProvider {
+private:
+    CyclesInterfaceType fixed_cost;
+    int max_params;
+    std::vector<std::string> supported_ops;
+
+public:
+    FixedCostProvider(CyclesInterfaceType fixed_cost, int max_params, std::vector<std::string> supported_ops)
+            : fixed_cost(fixed_cost), max_params(max_params), supported_ops(std::move(supported_ops)) {
+    }
+
+    CyclesInterfaceType get_cost(const SHAVEWorkload&, std::string* cost_source = nullptr) const override {
+        if (cost_source) {
+            *cost_source = "fixed_cost_provider";
+        }
+        return fixed_cost;
+    }
+
+    int get_max_num_params() const override {
+        return max_params;
+    }
+
+    std::vector<std::string> get_shave_supported_ops(VPUDevice&) const override {
+        return supported_ops;
+    }
+
+    std::optional<std::reference_wrapper<const ShaveOpExecutor>> get_shave_instance(const std::string&,
+                                                                                    VPUDevice&) const override {
+        return std::nullopt;
+    }
+};
+
 class ShaveCostProviderTests : public ::testing::Test {
 protected:
     void SetUp() override {
     }
-    std::shared_ptr<IShaveCostProvider> default_prio_provider{ShaveCostProviderBundles::createDefaultProvider()};
-    std::shared_ptr<IShaveCostProvider> old_prio_provider{ShaveCostProviderBundles::createOldShaveOnlyProvider()};
-    std::shared_ptr<IShaveCostProvider> new_prio_provider{ShaveCostProviderBundles::createNewShaveOnlyProvider()};
+    Shared_IShaveCostProvider default_prio_provider{ShaveCostProviderBundles::createDefaultProvider()};
+    Shared_IShaveCostProvider old_prio_provider{ShaveCostProviderBundles::createOldShaveOnlyProvider()};
+    Shared_IShaveCostProvider new_prio_provider{ShaveCostProviderBundles::createNewShaveOnlyProvider()};
 
-    std::shared_ptr<IShaveCostProvider> shave2_provider{std::make_shared<ShaveCostProvider>()};
-    std::shared_ptr<IShaveCostProvider> shave1_provider{std::make_shared<OldShaveCostProvider>()};
+    Shared_IShaveCostProvider shave2_provider{std::make_shared<ShaveCostProvider>()};
+    Shared_IShaveCostProvider shave1_provider{std::make_shared<OldShaveCostProvider>()};
 
-    void expectSameCost(const std::vector<std::shared_ptr<IShaveCostProvider>>& providers,
-                        const SHAVEWorkload& workload) {
+    void expectSameCost(const ShaveCostProviderList& providers, const SHAVEWorkload& workload) {
         if (providers.empty())
             return;
 
@@ -68,11 +100,10 @@ protected:
 };
 
 TEST_F(ShaveCostProviderTests, ProvidersTestNewOp) {
-    std::vector<std::shared_ptr<IShaveCostProvider>> providers = {default_prio_provider, new_prio_provider,
-                                                                  shave2_provider};
+    ShaveCostProviderList providers = {default_prio_provider, new_prio_provider, shave2_provider};
     expectSameCost(providers, new_swwl);
 
-    std::vector<std::shared_ptr<IShaveCostProvider>> providers_no_default = {old_prio_provider, shave1_provider};
+    ShaveCostProviderList providers_no_default = {old_prio_provider, shave1_provider};
     expectSameCost(providers_no_default, new_swwl);
 
     auto default_cost = default_prio_provider->get_cost(new_swwl);
@@ -83,11 +114,10 @@ TEST_F(ShaveCostProviderTests, ProvidersTestNewOp) {
 }
 
 TEST_F(ShaveCostProviderTests, ProvidersTestOldOp) {
-    std::vector<std::shared_ptr<IShaveCostProvider>> providers = {default_prio_provider, old_prio_provider,
-                                                                  shave1_provider};
+    ShaveCostProviderList providers = {default_prio_provider, old_prio_provider, shave1_provider};
     expectSameCost(providers, old_swwl);
 
-    std::vector<std::shared_ptr<IShaveCostProvider>> providers_no_default = {new_prio_provider, shave2_provider};
+    ShaveCostProviderList providers_no_default = {new_prio_provider, shave2_provider};
     expectSameCost(providers_no_default, old_swwl);
 
     auto default_cost = default_prio_provider->get_cost(old_swwl);
@@ -98,8 +128,8 @@ TEST_F(ShaveCostProviderTests, ProvidersTestOldOp) {
 }
 
 TEST_F(ShaveCostProviderTests, ProvidersTestUnknownOp) {
-    std::vector<std::shared_ptr<IShaveCostProvider>> providers = {default_prio_provider, old_prio_provider,
-                                                                  shave1_provider, new_prio_provider, shave2_provider};
+    ShaveCostProviderList providers = {default_prio_provider, old_prio_provider, shave1_provider, new_prio_provider,
+                                       shave2_provider};
     expectSameCost(providers, unknown_swwl);
 
     auto default_cost = default_prio_provider->get_cost(unknown_swwl);
@@ -124,8 +154,8 @@ TEST_F(ShaveCostProviderTests, CheckMultipleProvidersTestSoftMax) {
     EXPECT_TRUE(it != list_of_supported_ops.end());
 
     // Works only 5.0 +
-    auto composite_provider = ShaveCostProviderBundles::createCompositeBasedOnHeuristicWithOldNameMappingExtendedOps();
-    list_of_supported_ops = composite_provider->get_shave_supported_ops(device);
+    auto op_override_provider = ShaveCostProviderBundles::createHeuristicWithOldNameMappingExtendedOpsOverride();
+    list_of_supported_ops = op_override_provider->get_shave_supported_ops(device);
     it = std::find(list_of_supported_ops.begin(), list_of_supported_ops.end(), "SoftMax");
     EXPECT_TRUE(it == list_of_supported_ops.end());
 
@@ -137,21 +167,130 @@ TEST_F(ShaveCostProviderTests, CheckMultipleProvidersTestSoftMax) {
 
 TEST_F(ShaveCostProviderTests, LightweightQuerySupportedOperationsMatchesDeviceMappedProvider) {
     auto expected_provider = ShaveCostProviderBundles::createDeviceMappedProvider();
-// ============================================================================
-    std::vector<VPUDevice> devices = {
-            VPUDevice::VPU_2_0,
-            VPUDevice::VPU_2_7,
-            VPUDevice::VPU_4_0,
-            VPUDevice::NPU_5_0,
-    };
-    devices.push_back(VPUDevice::NPU_5_0_W);
-    for (const auto device : devices) {
+
+    for (int i = 0; i < static_cast<int>(VPUDevice::__size); ++i) {
+        VPUDevice device = static_cast<VPUDevice>(i);
         VPUDevice mutable_device = device;
         const auto expected_ops = expected_provider->get_shave_supported_ops(mutable_device);
         const auto queried_ops = ShaveCostProviderBundles::queryDeviceMappedSupportedOperations(device);
         expectSameSupportedOps(expected_ops, queried_ops);
     }
 }
+
+TEST_F(ShaveCostProviderTests, LightweightQueryAllDevicesInRangeAreMappedOrKnownUnmapped) {
+    // Devices that are intentionally unmapped when their embargo flag is absent.
+    // Update this set when a new device is added to VPUDevice and routing policy is decided.
+    const std::set<VPUDevice> known_unmapped = {
+            VPUDevice::NPU_RESERVED,
+            VPUDevice::NPU_RESERVED_1,
+    };
+
+    for (int i = 0; i < static_cast<int>(VPUDevice::__size); ++i) {
+        const VPUDevice device = static_cast<VPUDevice>(i);
+        const auto queried_ops = ShaveCostProviderBundles::queryDeviceMappedSupportedOperations(device);
+
+        if (known_unmapped.count(device)) {
+            EXPECT_TRUE(queried_ops.empty())
+                    << "Expected device " << i << " to be known-unmapped, but lightweight query returned ops";
+        } else {
+            EXPECT_FALSE(queried_ops.empty()) << "Device " << i
+                                              << " has no mapped lightweight query result. Add routing in "
+                                                 "createProviderForDevice or add to known_unmapped intentionally.";
+        }
+    }
+}
+
+TEST_F(ShaveCostProviderTests, CreateDeviceMappedProviderDoesNotThrow) {
+    Shared_IShaveCostProvider provider;
+    EXPECT_NO_THROW(provider = ShaveCostProviderBundles::createDeviceMappedProvider());
+    EXPECT_NE(provider, nullptr);
+}
+
+TEST_F(ShaveCostProviderTests, AllDevicesInRangeAreMappedOrKnownUnmapped) {
+    // Devices that are intentionally unmapped when their embargo flag is absent.
+    // Update this set when a new device is added to VPUDevice and routed in createProviderForDevice.
+    const std::set<VPUDevice> known_unmapped = {
+            VPUDevice::NPU_RESERVED,
+            VPUDevice::NPU_RESERVED_1,
+    };
+
+    auto provider = ShaveCostProviderBundles::createDeviceMappedProvider();
+
+    for (int i = 0; i < static_cast<int>(VPUDevice::__size); ++i) {
+        VPUDevice device = static_cast<VPUDevice>(i);
+        VPUDevice mutable_device = device;
+        const auto ops = provider->get_shave_supported_ops(mutable_device);
+
+        if (known_unmapped.count(device)) {
+            EXPECT_TRUE(ops.empty()) << "Expected device " << i << " to be unmapped but it returned ops";
+        } else {
+            EXPECT_FALSE(ops.empty())
+                    << "Device " << i
+                    << " has no mapped provider — add it to createProviderForDevice or to known_unmapped";
+        }
+    }
+}
+
+TEST_F(ShaveCostProviderTests, DeviceMappedProviderUnmappedDeviceStrictRouting) {
+    auto device_based_provider = ShaveCostProviderBundles::createDeviceMappedProvider();
+
+    VPUDevice unmapped_device = VPUDevice::__size;
+    const auto ops_from_provider = device_based_provider->get_shave_supported_ops(unmapped_device);
+    const auto ops_from_static_query = ShaveCostProviderBundles::queryDeviceMappedSupportedOperations(unmapped_device);
+
+    EXPECT_TRUE(ops_from_provider.empty());
+    EXPECT_TRUE(ops_from_static_query.empty());
+
+    const SHAVEWorkload wl_unmapped_device("Sigmoid", VPUDevice::__size, {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)},
+                                           {VPUTensor(1, 50, 50, 1, DataType::FLOAT16)});
+
+    std::string cost_source;
+    const auto cost = device_based_provider->get_cost(wl_unmapped_device, &cost_source);
+    EXPECT_EQ(cost, Cycles::ERROR_SHAVE_OPERATOR_MISSING);
+    EXPECT_EQ(cost_source, "no_provider");
+}
+
+TEST_F(ShaveCostProviderTests, RoutesOnlyConfiguredOperationsToOverrideProvider) {
+    auto default_provider = std::make_shared<FixedCostProvider>(100, 2, std::vector<std::string>{"relu", "MVN"});
+    auto override_provider = std::make_shared<FixedCostProvider>(200, 5, std::vector<std::string>{"SoftMax"});
+    OpSetOverrideShaveCostProvider provider(default_provider, override_provider, {"MVN"});
+
+    const SHAVEWorkload override_op_workload("MVN", VPUDevice::NPU_5_0, {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)},
+                                             {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)});
+    const SHAVEWorkload default_op_workload("relu", VPUDevice::NPU_5_0, {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)},
+                                            {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)});
+
+    EXPECT_EQ(provider.get_cost(override_op_workload), 200);
+    EXPECT_EQ(provider.get_cost(default_op_workload), 100);
+}
+
+TEST_F(ShaveCostProviderTests, SupportedOpsComeFromDefaultProviderAndMaxParamsUsesMaximum) {
+    auto default_provider = std::make_shared<FixedCostProvider>(100, 3, std::vector<std::string>{"A", "B"});
+    auto override_provider = std::make_shared<FixedCostProvider>(200, 7, std::vector<std::string>{"C"});
+    OpSetOverrideShaveCostProvider provider(default_provider, override_provider, {"B"});
+
+    VPUDevice device = VPUDevice::NPU_5_0;
+    const auto supported_ops = provider.get_shave_supported_ops(device);
+
+    EXPECT_EQ(provider.get_max_num_params(), 7);
+    EXPECT_EQ(std::set<std::string>(supported_ops.begin(), supported_ops.end()), std::set<std::string>({"A", "B"}));
+}
+
+TEST_F(ShaveCostProviderTests, NullOverrideProviderFallsBackToDefaultProvider) {
+    auto default_provider = std::make_shared<FixedCostProvider>(123, 4, std::vector<std::string>{"relu", "MVN"});
+    Shared_IShaveCostProvider override_provider;
+    OpSetOverrideShaveCostProvider provider(default_provider, override_provider, {"MVN"});
+
+    const SHAVEWorkload overridden_op_workload("MVN", VPUDevice::NPU_5_0, {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)},
+                                               {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)});
+    const SHAVEWorkload default_op_workload("relu", VPUDevice::NPU_5_0, {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)},
+                                            {VPUTensor(1, 8, 8, 1, DataType::FLOAT16)});
+
+    EXPECT_EQ(provider.get_cost(overridden_op_workload), 123);
+    EXPECT_EQ(provider.get_cost(default_op_workload), 123);
+    EXPECT_EQ(provider.get_max_num_params(), 4);
+}
+
 // ============================================================================
 
 // HeuristicCostProvider Tests
@@ -279,6 +418,96 @@ TEST_F(HeuristicCostProviderTests, GetCostScalesWithWorkloadSize) {
     }
 }
 
+TEST_F(HeuristicCostProviderTests, LegacyShvCompatScalesHeuristicCostsOnly) {
+    auto base_provider = ShaveCostProviderBundles::createHeuristicWithFactorsOnlyProvider();
+    auto wrapped_provider = ShaveCostProviderBundles::createDeviceMappedProvider();
+
+    // NPU_5_0_W is excluded: it routes to the legacy old selector (no LegacyShvCompatProvider wrapper applied)
+    std::vector<VPUDevice> wrapped_devices = {VPUDevice::NPU_5_0};
+
+    for (const auto device : wrapped_devices) {
+        SHAVEWorkload heuristic_workload("GridSample", device, {VPUTensor(80, 80, 4, 1, DataType::FLOAT16)},
+                                         {VPUTensor(80, 80, 4, 1, DataType::FLOAT16)});
+
+        std::string base_source;
+        std::string wrapped_source;
+
+        const auto base_cost = base_provider->get_cost(heuristic_workload, &base_source);
+        const auto wrapped_cost = wrapped_provider->get_cost(heuristic_workload, &wrapped_source);
+
+        ASSERT_FALSE(Cycles::isErrorCode(base_cost))
+                << "Base provider returned error code on device " << static_cast<int>(device) << ": "
+                << Cycles::toErrorText(base_cost);
+        ASSERT_FALSE(Cycles::isErrorCode(wrapped_cost))
+                << "Wrapped provider returned error code on device " << static_cast<int>(device) << ": "
+                << Cycles::toErrorText(wrapped_cost);
+
+        EXPECT_EQ(base_source, wrapped_source);
+        EXPECT_LT(wrapped_cost, base_cost);
+    }
+}
+
+TEST_F(HeuristicCostProviderTests, DeviceMappedProviderDoesNotAlterNonHeuristicMappedPath) {
+    auto composite_provider = ShaveCostProviderBundles::createDeviceMappedProvider();
+    auto old_mapped_provider = ShaveCostProviderBundles::createNameMappingOldProvider();
+
+    SHAVEWorkload mapped_old_path("SoftMax", VPUDevice::NPU_5_0, {VPUTensor(32, 1, 1, 1, DataType::FLOAT16)},
+                                  {VPUTensor(32, 1, 1, 1, DataType::FLOAT16)});
+
+    std::string composite_source;
+    std::string old_source;
+
+    const auto composite_cost = composite_provider->get_cost(mapped_old_path, &composite_source);
+    const auto old_cost = old_mapped_provider->get_cost(mapped_old_path, &old_source);
+
+    EXPECT_EQ(composite_cost, old_cost);
+    EXPECT_EQ(composite_source, old_source);
+}
+
+TEST_F(HeuristicCostProviderTests, LegacyShvCompatPreservesErrors) {
+    auto base_provider = ShaveCostProviderBundles::createHeuristicWithFactorsOnlyProvider();
+    auto wrapped_provider = ShaveCostProviderBundles::createDeviceMappedProvider();
+
+    SHAVEWorkload unknown_workload("definitely_unknown_op", VPUDevice::NPU_5_0,
+                                   {VPUTensor(8, 8, 1, 1, DataType::FLOAT16)},
+                                   {VPUTensor(8, 8, 1, 1, DataType::FLOAT16)});
+
+    const auto base_cost = base_provider->get_cost(unknown_workload);
+    const auto wrapped_cost = wrapped_provider->get_cost(unknown_workload);
+
+    EXPECT_TRUE(Cycles::isErrorCode(base_cost));
+    EXPECT_EQ(base_cost, wrapped_cost);
+}
+
+TEST_F(HeuristicCostProviderTests, LegacyShvCompatMatchesGetCyclesEquivalentPath) {
+    auto base_provider = ShaveCostProviderBundles::createHeuristicWithFactorsOnlyProvider();
+    auto wrapped_provider = ShaveCostProviderBundles::createDeviceMappedProvider();
+
+    // NPU_5_0_W is excluded: it routes to the legacy old selector (no LegacyShvCompatProvider wrapper applied).
+    std::vector<VPUDevice> wrapped_devices = {VPUDevice::NPU_5_0};
+
+    for (const auto device : wrapped_devices) {
+        SHAVEWorkload workload("GridSample", device, {VPUTensor(20, 20, 5, 1, DataType::FLOAT16)},
+                               {VPUTensor(20, 20, 5, 1, DataType::FLOAT16)});
+
+        const auto wrapped_cost = wrapped_provider->get_cost(workload);
+        ASSERT_FALSE(Cycles::isErrorCode(wrapped_cost))
+                << "Wrapped provider returned error code on device " << static_cast<int>(device) << ": "
+                << Cycles::toErrorText(wrapped_cost);
+
+        VPUDevice mutable_device = device;
+        auto shave_instance = base_provider->get_shave_instance(workload.get_name(), mutable_device);
+        ASSERT_TRUE(shave_instance.has_value());
+
+        const auto expected = shave_instance.value().get().dpuCycles(workload, 1, 1);
+
+        ASSERT_FALSE(Cycles::isErrorCode(expected))
+                << "Expected value returned error code on device " << static_cast<int>(device) << ": "
+                << Cycles::toErrorText(expected);
+        EXPECT_NEAR(static_cast<double>(wrapped_cost), static_cast<double>(expected), 1.0);
+    }
+}
+
 // ============================================================================
 // MathematicalShaveCostProviderBase Tests (via derived classes)
 // ============================================================================
@@ -297,6 +526,20 @@ protected:
 
     ShaveCostProvider* shave2_provider;
     OldShaveCostProvider* shave1_provider;
+};
+
+class ShaveCostProviderConfigInspector final : public ShaveCostProvider {
+public:
+    const ShaveConfiguration* get_config_address() const {
+        return &getShaveConfigurator();
+    }
+};
+
+class OldShaveCostProviderConfigInspector final : public OldShaveCostProvider {
+public:
+    const ShaveConfiguration* get_config_address() const {
+        return &getShaveConfigurator();
+    }
 };
 
 TEST_F(MathematicalShaveCostProviderBaseTests, Shave2CostSourceName) {
@@ -356,6 +599,13 @@ TEST_F(MathematicalShaveCostProviderBaseTests, GetShaveInstanceReturnsOptional) 
     if (instance1.has_value()) {
         EXPECT_EQ(instance1.value().get().getName(), "Sigmoid");
     }
+}
+
+TEST_F(MathematicalShaveCostProviderBaseTests, IndependentShaveConfigurationInstanceAcrossProviders) {
+    ShaveCostProviderConfigInspector shave2_provider_inspector;
+    OldShaveCostProviderConfigInspector shave1_provider_inspector;
+
+    EXPECT_NE(shave2_provider_inspector.get_config_address(), shave1_provider_inspector.get_config_address());
 }
 
 }  // namespace VPUNN_unit_tests

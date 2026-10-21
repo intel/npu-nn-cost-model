@@ -7,13 +7,13 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_COLLECTION_H
-#define SHAVE_COLLECTION_H
+#ifndef VPUNN_SHAVE_COLLECTION_H
+#define VPUNN_SHAVE_COLLECTION_H
 
 #include <map>
 #include <memory>
-#include <type_traits>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "elementwise.h"
@@ -21,9 +21,9 @@
 #include "shave_op_executors.h"
 #include "shave_vpuem_executors.h"
 #include "vpu/cycles_interface_types.h"
-#include "vpu/types.h"
 #include "vpu/shave/VPUEM_cost_function.h"
 #include "vpu/shave/shave_factors_mapping.h"
+#include "vpu/types.h"
 
 namespace VPUNN {
 
@@ -114,30 +114,26 @@ protected:
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
 
-    // Simple heuristic model: parameters moved from template params into function arguments
-    void AddSimpleHeuristic(const std::string& name,
-                            float elements_per_cycle = 1.0f,
-                            float code_derate = 1.0f,
-                            float bw_derate = 1.0f,
-                            float entry_cost = 2000.0f) {
-        auto p{new ShaveSimpleHeuristicModelActivation(name, elements_per_cycle, code_derate, bw_derate, entry_cost)};
+    // DpuFreq and ShvFreq are the nominal device frequencies used by the heuristic model instance for correctly
+    // calculating the cycles
+    template <unsigned int DpuFreq, unsigned int ShvFreq>
+    void AddSimpleHeuristic(const std::string& name, float elements_per_cycle = 1.0f, float code_derate = 1.0f,
+                            float bw_derate = 1.0f, float entry_cost = 2000.0f) {
+        auto p{new ShaveSimpleHeuristicModelActivation<DpuFreq, ShvFreq>(name, elements_per_cycle, code_derate,
+                                                                         bw_derate, entry_cost)};
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
 
-    // Roofline model: parameters moved from template params into function arguments
-    void AddRooflineModel(const std::string& name,
-                          float arithmetic_ops_per_32_outputs,
-                          float memory_ops_per_32_outputs,
-                          bool unaligned_by_nature = false,
-                          float bw_derate = 0.7f,
-                          float code_derate = 0.8f,
-                          float entry_cost_cycles = 1000.f,
-                          float scalar_cost_per_channel = 0.0f,
+    // DpuFreq and ShvFreq are the nominal device frequencies used by the roofline model instance for correctly
+    // calculating the cycles
+    template <unsigned int DpuFreq, unsigned int ShvFreq>
+    void AddRooflineModel(const std::string& name, float arithmetic_ops_per_32_outputs, float memory_ops_per_32_outputs,
+                          bool unaligned_by_nature = false, float bw_derate = 0.7f, float code_derate = 0.8f,
+                          float entry_cost_cycles = 1000.f, float scalar_cost_per_channel = 0.0f,
                           float unalignment_derate = 2.0f) {
-        auto p{new ShaveRooflineHeuristicModelActivation(name, arithmetic_ops_per_32_outputs,
-                                                         memory_ops_per_32_outputs, unaligned_by_nature, bw_derate,
-                                                         code_derate, entry_cost_cycles, scalar_cost_per_channel,
-                                                         unalignment_derate)};
+        auto p{new ShaveRooflineHeuristicModelActivation<DpuFreq, ShvFreq>(
+                name, arithmetic_ops_per_32_outputs, memory_ops_per_32_outputs, unaligned_by_nature, bw_derate,
+                code_derate, entry_cost_cycles, scalar_cost_per_channel, unalignment_derate)};
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
 
@@ -259,29 +255,26 @@ protected:
     }
 
     // Gather Model
-        template <DataType dtype, unsigned int VectorSize, unsigned int DpuFreq, unsigned int ShvFreq>
-        void AddGather(const std::string& name, float base_slope, float base_intercept, float inter_slope, 
-                       float worst_slope, float vector_offset){
-        auto p{new GatherActivationExec<dtype, VectorSize, DpuFreq, ShvFreq>(
-                name, base_slope, base_intercept, inter_slope, worst_slope, vector_offset)};
-        addOp(map_content_t(p, &DeviceShaveContainer::deleter));
-        }
-
-    // VPUEM PieceWise Model
-    template <DataType dtype, unsigned int DpuFreq,unsigned int ShvFreq>
-    void AddVPUEM_Piecewise(const std::string& name,
-                            const std::vector<CostFunction3SlopesDescriptor>& costFunction3SlopesData,
-                            bool adaptive_blk_num_en, 
-                            int max_blk_num, 
-                            int dspArch,
-                            float cost_curve_ratio,
-                            int unroll_mode = 0) { 
-        auto p {new PiecewiseExec<dtype, DpuFreq, ShvFreq>(name, costFunction3SlopesData, adaptive_blk_num_en, max_blk_num, dspArch, cost_curve_ratio, unroll_mode)
-        };
+    template <DataType dtype, unsigned int VectorSize, unsigned int DpuFreq, unsigned int ShvFreq>
+    void AddGather(const std::string& name, float base_slope, float base_intercept, float inter_slope,
+                   float worst_slope, float vector_offset) {
+        auto p{new GatherActivationExec<dtype, VectorSize, DpuFreq, ShvFreq>(name, base_slope, base_intercept,
+                                                                             inter_slope, worst_slope, vector_offset)};
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
 
-     // VPUEM Softmax Model
+    // VPUEM PieceWise Model
+    template <DataType dtype, unsigned int DpuFreq, unsigned int ShvFreq>
+    void AddVPUEM_Piecewise(const std::string& name,
+                            const std::vector<CostFunction3SlopesDescriptor>& costFunction3SlopesData,
+                            bool adaptive_blk_num_en, int max_blk_num, int dspArch, float cost_curve_ratio,
+                            int unroll_mode = 0) {
+        auto p{new PiecewiseExec<dtype, DpuFreq, ShvFreq>(name, costFunction3SlopesData, adaptive_blk_num_en,
+                                                          max_blk_num, dspArch, cost_curve_ratio, unroll_mode)};
+        addOp(map_content_t(p, &DeviceShaveContainer::deleter));
+    }
+
+    // VPUEM Softmax Model
     template <DataType dtype, unsigned int DpuFreq, unsigned int ShvFreq>
     void AddVPUEM_Softmax(const std::string& name,
                           const std::vector<CostFunctionSoftmaxDescriptor>& CostFunctionSoftmaxData) {
@@ -289,14 +282,13 @@ protected:
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
 
-     // VPUEM Spatial Model
+    // VPUEM Spatial Model
     template <DataType dtype, unsigned int DpuFreq, unsigned int ShvFreq>
     void AddVPUEM_Spatial(const std::string& name, const CostFunctionSpatialDescriptor& CostFunctionSpatialData) {
         auto p{new VPUEMSpatialExec<dtype, DpuFreq, ShvFreq>(name, CostFunctionSpatialData)};
         addOp(map_content_t(p, &DeviceShaveContainer::deleter));
     }
-
 };
 
 }  // namespace VPUNN
-#endif
+#endif // VPUNN_SHAVE_COLLECTION_H

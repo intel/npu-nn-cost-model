@@ -54,7 +54,7 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
         int i = 1;  // test case index
         for (const auto& t : tests) {
             std::cout << "Test case: " << i << "\n";
-            VPUNN::VPUCostModel model{t.t_in.model_path};
+            VPUNN::VPUCostModel model{t.t_in.wl.device, t.t_in.model_path};
             auto cyc = model.DPU(t.t_in.wl);
 
             if (t.t_exp.cyc_err == Cycles::NO_ERROR) {
@@ -106,9 +106,9 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
 
 TEST_F(TestCostModel, Mock_40_vs_VPU27_DPU) {
     {  // 27 and 40
-        VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+        VPUNN::VPUCostModel model_2_7{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
         EXPECT_TRUE(model_2_7.nn_initialized());
-        VPUNN::VPUCostModel model_4_0{VPU_2_7_MODEL_PATH};  // no post processing mock
+        VPUNN::VPUCostModel model_4_0{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};  // no post processing mock
         EXPECT_TRUE(model_4_0.nn_initialized());
 
         auto cycles_27 = model_2_7.DPU(wl_glob_27);
@@ -124,9 +124,9 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DPU) {
     }
     {  // garbage data/no file
         const std::string model_path = "NoFileHere.vpunn";
-        VPUNN::VPUCostModel model_2_7{model_path};
+        VPUNN::VPUCostModel model_2_7{VPUNN::VPUDevice::__size, model_path};
         EXPECT_FALSE(model_2_7.nn_initialized());
-        VPUNN::VPUCostModel model_4_0{model_path};
+        VPUNN::VPUCostModel model_4_0{VPUNN::VPUDevice::__size, model_path};
         EXPECT_FALSE(model_4_0.nn_initialized());
 
         auto cycles_27 = model_2_7.DPU(wl_glob_27);
@@ -143,8 +143,8 @@ TEST_F(TestCostModel, Mock_40_vs_VPU27_DMA) {
             (float)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::VPU_4_0);  //[cycles27/cycles40] is the unit
     {                                                                                 // DMA
         const std::string model_path = "NoFileHere.vpunn";
-        VPUNN::VPUCostModel model_2_7{model_path};
-        VPUNN::VPUCostModel model_4_0{model_path};
+        VPUNN::VPUCostModel model_2_7{VPUNN::VPUDevice::__size, model_path};
+        VPUNN::VPUCostModel model_4_0{VPUNN::VPUDevice::__size, model_path};
 
         auto cycles_27_DtoC = model_2_7.DMA(wl_glob_27.device, wl_glob_27.inputs[0], wl_glob_27.outputs[0],
                                             MemoryLocation::DRAM, MemoryLocation::CMX);
@@ -232,8 +232,9 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
     {  // 20
         const DPUWorkload wl{wl_glob_20};
         const std::string modelFile{VPU_2_0_MODEL_PATH};
+        const VPUDevice device{VPUDevice::VPU_2_0};
 
-        VPUNN::VPUCostModel test_model{modelFile};
+        VPUNN::VPUCostModel test_model{device, modelFile};
         EXPECT_TRUE(test_model.nn_initialized());
         auto cycles_dpu = test_model.DPU(wl);
         auto cycles_Pack = test_model.DPUInfo(wl);
@@ -245,8 +246,9 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
     {  // 27
         const DPUWorkload wl{wl_glob_27};
         const std::string modelFile{VPU_2_7_MODEL_PATH};
+        const VPUDevice device{VPUDevice::VPU_2_7};
 
-        VPUNN::VPUCostModel test_model{modelFile};
+        VPUNN::VPUCostModel test_model{device, modelFile};
         EXPECT_TRUE(test_model.nn_initialized());
         auto cycles_dpu = test_model.DPU(wl);
         auto cycles_Pack = test_model.DPUInfo(wl);
@@ -258,8 +260,9 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
     {  // 40
         const DPUWorkload wl{wl_glob_40};
         const std::string modelFile{VPU_4_0_MODEL_PATH};
+        const VPUDevice device{VPUDevice::VPU_4_0};
 
-        VPUNN::VPUCostModel test_model{modelFile};
+        VPUNN::VPUCostModel test_model{device, modelFile};
         EXPECT_TRUE(test_model.nn_initialized());
         auto cycles_dpu = test_model.DPU(wl);
         auto cycles_Pack = test_model.DPUInfo(wl);
@@ -272,8 +275,9 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
     {  // 50
         const DPUWorkload wl{wl_glob_50};
         const std::string modelFile{NPU_5_0_MODEL_PATH};
+        const VPUDevice device{VPUDevice::NPU_5_0};
 
-        VPUNN::VPUCostModel test_model{modelFile};
+        VPUNN::VPUCostModel test_model{device, modelFile};
         EXPECT_TRUE(test_model.nn_initialized());
         auto cycles_dpu = test_model.DPU(wl);
         auto cycles_Pack = test_model.DPUInfo(wl);
@@ -288,12 +292,13 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 20
         const DPUWorkload wl_device{wl_glob_20};
         const std::string modelFile{VPU_2_0_MODEL_PATH};
+        const VPUDevice device{VPUDevice::VPU_2_0};
         constexpr unsigned int n_workloads = 100;
 
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(wl_device.device));
 
-        VPUNN::VPUCostModel test_model{modelFile};
+        VPUNN::VPUCostModel test_model{device, modelFile};
         EXPECT_TRUE(test_model.nn_initialized());
 
         for (const auto& wl : workloads) {
@@ -306,12 +311,13 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 27
         const DPUWorkload wl_device{wl_glob_27};
         const std::string modelFile{VPU_2_7_MODEL_PATH};
+        const VPUDevice device{VPUDevice::VPU_2_7};
         constexpr unsigned int n_workloads = 100;
 
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(wl_device.device));
 
-        VPUNN::VPUCostModel test_model{modelFile};
+        VPUNN::VPUCostModel test_model{device, modelFile};
         EXPECT_TRUE(test_model.nn_initialized());
 
         for (const auto& wl : workloads) {
@@ -324,12 +330,13 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 40
         const DPUWorkload wl_device{wl_glob_40};
         const std::string modelFile{VPU_4_0_MODEL_PATH};
+        const VPUDevice device{VPUDevice::VPU_4_0};
         constexpr unsigned int n_workloads = 100;
 
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(wl_device.device));
 
-        VPUNN::VPUCostModel test_model{modelFile};
+        VPUNN::VPUCostModel test_model{device, modelFile};
         EXPECT_TRUE(test_model.nn_initialized());
 
         for (const auto& wl : workloads) {
@@ -502,7 +509,7 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
                 // clang-format on
         };
 
-        VPUCostModel test_model{VPU_2_0_MODEL_PATH};
+        VPUCostModel test_model{VPUDevice::VPU_2_0, VPU_2_0_MODEL_PATH};
         const HWPerformanceModel& performance{test_model.getPerformanceModel()};
         EXPECT_TRUE(test_model.nn_initialized());
         run_Tests(tests2_0, test_model, performance, verify_ideal_cyc);
@@ -525,7 +532,7 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
                 // clang-format on
         };
 
-        VPUCostModel test_model{VPU_2_7_MODEL_PATH};
+        VPUCostModel test_model{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
         const HWPerformanceModel& performance{test_model.getPerformanceModel()};
         EXPECT_TRUE(test_model.nn_initialized());
         run_Tests(tests2_7, test_model, performance, verify_ideal_cyc);
@@ -547,7 +554,7 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
 
                 // clang-format on
         };
-        VPUCostModel test_model{VPU_4_0_MODEL_PATH};
+        VPUCostModel test_model{VPUDevice::VPU_4_0, VPU_4_0_MODEL_PATH};
         const HWPerformanceModel& performance{test_model.getPerformanceModel()};
         EXPECT_TRUE(test_model.nn_initialized());
         run_Tests(tests4_0, test_model, performance, verify_ideal_cyc);
@@ -583,7 +590,7 @@ TEST_F(TestCostModel, SEP_smoke_test) {
         };
 
         {
-            VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+            VPUCostModel model_2_7{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
             // sparsity (input) is allowed only for CONV and ELEMENTwise, prohibited for rest
             // output sparsity should be enabled for all// not influencing  inferred runtime
 
@@ -630,7 +637,7 @@ TEST_F(TestCostModel, SEP_smoke_test) {
                 sepInfo107262,                                                 // SEP
         };
         {
-            VPUCostModel my_model{VPU_4_0_MODEL_PATH};
+            VPUCostModel my_model{VPUDevice::VPU_4_0, VPU_4_0_MODEL_PATH};
             // sparsity (input) is allowed only for CONV and ELEMENTwise, prohibited for rest
             // output sparsity should be enabled for all// not influencing  inferred runtime
 

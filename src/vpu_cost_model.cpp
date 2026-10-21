@@ -77,16 +77,20 @@ void VPUCostModel::swizzling_turn_OFF(DPUWorkload& workload) const {
     }
 }
 
-VPUCostModel::VPUCostModel(const std::string& filename, const std::string& dpu_cache_filename,
+VPUCostModel::VPUCostModel(VPUDevice device, const std::string& filename, const std::string& dpu_cache_filename,
                            const std::string& shave_cache_filename, bool tryToLoadPairedCache)
-        : VPUCostModel(filename, false, 16384, 1, dpu_cache_filename, shave_cache_filename, tryToLoadPairedCache) {
+                : VPUCostModel(device, filename, false, 16384, 1, dpu_cache_filename, shave_cache_filename,
+                                             tryToLoadPairedCache) {
     /* coverity[uninit_member] */
 }
 
-VPUCostModel::VPUCostModel(const std::string& filename, bool profile, const unsigned int cache_size,
+VPUCostModel::VPUCostModel(VPUDevice device, const std::string& filename, bool profile,
+                                                     const unsigned int cache_size,
                            const unsigned int batch_size, const std::string& dpu_cache_filename,
                            const std::string& shave_cache_filename, bool tryToLoadPairedCache)
-        : dpu_nn_cost_provider(filename, batch_size, profile, cache_size, dpu_cache_filename, tryToLoadPairedCache),
+                : model_device(device),
+                  dpu_nn_cost_provider(filename, batch_size, profile, cache_size, dpu_cache_filename,
+                                       tryToLoadPairedCache),
           ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_filename, cache_size)),
           http_dpu_cost_provider(HttpCostProviderFactory::create()) {
     Logger::initialize();
@@ -100,11 +104,13 @@ VPUCostModel::VPUCostModel(const std::string& filename, bool profile, const unsi
     serializer.initialize("l1_dpu_workloads", FileMode::READ_WRITE, dpu_nn_cost_provider.get_names_for_serializer());
 }
 
-VPUCostModel::VPUCostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile,
+VPUCostModel::VPUCostModel(VPUDevice device, const char* model_data, size_t model_data_length, bool copy_model_data,
+                                                     bool profile,
                            const unsigned int cache_size, const unsigned int batch_size, const char* dpu_cache_data,
                            size_t dpu_cache_data_length, const char* shave_cache_data, size_t shave_cache_data_length)
-        : dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, profile, cache_size,
-                               dpu_cache_data, dpu_cache_data_length),
+                : model_device(device),
+          dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, profile,
+                       cache_size, dpu_cache_data, dpu_cache_data_length),
           ptr_internal_shave_cost_model(
                   std::make_shared<SHAVECostModel>(shave_cache_data, shave_cache_data_length, cache_size)),
           http_dpu_cost_provider(HttpCostProviderFactory::create()) {

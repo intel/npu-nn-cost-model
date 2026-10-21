@@ -7,12 +7,14 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_DEVICES_H
-#define SHAVE_DEVICES_H
+#ifndef VPUNN_SHAVE_DEVICES_H
+#define VPUNN_SHAVE_DEVICES_H
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <type_traits>
 
 #include "vpu/cycles_interface_types.h"
@@ -32,216 +34,151 @@ namespace VPUNN {
 /// @brief selects  in a trivial manner, from one container
 class ShaveSelector {
 private:
-    const DeviceShaveContainer& container;
+    std::unique_ptr<const DeviceShaveContainer> container;
 
 public:
-    ShaveSelector(const DeviceShaveContainer& shave_container): container(shave_container) {
+    explicit ShaveSelector(std::unique_ptr<const DeviceShaveContainer> shave_container)
+            : container(std::move(shave_container)) {
     }
 
     virtual ~ShaveSelector() = default;
 
-    virtual const ShaveOpExecutor& getShaveFuntion(const std::string& name) const {
-        return container.getShaveExecutor(name);  // will throw if not existing
+    virtual const ShaveOpExecutor& getShaveFunction(const std::string& name) const {
+        return container->getShaveExecutor(name);  // will throw if not existing
     }
     virtual std::vector<std::string> getShaveList() const {
-        return container.getShaveList();
+        return container->getShaveList();
     }
 
 protected:
     bool existsShave(const std::string& name) const {
-        return container.existsShave(name);
+        return container->existsShave(name);
     }
 };
 
 /// @brief selects from 2 containers , 1st with priority
 class ShavePrioritySelector : public ShaveSelector {
-    const DeviceShaveContainer& container2;
+    std::unique_ptr<const DeviceShaveContainer> container2;
 
 public:
-    ShavePrioritySelector(const DeviceShaveContainer& shave_container_first,
-                          const DeviceShaveContainer& shave_container_second)
-            : ShaveSelector(shave_container_first), container2(shave_container_second) {
+    ShavePrioritySelector(std::unique_ptr<const DeviceShaveContainer> shave_container_first,
+                          std::unique_ptr<const DeviceShaveContainer> shave_container_second)
+            : ShaveSelector(std::move(shave_container_first)), container2(std::move(shave_container_second)) {
     }
 
     virtual ~ShavePrioritySelector() = default;
 
-    const ShaveOpExecutor& getShaveFuntion(const std::string& name) const override {
+    const ShaveOpExecutor& getShaveFunction(const std::string& name) const override {
         if (ShaveSelector::existsShave(name)) {
-            return ShaveSelector::getShaveFuntion(name);  // should not throw
+            return ShaveSelector::getShaveFunction(name);  // should not throw
         } else {
-            return container2.getShaveExecutor(name);  // will throw if not existing
+            return container2->getShaveExecutor(name);  // will throw if not existing
         }
     }
     virtual std::vector<std::string> getShaveList() const override {
         auto v1{ShaveSelector::getShaveList()};
-        const auto v2{container2.getShaveList()};
+        const auto v2{container2->getShaveList()};
         v1.insert(v1.end(), v2.begin(), v2.end());
         return v1;
     }
 };
 
-/// @brief the shave configuration. Holds instances of all configurations supported by this app version
+/// @brief the shave configuration. Holds instances of selectors for different devices
+/// This class is responsible for managing the SHAVE function executors for different devices and providing selectors to
+/// access them. It uses lazy initialization to create selectors on demand and caches them for future use.
 class ShaveConfiguration {
 private:
-    // instances of collections
-    const struct {
-        const ShaveInstanceHolder_VPU27CLassic shaves_20_classic{};  ///< fixed frequencies in model
-        const ShaveInstanceHolder_VPU27 shaves_27{};                 ///< new list
+    using SelectorCache = std::map<VPUDevice, std::unique_ptr<ShaveSelector>>;
 
-        const ShaveInstanceHolder_NPU40 shaves_40{};
+    // Lazy-initialized selector caches (mutable for const access in getters).
+    // All five caches share one mutex: construction is a one-time-per-device cost,
+    // so per-cache granularity would only add complexity without measurable benefit.
+    mutable std::shared_mutex cache_mutex;
+    mutable SelectorCache selector_cache;
+    mutable SelectorCache old_selector_cache;
+    mutable SelectorCache selector_with_factors_cache;
+    mutable SelectorCache heuristic_selector_cache;
+    mutable SelectorCache heuristic_selector_with_factors_cache;
 
-        // mocks instances
-        const ShaveInstanceHolder_Mock_NPU40 mock_shaves_40{};  // mock 2.7  as they are for 4.0
+    // Factory methods for each selector type
+    std::unique_ptr<ShaveSelector> createSelectorForDevice(VPUDevice device) const;
+    std::unique_ptr<ShaveSelector> createOldSelectorForDevice(VPUDevice device) const;
+    std::unique_ptr<ShaveSelector> createSelectorWithFactorsForDevice(VPUDevice device) const;
+    std::unique_ptr<ShaveSelector> createHeuristicSelectorForDevice(VPUDevice device) const;
+    std::unique_ptr<ShaveSelector> createHeuristicSelectorWithFactorsForDevice(VPUDevice device) const;
 
-        const ShaveInstanceHolder_VPU27CLassic old_shave_27{};
-        const ShaveInstanceHolder_NPU40CLassic old_shave_40{};
-
-        const ShaveInstanceHolder_Mock_NPU50 mock_shaves_50{};
-        const ShaveInstanceHolder_Mock_NPU50W mock_shaves_50W{};
-        const ShaveInstanceHolder_NPU50CLassic old_shave_50{};
-
-        const ShaveInstanceHolder_NPU50_WithFactors shave_50_with_factors{}; // generated class that populates the factors map
-
-        const ShaveInstanceHolder_HeuristicNPU50 heuristic_shaves_50{};
-        const ShaveInstanceHolder_HeuristicNPU50_WithFactors heuristic_shaves_50_with_factors{}; // heuristic models with speed-up factors
-
-
-
-    } collections{};
-
-    // selectors know on what collections to look (they are properly configured for each device)
-    const ShaveSelector selector_20{collections.shaves_20_classic};
-    // const ShavePrioritySelector selector_27{shaves_27_new,
-    //                                         shaves_27_classic};          ///< special with 2 lists
-    const ShaveSelector selector_27{collections.shaves_27};  ///< only the new list
-    const ShaveSelector selector_40{collections.shaves_40};
-
-    const ShaveSelector selector_old_20{collections.shaves_20_classic};
-    const ShaveSelector selector_old_27{collections.old_shave_27};
-    const ShaveSelector selector_old_40{collections.old_shave_40};
-    const ShaveSelector selector_50{collections.mock_shaves_50};
-    const ShaveSelector selector_50W{collections.mock_shaves_50W};
-    const ShaveSelector selector_old_50{collections.old_shave_50};
-
-    const ShaveSelector selector_50_heuristic{collections.heuristic_shaves_50};
-    const ShaveSelector selector_50_heuristic_with_factors{collections.heuristic_shaves_50_with_factors};
-
-    const ShaveSelector selector_50_with_factors{collections.shave_50_with_factors};
-
-
+    /// @brief Returns the cached selector for @p device, creating it via @p make_selector on first access.
+    /// Uses double-checked locking: a shared (read) lock is sufficient for the common post-warmup case,
+    /// and a unique (write) lock is only acquired when construction is actually needed.
+    template<typename SelectorFactory>
+    const ShaveSelector& getOrCreate(SelectorCache& cache, VPUDevice device, SelectorFactory&& make_selector) const {
+        {
+            std::shared_lock read(cache_mutex);
+            auto it = cache.find(device);
+            if (it != cache.end() && it->second)
+                return *it->second;
+        }
+        std::unique_lock write(cache_mutex);
+        auto& entry = cache[device];  // re-check after acquiring write lock
+        if (!entry)
+            entry = make_selector(device);
+        return *entry;
+    }
 
 public:
-    const ShaveSelector& getSelector(VPUDevice desired_device) const {
-        switch (desired_device) {
-        case VPUDevice::VPU_2_0:
-        case VPUDevice::VPU_2_1:
-            return selector_20;
-            break;
-        case VPUDevice::VPU_2_7:
-            return selector_27;
-            break;
-        case VPUDevice::VPU_4_0:
-            return selector_40;
-            break;
-        case VPUDevice::NPU_5_0:
-            return selector_50;
-            break;
-        case VPUDevice::NPU_5_0_W:
-            return selector_50W;
-            break;
-        default:
-            static const DeviceShaveContainer empty_shaves{VPUDevice::__size};
-            static const ShaveSelector empty_selector{empty_shaves};
-            return empty_selector;
-            break;
-        }
+    /// @brief Returns the standard selector for @p device (model-based, no correction factors).
+    const ShaveSelector& getSelector(VPUDevice device) const {
+        auto make_selector = [this](VPUDevice d) { return createSelectorForDevice(d); };
+        return getOrCreate(selector_cache, device, make_selector);
     }
 
-    const ShaveSelector& getOldSelector(VPUDevice desired_device) const {
-        switch (desired_device) {
-        case VPUDevice::VPU_2_0:
-        case VPUDevice::VPU_2_1:
-            return selector_old_20;
-            break;
-        case VPUDevice::VPU_2_7:
-            return selector_old_27;
-            break;
-        case VPUDevice::VPU_4_0:
-            return selector_old_40;
-            break;
-        case VPUDevice::NPU_5_0:
-        case VPUDevice::NPU_5_0_W:
-            return selector_old_50;
-            break;
-        default:
-            static const DeviceShaveContainer empty_shaves{VPUDevice::__size};
-            static const ShaveSelector empty_selector{empty_shaves};
-            return empty_selector;
-            break;
-        }
+    /// @brief Returns the legacy/old selector for @p device, used for backwards-compatible cost estimates.
+    const ShaveSelector& getOldSelector(VPUDevice device) const {
+        auto make_selector = [this](VPUDevice d) { return createOldSelectorForDevice(d); };
+        return getOrCreate(old_selector_cache, device, make_selector);
     }
 
-    const ShaveSelector& getSelectorWithFactors(VPUDevice desired_device) const {
-        switch (desired_device) {
-            case VPUDevice::NPU_5_0:
-                return selector_50_with_factors;
-                break;
-            default:
-                // if there is no factors map for the device, return the regular selector
-                return getSelector(desired_device);
-                break;
-        }
+    /// @brief Returns the selector with correction factors applied for @p device.
+    const ShaveSelector& getSelectorWithFactors(VPUDevice device) const {
+        auto make_selector = [this](VPUDevice d) { return createSelectorWithFactorsForDevice(d); };
+        return getOrCreate(selector_with_factors_cache, device, make_selector);
     }
 
-    const ShaveSelector& getHeuristicSelector(VPUDevice desired_device) const {
-        switch (desired_device) {
-            case VPUDevice::NPU_5_0:
-                return selector_50_heuristic;
-                break;
-            case VPUDevice::NPU_5_0_W:
-                // for compatibility reasons, we need to use old selector for WCL
-                return getOldSelector(desired_device);
-                break;
-            default:
-                // if there is no heuristic selector for the device, return the regular selector
-                return getOldSelector(desired_device);
-                break;
-        }
+    /// @brief Returns the heuristic-based selector for @p device.
+    const ShaveSelector& getHeuristicSelector(VPUDevice device) const {
+        auto make_selector = [this](VPUDevice d) { return createHeuristicSelectorForDevice(d); };
+        return getOrCreate(heuristic_selector_cache, device, make_selector);
     }
 
-    const ShaveSelector& getHeuristicSelectorWithFactors(VPUDevice desired_device) const {
-        switch (desired_device) {
-            case VPUDevice::NPU_5_0:
-                return selector_50_heuristic_with_factors;
-                break;
-            default:
-                // if there is no heuristic selector for the device, return the regular selector
-                return getHeuristicSelector(desired_device);
-                break;
-        }
+    /// @brief Returns the heuristic-based selector with correction factors applied for @p device.
+    const ShaveSelector& getHeuristicSelectorWithFactors(VPUDevice device) const {
+        auto make_selector = [this](VPUDevice d) { return createHeuristicSelectorWithFactorsForDevice(d); };
+        return getOrCreate(heuristic_selector_with_factors_cache, device, make_selector);
     }
-    
+
     /**
      * @brief Get the maximum number of parameters across all SHAVE functions
-     * 
-     * Iterates through all SHAVE functions to find the maximum number of expected parameters. 
+     *
+     * Iterates through all SHAVE functions to find the maximum number of expected parameters.
      * This is useful for determining the appropriate buffer sizes or field counts needed for serialization.
-     * 
-     * @param sel Reference to ShaveSelector containing SHAVE function definitions
+     *
      * @return int Maximum number of parameters found across all SHAVE functions
      */
     int get_max_num_params() const {
-        std::vector<int> all_num_params{};
+        int max_num_params = 0;
         for (int i = 0; i < static_cast<int>(VPUDevice::__size); i++) {
             const auto& sel = getSelector(static_cast<VPUDevice>(i));
             const auto& shv_list = sel.getShaveList();
             for (const auto& name : shv_list) {
-                all_num_params.push_back(sel.getShaveFuntion(name).getNumExpectedParams());
+                const int current_num_params = sel.getShaveFunction(name).getNumExpectedParams();
+                if (current_num_params > max_num_params) {
+                    max_num_params = current_num_params;
+                }
             }
         }
 
-        return *std::max_element(all_num_params.begin(), all_num_params.end());
+        return max_num_params;
     }
 };
 }  // namespace VPUNN
-#endif
+#endif // VPUNN_SHAVE_DEVICES_H

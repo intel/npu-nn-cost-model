@@ -24,7 +24,7 @@ using namespace VPUNN;
 
 class CostModelStochastic : public ::testing::Test {
 protected:
-    VPUNN::VPUCostModel model{};
+    VPUNN::VPUCostModel model{VPUNN::VPUDevice::__size, ""};
     using ModelDescriptor =
             VPUNNModelsFiles::ModelDescriptor;  ///< make this type directly visible inside of this class
     const VPUNNModelsFiles& the_NN_models{VPUNNModelsFiles::getModels()};  ///< the paths to available NN models
@@ -32,9 +32,9 @@ protected:
      std::tuple<int, int> CheckInValidIntervalCycles(const ModelDescriptor& model_info, const unsigned int low_threshold,
                                                     const unsigned int high_threshold, unsigned int n_workloads) {
         const auto& model_path = model_info.first;
+        const auto& device = model_info.second;
 
-        VPUNN::VPUCostModel current_model{model_path, false};  // with cache, batch =1
-        const VPUNN::VPUDevice device = model_info.second;
+        VPUNN::VPUCostModel current_model{device, model_path, false};  // with cache, batch =1
 
         // Generate N workloads
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -64,11 +64,11 @@ protected:
      int CheckNoCase_InferenceOutput(const ModelDescriptor& model_info, const float not_valid_value,
                                     unsigned int n_workloads = 1000) {
         const auto& model_path = model_info.first;
+        const auto& device = model_info.second;
         const auto checked_result{Cycles::toCycleInterfaceType(not_valid_value)};
         // const float delta_error = 0.01F;
 
-        VPUNN::VPUCostModel current_model{model_path, false, 0U};  // with cache, batch =1
-        const VPUNN::VPUDevice device = model_info.second;
+        VPUNN::VPUCostModel current_model{device, model_path, false, 0U};  // with cache, batch =1
 
         // Generate N workloads
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -89,7 +89,8 @@ protected:
                                                            const float low_threshold_, const float high_threshold_,
                                                            const std::vector<VPUNN::DPUWorkload>& workloads) {
         const auto& model_path = model_info.first;
-        VPUNN::VPUCostModel current_model{model_path, false};  // with cache, batch =1
+        const auto& device = model_info.second;
+        VPUNN::VPUCostModel current_model{device, model_path, false};  // with cache, batch =1
 
         int ilow{0};   // increments at every error
         int ihigh{0};  // increments at every error
@@ -133,9 +134,11 @@ protected:
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device_version));
 
-        VPUNN::VPUCostModel slow_model{the_NN_models.standard_model_paths[modelIndex].first,
+        VPUNN::VPUCostModel slow_model{the_NN_models.standard_model_paths[modelIndex].second,
+                           the_NN_models.standard_model_paths[modelIndex].first,
                                        false};  // with cache, batch =1
-        VPUNN::VPUCostModel fast_model{the_NN_models.fast_model_paths[modelIndex].first,
+        VPUNN::VPUCostModel fast_model{the_NN_models.fast_model_paths[modelIndex].second,
+                           the_NN_models.fast_model_paths[modelIndex].first,
                                        false};  // with cache, batch =1
 
         std::map<VPUNN::Operation, int> ops_errors;
@@ -229,8 +232,8 @@ protected:
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device_version));
 
-        VPUNN::VPUCostModel slow_model{nn1, false};  // with cache, batch =1
-        VPUNN::VPUCostModel fast_model{nn2, false};  // with cache, batch =1
+        VPUNN::VPUCostModel slow_model{device_version, nn1, false};  // with cache, batch =1
+        VPUNN::VPUCostModel fast_model{device_version, nn2, false};  // with cache, batch =1
 
         EXPECT_TRUE(slow_model.nn_initialized()) << "\n Modelfile: " << nn1 << "  not initialized";
         EXPECT_TRUE(fast_model.nn_initialized()) << "\n Modelfile: " << nn2 << "  not initialized";

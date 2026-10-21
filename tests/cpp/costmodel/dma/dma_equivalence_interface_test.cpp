@@ -71,7 +71,7 @@ using namespace VPUNN;
 class TestDMAEquivalenceInterface : public ::testing::Test {
 protected:
     /// Cost model without a NN — DMA always uses the theoretical provider.
-    VPUCostModel cm{"empty"};
+    VPUCostModel cm{VPUNN::VPUDevice::__size, "empty"};
 
     // -----------------------------------------------------------------------
     // Helpers

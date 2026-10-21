@@ -63,8 +63,8 @@ protected:
     DMACostModel<DMANNWorkload_NPU50> dma_model_5_0{NPU_DMA_5_0_MODEL_PATH};
 
     ModelMap<VPULayerCostModel> layer_models{&dma_model_invalid, ""};
-    VPULayerCostModel model_2_7_no_dma{VPU_2_7_MODEL_PATH};
-    VPULayerCostModel model_5_0_old_shave{&dma_model_5_0, NPU_5_0_MODEL_PATH};
+    VPULayerCostModel model_2_7_no_dma{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
+    VPULayerCostModel model_5_0_old_shave{VPUDevice::NPU_5_0, &dma_model_5_0, NPU_5_0_MODEL_PATH};
 
     VPULayerCostModelTest() {
         layer_models.addModel(VPUDevice::VPU_2_0, &dma_model_2_7, VPU_2_0_MODEL_PATH);
@@ -170,10 +170,10 @@ protected:
         std::string test_info_str = test_case;
         std::replace(test_info_str.begin(), test_info_str.end(), ',', '_');
         test_info_str.erase(std::remove(test_info_str.begin(), test_info_str.end(), '\n'), test_info_str.end());
-        // TO BE REFACTORED
-        layer_models.getModel(l1.device).get_serializer().serialize(SerializableField<std::string>(
-                "info", current_test_fixture_name() + "::" + current_test_name() + "::" + test_info_str +
-                                "::" + std::to_string(t_exp.min_cyc) + "<->" + std::to_string(t_exp.max_cyc)));
+        const std::string info_layer{current_test_fixture_name() + "::" + current_test_name() + "::" + test_info_str +
+                         "::" + std::to_string(t_exp.min_cyc) + "<->" +
+                         std::to_string(t_exp.max_cyc)};
+        l1.set_layer_info(info_layer);
 
         LayerSplitInfo detailed_split;
         ASSERT_NO_THROW(cost_cyc = layer_models.getModel(l1.device).Layer(l1, strategy, detailed_split))

@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_COLLECTION_MOCK_H
-#define SHAVE_COLLECTION_MOCK_H
+#ifndef VPUNN_SHAVE_COLLECTION_MOCK_H
+#define VPUNN_SHAVE_COLLECTION_MOCK_H
 
 #include "shave_collection.h"
 
@@ -54,4 +54,4 @@ protected:
 };
 
 }  // namespace VPUNN
-#endif
+#endif  // VPUNN_SHAVE_COLLECTION_MOCK_H

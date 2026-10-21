@@ -259,15 +259,20 @@ TEST_F(TestSHAVEPrefetch, ComputeCycles_DefaultPrefetchFlagFalse_DoesNotAddPrefe
     ASSERT_TRUE(selected_op.has_value()) << "No valid SHAVE operator found for NPU_5_0.";
 
     SHAVEWorkload swl{*selected_op, device, {input_0}, {output_0}};
+    SHAVEWorkload with_prefetch_swl{*selected_op, device, {input_0}, {output_0}};
+    with_prefetch_swl.include_code_prefetch = true;
 
     std::string info;
     const auto cycles = empty_model.computeCycles(swl, info);
     ASSERT_FALSE(Cycles::isErrorCode(cycles)) << info;
 
-    const auto instance = empty_model.getShaveInstance(*selected_op, device);
-    ASSERT_TRUE(instance.has_value());
-    const auto expected_base = instance->get().dpuCycles(swl);
-    EXPECT_EQ(cycles, expected_base);
+    const auto prefetch_cost = empty_model.getCodePrefetchCost(with_prefetch_swl);
+    ASSERT_FALSE(Cycles::isErrorCode(prefetch_cost));
+
+    const auto with_prefetch_cycles = empty_model.computeCycles(with_prefetch_swl, info);
+    ASSERT_FALSE(Cycles::isErrorCode(with_prefetch_cycles)) << info;
+
+    EXPECT_EQ(with_prefetch_cycles, Cycles::cost_adder(cycles, prefetch_cost));
 }
 
 // With include_code_prefetch enabled on a covered device, the model must add the measured
