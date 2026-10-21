@@ -34,9 +34,9 @@ namespace VPUNN {
  */
 template <class T>
 inline T dpu_schedule(const unsigned int n_procesors, const std::vector<T>& tasks_cost, const T runtime_overhead = 0) {
-    const auto initializer = std::vector<T>(n_procesors, 0);
     // MIN priority queue
-    auto queue = std::priority_queue<T, std::vector<T>, std::greater<T>>(initializer.begin(), initializer.end());
+    auto queue = std::priority_queue<T, std::vector<T>, std::greater<T>>(
+            std::greater<T>{}, std::vector<T>(n_procesors, 0));
 
     for (long unsigned int idx = 0; idx < tasks_cost.size(); idx++) {
         auto smallest_time = queue.top();
@@ -57,10 +57,10 @@ template <>
 inline CyclesInterfaceType dpu_schedule(const unsigned int n_procesors,
                                         const std::vector<CyclesInterfaceType>& tasks_cost,
                                         const CyclesInterfaceType runtime_overhead) {
-    const auto initializer = std::vector<CyclesInterfaceType>(n_procesors, 0);
     // MIN priority queue, one element per processor, minimum used processor first.
     auto queue = std::priority_queue<CyclesInterfaceType, std::vector<CyclesInterfaceType>,
-                                     std::greater<CyclesInterfaceType>>(initializer.begin(), initializer.end());
+                                     std::greater<CyclesInterfaceType>>(
+            std::greater<CyclesInterfaceType>{}, std::vector<CyclesInterfaceType>(n_procesors, 0));
 
     for (const auto& cost : tasks_cost) {
         const CyclesInterfaceType smallest_time = queue.top();

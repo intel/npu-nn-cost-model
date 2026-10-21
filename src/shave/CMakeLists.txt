@@ -111,7 +111,7 @@ function(GENERATE_SHV_INITIALIZER_NPU40 kernel_type kernel_name slope intercept 
     if(ARGC EQUAL 12)
         # use the passed params
     else()
-        message(FATAL_ERROR "Wrong number of parameters in GENERATE_SHV_INITIALIZER function: ${ARGC} instead of  11 , \n ${ARGV}")
+        message(FATAL_ERROR "Wrong number of parameters in GENERATE_SHV_INITIALIZER function: ${ARGC} instead of  12 , \n ${ARGV}")
     endif()
 
     set(data_type "DataType::FLOAT16")
@@ -196,11 +196,11 @@ set(P2 "SHAVE_V40.inl")
 PARSE_CSV( ${P1} ${P2} "Shave NPU40 WIP")
 
 # New heuristic models parser
-function(GENERATE_HEURISTIC_INITIALIZER kernel_name arith_ops mem_ops unaligned bw_derate code_derate scalar_cost entry_cost simple_heuristic)
-    if(ARGC EQUAL 9)
+function(GENERATE_HEURISTIC_INITIALIZER kernel_name arith_ops mem_ops unaligned bw_derate code_derate scalar_cost entry_cost simple_heuristic DPU_frequency SHV_frequency)
+    if(ARGC EQUAL 11)
         # use the passed params
     else()
-        message(FATAL_ERROR "Wrong number of parameters in GENERATE_HEURISTIC_INITIALIZER function: ${ARGC} instead of 9")
+        message(FATAL_ERROR "Wrong number of parameters in GENERATE_HEURISTIC_INITIALIZER function: ${ARGC} instead of 11")
     endif()
 
     # Check if simple_heuristic flag is 1
@@ -229,7 +229,7 @@ function(GENERATE_HEURISTIC_INITIALIZER kernel_name arith_ops mem_ops unaligned 
             endif()
         endif()
         
-        set(ADD_LINE "AddSimpleHeuristic(${params})\;  // simple_heuristic")
+        set(ADD_LINE "AddSimpleHeuristic<${DPU_frequency}, ${SHV_frequency}>(${params})\;  // simple_heuristic")
     else()
         # Generate AddRooflineModel call
         set(params "\"${kernel_name}\"")
@@ -280,13 +280,13 @@ function(GENERATE_HEURISTIC_INITIALIZER kernel_name arith_ops mem_ops unaligned 
             endif()
         endif()
         
-        set(ADD_LINE "AddRooflineModel(${params})\;  // roofline")
+        set(ADD_LINE "AddRooflineModel<${DPU_frequency}, ${SHV_frequency}>(${params})\;  // roofline")
     endif()
     
     set(LIST_HEURISTIC_INITIALIZER "${LIST_HEURISTIC_INITIALIZER}${ADD_LINE} \n " PARENT_SCOPE)
 endfunction()
 
-function(PARSE_HEURISTIC_CSV csv_file inl_out_file info)
+function(PARSE_HEURISTIC_CSV csv_file inl_out_file info DPU_frequency SHV_frequency)
     message(STATUS "\n >> Starting to generate heuristic initializer for ${info}")
     message(STATUS "\n >> PARAMS:\n csv_file: " ${csv_file} "\n inl_out_file: " ${inl_out_file} "\n info: " ${info})
 
@@ -316,8 +316,9 @@ function(PARSE_HEURISTIC_CSV csv_file inl_out_file info)
             set(entry_cost "${CMAKE_MATCH_8}")
             set(simple_heuristic "${CMAKE_MATCH_9}")
             
-            GENERATE_HEURISTIC_INITIALIZER("${kernel_name}" "${arith_ops}" "${mem_ops}" "${unaligned}" 
-                                          "${bw_derate}" "${code_derate}" "${scalar_cost}" "${entry_cost}" "${simple_heuristic}")
+            GENERATE_HEURISTIC_INITIALIZER("${kernel_name}" "${arith_ops}" "${mem_ops}" "${unaligned}"
+                                          "${bw_derate}" "${code_derate}" "${scalar_cost}" "${entry_cost}"
+                                          "${simple_heuristic}" "${DPU_frequency}" "${SHV_frequency}")
         endif()
     endforeach()
 
@@ -327,9 +328,14 @@ function(PARSE_HEURISTIC_CSV csv_file inl_out_file info)
 endfunction()
 
 # Parse the heuristic CSV file
+# DPU_frequency and SHV_frequency are compile-time parameters for the
+# generated heuristic models and must match dpu_freq_clk and cmx_freq_clk in the corresponding
+# device_HW_characteristics_VPU*.h. Update both locations for a device in the same change, then
+# reconfigure so the generated .inl is refreshed. Verify the update with
+# ShaveDevicesTest.HeuristicSelectorNominalFrequenciesMatchHWCharacteristics, which checks all mapped devices.
 set(P1 "shave_layers_heuristic_npu5.csv")
 set(P2 "shave_heuristic_npu5.inl")
-PARSE_HEURISTIC_CSV(${P1} ${P2} "Shave Heuristic Models NPU5")
+PARSE_HEURISTIC_CSV(${P1} ${P2} "Shave Heuristic Models NPU5" 1950 1114)
 
 # shave library for new cpps
 if(VPUNN_BUILD_SHARED_LIB)
@@ -349,6 +355,7 @@ target_sources(vpunn_shave
     PRIVATE 
         shave_cache.cpp
         shave_collection.cpp # for shared builds
+        shave_devices.cpp
 )
 
 target_link_libraries(vpunn_shave

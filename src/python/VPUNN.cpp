@@ -215,8 +215,16 @@ PYBIND11_MODULE(_VPUNN, m) {
 
     // VPUCostModel class - only DPUMsg method
     py::class_<VPUNN::VPUCostModel>(m, "VPUCostModel")
-        .def(py::init<>())
-        .def(py::init<const std::string&>(), py::arg("model_path"))
+        .def(py::init<VPUNN::VPUDevice, const std::string&, bool, const unsigned int, const unsigned int,
+                      const std::string&, const std::string&, bool>(),
+             py::arg("device") = VPUNN::VPUDevice::__size,
+             py::arg("model_path") = "",
+             py::arg("profile") = false,
+             py::arg("cache_size") = 16384,
+             py::arg("batch_size") = 1,
+             py::arg("dpu_cache_filename") = "",
+             py::arg("shave_cache_filename") = "",
+             py::arg("try_to_load_paired_cache") = false)
         .def("DPUMsg", &VPUNN::VPUCostModel::DPUMsg, 
              "Calculate DPU cost and return cycles with error message",
              py::arg("workload"))

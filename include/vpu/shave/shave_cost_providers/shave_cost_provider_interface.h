@@ -6,8 +6,8 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#ifndef SHAVE_COST_PROVIDER_INTERFACE_H
-#define SHAVE_COST_PROVIDER_INTERFACE_H
+#ifndef VPUNN_SHAVE_COST_PROVIDER_INTERFACE_H
+#define VPUNN_SHAVE_COST_PROVIDER_INTERFACE_H
 
 #include <functional>
 #include <memory>
@@ -15,16 +15,15 @@
 #include <string>
 #include <vector>
 
-#include "vpu/shave_workload.h"
 #include "vpu/cycles_interface_types.h"
 #include "vpu/shave/shave_op_executors.h"
-
+#include "vpu/shave_workload.h"
 
 namespace VPUNN {
 
 /**
  * @brief Interface for SHAVE cost providers
- * 
+ *
  * This interface defines the contract for classes that provide cost estimation
  * for SHAVE workloads. Implementations of this interface should provide
  * specific algorithms or models for calculating the execution cost of
@@ -39,16 +38,16 @@ public:
 
     /**
      * @brief Calculate the execution cost for a SHAVE workload
-     * 
+     *
      * This pure virtual function must be implemented by derived classes to
      * provide cost estimation for the given SHAVE workload. The cost is
      * typically measured in cycles or other performance metrics.
-     * 
+     *
      * @param workload The SHAVE workload for which to calculate the cost
      * @param cost_source The source of cost under a string to be put in serializer
      * @return CyclesInterfaceType The estimated execution cost/cycles for the workload
      */
-    
+
     virtual CyclesInterfaceType get_cost(const SHAVEWorkload& workload, std::string* cost_source = nullptr) const = 0;
 
     /// @brief Get the maximum number of parameters across all SHAVE functions
@@ -62,8 +61,7 @@ public:
      */
     virtual std::vector<std::string> get_shave_supported_ops(VPUDevice& device) const = 0;
 
-
-    /** 
+    /**
      * @brief provides a reference to the operator executor specified by name
      * The executor can be used to execute (run) the runtime prediction on different tensors/parameters
      * Or can be asked to print information about its implementation parameters
@@ -72,9 +70,14 @@ public:
      * @param device name
      * @returns a ref (no ownership transfered. exists as long as this VPUCostModel instance exists)
      */
-    virtual std::optional<std::reference_wrapper<const ShaveOpExecutor>> get_shave_instance(const std::string& name, VPUDevice& device) const = 0;
-
+    virtual std::optional<std::reference_wrapper<const ShaveOpExecutor>> get_shave_instance(
+            const std::string& name, VPUDevice& device) const = 0;
 };
+
+
+/// @brief Type alias for a shared pointer to a constant IShaveCostProvider instance. This allows for shared ownership
+/// of the cost provider while ensuring that the underlying object cannot be modified through this pointer.
+using Shared_IShaveCostProvider = std::shared_ptr<const IShaveCostProvider>;
 
 /**
  * @brief Type alias for a list of SHAVE cost providers.
@@ -82,7 +85,7 @@ public:
  * If we are going to add a different way to composite the Providers we can
  * simply share the references.
  */
-using ShaveCostProviderList = std::vector<std::shared_ptr<IShaveCostProvider>>;
+using ShaveCostProviderList = std::vector<Shared_IShaveCostProvider>;
 
 }  // namespace VPUNN
-#endif  // SHAVE_COST_PROVIDER_INTERFACE_H
+#endif  // VPUNN_SHAVE_COST_PROVIDER_INTERFACE_H

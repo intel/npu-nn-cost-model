@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef INTERFACE_SHAVE_OP_EXECUTOR_H
-#define INTERFACE_SHAVE_OP_EXECUTOR_H
+#ifndef VPUNN_INTERFACE_SHAVE_OP_EXECUTOR_H
+#define VPUNN_INTERFACE_SHAVE_OP_EXECUTOR_H
 
 #include "vpu/cycles_interface_types.h"
 #include "vpu/types.h"
@@ -75,4 +75,4 @@ public:  // extended interface
 };
 
 }  // namespace VPUNN
-#endif
+#endif  // VPUNN_INTERFACE_SHAVE_OP_EXECUTOR_H

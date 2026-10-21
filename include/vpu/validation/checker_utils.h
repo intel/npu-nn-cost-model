@@ -57,8 +57,12 @@ public:
     void add_check_failed(const std::string& info) {
         clean_status = false;  // at least one problem
 
-        if (Checker::print_tags) {
-            acc_findings += ("\n[CHECK FAILED]: " + info + " [END CHECK]");
+        if (!acc_findings.empty()) {
+            acc_findings += "; ";
+        }
+
+        if (Checker::print_tags && info.find("[CHECK FAILED]") == std::string::npos) {
+            acc_findings += ("[CHECK FAILED]: " + info + " [END CHECK]");
         } else {
             acc_findings += info;
         }
@@ -119,8 +123,8 @@ public:
 
         if (!belongs) {
             std::stringstream buffer;
-            buffer << what << " with value: " << Show<T>::show_value(item) << " is not found in interval: [ "
-                   << interval.first << " , " << interval.second << " ]";
+            buffer << what << " with value: " << Show<T>::show_value(item) << " is not found in interval: ["
+                   << interval.first << ", " << interval.second << "]";
             const std::string details = buffer.str();
 
             add_check_failed(details);

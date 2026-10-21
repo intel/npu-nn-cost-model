@@ -11,6 +11,7 @@
 #include "vpu/shave/shave_op_executors.h"
 
 #include "common/common_helpers.h"
+#include "vpu/performance.h"
 #include "vpu/shave/shave_collection.h"
 #include "vpu/shave/shave_cost_providers/shave_cost_providers.h"
 #include "vpu/shave/shave_devices.h"
@@ -22,6 +23,7 @@
 #include "vpu/shave/generated_shave_factors_population_heuristic.h"
 #include "vpu/shave/generated_shave_factors_population_npu5.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 
@@ -980,8 +982,8 @@ TEST_F(ShaveCollectionTest, NPU5FactorsEquivalentToGetSelector) {
     size_t tests_total = 0;
 
     for (const auto& fn : available_functions) {
-        const auto& shave_op_no_factors = selector_no_factors.getShaveFuntion(fn);
-        const auto& shave_op_with_factors = selector_with_factors.getShaveFuntion(fn);
+        const auto& shave_op_no_factors = selector_no_factors.getShaveFunction(fn);
+        const auto& shave_op_with_factors = selector_with_factors.getShaveFunction(fn);
 
         for (const auto& [w, h, c, b] : test_shapes) {
             SHAVEWorkload swl(fn, VPUDevice::NPU_5_0, {VPUTensor(w, h, c, b, DataType::FLOAT16)},
@@ -1391,6 +1393,109 @@ TEST_F(ShaveDevicesTest, config_Smoke) {
     // empty_shavesB = empty_shavesC;
 
     // DeviceShaveContainer empty_shavesD{empty_shavesB};
+}
+
+TEST_F(ShaveDevicesTest, HeuristicSelectorsForEnabledNPUDevicesArePopulated) {
+    // Devices that are intentionally unmapped in this build configuration.
+    // Keep this list macro-driven so mapped devices are still validated and
+    // newly added mapped NPU enum values fail fast if not wired.
+    const auto known_unmapped = []() {
+        std::vector<VPUDevice> devices;
+        devices.push_back(VPUDevice::NPU_RESERVED);
+        devices.push_back(VPUDevice::NPU_RESERVED_1);
+        return devices;
+    }();
+
+    const auto is_known_unmapped = [&known_unmapped](const VPUDevice d) {
+        return std::find(known_unmapped.begin(), known_unmapped.end(), d) != known_unmapped.end();
+    };
+
+    ShaveConfiguration shave_config;
+    int mapped_devices_checked = 0;
+
+    for (int d = static_cast<int>(VPUDevice::NPU_5_0); d < static_cast<int>(VPUDevice::__size); ++d) {
+        const auto device = static_cast<VPUDevice>(d);
+        const auto& selector = shave_config.getHeuristicSelector(device);
+        const auto available = selector.getShaveList();
+
+        if (is_known_unmapped(device)) {
+            EXPECT_TRUE(available.empty())
+                    << "Expected heuristic selector to be empty for known unmapped device " << static_cast<int>(device);
+            continue;
+        }
+
+        ASSERT_FALSE(available.empty()) << "Heuristic selector is empty for device " << static_cast<int>(device);
+        mapped_devices_checked++;
+
+        const auto& fn = available.front();
+        const auto& shave_op = selector.getShaveFunction(fn);
+
+        SHAVEWorkload swl(fn, device, {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                          {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)});
+
+        const auto cycles = shave_op.dpuCycles(swl);
+        EXPECT_GT(cycles, 0u) << "Expected non-zero cost for heuristic op " << fn;
+        EXPECT_LT(cycles, V(Cycles::START_ERROR_RANGE))
+                << "Expected non-error cost for heuristic op " << fn << " on device " << static_cast<int>(device);
+    }
+
+    EXPECT_GT(mapped_devices_checked, 0)
+            << "No mapped NPU heuristic devices were validated; check embargo/device configuration";
+}
+
+TEST_F(ShaveDevicesTest, HeuristicSelectorNominalFrequenciesMatchHWCharacteristics) {
+    const auto known_unmapped = []() {
+        std::vector<VPUDevice> devices;
+        devices.push_back(VPUDevice::NPU_RESERVED);
+        devices.push_back(VPUDevice::NPU_RESERVED_1);
+        return devices;
+    }();
+
+    const auto is_known_unmapped = [&known_unmapped](const VPUDevice d) {
+        return std::find(known_unmapped.begin(), known_unmapped.end(), d) != known_unmapped.end();
+    };
+
+    ShaveConfiguration shave_config;
+    int mapped_devices_checked = 0;
+
+    for (int d = static_cast<int>(VPUDevice::NPU_5_0); d < static_cast<int>(VPUDevice::__size); ++d) {
+        const auto device = static_cast<VPUDevice>(d);
+        const auto& selector = shave_config.getHeuristicSelector(device);
+        const auto available = selector.getShaveList();
+
+        if (is_known_unmapped(device)) {
+            EXPECT_TRUE(available.empty())
+                    << "Expected heuristic selector to be empty for known unmapped device " << static_cast<int>(device);
+            continue;
+        }
+
+        ASSERT_FALSE(available.empty()) << "Heuristic selector is empty for device " << static_cast<int>(device);
+        mapped_devices_checked++;
+
+        // NPU_5_0_W forwards to the legacy old selector, not the heuristic selector, so it's not relevant
+        if (device == VPUDevice::NPU_5_0_W)
+            continue;
+
+        const int expected_dpu_freq = static_cast<int>(GlobalHarwdwareCharacteristics::get_dpu_fclk(device));
+        const int expected_shv_freq = static_cast<int>(GlobalHarwdwareCharacteristics::get_cmx_fclk(device));
+
+        for (const auto& fn : available) {
+            const auto& shave_op = selector.getShaveFunction(fn);
+
+            SHAVEWorkload swl(fn, device, {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                              {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)});
+
+            const auto implicit_nominal = shave_op.dpuCycles(swl);
+            const auto explicit_hw_nominal = shave_op.dpuCycles(swl, expected_dpu_freq, expected_shv_freq);
+
+            EXPECT_EQ(implicit_nominal, explicit_hw_nominal)
+                    << "Heuristic nominal frequency mismatch for op " << fn << " on device " << static_cast<int>(device)
+                    << " expected DPU/SHV=" << expected_dpu_freq << "/" << expected_shv_freq;
+        }
+    }
+
+    EXPECT_GT(mapped_devices_checked, 0)
+            << "No mapped NPU heuristic devices were validated; check embargo/device configuration";
 }
 
 class ShaveModelSweepTest : public ::testing::Test {

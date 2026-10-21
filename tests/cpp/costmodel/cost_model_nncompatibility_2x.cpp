@@ -56,7 +56,7 @@ protected:
 
     const float epsilon{0.01F};
 
-    VPUNN::VPUCostModel ideal_model{""};  // model without NN, output is interface 1-hw overhead
+    VPUNN::VPUCostModel ideal_model{VPUNN::VPUDevice::__size, ""};  // model without NN, output is interface 1-hw overhead
     const IEnergy& my_energy_ideal_model = ideal_model.getEnergyInterface();
     const HWPerformanceModel& performance_ideal_model{ideal_model.getPerformanceModel()};
 
@@ -93,7 +93,8 @@ TEST_F(TestNNModelCompatibilityVPU2x, Ideal_Empty_Model) {
 
 /// Test VPU2.0 exists, this version is using hw_overhead which is deprecated
 TEST_F(TestNNModelCompatibilityVPU2x, VPU20_default_01) {
-    EXPECT_THROW(VPUNN::VPUCostModel vpunn_model{VPU20_default_}, std::runtime_error);
+    auto construct_vpu20_default = [&]() { VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_0, VPU20_default_}; };
+    EXPECT_THROW(construct_vpu20_default(), std::runtime_error);
 
     // making sure that the error came from the output version:
     const VPUNN::Runtime vpunn_runtime(VPU20_default_);
@@ -108,7 +109,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU20_default_01) {
 
     // checking error message to contain key words:
     try {
-        VPUNN::VPUCostModel vpunn_model{VPU20_default_};
+        VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_0, VPU20_default_};
     } catch (const std::exception& e) {
         std::string err_message = e.what();
         EXPECT_TRUE((err_message.find("Cannot load/handle Models output version. The output version", 0) !=
@@ -118,7 +119,8 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU20_default_01) {
 
 /// Test VPU2.7 1 exists, this version is using hw_overhead which is deprecated
 TEST_F(TestNNModelCompatibilityVPU2x, VPU27_default_01) {
-    EXPECT_THROW(VPUNN::VPUCostModel vpunn_model{VPU27_default_}, std::runtime_error);
+        auto construct_vpu27_default = [&]() { VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_7, VPU27_default_}; };
+        EXPECT_THROW(construct_vpu27_default(), std::runtime_error);
 
     // making sure that the error came from the output version:
     const VPUNN::Runtime vpunn_runtime(VPU27_default_);
@@ -133,7 +135,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU27_default_01) {
 
     // checking error message to contain key words:
     try {
-        VPUNN::VPUCostModel vpunn_model{VPU27_default_};
+        VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_7, VPU27_default_};
     } catch (const std::exception& e) {
         std::string err_message = e.what();
         EXPECT_TRUE((err_message.find("Cannot load/handle Models output version. The output version", 0) !=
@@ -144,7 +146,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU27_default_01) {
 /// Test VPU2.7 v 10 exists
 TEST_F(TestNNModelCompatibilityVPU2x, VPU_10_2) {
     VPUNN::DPUWorkload wl{wl_27};
-    VPUNN::VPUCostModel vpunn_model{VPU27_10_2_};
+    VPUNN::VPUCostModel vpunn_model{VPUNN::VPUDevice::VPU_2_7, VPU27_10_2_};
     const IEnergy& my_energy = vpunn_model.getEnergyInterface();
     ASSERT_TRUE(vpunn_model.nn_initialized())
             << "Model not loaded, might be due to file location: " << VPU27_10_2_ << std::endl;
@@ -179,7 +181,7 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU_10_2) {
 /// Test VPU2.7 v 11 exists
 TEST_F(TestNNModelCompatibilityVPU2x, VPU_11_2) {
     VPUNN::DPUWorkload wl{wl_27};
-    VPUNN::VPUCostModel vpunn_model{VPU27_11_2_};
+    VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_7, VPU27_11_2_};
     const IEnergy& my_energy = vpunn_model.getEnergyInterface();
     ASSERT_TRUE(vpunn_model.nn_initialized())
             << "Model not loaded, might be due to file location: " << VPU27_11_2_ << std::endl;

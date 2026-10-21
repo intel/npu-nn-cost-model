@@ -18,6 +18,9 @@ add_subdirectory(shave)
 add_subdirectory(schema)
 add_subdirectory(vpu)
 
+# Ensure SHAVE sources that include persistent cache headers wait for generated schema headers.
+add_dependencies(vpunn_shave vpunn_cpp_schema)
+
 if(VPUNN_HTTP_CLIENT_AVAILABLE)
     add_subdirectory(http_client)
 endif()

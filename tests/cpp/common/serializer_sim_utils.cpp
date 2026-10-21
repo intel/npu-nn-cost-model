@@ -204,8 +204,8 @@ public:
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
-        VPUCostModel model_4_0_mock{modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
-        VPUCostModel model_4_0_Post8{modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
+        VPUCostModel model_4_0_mock{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
+        VPUCostModel model_4_0_Post8{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
 
         EXPECT_TRUE(model_4_0_mock.nn_initialized());
         EXPECT_TRUE(model_4_0_Post8.nn_initialized());
@@ -285,8 +285,8 @@ public:
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
-        VPUCostModel model_4_0_mock{modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
-        VPUCostModel model_4_0_Post8{modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
+        VPUCostModel model_4_0_mock{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
+        VPUCostModel model_4_0_Post8{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
 
         EXPECT_TRUE(model_4_0_mock.nn_initialized());
         EXPECT_TRUE(model_4_0_Post8.nn_initialized());
@@ -371,9 +371,9 @@ public:
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
-        VPUCostModel model_4_0_mock{modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
-        VPUCostModel model_4_0_Post6{modelsRoot + "vpu_4_0_post6.vpunn"};
-        VPUCostModel model_4_0_Post8{modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
+        VPUCostModel model_4_0_mock{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
+        VPUCostModel model_4_0_Post6{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0_post6.vpunn"};
+        VPUCostModel model_4_0_Post8{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
 
         EXPECT_TRUE(model_4_0_mock.nn_initialized());
         EXPECT_TRUE(model_4_0_Post6.nn_initialized());
@@ -604,9 +604,9 @@ public:
             EXPECT_TRUE(serializer_out.is_initialized());
         }
 
-        VPUCostModel model_4_0_mock{modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
-        VPUCostModel model_4_0_Post6{modelsRoot + "vpu_4_0_post6.vpunn"};
-        VPUCostModel model_4_0_Post8{modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
+        VPUCostModel model_4_0_mock{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0_cloned_from27.vpunn"};
+        VPUCostModel model_4_0_Post6{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0_post6.vpunn"};
+        VPUCostModel model_4_0_Post8{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0-LucaPost8.vpunn"};
 
         EXPECT_TRUE(model_4_0_mock.nn_initialized());
         EXPECT_TRUE(model_4_0_Post6.nn_initialized());
@@ -696,14 +696,14 @@ public:
     }
 
     std::array<VPUCostModel, 6> the_models{
-            VPUCostModel{modelsRoot + "vpu_4_0-LucaPost8.vpunn"},  //
-            VPUCostModel{modelsRoot + "vpu_4_0_8192.vpunn"},       //
+            VPUCostModel{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0-LucaPost8.vpunn"},  //
+            VPUCostModel{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_4_0_8192.vpunn"},       //
 
-            VPUCostModel{modelsRoot + "vpu_40_159.vpunn"},       //
-            VPUCostModel{modelsRoot + "vpu_40_159.fast.vpunn"},  //
+            VPUCostModel{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_40_159.vpunn"},       //
+            VPUCostModel{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_40_159.fast.vpunn"},  //
 
-            VPUCostModel{modelsRoot + "vpu_40_159_strict.vpunn"},       //
-            VPUCostModel{modelsRoot + "vpu_40_159_strict.fast.vpunn"},  //
+            VPUCostModel{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_40_159_strict.vpunn"},       //
+            VPUCostModel{VPUNN::VPUDevice::VPU_4_0, modelsRoot + "vpu_40_159_strict.fast.vpunn"},  //
 
             // VPUCostModel{modelsRoot + "\\runs\\MSPE_512\\model.vpunn"},      //
             // VPUCostModel{modelsRoot + "\\runs\\MSPE_512\\model_max.vpunn"},  //

@@ -32,8 +32,8 @@ public:
 protected:
     void SetUp() override {
     }
-    VPUNN::VPUCostModel small_cache_model{std::string(""), false, 10};
-    VPUNN::VPUCostModel no_cache_model{std::string(""), false, 0};
+    VPUNN::VPUCostModel small_cache_model{VPUNN::VPUDevice::__size, std::string(""), false, 10};
+    VPUNN::VPUCostModel no_cache_model{VPUNN::VPUDevice::__size, std::string(""), false, 0};
 
     using DPU_LRU_Cache = LRUCache<std::vector<float>, float>;  ///< DPU Cache, ex LRUCache of float
 };
@@ -227,18 +227,18 @@ protected:
 
     const std::string cache_file_40{
             (std::filesystem::path{VPU_4_0_MODEL_PATH}).replace_extension("cache_bin").string()};
-    const VPUCostModel model_40{VPU_4_0_MODEL_PATH};  // default 4 model
-    Preprocessing_Interface4011<float> pp_4011;       // used interface where we have cache
+    const VPUCostModel model_40{VPUNN::VPUDevice::VPU_4_0, VPU_4_0_MODEL_PATH};  // default 4 model
+    Preprocessing_Interface4011<float> pp_4011;                                  // used interface where we have cache
 
     const std::string cache_file_41{
             (std::filesystem::path{VPU_4_1_MODEL_PATH}).replace_extension("cache_bin").string()};
-    const VPUCostModel model_41{VPU_4_1_MODEL_PATH};  // default 4 model
-    Preprocessing_Interface4111<float> pp_4111;       // used interface where we have cache
+    const VPUCostModel model_41{VPUNN::VPUDevice::VPU_4_0, VPU_4_1_MODEL_PATH};  // default 4 model
+    Preprocessing_Interface4111<float> pp_4111;                                  // used interface where we have cache
 
     const size_t size_of_descriptor_INterface11{pp_4011.output_size()};  // same for all 11
 
     const std::string cache_file_51{(std::filesystem::path{NPU_5_0_MODEL_PATH}).replace_extension("cachebin").string()};
-    const VPUCostModel model_51{NPU_5_0_MODEL_PATH};
+    const VPUCostModel model_51{VPUNN::VPUDevice::NPU_5_0, NPU_5_0_MODEL_PATH};
     Preprocessing_Interface14<float> pp_5014;  // used interface where we have cache
     const size_t size_of_descriptor_INterface14{pp_5014.output_size()};
 
@@ -1262,7 +1262,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
-    VPUCostModel model_active_cache{cache_file_now.string()};
+    VPUDevice device{normalConfig.sanitizerModel.getModelDevice()};
+    VPUCostModel model_active_cache{device, cache_file_now.string()};
 
     FixedCache the_cache{""};
     EXPECT_TRUE(the_cache.read_cache(cache_file_now.string()));
@@ -1359,7 +1360,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
-    VPUCostModel model_active_cache{normalConfig.NN_CM_to_use, cache_file_now.string(), "" /*shavecache*/};
+    VPUDevice device{normalConfig.sanitizerModel.getModelDevice()};
+    VPUCostModel model_active_cache{device, normalConfig.NN_CM_to_use, cache_file_now.string(), "" /*shavecache*/};
 
     FixedCache the_cache{""};
     EXPECT_TRUE(the_cache.read_cache(cache_file_now.string()));

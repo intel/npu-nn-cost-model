@@ -563,4 +563,40 @@ TEST_F(ShaveMVN6Test, Template_getDPUCycles_specialisation) {
         // EXPECT_NE(cycles2, cycles3);
     }
 }
+
+// DPU Cycles Unit Contract Tests: ShaveCyclesProvider models
+TEST_F(ShaveModel1to1Test, DPUCyclesNominalFreqsConsistency) {
+    // Verify getDPUCycles() matches getDPUCyclesAnotherFreqDPU_SHV with nominal freqs
+    // This ensures both paths use the same underlying conversion
+    const int output_size_bytes = 2112;
+    auto cycles_nominal = modelUnroll16.getDPUCycles(output_size_bytes);
+    auto cycles_at_nominal = modelUnroll16.getDPUCyclesAnotherFreqDPU_SHV(
+        modelUnroll16.getNominalDPUFrq(), modelUnroll16.getNominalSHVFrq(), output_size_bytes);
+    
+    EXPECT_EQ(cycles_nominal, cycles_at_nominal) << "Nominal frequency paths should match";
+}
+
+TEST_F(ShaveModel1to1Test, DPUCyclesFrequencyScaling) {
+    // Verify ShaveCyclesProvider frequency scaling is physically correct
+    // Higher DPU freq (same SHAVE freq and microseconds work) gives more DPU cycles
+    const int output_size_bytes = 2112;
+    auto cycles_1000mhz = modelUnroll16.getDPUCyclesAnotherFreqDPU_SHV(1000, 1000, output_size_bytes);
+    auto cycles_2000mhz = modelUnroll16.getDPUCyclesAnotherFreqDPU_SHV(2000, 1000, output_size_bytes);
+    
+    EXPECT_GT(cycles_2000mhz, cycles_1000mhz) << "Higher freq should give more DPU cycles";
+    double ratio = static_cast<double>(cycles_2000mhz) / static_cast<double>(cycles_1000mhz);
+    EXPECT_NEAR(ratio, 2.0, 0.01) << "Frequency ratio should be approximately 2.0";
+}
+
+TEST_F(ShaveModel1to1Test, DPUCyclesMagnitudeReasonable) {
+    // Verify DPU cycles are in physically reasonable range (not in microseconds)
+    const int output_size_bytes = 2112;
+    auto cycles = modelUnroll16.getDPUCyclesAnotherFreqDPU_SHV(1950, 1114, output_size_bytes);
+    
+    // For 2112 bytes on NPU5 (1950 MHz DPU), should be in range [10, 10000] DPU cycles
+    // (not in microseconds like 2.5)
+    EXPECT_GT(cycles, 10) << "DPU cycles should be > 10 for reasonable workload";
+    EXPECT_LT(cycles, 10000) << "DPU cycles should be < 10000 for reasonable workload";
+}
+
 }  // namespace VPUNN_unit_tests

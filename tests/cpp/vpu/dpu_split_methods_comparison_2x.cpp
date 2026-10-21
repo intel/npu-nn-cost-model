@@ -22,7 +22,7 @@ using namespace VPUNN;
 class TestSplitMethodsComparisonsVPU2x : public ::testing::Test {
 public:
 protected:
-    VPUNN::VPUCostModel model_2_7{VPU_2_7_MODEL_PATH};
+    VPUNN::VPUCostModel model_2_7{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
     std::string info{};
 
     float strategy_scale = 1.0f;  // adjust SOK/SOH valued by this

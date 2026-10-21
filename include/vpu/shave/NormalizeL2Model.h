@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVEMODELNORMALIZEL2_H
-#define SHAVEMODELNORMALIZEL2_H
+#ifndef VPUNN_SHAVEMODELNORMALIZEL2_H
+#define VPUNN_SHAVEMODELNORMALIZEL2_H
 
 #include <iostream>
 #include <list>
@@ -130,4 +130,4 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::NormalizeL2On
 
 }  // namespace VPUNN
 
-#endif /* SHAVEMODEL1to1_H*/
+#endif // VPUNN_SHAVEMODELNORMALIZEL2_H

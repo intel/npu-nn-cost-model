@@ -34,7 +34,7 @@ using namespace VPUNN;
 class TestDCIMCostModel : public ::testing::Test {
 public:
 protected:
-    VPUCostModel model{};  // empty model
+    VPUCostModel model{VPUNN::VPUDevice::__size, ""};  // empty model
     // Global model for all dcim tests
     ModelMap<VPUCostModel> dcim_cost_models{""};
 

@@ -576,18 +576,20 @@ public:
         }
         std::string all_failed_message{""};
         std::string one_range_message{""};
+        bool checked_any_range{false};
         for (size_t i = 0; i < ranges.size(); ++i) {
             if (mask[i]) {
+                checked_any_range = true;
                 if (ranges[i].is_in(value, one_range_message)) {
                     // at least one match found, no message needed
                     return true;  // at least one match found,  EXIT
                 } else {
                     // accumulate messages for all failed ranges
-                    all_failed_message += " Range " + std::to_string(i) + " check failed: " + one_range_message + "\n";
+                    all_failed_message += " Range " + std::to_string(i) + " check failed: " + one_range_message;
                 }
             }
         }
-        text = std::move(all_failed_message);  // all failed ranges
+        text = checked_any_range ? std::move(all_failed_message) : "No ranges specified";
         return false;                          // no match found
     }
 

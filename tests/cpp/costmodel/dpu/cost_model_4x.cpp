@@ -94,7 +94,7 @@ TEST_F(TestCostModelNPU4x, Test_Serializer_for_DPU_vec_function) {
 
     std::vector<VPUNN::DPUWorkload> workloads = {std::move(wl0), std::move(wl1), std::move(wl2)};
 
-    VPUNN::VPUCostModel model_path{VPU_4_0_MODEL_PATH};
+    VPUNN::VPUCostModel model_path{device, VPU_4_0_MODEL_PATH};
 
     // run all in one vector
     std::vector<VPUNN::CyclesInterfaceType> cycles;
@@ -112,7 +112,7 @@ TEST_F(TestCostModelNPU4x, Test_Serializer_for_DPU_function) {
             {1, 1, 1, 1},                                               // padding
             VPUNN::ExecutionMode::CUBOID_16x16                          // execution mode
     };
-    VPUNN::VPUCostModel model40{VPU_4_0_MODEL_PATH};
+    VPUNN::VPUCostModel model40{device, VPU_4_0_MODEL_PATH};
     EXPECT_TRUE(model40.nn_initialized());
 
     auto cycles = model40.DPU(std::move(wl));
@@ -133,7 +133,7 @@ TEST_F(TestCostModelNPU4x, Test_Serializer_for_NNCostProvider) {
 
     // uncomment to generate the csv from NNCostProvider
     // set_env_var("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION", "TRUE");
-    VPUNN::VPUCostModel model40{VPU_4_0_MODEL_PATH};
+    VPUNN::VPUCostModel model40{device, VPU_4_0_MODEL_PATH};
     EXPECT_TRUE(model40.nn_initialized());
 
     auto cycles = model40.DPU(std::move(wl));
@@ -147,18 +147,18 @@ TEST_F(TestCostModelNPU4x, Mock_Legacy159_40_DPU) {
     const std::filesystem::path stricti89_02Ver{std::filesystem::path(models_root) /= "vpu_40_159_strict.vpunn"};
     const std::filesystem::path i11_02Ver{std::filesystem::path(std::move(models_root)) /= "vpu_40_159.vpunn"};
     {
-        VPUNN::VPUCostModel model_strict{stricti89_02Ver.string()};
+        VPUNN::VPUCostModel model_strict{VPUDevice::VPU_4_0, stricti89_02Ver.string()};
         EXPECT_TRUE(model_strict.nn_initialized());
     }
     {
-        VPUNN::VPUCostModel model_Nostrict{i11_02Ver.string()};
+        VPUNN::VPUCostModel model_Nostrict{VPUDevice::VPU_4_0, i11_02Ver.string()};
         EXPECT_TRUE(model_Nostrict.nn_initialized());
     }
 
     {
-        VPUNN::VPUCostModel model_strict{stricti89_02Ver.string()};
+        VPUNN::VPUCostModel model_strict{VPUDevice::VPU_4_0, stricti89_02Ver.string()};
         EXPECT_TRUE(model_strict.nn_initialized());
-        VPUNN::VPUCostModel model_nostrict{i11_02Ver.string()};
+        VPUNN::VPUCostModel model_nostrict{VPUDevice::VPU_4_0, i11_02Ver.string()};
         EXPECT_TRUE(model_nostrict.nn_initialized());
 
         {
@@ -232,7 +232,7 @@ TEST_F(TestCostModelNPU4x, Sanitization_with_stride_and_kernel_0) {
 
     const std::string modelFile{VPU_4_0_MODEL_PATH};
 
-    VPUNN::VPUCostModel test_model{modelFile};
+    VPUNN::VPUCostModel test_model{device, modelFile};
     EXPECT_TRUE(test_model.nn_initialized());
 
     std::string info = "";
@@ -265,7 +265,7 @@ TEST_F(TestCostModelNPU4x, Wl_with_extreme_values) {
 
     const std::string modelFile{VPU_4_0_MODEL_PATH};
 
-    VPUNN::VPUCostModel test_model{modelFile};
+    VPUNN::VPUCostModel test_model{device, modelFile};
     EXPECT_TRUE(test_model.nn_initialized());
 
     std::string info = "";
@@ -686,7 +686,7 @@ TEST_F(TestCostModelNPU4x, DISABLED_Compressed_CONV_EquivPostprocessing_test_VPU
     // const DPUWorkload wl_CMequiv{make_eqiv(wl_CM_4)};
 
     {
-        VPUCostModel model_{VPU_4_0_MODEL_PATH};
+        VPUCostModel model_{device, VPU_4_0_MODEL_PATH};
         const auto [v_in, v_out] = model_.get_NN_cost_provider().getNNVersion();
 
         /* coverity[pass_by_value] */
@@ -833,7 +833,7 @@ TEST_F(TestCostModelNPU4x, DISABLED_Compressed_CONV_EquivPostprocessing_test_VPU
 }
 
 TEST_F(TestCostModelNPU4x, FP32_output_basic) {
-    VPUCostModel crt_model{VPU_4_0_MODEL_PATH};
+    VPUCostModel crt_model{device, VPU_4_0_MODEL_PATH};
 
     const DPUWorkload wl_ref_less{
             device_req,

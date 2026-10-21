@@ -7,8 +7,8 @@
 // Please refer to the third-party-programs.txt or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef GATHERMODEL_H
-#define GATHERMODEL_H
+#ifndef VPUNN_GATHERMODEL_H
+#define VPUNN_GATHERMODEL_H
 
 #include <cmath>
 #include <iostream>
@@ -76,4 +76,4 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::GatherModel& 
 }
 
 }  // namespace VPUNN
-#endif /* SHAVEMODEL1to1_H*/
+#endif  // VPUNN_GATHERMODEL_H

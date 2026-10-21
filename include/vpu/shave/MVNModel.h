@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef MVNMODEL_H
-#define MVNMODEL_H
+#ifndef VPUNN_MVNMODEL_H
+#define VPUNN_MVNMODEL_H
 
 #include <cmath>
 #include <iostream>
@@ -216,4 +216,4 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::MVNSimple2and
 
 }  // namespace VPUNN
 
-#endif /* SHAVEMODEL1to1_H*/
+#endif // VPUNN_MVNMODEL_H

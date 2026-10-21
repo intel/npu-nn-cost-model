@@ -6,8 +6,8 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the "third-party-programs.txt" or other similarly-named text file included with the
 // Software Package for additional details.
-#ifndef COMPOSITE_SHAVE_COST_PROVIDER_H
-#define COMPOSITE_SHAVE_COST_PROVIDER_H
+#ifndef VPUNN_COMPOSITE_SHAVE_COST_PROVIDER_H
+#define VPUNN_COMPOSITE_SHAVE_COST_PROVIDER_H
 
 #include <vpu/shave/shave_cost_providers/shave_cost_provider_interface.h>
 #include <memory>
@@ -37,8 +37,8 @@ namespace VPUNN {
  */
 class CompositeShaveCostProvider : public IShaveCostProvider {
 private:
-    const std::shared_ptr<IShaveCostProvider> default_provider;  ///< Default provider for all operations
-    const std::unordered_map<std::string, std::shared_ptr<IShaveCostProvider>> operation_to_provider;  ///< Maps operation names to specific providers
+    const Shared_IShaveCostProvider default_provider;  ///< Default provider for all operations
+    const std::unordered_map<std::string, Shared_IShaveCostProvider> operation_to_provider;  ///< Maps operation names to specific providers
 
 public:
     /**
@@ -46,7 +46,7 @@ public:
      * 
      * @param default_provider Shared pointer to the default IShaveCostProvider instance
      */
-    explicit CompositeShaveCostProvider(std::shared_ptr<IShaveCostProvider> default_provider)
+    explicit CompositeShaveCostProvider(Shared_IShaveCostProvider default_provider)
         : default_provider(std::move(default_provider)) {
         if (!this->default_provider) {
             throw std::invalid_argument("Default provider cannot be null");
@@ -60,8 +60,8 @@ public:
      * @param op_to_provider_map Map of operation names to specific provider instances
      */
     CompositeShaveCostProvider(
-        std::shared_ptr<IShaveCostProvider> default_provider,
-        std::unordered_map<std::string, std::shared_ptr<IShaveCostProvider>> op_to_provider_map = {})
+                Shared_IShaveCostProvider default_provider,
+                std::unordered_map<std::string, Shared_IShaveCostProvider> op_to_provider_map = {})
         : default_provider(std::move(default_provider)),
           operation_to_provider(std::move(op_to_provider_map)) {
         
@@ -146,4 +146,4 @@ public:
 };
 
 }  // namespace VPUNN
-#endif  // COMPOSITE_SHAVE_COST_PROVIDER_H
+#endif  // VPUNN_COMPOSITE_SHAVE_COST_PROVIDER_H

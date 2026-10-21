@@ -38,12 +38,12 @@ private:
     SHAVE_Workloads_Sanitizer sanitizer;  ///< sanitizes the workload before processing
     mutable CSVSerializer serializer;     ///< serializes workloads to a CSV file
 
-    std::shared_ptr<IShaveCostProvider>
+    Shared_IShaveCostProvider
             ptr_internal_shave_cost_provider;  ///< shared ownership of SHAVE cost provider
                                                ///< Currently is shared in case that in future we decide
                                                ///< to have an internal factory that will create the SHAVECM
                                                ///< it has to be revisited
-    IShaveCostProvider& shave_cost_provider{*ptr_internal_shave_cost_provider};  ///< provides cycles
+    const IShaveCostProvider& shave_cost_provider{*ptr_internal_shave_cost_provider};  ///< provides cycles
 
     std::shared_ptr<const IPrefetchCostStrategy> prefetch_cost_strategy;  ///< standalone prefetch lookup infrastructure
 
@@ -63,9 +63,9 @@ private:
      * Currently returns the device-mapped provider, but can be easily modified to
      * switch to old SHAVE-only provider or other implementations.
      *
-     * @return std::shared_ptr<IShaveCostProvider> The created cost provider
+    * @return Shared_IShaveCostProvider The created cost provider
      */
-    static std::shared_ptr<IShaveCostProvider> createDefaultCostProvider();
+    static Shared_IShaveCostProvider createDefaultCostProvider();
 
     /// @brief Creates the default prefetch strategy.
     static std::shared_ptr<const IPrefetchCostStrategy> createDefaultPrefetchCostStrategy();
@@ -78,12 +78,12 @@ public:
 protected:
     // Constructor with IShaveCostProvider externally provided - to be used in future when we are going to feature a
     // CostModel based on an internal factory
-    explicit SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider,
+    explicit SHAVECostModel(Shared_IShaveCostProvider external_shave_cost_provider,
                             const std::string& cache_filename = "", const unsigned int cache_size = 16384);
 
     // Constructor with IShaveCostProvider externally provided - to be used in future when we are going to feature a
     // CostModel based on an internal factory
-    explicit SHAVECostModel(std::shared_ptr<IShaveCostProvider> external_shave_cost_provider, const char* cache_data,
+    explicit SHAVECostModel(Shared_IShaveCostProvider external_shave_cost_provider, const char* cache_data,
                             size_t cache_data_length, const unsigned int cache_size = 16384);
 
 public:

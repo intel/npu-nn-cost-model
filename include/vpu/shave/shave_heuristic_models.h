@@ -7,12 +7,12 @@
 // Please refer to the "third-party-programs.txt" or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_HEURISTIC_MODELS_H
-#define SHAVE_HEURISTIC_MODELS_H
+#ifndef VPUNN_SHAVE_HEURISTIC_MODELS_H
+#define VPUNN_SHAVE_HEURISTIC_MODELS_H
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <algorithm>
 #include "vpu/cycles_interface_types.h"
 #include "vpu/datatype_collection_size.h"
 #include "vpu/shave/shave_model_basics.h"
@@ -27,16 +27,15 @@ namespace VPUNN {
  * (e.g., interpolate, elementwise gather, gridSample) using a simple 1 element/cycle
  * throughput with derates and entry cost.
  *
- * Cost formula: cycles = entry_cost + (output_elements * cycles_per_element * overall_derate)
- * ATTENTION: Currently this model return SHAVE Cycles only, It will need adaptation to return DPU cycles.
- * Any negative values are handled at ctor level.
+ *  Cost formula: cycles = entry_cost + (output_elements / (elements_per_cycle * code_derate * bw_derate))
+ *  Derates reduce effective throughput, so smaller derate values increase the number of cycles.
  */
-class ShaveSimpleHeuristicModel {
+class ShaveSimpleHeuristicModel : public HeuristicShaveCyclesProvider<ShaveSimpleHeuristicModel> {
 private:
-    const float elements_per_cycle_;         ///< Base cycles per element (default: 1.0)
-    const float code_derate_;                ///< Overall kernel efficiency derate (default: 0.8 for 20% derate)
-    const float bw_derate_;                  ///< Bandwidth derate (default: 0.7 for 30% derate)
-    const float entry_cost_cycles_;          ///< Entry cost in cycles (default: 2000)
+    const float elements_per_cycle_;  ///< Base cycles per element (default: 1.0)
+    const float code_derate_;         ///< Overall kernel efficiency derate (default: 0.8 for 20% derate)
+    const float bw_derate_;           ///< Bandwidth derate (default: 0.7 for 30% derate)
+    const float entry_cost_cycles_;   ///< Entry cost in cycles (default: 2000)
 
     friend std::ostream& operator<<(std::ostream& stream, const VPUNN::ShaveSimpleHeuristicModel& d);
 
@@ -44,14 +43,17 @@ public:
     /**
      * @brief Construct a Simple Heuristic Model for non-vectorizable operations
      *
+     * @param dpu_freq DPU nominal frequency in MHz
+     * @param shv_freq SHAVE nominal frequency in MHz
      * @param elements_per_cycle Base throughput (default: 1 element/cycle)
-     * @param overall_derate Overall efficiency derate multiplier (default: 0.8 for 20% derate)
+     * @param code_derate Code efficiency derate multiplier (default: 0.8 for 20% derate)
+     * @param bw_derate Bandwidth derate multiplier (default: 0.7 for 30% derate)
      * @param entry_cost_cycles Fixed entry cost in cycles (default: 2000)
-
      */
-    ShaveSimpleHeuristicModel(float elements_per_cycle = 1.0f, float code_derate = 0.8f, float bw_derate = 0.7f,
-                              float entry_cost_cycles = 2000.0f)
-            : elements_per_cycle_(elements_per_cycle > 0.0f ? elements_per_cycle : 1.0f),
+    ShaveSimpleHeuristicModel(unsigned int dpu_freq, unsigned int shv_freq, float elements_per_cycle = 1.0f,
+                              float code_derate = 0.8f, float bw_derate = 0.7f, float entry_cost_cycles = 2000.0f)
+            : HeuristicShaveCyclesProvider<ShaveSimpleHeuristicModel>(dpu_freq, shv_freq),
+              elements_per_cycle_(elements_per_cycle > 0.0f ? elements_per_cycle : 1.0f),
               code_derate_(code_derate > 0.0f ? code_derate : 0.8f),
               bw_derate_(bw_derate > 0.0f ? bw_derate : 0.7f),
               entry_cost_cycles_(entry_cost_cycles > 0.0f ? entry_cost_cycles : 2000.0f) {
@@ -59,18 +61,18 @@ public:
 
 public:
     /**
-     * @brief Get the time in microseconds for the operation based on total elements
+     * @brief Get the operation cost as SHAVE cycles based on total elements
      *
      * @param total_elements Number of total elements
-     * @return Number of cycles
+     * @return Number of SHAVE cycles
      */
-    CyclesInterfaceType getCycles(const long long& total_elements) const {
+    CyclesInterfaceType getCycles(const long long total_elements) const {
         // Calculate cycles: entry_cost + (elements * cycles_per_element * overall_derate)
         // Apply the overall derate multiplier directly as a factor on per-element cost
         const float total_cycles = entry_cost_cycles_ + (static_cast<float>(total_elements) /
                                                          (elements_per_cycle_ * code_derate_ * bw_derate_));
 
-        return static_cast<CyclesInterfaceType>(std::ceil(total_cycles));
+        return Cycles::toCycleInterfaceType(std::ceil(total_cycles));
     }
 };
 
@@ -80,7 +82,7 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::ShaveSimpleHe
            << " code_derate: \t" << d.code_derate_ << " ;\n"
            << " bw_derate: \t" << d.bw_derate_ << " ;\n"
            << " entry_cost_cycles: \t" << d.entry_cost_cycles_ << " ;\n"
-           << out_terminator() << "ShaveSimpleHeuristicModel ";
+           << d.converter << out_terminator() << "ShaveSimpleHeuristicModel ";
     return stream;
 }
 
@@ -98,12 +100,11 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::ShaveSimpleHe
  * - Overall efficiency derate of 20% (1.2 multiplier)
  * - Entry cost of 2000 cycles
  * - Unaligned shape derate (2x for non-aligned inner dimensions)
- * ATTENTION: Currently this model return SHAVE Cycles only, It will need adaptation to return DPU cycles.
  *
  * If negative values or zero are provided then it will call the simple heuristic model.
  * Any negative values are handled internally or at ctor level.
  */
-class ShaveRooflineHeuristicModel {
+class ShaveRooflineHeuristicModel : public HeuristicShaveCyclesProvider<ShaveRooflineHeuristicModel> {
 private:
     const float arithmetic_ops_per_32_outputs_;  ///< Number of arithmetic operations per 32 outputs
     const float memory_ops_per_32_outputs_;      ///< Number of memory operations per 32 outputs
@@ -125,7 +126,7 @@ protected:
      * @param dtype_bits Bits per element (default: 16 for fp16)
      * @return Cycles using simple heuristic approach
      */
-    CyclesInterfaceType calculateSimpleHeuristic(const long long& total_number_of_elements,
+    CyclesInterfaceType calculateSimpleHeuristic(const long long total_number_of_elements,
                                                  const int num_channels) const {
         const float computation_cycles = total_number_of_elements / (code_derate_ * bw_derate_);
         const float scalar_cycles = scalar_cost_per_channel_ * num_channels;
@@ -195,18 +196,20 @@ protected:
      * @param num_channels Number of channels for scalar cost
      * @return Total cycles (rounded up)
      */
-    CyclesInterfaceType calculateTotalCycles(const long long& total_size_in_bits, const float effective_throughput,
+    CyclesInterfaceType calculateTotalCycles(const long long total_size_in_bits, const float effective_throughput,
                                              const int num_channels) const {
         const float computation_cycles = static_cast<float>(total_size_in_bits) / effective_throughput;
         const float scalar_cycles = scalar_cost_per_channel_ * num_channels;
         const float total_cycles = entry_cost_cycles_ + computation_cycles + scalar_cycles;
-        return static_cast<CyclesInterfaceType>(std::ceil(total_cycles));
+        return Cycles::toCycleInterfaceType(std::ceil(total_cycles));
     }
 
 public:
     /**
      * @brief Construct a Roofline Heuristic Model for vectorizable operations
      *
+     * @param dpu_freq DPU nominal frequency in MHz
+     * @param shv_freq SHAVE nominal frequency in MHz
      * @param arithmetic_ops_per_32_outputs Number of vector arithmetic operations per 32 outputs
      * @param memory_ops_per_32_outputs Number of memory operations per 32 outputs
      * @param unaligned_by_nature Whether kernel has inherently unaligned access patterns
@@ -218,18 +221,19 @@ public:
      * @param scalar_cost_per_channel Additional per-channel scalar cost (default: 0)
      * @param unalignment_derate Derate for unaligned inner shape (default: 2.0)
      */
-    ShaveRooflineHeuristicModel(float arithmetic_ops_per_32_outputs, float memory_ops_per_32_outputs,
-                                bool unaligned_by_nature = false, float bw_derate = 0.7f, float code_derate = 0.8f,
-                                float entry_cost_cycles = 2000.0f, float scalar_cost_per_channel = 0.0f,
-                                                                float unalignment_derate = 2.0f)
-            : arithmetic_ops_per_32_outputs_(arithmetic_ops_per_32_outputs),
+    ShaveRooflineHeuristicModel(unsigned int dpu_freq, unsigned int shv_freq, float arithmetic_ops_per_32_outputs,
+                                float memory_ops_per_32_outputs, bool unaligned_by_nature = false,
+                                float bw_derate = 0.7f, float code_derate = 0.8f, float entry_cost_cycles = 2000.0f,
+                                float scalar_cost_per_channel = 0.0f, float unalignment_derate = 2.0f)
+            : HeuristicShaveCyclesProvider<ShaveRooflineHeuristicModel>(dpu_freq, shv_freq),
+              arithmetic_ops_per_32_outputs_(arithmetic_ops_per_32_outputs),
               memory_ops_per_32_outputs_(memory_ops_per_32_outputs),
               unaligned_by_nature_(unaligned_by_nature),
               bw_derate_(bw_derate > 0.0f ? bw_derate : 0.7f),
               code_derate_(code_derate > 0.0f ? code_derate : 0.8f),
               entry_cost_cycles_(entry_cost_cycles > 0.0f ? entry_cost_cycles : 2000.0f),
               scalar_cost_per_channel_(scalar_cost_per_channel > 0.0f ? scalar_cost_per_channel : 0.0f),
-                            unalignment_derate_(unalignment_derate > 0.0f ? unalignment_derate : 2.0f) {
+              unalignment_derate_(unalignment_derate > 0.0f ? unalignment_derate : 2.0f) {
     }
 
     /**
@@ -242,9 +246,9 @@ public:
      * @param total_size_in_bits Size of the output (or processed data) in bits
      * @param num_channels Number of channels (for per-channel scalar cost)
      * @param dtype_bits Bits per element (default: 16 for fp16)
-     * @return Number of cycles (rounded up)
+     * @return Number of SHAVE cycles (rounded up)
      */
-    CyclesInterfaceType getCycles(const long long& total_size_in_bits, const long long& total_number_of_elements,
+    CyclesInterfaceType getCycles(const long long total_size_in_bits, const long long total_number_of_elements,
                                   const int num_channels = 0) const {
         float memory_ops = memory_ops_per_32_outputs_;
         float arithmetic_ops = arithmetic_ops_per_32_outputs_;
@@ -276,10 +280,10 @@ inline std::ostream& operator<<(std::ostream& stream, const VPUNN::ShaveRoofline
            << " entry_cost_cycles: \t" << d.entry_cost_cycles_ << " ;\n"
            << " scalar_cost_per_channel: \t" << d.scalar_cost_per_channel_ << " ;\n"
            << " unalignment_derate: \t" << d.unalignment_derate_ << " ;\n"
-           << out_terminator() << "ShaveRooflineHeuristicModel ";
+           << d.converter << out_terminator() << "ShaveRooflineHeuristicModel ";
     return stream;
 }
 
 }  // namespace VPUNN
 
-#endif  // SHAVE_HEURISTIC_MODELS_H
+#endif  // VPUNN_SHAVE_HEURISTIC_MODELS_H

@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef SHAVE_INSTANCE_HOLDER_FACTORS_H
-#define SHAVE_INSTANCE_HOLDER_FACTORS_H
+#ifndef VPUNN_SHAVE_INSTANCE_HOLDER_FACTORS_H
+#define VPUNN_SHAVE_INSTANCE_HOLDER_FACTORS_H
 
 #include "vpu/performance.h"
 #include "vpu/shave/shave_collection.h"
@@ -59,4 +59,4 @@ private:
 };
 }  // namespace VPUNN
 
-#endif
+#endif // VPUNN_SHAVE_INSTANCE_HOLDER_FACTORS_H

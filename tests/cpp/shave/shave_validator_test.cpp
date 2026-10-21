@@ -26,11 +26,11 @@ using namespace VPUNN;
 class SHAVEWorkloadsSanitizer_Test : public ::testing::Test {
 public:
 protected:
-    std::shared_ptr<VPUNN::IShaveCostProvider> only_new_provider{ShaveCostProviderBundles::createNewShaveOnlyProvider()};
+    Shared_IShaveCostProvider only_new_provider{ShaveCostProviderBundles::createNewShaveOnlyProvider()};
     
     class SHAVECostModelTest : public VPUNN::SHAVECostModel {
         public:
-            SHAVECostModelTest(std::shared_ptr<IShaveCostProvider> provider) 
+            SHAVECostModelTest(Shared_IShaveCostProvider provider) 
                 : VPUNN::SHAVECostModel(std::move(provider)) {}
     };
 

@@ -266,6 +266,24 @@ public:
         return conversion_number;
     }
 
+    /// @brief Multiply cycles by an integer ratio (numerator/denominator) with overflow protection.
+    /// Uses cycles * numerator / denominator order to preserve integer precision.
+    /// Returns ERROR_INVALID_CONVERSION_TO_CYCLES on bad inputs or overflow, propagates pre-existing cycles errors.
+    static constexpr CyclesInterfaceType multiply_by_ratio(const CyclesInterfaceType cycles, const long long numerator,
+                                                           const long long denominator) {
+        if (isErrorCode(cycles)) {
+            return cycles;
+        }
+        if (numerator <= 0 || denominator <= 0) {
+            return Cycles::ERROR_INVALID_CONVERSION_TO_CYCLES;
+        }
+        const long long cycles_ll{static_cast<long long>(cycles)};
+        if (cycles_ll > (std::numeric_limits<long long>::max() / numerator)) {
+            return Cycles::ERROR_INVALID_CONVERSION_TO_CYCLES;
+        }
+        return toCycleInterfaceType(cycles_ll * numerator / denominator);
+    }
+
     /// @brief function to compute extrapolated/interpolated cost
     /// @param x the point for which we want to compute cost
     /// @param x1, y1 first point

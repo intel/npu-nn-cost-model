@@ -50,6 +50,8 @@ private:
     mutable CSVSerializer serializer{};                 ///< serializer for DPU workloads
     mutable CSVSerializer dma_descriptor_serializer{};  ///< serializer for VPUDMADescriptor workloads
 
+    const VPUDevice model_device{VPUDevice::__size};  ///< model target device, __size means empty/non-bound model
+
     const HWPerformanceModel performance{};  // performance instance, not used here
 
 protected:
@@ -136,30 +138,30 @@ public:
     void swizzling_turn_OFF(DPUWorkload& workload) const;
 
 public:
-    /// @brief Get a reference to the serializer
-    /// temporary only for testing aspects (extra save ). TO BE REFACTORED
-    CSVSerializer& get_serializer() noexcept {
-        return serializer;
-    }
-
     const NNCostProvider& get_NN_cost_provider() const noexcept {
         return dpu_nn_cost_provider;
+    }
+
+    VPUDevice getModelDevice() const noexcept {
+        return model_device;
     }
 
     /**
      * @brief Construct a new VPUCostModel object
      *
+     * @param device target device bound to this model instance; use VPUDevice::__size for an empty/non-bound model
      * @param filename the name of the .vpunn model
      * @param dpu_cache_filename the name of the cache file
      * @param shave_cache_filename the name of the shave cache file
      *
      */
-    explicit VPUCostModel(const std::string& filename, const std::string& dpu_cache_filename,
+    explicit VPUCostModel(VPUDevice device, const std::string& filename, const std::string& dpu_cache_filename,
                           const std::string& shave_cache_filename, bool tryToLoadPairedCache = false);
 
     /**
      * @brief Construct a new VPUCostModel object
      *
+     * @param device target device bound to this model instance; use VPUDevice::__size for an empty/non-bound model
      * @param filename the name of the .vpunn model
      * @param profile enable/disable profiling
      * @param cache_size the size of the LRUCache
@@ -170,7 +172,8 @@ public:
      * based on NN file. (fro DPU, for others?) DRAFT!
      *
      */
-    explicit VPUCostModel(const std::string& filename = "", bool profile = false, const unsigned int cache_size = 16384,
+    explicit VPUCostModel(VPUDevice device = VPUDevice::__size, const std::string& filename = "", bool profile = false,
+                          const unsigned int cache_size = 16384,
                           const unsigned int batch_size = 1, const std::string& dpu_cache_filename = "",
                           const std::string& shave_cache_filename = "", bool tryToLoadPairedCache = false);
 
@@ -181,6 +184,7 @@ public:
     /**
      * @brief Construct a new VPUCostModel object
      *
+     * @param device target device bound to this model instance; use VPUDevice::__size for an empty/non-bound model
      * @param model_data a buffer containing a .vpunn model
      * @param model_data_length the size of the model_data buffer
      * @param copy_model_data enable/disable the memcopy of the buffer
@@ -188,7 +192,8 @@ public:
      * @param cache_size the size of the LRUCache
      * @param batch_size model batch size
      */
-    explicit VPUCostModel(const char* model_data, size_t model_data_length, bool copy_model_data, bool profile = false,
+    explicit VPUCostModel(VPUDevice device, const char* model_data, size_t model_data_length, bool copy_model_data,
+                          bool profile = false,
                           const unsigned int cache_size = 16384, const unsigned int batch_size = 1,
                           const char* dpu_cache_data = nullptr, size_t dpu_cache_data_length = 0,
                           const char* shave_cache_data = nullptr, size_t shave_cache_data_length = 0);

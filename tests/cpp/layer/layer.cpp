@@ -1292,17 +1292,19 @@ TEST_F(VPULayerCostModelTest, Layer_DMA_DDRvsCMX_Smoke) {
 TEST_F(VPULayerCostModelTest, L2_instantiated_with_external_DPU) {
     {
         const std::string model_path = VPU_2_7_MODEL_PATH;
-        EXPECT_NO_THROW(VPUCostModel x{model_path});
-        // VPUCostModel costmodel{model_path};
-        auto costmodel{std::make_shared<VPUCostModel>(model_path)};
+        const VPUDevice device{VPUDevice::VPU_2_7};
+        EXPECT_NO_THROW(VPUCostModel x(device, model_path));
+        // VPUCostModel costmodel{device, model_path};
+        std::shared_ptr<VPUCostModel> costmodel = std::make_shared<VPUCostModel>(device, model_path);
         const VPULayerCostModel layer_costmodel{costmodel};
         EXPECT_EQ(costmodel.get(), (&layer_costmodel.get_cost_model()));
     }
     {
         const std::string model_path = VPU_4_0_MODEL_PATH;
-        EXPECT_NO_THROW(VPUCostModel x{model_path});
-        // VPUCostModel costmodel{model_path};
-        auto costmodel{std::make_shared<VPUCostModel>(model_path)};
+        const VPUDevice device{VPUDevice::VPU_4_0};
+        EXPECT_NO_THROW(VPUCostModel x(device, model_path));
+        // VPUCostModel costmodel{device, model_path};
+        std::shared_ptr<VPUCostModel> costmodel = std::make_shared<VPUCostModel>(device, model_path);
         const VPULayerCostModel layer_costmodel{costmodel};
         EXPECT_EQ(costmodel.get(), (&layer_costmodel.get_cost_model()));
     }

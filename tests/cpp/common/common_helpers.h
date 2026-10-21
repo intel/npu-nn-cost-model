@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <string>
 #include <system_error>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 #include "nn_models.h"
@@ -214,13 +215,25 @@ private:
 template <typename ModelType>
 class ModelMap {
 public:
+    template <typename... Args>
+    static std::unique_ptr<ModelType> makeModelForDevice(const VPUNN::VPUDevice device, Args&&... args) {
+        if constexpr (std::is_constructible_v<ModelType, VPUNN::VPUDevice, Args...>) {
+            return std::make_unique<ModelType>(device, std::forward<Args>(args)...);
+        } else if constexpr (std::is_constructible_v<ModelType, Args..., VPUNN::VPUDevice>) {
+            return std::make_unique<ModelType>(std::forward<Args>(args)..., device);
+        } else {
+            return std::make_unique<ModelType>(std::forward<Args>(args)...);
+        }
+    }
+
     /**
      * @brief Constructor that creates a fallback model for unregistered devices
      * @param args Constructor arguments for the fallback ModelType instance
      */
     template <typename... Args>
     ModelMap(Args&&... args) {
-        models_map.emplace(VPUNN::VPUDevice::__size, std::make_unique<ModelType>(std::forward<Args>(args)...));
+        models_map.emplace(VPUNN::VPUDevice::__size,
+                           makeModelForDevice(VPUNN::VPUDevice::__size, std::forward<Args>(args)...));
     }
 
     /**
@@ -230,7 +243,7 @@ public:
      */
     template <typename... Args>
     void addModel(const VPUNN::VPUDevice device, Args&&... args) {
-        models_map.emplace(device, std::make_unique<ModelType>(std::forward<Args>(args)...));
+        models_map.emplace(device, makeModelForDevice(device, std::forward<Args>(args)...));
     }
 
     /**

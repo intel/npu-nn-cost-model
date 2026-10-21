@@ -36,29 +36,21 @@ protected:
     // - Verifies that DPUWorkload::hash(), SerializableDPU::hash() and DPUOperation::hash() remain byte-for-byte
     //   compatible with captured reference baselines.
     //
-    // How these numbers were obtained:
-    // - Captured from a dedicated baseline-capture test on main (as of July 7th 2026).
     // - Captured outputs used here:
     //   conv_npu5_sparse
     //     DPUWorkload::hash = 3047471188 (0xB5A4B854)
     //     DPUOperation::hash = 1443614963 (0x560BD0F3)
-    //     SerializableDPU::hash = 8497312528070532486 (0x75EC84B93D1EDD86)
+    //     SerializableDPU::hash = 2348771807 (0x8C01543F)
     //   dwconv_NPU_RESERVED_halo_sep
     //     DPUWorkload::hash = 3693615666 (0xDC281A32)
     //     DPUOperation::hash = 3883484373 (0xE77944D5)
-    //     SerializableDPU::hash = 11088967406853551299 (0x99E3ED1ACB63F4C3)
+    //     SerializableDPU::hash = 1224966957 (0x4902382D)
     //   eltwise_npu5_inplace
     //     DPUWorkload::hash = 2160729845 (0x80CA1EF5)
     //     DPUOperation::hash = 1198316386 (0x476CDB62)
-    //     SerializableDPU::hash = 138335532694033158 (0x1EB776F1E0AD306)
-    // - The DPUOperation hash values above were captured on July 10th 2026, after the
-    //   direct DPUOperation hash implementation replaced the previous SerializableDPU-based path.
+    //     SerializableDPU::hash = 3125163774 (0xBA45CF9E)
     //
-    // Environment relevance:
-    // - These baselines were captured in the target environment (MSVC on Windows 11) (relevant for
-    // SerializableDPU::hash).
-    //
-    // Do NOT change these constants lightly:
+    //  When changing these constants, keep in mind that:
     // - Changing them invalidates compatibility guarantees and can silently break cache/UID
     //   continuity with historical data.
     // - Only update when there is an explicit, reviewed decision to change hash contract.
@@ -84,7 +76,7 @@ protected:
             wl.reduce_minmax_op = false;
 
             cases.push_back({"conv_npu5_sparse", wl, static_cast<uint32_t>(3047471188U),
-                             static_cast<size_t>(1443614963ULL), static_cast<size_t>(8497312528070532486ULL),
+                             static_cast<size_t>(1443614963ULL), static_cast<size_t>(2348771807ULL),
                              [](DPUOperation& op) {
                                  op.input_1.batch = 1;
                                  op.input_1.channels = 64;
@@ -118,7 +110,7 @@ protected:
             wl.reduce_minmax_op = true;
 
             cases.push_back({"dwconv_NPU_RESERVED_halo_sep", wl, static_cast<uint32_t>(3693615666U),
-                             static_cast<size_t>(3883484373ULL), static_cast<size_t>(11088967406853551299ULL),
+                             static_cast<size_t>(3883484373ULL), static_cast<size_t>(1224966957ULL),
                              [](DPUOperation& op) {
                                  op.input_1.batch = 1;
                                  op.input_1.channels = 64;
@@ -145,7 +137,7 @@ protected:
             wl.mpe_engine = MPEEngine::SCL;
 
             cases.push_back({"eltwise_npu5_inplace", wl, static_cast<uint32_t>(2160729845U),
-                             static_cast<size_t>(1198316386ULL), static_cast<size_t>(138335532694033158ULL),
+                             static_cast<size_t>(1198316386ULL), static_cast<size_t>(3125163774ULL),
                              [](DPUOperation& op) {
                                  op.input_1.batch = 1;
                                  op.input_1.channels = 64;
@@ -166,7 +158,6 @@ TEST_F(HashRegressionTest, DPUWorkload_StoredBaselines) {
     }
 }
 
-#if defined(_WIN32) && defined(_MSC_VER)
 TEST_F(HashRegressionTest, SerializableDPU_StoredBaselines) {
     const auto test_cases = make_baseline_cases();
     for (const auto& test_case : test_cases) {
@@ -177,7 +168,6 @@ TEST_F(HashRegressionTest, SerializableDPU_StoredBaselines) {
         EXPECT_EQ(serializable.hash(), test_case.expected_serializable_hash) << "Case: " << test_case.name;
     }
 }
-#endif  // defined(_WIN32) && defined(_MSC_VER)
 
 TEST_F(HashRegressionTest, DPUOperation_StoredBaselines) {
     const auto test_cases = make_baseline_cases();

@@ -10,6 +10,7 @@
 #ifndef VPUNN_SHAVE_WORKLOAD_H
 #define VPUNN_SHAVE_WORKLOAD_H
 
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <string>
@@ -119,6 +120,9 @@ public:
     uint32_t hash() const;
 
     /// @brief Get the total number of elements from all input and output tensors
+    // Use long long here because SHAVE workloads are not constrained by DPU CMX-sized working sets.
+    // SHAVE may process very large L1/L2-style tensors streamed from DDR, so aggregate element/bit counts
+    // can exceed 32-bit int range.
     long long total_number_of_elements() const {
         long long total_elements = 0;
         for (const auto& output : get_outputs()) {
@@ -132,6 +136,10 @@ public:
         return total_elements;
     }
 
+    /// @brief Get the aggregate size in bits of all input and output tensors
+    // Use long long here because SHAVE workloads are not constrained by DPU CMX-sized working sets.
+    // SHAVE may process very large L1/L2-style tensors streamed from DDR, so aggregate element/bit counts
+    // can exceed 32-bit int range.
     long long total_size_in_bits() const {
         long long total_size_bits = 0;
         for (const auto& output : get_outputs()) {

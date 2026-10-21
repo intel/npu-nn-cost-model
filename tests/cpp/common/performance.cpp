@@ -63,12 +63,10 @@ protected:
 
     void runModelLatency(const VPUNNModelsFiles::ModelDescriptor& model_info, unsigned int n_workloads) {
         const auto& model_path = model_info.first;
-        // Use no cache
-        const VPUCostModel model{model_path, false,
-                                 0 /* no cache*/};  // no cache, so second iteration finds nothing, batch =1
-
-        // Check device
         const VPUNN::VPUDevice device = model_info.second;
+        // Use no cache
+        const VPUCostModel model{device, model_path, false,
+                                 0 /* no cache*/};  // no cache, so second iteration finds nothing, batch =1
 
         // Generate N workloads
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -187,11 +185,9 @@ TEST_F(VPUNNPerformanceTest, DISABLED_FAST_InferenceLatencyStrict_stochastic) {
             continue;  // ignore this because is not in focus for runtime
         }
         const auto& model_path = model_info.first;
-        // Use no cache
-        VPUNN::VPUCostModel model{model_path, false, 0};  // no cache, batch =1
-
-        // Check device
         const VPUNN::VPUDevice device = model_info.second;
+        // Use no cache
+        VPUNN::VPUCostModel model{device, model_path, false, 0};  // no cache, batch =1
 
         // Generate N workloads
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
@@ -292,7 +288,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelInstantiationVsInstanceQue
 
     // Warm-up paths once.
     {
-        auto warmup_model = std::make_unique<VPUCostModel>(model_path);
+        auto warmup_model = std::make_unique<VPUCostModel>(device, model_path);
         ASSERT_TRUE(warmup_model->nn_initialized()) << "Failed to initialize NN model from: " << model_path;
         [[maybe_unused]] const auto warmup_ops = warmup_model->getShaveSupportedOperations(device);
     }
@@ -300,7 +296,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelInstantiationVsInstanceQue
 
     const auto measure_instantiate_only = [&]() {
         const auto t0 = Clock::now();
-        auto model = std::make_unique<VPUCostModel>(model_path);
+        auto model = std::make_unique<VPUCostModel>(device, model_path);
         const auto t1 = Clock::now();
         const bool initialized = model->nn_initialized();
         model.reset();
@@ -309,7 +305,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelInstantiationVsInstanceQue
 
     const auto measure_construct_plus_query = [&]() {
         const auto t0 = Clock::now();
-        auto model = std::make_unique<VPUCostModel>(model_path);
+        auto model = std::make_unique<VPUCostModel>(device, model_path);
         const auto ops = model->getShaveSupportedOperations(device);
         const auto t1 = Clock::now();
         const bool initialized = model->nn_initialized();
@@ -344,7 +340,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelInstantiationVsInstanceQue
 
     // 2) Measure getShaveSupportedOperations call only on an already-instantiated model.
     {
-        auto model = std::make_unique<VPUCostModel>(model_path);
+        auto model = std::make_unique<VPUCostModel>(device, model_path);
         ASSERT_TRUE(model->nn_initialized()) << "Failed to initialize NN model from: " << model_path;
 
         for (int i = 0; i < iterations; ++i) {
@@ -451,7 +447,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelConstructPlusQueryVsStatic
         static_query_us.reserve(iterations);
 
         {
-            auto warmup_model = std::make_unique<VPUCostModel>(model_path);
+            auto warmup_model = std::make_unique<VPUCostModel>(device, model_path);
             ASSERT_TRUE(warmup_model->nn_initialized()) << "Failed to initialize NN model from: " << model_path;
             [[maybe_unused]] const auto warmup_ops = warmup_model->getShaveSupportedOperations(device);
         }
@@ -459,7 +455,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelConstructPlusQueryVsStatic
 
         const auto measure_instantiate_only = [&]() {
             const auto t0 = Clock::now();
-            auto model = std::make_unique<VPUCostModel>(model_path);
+            auto model = std::make_unique<VPUCostModel>(device, model_path);
             const auto t1 = Clock::now();
             const bool initialized = model->nn_initialized();
             model.reset();
@@ -468,7 +464,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelConstructPlusQueryVsStatic
 
         const auto measure_construct_plus_query = [&]() {
             const auto t0 = Clock::now();
-            auto model = std::make_unique<VPUCostModel>(model_path);
+            auto model = std::make_unique<VPUCostModel>(device, model_path);
             const auto ops = model->getShaveSupportedOperations(device);
             const auto t1 = Clock::now();
             const bool initialized = model->nn_initialized();
@@ -502,7 +498,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelConstructPlusQueryVsStatic
         }
 
         {
-            auto model = std::make_unique<VPUCostModel>(model_path);
+            auto model = std::make_unique<VPUCostModel>(device, model_path);
             ASSERT_TRUE(model->nn_initialized()) << "Failed to initialize NN model from: " << model_path;
 
             for (int i = 0; i < iterations; ++i) {
@@ -695,7 +691,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_NPU5_ConstructPlusQueryVsStaticQue
 
     const auto measure_no_cache = [&]() -> MeasureResult {
         const auto t0 = Clock::now();
-        auto model = std::make_unique<VPUCostModel>(model_path, false, 0, 1, "");
+        auto model = std::make_unique<VPUCostModel>(device, model_path, false, 0, 1, "");
         const auto ops = model->getShaveSupportedOperations(device);
         const auto t1 = Clock::now();
         const bool initialized = model->nn_initialized();
@@ -705,7 +701,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_NPU5_ConstructPlusQueryVsStaticQue
 
     const auto measure_cache_file = [&]() -> MeasureResult {
         const auto t0 = Clock::now();
-        auto model = std::make_unique<VPUCostModel>(model_path, false, 16384, 1, cache_file_default);
+        auto model = std::make_unique<VPUCostModel>(device, model_path, false, 16384, 1, cache_file_default);
         const auto ops = model->getShaveSupportedOperations(device);
         const auto t1 = Clock::now();
         const bool initialized = model->nn_initialized();
@@ -715,7 +711,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_NPU5_ConstructPlusQueryVsStaticQue
 
     const auto measure_cache_memory = [&]() -> MeasureResult {
         const auto t0 = Clock::now();
-        auto model = std::make_unique<VPUCostModel>(model_buffer.data(), model_buffer.size(), false, false, 16384, 1,
+        auto model = std::make_unique<VPUCostModel>(device, model_buffer.data(), model_buffer.size(), false, false, 16384, 1,
                                                     cache_buffer.data(), cache_buffer.size());
         const auto ops = model->getShaveSupportedOperations(device);
         const auto t1 = Clock::now();
