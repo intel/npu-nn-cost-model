@@ -160,4 +160,5 @@ PopulateWeightTable,NPU_5_0,0
 DynamicDataMask,NPU_5_0,0
 SDPA,NPU_5_0,0
 FlashSDPA,NPU_5_0,0
-SDPAExtended,NPU_5_0,0
+GroupQuantCorrection,NPU_5_0,0
+Attention,NPU_5_0,0

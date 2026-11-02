@@ -32,7 +32,7 @@ private:
     /// Each provider instance owns its own selector cache, reducing cross-instance contention.
     /// ShaveConfiguration synchronizes lazy creation; additional per-instance thread-safety
     /// guarantees are unspecified.
-    const ShaveConfiguration shave_configurator;
+    const ShaveConfiguration shave_configurator{};
 
 protected:
     /// @brief Provides access to the SHAVE configuration instance used internally for CRTP.

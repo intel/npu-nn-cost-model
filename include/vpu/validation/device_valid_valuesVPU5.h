@@ -87,6 +87,8 @@ private:
     static constexpr int alignement_size_bytes_def{
             32};  // 32KB, but only 32B  tensor alignment put here in place for sanity reasons
 
+    inline static const Values<MPEEngine> valid_mpe_engines_def{MPEEngine::SCL};  // no dCIM support
+
     inline static const std::vector<DataType> types_16bits = {DataType::FLOAT16, DataType::BFLOAT16};
     inline static const std::vector<DataType> types_8bits = {DataType::INT8, DataType::UINT8, DataType::HF8,
                                                              DataType::BF8};
@@ -203,7 +205,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def) {};
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def) {};
 
     /// constructor with link to operations dynamic behavior and input channels rules and restrictions
     VPU5_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
@@ -223,7 +226,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def),
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def),
               input_channels_restrictions{input_channels_restrictions_},
               batch_restrictions{{batch_restrictions_}} {};
 
@@ -246,7 +250,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def),
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def),
               input_channels_restrictions{input_channels_restrictions_},
               batch_restrictions{{batch_restrictions_}} {};
 

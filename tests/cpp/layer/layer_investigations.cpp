@@ -14,6 +14,7 @@
 #include "common/common_helpers.h"
 
 #include "layer.h"
+#include "logger/logger.h"
 #include "vpu/shave/layers.h"
 
 namespace VPUNN_unit_tests {
@@ -62,7 +63,8 @@ TEST_F(VPULayerCM_InvestigationTest, DISABLED_UnimplementedStrategies_ResultsTes
 
     const DPULayer tst_layer(wl_ref);
     const std::vector<TestCase> tests{
-            {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
+            {{std::move(tst_layer),
+              VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOW, false, false, prefetch}},
              {VPUNN::Cycles::ERROR_TILE_OUTPUT, true, 1000, fail * 1000 + 1000},
              "SOW "},
 
@@ -100,7 +102,8 @@ TEST_F(VPULayerCM_InvestigationTest, SOW_SmokeTest) {
     const DPULayer tst_layer(wl_ref);
     // TODO: test should be SOHO wins,
     const std::vector<TestCase> tests{
-            {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+            {{std::move(tst_layer),
+              VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
              {VPUNN::Cycles::NO_ERROR, true, 3700, fail * 3700 + 1000},
              "SOW "},
 
@@ -140,7 +143,8 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_CONV75_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 2734, fail * 3734 + 1300},
                  "SOHO , no memmove, "},  // GT is 3734 for 16x16
 
@@ -185,7 +189,8 @@ TEST_F(VPULayerCM_InvestigationTest, EISXW_140892_err_investigation_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
+                {{std::move(tst_layer),
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK, false, false, prefetch}},
                  {Cycles::ERROR_INPUT_TOO_BIG, true, 4000, fail * (4686) + 800},
                  "SOK , no memmove, "},
         };
@@ -234,7 +239,8 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_GC105_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 5485, fail * (4 * 1410) + 500},
                  "SOHO , no memmove, "},  // GT 5640
 
@@ -279,7 +285,8 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_GC124_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 2500, fail * (1361 * 2) + 1000},
                  "SOHO , no memmove, "},  // gt = 2712
 
@@ -324,7 +331,8 @@ TEST_F(VPULayerCM_InvestigationTest, ModelA_CONV251_NPU40) {
     {
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 1200, fail * 1585 + 100},
                  "SOHO , no memmove, "},  // gt 1585
 
@@ -407,7 +415,8 @@ TEST_F(VPULayerCostModelTest, Layer_Detailed_SEP_split_EISXW_132541_NPU40) {
         const DPULayer layer(t.t_in.wl);
         std::vector<DPULayer> tiles_layer = layer.splitAcrossTiles(t.t_in.strategy, t.t_in.n_tiles);
 
-        std::cout << "--------------------------------- " << t.test_case << " ---------------------------------\n ";
+        utest_log::debug() << "--------------------------------- " << t.test_case
+                          << " ---------------------------------\n ";
 
         for (unsigned int i = 0U; i < t.t_in.n_tiles; i++) {
             EXPECT_EQ(tiles_layer[i].sep_activators.storage_elements_pointers, t.t_exp.tensors_sep_info[i].first)
@@ -516,7 +525,8 @@ TEST_F(VPULayerCostModelTest, Test_layer_SEP_split_value_propagation_EISXW_13254
         LayerSplitInfo detailed_split;
         CyclesInterfaceType cost_cyc = layer_models.getModel(layer.device).Layer(layer, strategy, detailed_split);
 
-        std::cout << "--------------------------------- " << t.test_case << " ---------------------------------\n ";
+        utest_log::debug() << "--------------------------------- " << t.test_case
+                          << " ---------------------------------\n ";
 
         EXPECT_FALSE(Cycles::isErrorCode(cost_cyc));
 

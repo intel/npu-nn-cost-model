@@ -723,7 +723,7 @@ TEST_F(TestHWPerformanceModel_DPUCycles, MACCycles_DCIM_UINT16_IncreasesCycles_V
  *
  * The method returns the factor by which a workload's datatype increases MAC
  * hardware resource consumption relative to the 8-bit baseline:
- *   - FP16-family (FLOAT16, BFLOAT16, FLOAT32) input or weights → fp_ratio
+ *   - FP16-family (FLOAT16, BFLOAT16) input or weights → fp_ratio
  *   - i16 integer (INT16, UINT16) input with non-float weights   → fp_ratio
  *   - Everything else (INT8, FP8, FP4, sub-8-bit, ...)           → 1
  *
@@ -749,7 +749,7 @@ protected:
         // FP16-family input: fp16 path fires → factor = fp_ratio
         {DataType::FLOAT16,  DataType::UINT8,  {},                    true,  "FLOAT16 input"},
         {DataType::BFLOAT16, DataType::UINT8,  {},                    true,  "BFLOAT16 input"},
-        {DataType::FLOAT32,  DataType::UINT8,  {},                    true,  "FLOAT32 input (fp16family)"},
+        {DataType::FLOAT32,  DataType::UINT8,  {},                    false, "FLOAT32 input (own fp32family, not fp16family)"},
         // FP16 weights with integer input: fp16 path fires via weights → factor = fp_ratio
         {DataType::UINT8,    DataType::UINT8,  DataType::FLOAT16,     true,  "INT8 input, FP16 weights"},
         {DataType::UINT8,    DataType::UINT8,  DataType::BFLOAT16,    true,  "INT8 input, BFLOAT16 weights"},
@@ -892,7 +892,7 @@ protected:
             {DataType::INT16,    DataType::UINT8,    {},           false, false, true,  false, "int16 input (i16 family)"},
             {DataType::INT4,     DataType::INT4,     {},           false, false, false, true,  "int4 input and output"},
             {DataType::UINT4,    DataType::UINT8,    {},           false, false, false, true,  "uint4 input"},
-            {DataType::INT32,    DataType::INT32,    {},           false, false, false, true,  "int32 treated as i8 family"},
+            {DataType::INT32,    DataType::INT32,    {},           false, false, false, false, "int32 no longer treated as i8 family (own is_i32family_dtype)"},
             // weight type overrides --
             // fp16 weights lift computation to fp16 even when input is integer
             {DataType::UINT8,    DataType::UINT8,    DataType::FLOAT16,  true,  false, false, false, "i8 input, fp16 weights -> fp16 compute"},
@@ -914,7 +914,7 @@ protected:
  * @brief native_comp_on_fp16 returns the same value for every device.
  *
  * Returns true when the input or weight tensor belongs to the fp16 family
- * (FLOAT16, BFLOAT16, FLOAT32). FP8 / FP4 inputs without FP16 weights return false.
+ * (FLOAT16, BFLOAT16). FP8 / FP4 / FP32 inputs without FP16 weights return false.
  */
 TEST_F(TestHWPerformanceModel_NativeComp, OnFP16_DeviceIndependent) {
     for (const auto& tc : cases) {
@@ -971,8 +971,8 @@ TEST_F(TestHWPerformanceModel_NativeComp, OnI16_DeviceIndependent) {
 /**
  * @brief native_comp_on_i8 returns the same value for every device.
  *
- * Returns true when the input tensor is integer (i8 family: UINT8, INT8, sub-8-bit,
- * INT32) AND the weight tensor is not a floating-point type. INT16/UINT16 inputs
+ * Returns true when the input tensor is integer (i8 family: UINT8, INT8, sub-8-bit)
+ * AND the weight tensor is not a floating-point type. INT16/UINT16/INT32/UINT32 inputs
  * are NOT part of the i8 family.
  */
 TEST_F(TestHWPerformanceModel_NativeComp, OnI8_DeviceIndependent) {

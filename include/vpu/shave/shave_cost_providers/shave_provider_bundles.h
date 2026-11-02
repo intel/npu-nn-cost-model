@@ -281,6 +281,8 @@ public:
         // the objects in the map are just smart wrapper on top of teh static LUT specific for each device
         static const DeviceMappedPrefetchCostStrategy::DeviceToStrategyMap device_to_strategy_map = {
                 {VPUDevice::NPU_5_0, createPrefetchStrategyForDevice(VPUDevice::NPU_5_0)},
+                // WCL returns empty table for now, this is intentional behavior
+                // prefetch support for WCL is WIP
                 {VPUDevice::NPU_5_0_W, createPrefetchStrategyForDevice(VPUDevice::NPU_5_0_W)},
         };
 

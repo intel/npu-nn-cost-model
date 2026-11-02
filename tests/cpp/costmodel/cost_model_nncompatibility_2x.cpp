@@ -12,6 +12,7 @@
 #include "common/common_helpers.h"
 
 #include <unordered_map>
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -56,7 +57,8 @@ protected:
 
     const float epsilon{0.01F};
 
-    VPUNN::VPUCostModel ideal_model{VPUNN::VPUDevice::__size, ""};  // model without NN, output is interface 1-hw overhead
+    VPUNN::VPUCostModel ideal_model{VPUNN::VPUDevice::__size,
+                                    ""};  // model without NN, output is interface 1-hw overhead
     const IEnergy& my_energy_ideal_model = ideal_model.getEnergyInterface();
     const HWPerformanceModel& performance_ideal_model{ideal_model.getPerformanceModel()};
 
@@ -93,7 +95,9 @@ TEST_F(TestNNModelCompatibilityVPU2x, Ideal_Empty_Model) {
 
 /// Test VPU2.0 exists, this version is using hw_overhead which is deprecated
 TEST_F(TestNNModelCompatibilityVPU2x, VPU20_default_01) {
-    auto construct_vpu20_default = [&]() { VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_0, VPU20_default_}; };
+    auto construct_vpu20_default = [&]() {
+        VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_0, VPU20_default_};
+    };
     EXPECT_THROW(construct_vpu20_default(), std::runtime_error);
 
     // making sure that the error came from the output version:
@@ -119,8 +123,10 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU20_default_01) {
 
 /// Test VPU2.7 1 exists, this version is using hw_overhead which is deprecated
 TEST_F(TestNNModelCompatibilityVPU2x, VPU27_default_01) {
-        auto construct_vpu27_default = [&]() { VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_7, VPU27_default_}; };
-        EXPECT_THROW(construct_vpu27_default(), std::runtime_error);
+    auto construct_vpu27_default = [&]() {
+        VPUNN::VPUCostModel vpunn_model{VPUDevice::VPU_2_7, VPU27_default_};
+    };
+    EXPECT_THROW(construct_vpu27_default(), std::runtime_error);
 
     // making sure that the error came from the output version:
     const VPUNN::Runtime vpunn_runtime(VPU27_default_);
@@ -165,17 +171,17 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU_10_2) {
     const auto theoretical_dpu_cycles = ideal_model.DPU(wl);                          //
     const auto ideal_dpu_cycles = performance_ideal_model.DPU_Power_IdealCycles(wl);  //
 
-    if (hw_util != 0.0F) { // coverity division by zero
+    if (hw_util != 0.0F) {  // coverity division by zero
         /* coverity[divide_by_zero] */
         EXPECT_NEAR(dpu_cycles / (ideal_dpu_cycles / hw_util), 1.0F, epsilon)
                 << " info: " << dpu_cycles << ", ideal: " << ideal_dpu_cycles
                 << ", theoretical:  " << theoretical_dpu_cycles << ",  hw_util: " << hw_util << std::endl;
     }
-    std::cout << "VPU2.7v 10 2, default wl. "
-              /*<< "NN output/hw overhead: " << nn_out1*/
-              << ", DPU cycles: " << dpu_cycles << ", hw_utilization: " << hw_util
-              << ", Theoretical DPU cycles: " << theoretical_dpu_cycles << ", Ideal DPU cycles: " << ideal_dpu_cycles
-              << std::endl;
+    utest_log::debug() << "VPU2.7v 10 2, default wl. "
+                      /*<< "NN output/hw overhead: " << nn_out1*/
+                      << ", DPU cycles: " << dpu_cycles << ", hw_utilization: " << hw_util
+                      << ", Theoretical DPU cycles: " << theoretical_dpu_cycles
+                      << ", Ideal DPU cycles: " << ideal_dpu_cycles << std::endl;
 }
 
 /// Test VPU2.7 v 11 exists
@@ -200,18 +206,18 @@ TEST_F(TestNNModelCompatibilityVPU2x, VPU_11_2) {
     const auto theoretical_dpu_cycles = ideal_model.DPU(wl);                          //
     const auto ideal_dpu_cycles = performance_ideal_model.DPU_Power_IdealCycles(wl);  //
 
-    if (hw_util != 0.0F) { // coverity division by zero
+    if (hw_util != 0.0F) {  // coverity division by zero
         /* coverity[divide_by_zero] */
         EXPECT_NEAR(dpu_cycles / (ideal_dpu_cycles / hw_util), 1.0F, epsilon)
                 << " info: " << dpu_cycles << ", ideal: " << ideal_dpu_cycles
                 << ", theoretical:  " << theoretical_dpu_cycles << ",  hw_util: " << hw_util << std::endl;
     }
 
-    std::cout << "VPU2.7v 11 2, default wl. "
-              /*  << "NN output/hw overhead: " << nn_out1 */
-              << ", DPU cycles: " << dpu_cycles << ", hw_utilization: " << hw_util
-              << ", Theoretical DPU cycles: " << theoretical_dpu_cycles << ", Ideal DPU cycles: " << ideal_dpu_cycles
-              << std::endl;
+    utest_log::debug() << "VPU2.7v 11 2, default wl. "
+                      /*  << "NN output/hw overhead: " << nn_out1 */
+                      << ", DPU cycles: " << dpu_cycles << ", hw_utilization: " << hw_util
+                      << ", Theoretical DPU cycles: " << theoretical_dpu_cycles
+                      << ", Ideal DPU cycles: " << ideal_dpu_cycles << std::endl;
 }
 
 }  // namespace VPUNN_unit_tests

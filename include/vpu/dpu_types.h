@@ -141,6 +141,10 @@ enum class DataType {
     UINT16,
     INT16,
     FLOAT4,
+    INT64,
+    UINT64,
+    FLOAT64,
+    UINT32,
     __size  ///< last element, its value  equals number of useful enum values
 };
 static const EnumMap DataType_ToText{
@@ -149,7 +153,8 @@ static const EnumMap DataType_ToText{
         link(DataType::UINT4, "UINT4"),       link(DataType::INT4, "INT4"),       link(DataType::UINT2, "UINT2"),
         link(DataType::INT2, "INT2"),         link(DataType::UINT1, "UINT1"),     link(DataType::INT1, "INT1"),
         link(DataType::INT32, "INT32"),       link(DataType::FLOAT32, "FLOAT32"), link(DataType::UINT16, "UINT16"),
-        link(DataType::INT16, "INT16"),       link(DataType::FLOAT4, "FLOAT4")};
+        link(DataType::INT16, "INT16"),       link(DataType::FLOAT4, "FLOAT4"),   link(DataType::INT64, "INT64"),
+        link(DataType::UINT64, "UINT64"),     link(DataType::FLOAT64, "FLOAT64"), link(DataType::UINT32, "UINT32")};
 template <>
 inline const EnumMap& mapToText<DataType>() {
     return DataType_ToText;
@@ -183,16 +188,11 @@ enum class Operation {
     __size
 };
 static const EnumMap Operation_ToText{
-        link(Operation::CONVOLUTION, "CONVOLUTION"),
-        link(Operation::DW_CONVOLUTION, "DW_CONVOLUTION"),
-        link(Operation::ELTWISE, "ELTWISE"),
-        link(Operation::MAXPOOL, "MAXPOOL"),
-        link(Operation::AVEPOOL, "AVEPOOL"),
-        link(Operation::CM_CONVOLUTION, "CM_CONVOLUTION"),
-        link(Operation::LAYER_NORM, "LAYER_NORM"),
-        link(Operation::ELTWISE_MUL, "ELTWISE_MUL"),
-        link(Operation::REDUCE_MS, "REDUCE_MS"),
-        link(Operation::REDUCE_SUMSQUARES, "REDUCE_SUMSQUARES"),
+        link(Operation::CONVOLUTION, "CONVOLUTION"), link(Operation::DW_CONVOLUTION, "DW_CONVOLUTION"),
+        link(Operation::ELTWISE, "ELTWISE"),         link(Operation::MAXPOOL, "MAXPOOL"),
+        link(Operation::AVEPOOL, "AVEPOOL"),         link(Operation::CM_CONVOLUTION, "CM_CONVOLUTION"),
+        link(Operation::LAYER_NORM, "LAYER_NORM"),   link(Operation::ELTWISE_MUL, "ELTWISE_MUL"),
+        link(Operation::REDUCE_MS, "REDUCE_MS"),     link(Operation::REDUCE_SUMSQUARES, "REDUCE_SUMSQUARES"),
 };
 template <>
 inline const EnumMap& mapToText<Operation>() {
@@ -309,8 +309,9 @@ inline std::string enumName<Layout>() {
 enum class ISIStrategy {
     CLUSTERING,
     SPLIT_OVER_H,
-    SPLIT_OVER_K, // SOK + output_write_tiles=1 is not supported, SOK forces us to have broadcast
-    SPLIT_OVER_K_nxtHW, __size
+    SPLIT_OVER_K,  // SOK + output_write_tiles=1 is not supported, SOK forces us to have broadcast
+    SPLIT_OVER_K_nxtHW,
+    __size
 };  // shall we add SPLIT_OVER_K_switchHW ?
 static const EnumMap ISIStrategy_ToText{
         link(ISIStrategy::CLUSTERING, "Clustering"),

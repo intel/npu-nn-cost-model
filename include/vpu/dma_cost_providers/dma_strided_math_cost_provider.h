@@ -23,6 +23,7 @@
 #include "vpu/types.h"
 
 #include "dma_cost_provider_interface.h"                          // for IDMACostProvider
+#include "dma_stride_lut_fallback.h"                              // for DMAStrideLUTFallback
 #include "vpu/hw_characteristics/HW_characteristics_supersets.h"  // for HWCharacteristicsSet
 #include "vpu/hw_characteristics/itf_HW_characteristics_set.h"    // for IHWCharacteristicsSet
 
@@ -122,6 +123,18 @@ protected:
     }
 
     /**
+     * @brief Look up the LUT entry for (device, direction); the single lookup shared by all callers below.
+     *
+     * @return Pointer to the entry, or nullptr if (device, direction) has no curated fit
+     *         (see @ref DMAStrideLUTFallback for the shared substitute values).
+     */
+    static const DirectionModelingEntry* find_entry(const VPUDevice& device, MemoryDirection direction) {
+        const auto& modeling_map = get_modeling_function_map();
+        const auto it = modeling_map.find({device, direction});
+        return it != modeling_map.end() ? &it->second : nullptr;
+    }
+
+    /**
      * @brief Get src/dst-specific stride threshold from the direction LUT.
      *
      * Thresholds are stored per (device, direction) entry as a {src, dst} pair.
@@ -133,15 +146,12 @@ protected:
      * @return Src/dst stride threshold in bytes for the selected endpoint
      */
     static int get_stride_threshold_bytes(const VPUDevice& device, MemoryDirection direction, bool is_source) {
-        const auto& modeling_map = get_modeling_function_map();
-        const auto it = modeling_map.find({device, direction});
-        assert(it != modeling_map.end() && "Missing DMA stride-threshold LUT entry for (device, direction)");
-
-        if (it == modeling_map.end()) {
-            return 64;  // Safe fallback: smallest threshold used across all devices
+        const auto* entry = find_entry(device, direction);
+        if (!entry) {
+            return DMAStrideLUTFallback::threshold_bytes(direction, is_source);
         }
 
-        return is_source ? it->second.thresholds.first : it->second.thresholds.second;
+        return is_source ? entry->thresholds.first : entry->thresholds.second;
     }
 
     /// Stride penalty enablement map for DMA transfers
@@ -317,24 +327,14 @@ protected:
      */
     unsigned long long query_dma_cost_by_size(unsigned long long dma_size, const VPUDevice& device,
                                               MemoryDirection direction) const {
-        const auto& modeling_map = get_modeling_function_map();
-
-        // 1. Try exact (device, direction) match
-        auto it = modeling_map.find({device, direction});
-
-        // 3. Use linear model if any entry was found (no fallback if missing)
-        if (it != modeling_map.end()) {
-            const auto& params = it->second.linear;           // LinearModelingParams
-            double cycles = params.compute_cycles(dma_size);  // linear, without penalty
-            return static_cast<unsigned long long>(cycles);
-        } else {
-            // Device not in map at all — legacy bandwidth fallback,
-            const int bw_bpc = hw_info.device(device).get_DMA_DDR_interface_bytes();  // bytes per cycle
-            // Guard: non-positive bandwidth (e.g. -1 for unknown/default HW) falls back to 1 byte/cycle.
-            const int safe_bw_bpc = bw_bpc > 0 ? bw_bpc : 1;
-            const auto CMX_cycles = ((float)dma_size) / ((float)safe_bw_bpc);
-            return std::max(1ULL, static_cast<unsigned long long>(CMX_cycles));
+        const auto* entry = find_entry(device, direction);
+        if (!entry) {
+            return DMAStrideLUTFallback::cycles_by_bandwidth(dma_size, device, hw_info);
         }
+        
+        const auto& params = entry->linear;           // LinearModelingParams
+        double cycles = params.compute_cycles(dma_size);  // linear, without penalty
+        return static_cast<unsigned long long>(cycles);
     }
 
 public:

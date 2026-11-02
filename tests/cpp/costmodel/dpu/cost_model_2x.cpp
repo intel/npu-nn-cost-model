@@ -8,6 +8,7 @@
 // Software Package for additional details.
 
 #include "costmodel/cost_model.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -220,7 +221,7 @@ TEST_F(TestCostModel, Compute_Input1_size_TestVPU2x) {
     const DPU_OperationSanitizer sanitizer;
     auto run_tests = [&sanitizer, &test_message](const TestsVector& tests) {
         for (auto& t : tests) {
-            std::cout << test_message(t.t_in.wl);
+            utest_log::debug() << test_message(t.t_in.wl);
             auto wl_op = DPUOperation(t.t_in.wl, sanitizer.getDeviceConfiguration(t.t_in.wl.device));
 
             EXPECT_EQ(wl_op.input_1.width, t.t_exp.inpu1_W) << test_message(t.t_in.wl);
@@ -236,7 +237,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_BasicAssertions) {
     {  // 2_0
         const std::string model_path = VPU_2_0_MODEL_PATH;
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
@@ -244,7 +245,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_BasicAssertions) {
     {  // 2_7
         const std::string model_path = VPU_2_7_MODEL_PATH;
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
@@ -252,7 +253,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_BasicAssertions) {
     {  // 2_0 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH)};
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
@@ -260,7 +261,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_BasicAssertions) {
     {  // 2_7 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH)};
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
     }
@@ -281,7 +282,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
     {  // 2_0
         const std::string model_path = VPU_2_0_MODEL_PATH;
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
@@ -293,7 +294,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
     {  // 2_7
         const std::string model_path = VPU_2_7_MODEL_PATH;
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
@@ -305,7 +306,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
     {  // 2_0 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH)};
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_0};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
@@ -317,7 +318,7 @@ TEST_F(TestCostModelVPU2x, LoadModels_NN_Valid_Interval) {
     {  // 2_7 fast
         const std::string model_path{NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH)};
         const VPUDevice device{VPUNN::VPUDevice::VPU_2_7};
-        EXPECT_NO_THROW({VPUNN::VPUCostModel x(device, model_path);});
+        EXPECT_NO_THROW({ VPUNN::VPUCostModel x(device, model_path); });
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         ASSERT_TRUE(vpunn_model.nn_initialized());
 
@@ -888,7 +889,7 @@ TEST_F(TestCostModelVPU2x, Special_Tests_DPU_MAXPOOL_VPU_2_0_1_96_96_9_9_1_2_VAL
         TestCycles cycles_slow{cost_models.getModel(device20).DPU(wl), cost_models.getModel(device20).DPU(wl_smaller)};
 
         VPUNN::VPUCostModel model_fast{the_NN_models.fast_model_paths[0].second,
-                           the_NN_models.fast_model_paths[0].first};
+                                       the_NN_models.fast_model_paths[0].first};
         TestCycles cycles_fast{model_fast.DPU(wl), model_fast.DPU(wl_smaller)};
 
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_slow.cycles_smaller))
@@ -1194,14 +1195,14 @@ TEST_F(TestCostModelVPU2x, InitAspects) {
         ASSERT_GT(file_content.size(), 10) << "Must have some content";
 
         EXPECT_NO_THROW(
-            (VPUNN::VPUCostModel(VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), true)));
+                (VPUNN::VPUCostModel(VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), true)));
         VPUNN::VPUCostModel vpunn_model_buf{VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), true};
         EXPECT_FALSE(vpunn_model_buf.nn_initialized());
 
         EXPECT_NO_THROW(
-            (VPUNN::VPUCostModel(VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), false)));
+                (VPUNN::VPUCostModel(VPUNN::VPUDevice::__size, file_content.data(), file_content.size(), false)));
         VPUNN::VPUCostModel vpunn_model_buf_copy{VPUNN::VPUDevice::__size, file_content.data(), file_content.size(),
-                             false};
+                                                 false};
         EXPECT_FALSE(vpunn_model_buf_copy.nn_initialized());
 
         auto cycles_20 = vpunn_model_buf.DPU(wl_glob_20);
@@ -1219,26 +1220,26 @@ TEST_F(TestCostModelVPU2x, ComaparativeRuns) {
     auto modelRun = [](VPUNN::VPUDevice device, const std::string& model_path, VPUNN::DPUWorkload& wld) {
         VPUNN::VPUCostModel vpunn_model{device, model_path};
         const IEnergy& my_energy = vpunn_model.getEnergyInterface();
-        std::cout << model_path << " : initialized: " << vpunn_model.nn_initialized() << std::endl;
+        utest_log::debug() << model_path << " : initialized: " << vpunn_model.nn_initialized() << std::endl;
 
-        // std::cout << "run_NN(wl)   : " << vpunn_model.run_NN(wld) << std::endl;
-        std::cout << "DPU(wl)   : " << vpunn_model.DPU(wld) << std::endl;
-        std::cout << "hw_utilization(wl)   : " << my_energy.hw_utilization(wld) << std::endl;
+        // utest_log::debug() << "run_NN(wl)   : " << vpunn_model.run_NN(wld) << std::endl;
+        utest_log::debug() << "DPU(wl)   : " << vpunn_model.DPU(wld) << std::endl;
+        utest_log::debug() << "hw_utilization(wl)   : " << my_energy.hw_utilization(wld) << std::endl;
     };
 
-    std::cout << "----------------------------------------------------------\n";
+    utest_log::debug() << "----------------------------------------------------------\n";
     modelRun(device20, model20_path, wl_glob_20);
     // modelRun(VPU_2_0_MODEL_PATH, device20, wl_glob_20);
-    std::cout << "----------------------------------------------------------\n";
+    utest_log::debug() << "----------------------------------------------------------\n";
     modelRun(device27, model27_path, wl_glob_27);
     // modelRun(VPU_2_7_MODEL_PATH, device27, wl_glob_27);
-    std::cout << "----------------------------------------------------------\n";
+    utest_log::debug() << "----------------------------------------------------------\n";
     modelRun(device20, NameHelperNN::make_fast_version(model20_path), wl_glob_20);
     // modelRun(NameHelperNN::make_fast_version(VPU_2_0_MODEL_PATH), device20, wl_glob_20);
-    std::cout << "----------------------------------------------------------\n";
+    utest_log::debug() << "----------------------------------------------------------\n";
     modelRun(device27, NameHelperNN::make_fast_version(model27_path), wl_glob_27);
     // modelRun(NameHelperNN::make_fast_version(VPU_2_7_MODEL_PATH), device27, wl_glob_27);
-    std::cout << "----------------------------------------------------------\n";
+    utest_log::debug() << "----------------------------------------------------------\n";
 }
 
 TEST_F(TestCostModelVPU2x, OutputWriteTiles_multiple) {
@@ -1294,7 +1295,8 @@ TEST_F(TestCostModelVPU2x, OutputWriteTiles_multiple) {
         EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles))
                 << h << "err_code: " << VPUNN::Cycles::toErrorText(cycles) << std::endl;
 
-        std::cout << h << "\t :output_write_tiles: " << wl.output_write_tiles << ",  cyc: " << cycles << std::endl;
+        utest_log::debug() << h << "\t :output_write_tiles: " << wl.output_write_tiles << ",  cyc: " << cycles
+                          << std::endl;
     };
 
     auto run_test_all_owt = [&run_test_1owt, &owt_list](const VPUNN::DPUWorkload& wlref, const std::string& h) {
@@ -1303,7 +1305,7 @@ TEST_F(TestCostModelVPU2x, OutputWriteTiles_multiple) {
             wl.output_write_tiles = owt;
             run_test_1owt(wl, h);
         }
-        std::cout << std::endl;
+        utest_log::debug() << std::endl;
     };
     {
         bool expectationToForce{true};
@@ -1424,8 +1426,8 @@ TEST_F(TestCostModelVPU2x, TestDPUVPU27ModelIC_4_16_32) {
         EXPECT_LT(wl0_cycles, wl1_cycles);
         EXPECT_LT(wl0_cycles, wl2_cycles);
 
-        std::cout << "On Execution Mode Cuboid 16x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
-                  << "\nIC = 32:" << wl2_cycles;
+        utest_log::debug() << "On Execution Mode Cuboid 16x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
+                          << "\nIC = 32:" << wl2_cycles;
     }
 
     wl0.execution_order = wl1.execution_order = wl2.execution_order = VPUNN::ExecutionMode::CUBOID_8x16;
@@ -1441,8 +1443,8 @@ TEST_F(TestCostModelVPU2x, TestDPUVPU27ModelIC_4_16_32) {
         EXPECT_LT(wl0_cycles, wl1_cycles);
         EXPECT_LT(wl0_cycles, wl2_cycles);
 
-        std::cout << "On Execution Mode Cuboid 8x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
-                  << "\nIC = 32:" << wl2_cycles;
+        utest_log::debug() << "On Execution Mode Cuboid 8x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
+                          << "\nIC = 32:" << wl2_cycles;
     }
     wl0.execution_order = wl1.execution_order = wl2.execution_order = VPUNN::ExecutionMode::CUBOID_4x16;
 
@@ -1457,8 +1459,8 @@ TEST_F(TestCostModelVPU2x, TestDPUVPU27ModelIC_4_16_32) {
         EXPECT_LT(wl0_cycles, wl1_cycles);
         EXPECT_LT(wl0_cycles, wl2_cycles);
 
-        std::cout << "On Execution Mode Cuboid 4x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
-                  << "\nIC = 32:" << wl2_cycles;
+        utest_log::debug() << "On Execution Mode Cuboid 4x16\nIC = 4:" << wl0_cycles << "\nIC = 16:" << wl1_cycles
+                          << "\nIC = 32:" << wl2_cycles;
     }
 }
 
@@ -1850,7 +1852,7 @@ TEST_F(TestCostModelVPU2x, DISABLED_Compressed_CONV_Sweep_log_NPU27_EISXW_103713
                     << "ERROR code received: " << cycles_raw << " : " << Cycles::toErrorText(cycles_raw)
                     << "\n TEST: " << test.t_in.test_name << "\n INFO: " << wl << info_raw << std::endl;
 
-            std::cout << "\n TEST: " << test.t_in.test_name << " :\t Value : " << cycles_raw;
+            utest_log::debug() << "\n TEST: " << test.t_in.test_name << " :\t Value : " << cycles_raw;
         }
     }
 }
@@ -1911,7 +1913,7 @@ TEST_F(TestCostModelVPU2x, Check_Wl_halo_data_test) {
         std::string info;
 
         for (const auto& t : tests) {
-            std::cout << "TEST " << i << ": " << t.test_case << "\n";
+            utest_log::debug() << "TEST " << i << ": " << t.test_case << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;
@@ -1923,7 +1925,7 @@ TEST_F(TestCostModelVPU2x, Check_Wl_halo_data_test) {
             if (!is_error_code(t.t_exp.cycles)) {
                 ASSERT_FALSE(is_error_code(cyc)) << cyc << wl_ref_halo;
             } else {
-                ASSERT_TRUE(is_error_code(cyc))<<cyc<<wl_ref_halo;
+                ASSERT_TRUE(is_error_code(cyc)) << cyc << wl_ref_halo;
                 ASSERT_EQ(cyc, t.t_exp.cycles);
             }
 
@@ -2209,9 +2211,9 @@ TEST_F(TestCostModelVPU2x, SOK_CLUSTERING_OWT_equivalence_test_103266) {
                 c_sok_2 = cycles;
             }
 
-            std::cout << "\n--------- RESULTS conv : "
-                      << "\n cost clustering 1: " << c_clu_1 << "\n cost clustering 2: " << c_clu_2
-                      << "\n cost sok_2: " << c_sok_2 << " \n ";
+            utest_log::debug() << "\n--------- RESULTS conv : "
+                              << "\n cost clustering 1: " << c_clu_1 << "\n cost clustering 2: " << c_clu_2
+                              << "\n cost sok_2: " << c_sok_2 << " \n ";
 
             EXPECT_GT(c_clu_2, c_clu_1) << "broadcasting must be greater " << wl_clu << std::endl;
             EXPECT_GT(c_sok_2, c_clu_1) << "broadcasting must be greater " << wl_clu << std::endl;
@@ -2273,9 +2275,9 @@ TEST_F(TestCostModelVPU2x, SOK_CLUSTERING_OWT_equivalence_test_103266) {
                 c_sok_2 = cycles;
             }
 
-            std::cout << "\n--------- RESULTS elementwise : "
-                      << "\n cost clustering 1: " << c_clu_1 << "\n cost clustering 2: " << c_clu_2
-                      << "\n cost sok_2: " << c_sok_2 << " \n ";
+            utest_log::debug() << "\n--------- RESULTS elementwise : "
+                              << "\n cost clustering 1: " << c_clu_1 << "\n cost clustering 2: " << c_clu_2
+                              << "\n cost sok_2: " << c_sok_2 << " \n ";
 
             EXPECT_GE(c_clu_2, c_clu_1) << "broadcasting must be greater " << wl_clu << std::endl;
             EXPECT_GE(c_sok_2, c_clu_1) << "broadcasting must be greater " << wl_clu << std::endl;
@@ -2336,9 +2338,9 @@ TEST_F(TestCostModelVPU2x, SOK_CLUSTERING_OWT_equivalence_test_103266) {
                 c_sok_2 = cycles;
             }
 
-            std::cout << "\n--------- RESULTS elementwise orig : "
-                      << "\n cost clustering 1: " << c_clu_1 << "\n cost clustering 2: " << c_clu_2
-                      << "\n cost sok_2: " << c_sok_2 << " \n ";
+            utest_log::debug() << "\n--------- RESULTS elementwise orig : "
+                              << "\n cost clustering 1: " << c_clu_1 << "\n cost clustering 2: " << c_clu_2
+                              << "\n cost sok_2: " << c_sok_2 << " \n ";
 
             EXPECT_GE(c_clu_2, c_clu_1) << "broadcasting must be greater " << wl_clu << std::endl;
             EXPECT_GE(c_sok_2, c_clu_1) << "broadcasting must be greater " << wl_clu << std::endl;
@@ -2574,7 +2576,7 @@ TEST_F(TestCostModelVPU2x, Dual_sparsity_NN_Output_Cycle_invalid_values_Test) {
     // sparsity now this wl has only input sparsity active => may generate an error
     auto verify_cycle = [this](const TestsVector& tests) {
         for (const auto& t : tests) {
-            std::cout << " Test CASE: " << t.t_info << "\n";
+            utest_log::debug() << " Test CASE: " << t.t_info << "\n";
 
             // PRECONDITION: verify if both input and weight sparsity are active
             ASSERT_TRUE(t.t_in.wl_ref.inputs[0].get_sparsity());
@@ -2773,7 +2775,7 @@ TEST_F(TestCostModelVPU2x, Weigths_types_NPU27_test) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << " Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << " Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     };
@@ -2844,7 +2846,7 @@ TEST_F(TestCostModelVPU2x, MTL_Weigths_types_CONV_NPU27) {
 
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }
@@ -2894,7 +2896,7 @@ TEST_F(TestCostModelVPU2x, MTL_Weigths_types_CONV_NPU27) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }
@@ -2944,7 +2946,7 @@ TEST_F(TestCostModelVPU2x, MTL_Weigths_types_CONV_NPU27) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }
@@ -2994,7 +2996,7 @@ TEST_F(TestCostModelVPU2x, MTL_Weigths_types_CONV_NPU27) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }

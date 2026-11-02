@@ -8,11 +8,11 @@
 // Software Package for additional details.
 
 #include "http_client/http_cost_provider.h"
-#include "http_client/workload_json.h"
 #include <algorithm>
 #include <functional>
 #include <iostream>
 #include <variant>
+#include "http_client/workload_json.h"
 #include "vpu/http_workload_variant.h"
 
 namespace VPUNN {
@@ -60,9 +60,9 @@ bool HTTPProfilingClient::is_available(const std::string& check_backend) const {
 
     nlohmann::json status_request_payload;
 
+    // KNOWN PARAMS KEYS: 'status', 'bypass_validation', 'bypass_heuristic','override', 'backend', 'offset'
     status_request_payload["params"] = nlohmann::json::object();
     status_request_payload["params"]["status"] = true;
-    status_request_payload["params"]["name"] = "profiling_request";
 
     auto res = sendJsonRequest(status_request_payload, "/generate_workload");
 
@@ -278,11 +278,9 @@ CyclesInterfaceType HttpCostProvider::getHttpCost(const WlT& workload, std::stri
 
         nlohmann::json payload;
 
+        // KNOWN PARAMS KEYS: 'status', 'bypass_validation', 'bypass_heuristic','override', 'backend', 'offset'
         payload["params"] = nlohmann::json::object();
         payload["params"]["backend"] = backend;
-
-        payload["params"]["name"] = "profiling_request";
-        payload["params"]["timeout"] = -1;  // Need to wait for the profiling to finish
 
         constexpr const char* workload_key = WorkloadKeyTrait<WlT>::key;
         payload[workload_key] = toJson(workload);

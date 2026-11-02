@@ -7,6 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 #include "dpu_validator.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -67,8 +68,8 @@ TEST_F(DPU_OperationValidator_TestNPU5x, Compute_memory_subByte_dtypes) {
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << "Test case:"
-                      << " " << i << " , " << t.info << "\n";
+            utest_log::debug() << "Test case:"
+                              << " " << i << " , " << t.info << "\n";
 
             DPUWorkload wl_ref{t.t_in.wl};
 
@@ -165,8 +166,8 @@ TEST_F(DPU_OperationValidator_TestNPU5x, Input1_memory_computation_test) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
-            std::cout << "Test case "
-                      << " " << i << ": " << test_info(wl_ref) << "\n";
+            utest_log::debug() << "Test case "
+                              << " " << i << ": " << test_info(wl_ref) << "\n";
 
             {
                 long long mem = 0;
@@ -541,8 +542,8 @@ TEST_F(DPU_OperationValidator_TestNPU5x, Output_tensor_memory_computation_test_f
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
-            std::cout << "Test case "
-                      << " " << i << ": " << test_info(wl_ref) << "\n";
+            utest_log::debug() << "Test case "
+                              << " " << i << ": " << test_info(wl_ref) << "\n";
 
             MemorySize memory;
             {

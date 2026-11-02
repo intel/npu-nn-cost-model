@@ -180,6 +180,9 @@ nlohmann::json toJson<DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50& wl) 
     payload["dst_dim_size_5"] = wl.e_dim[4].dst_dim_size;
 
     // Python profiling server expects num_engine as 1-indexed (1 or 2); enum is 0-indexed.
+    // for profiling 1 or 2 will impact if teh operation will be done on one port (1), or it will be replicated also on
+    // second port(2) , so we will have 2 DMA's running in parallel on 2 different tiles. This feature is to be used for
+    // profiling with parallel DMAs, and works in HPP
     payload["num_engine"] = static_cast<int>(wl.num_engine) + 1;
     // Python profiling server expects "Direction.<value>" (e.g. "Direction.CMX2DDR")
     payload["direction"] = "Direction." + mapToText<MemoryDirection>().at(static_cast<int>(wl.transfer_direction));

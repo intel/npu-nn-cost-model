@@ -6,13 +6,14 @@
 // included in or with the Software Package, and your use indicates your acceptance of all such terms.
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
-#include "vpu/device_layer_properties/device_layer_properties_holder.h"
 #include <algorithm>
+#include "vpu/device_layer_properties/device_layer_properties_holder.h"
 #include "vpu_layer_cost_model.h"
 
 #include <gtest/gtest.h>
 #include <sstream>  // for error formating
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -193,7 +194,7 @@ public:
         }
 
         std::string t_header{"** Test Case: " + details + "\n"};
-        std::cout << ">> " << t_header << std::endl;
+        utest_log::debug() << ">> " << t_header << std::endl;
 
         EXPECT_TRUE(t_exp.has_consistent_size()) << "problem with expected values consistency";
 
@@ -232,8 +233,8 @@ public:
             // can do checks that other fields are not changed!
         }
 
-        std::cout << t_header << "------------------------------------------------------------------------"
-                  << std::endl;
+        utest_log::debug() << t_header << "------------------------------------------------------------------------"
+                          << std::endl;
     }
 
     void TestSow(std::function<std::vector<DPULayer>(const DPULayer*, unsigned int)>& wSplit, const TestInput& t_in,
@@ -251,7 +252,7 @@ public:
         }
 
         std::string t_header{"** Test Case: " + details + "\n"};
-        std::cout << ">> " << t_header << std::endl;
+        utest_log::debug() << ">> " << t_header << std::endl;
 
         EXPECT_TRUE(t_exp.has_consistent_size()) << "problem with expected values consistency";
 
@@ -290,8 +291,8 @@ public:
             // can do checks that other fields are not changed!
         }
 
-        std::cout << t_header << "------------------------------------------------------------------------"
-                  << std::endl;
+        utest_log::debug() << t_header << "------------------------------------------------------------------------"
+                          << std::endl;
     }
 
 protected:

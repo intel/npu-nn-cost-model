@@ -145,12 +145,14 @@ unsigned long int HWPerformanceModel::compute_HW_MAC_operations_cnt(const DPUWor
 bool HWPerformanceModel::native_comp_on_fp16(const DPUWorkload& wl) const {
     // If either activations or weights are FP16/BF16 then native computation is FP16/BF16
     static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+    // FLOAT32/INT32 not expected here: not valid input/weight datatypes for any device.
     return DTypeCategoryInfo::is_fp16family_dtype(wl.inputs[0].get_dtype()) || DTypeCategoryInfo::is_fp16family_dtype(wl.get_weight_type());
 }
 
 bool HWPerformanceModel::native_comp_on_fp8(const DPUWorkload& wl) const {
     // Native computation is FP8 when the input is FP8-family and weights are not FP16-family.
     static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+    // FLOAT32/INT32 not expected here: not a valid weight datatype for any device.
     return DTypeCategoryInfo::is_fp8family_dtype(wl.inputs[0].get_dtype()) && (!DTypeCategoryInfo::is_fp16family_dtype(wl.get_weight_type()));
 }
 
@@ -162,6 +164,7 @@ bool HWPerformanceModel::native_comp_on_i16(const DPUWorkload& wl) const {
 
 bool HWPerformanceModel::native_comp_on_i8(const DPUWorkload& wl) const {
     static_assert(std::tuple_size<decltype(wl.inputs)>{} == 1, "only one input");
+    // FLOAT32/INT32 not expected here: not a valid input datatype for any device.
     return DTypeCategoryInfo::is_i8family_dtype(wl.inputs[0].get_dtype()) && (!DTypeCategoryInfo::is_any_float_dtype(wl.get_weight_type()));
 }
 

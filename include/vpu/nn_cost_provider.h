@@ -7,8 +7,8 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef NN_COST_PROVIDER_H_
-#define NN_COST_PROVIDER_H_
+#ifndef VPUNN_NN_COST_PROVIDER_H_
+#define VPUNN_NN_COST_PROVIDER_H_
 
 #include <algorithm>  // for std::fill, std::transform, std::replace
 #include <cmath>      // for std::ceil
@@ -20,7 +20,6 @@
 #include <stdexcept>    // for std::runtime_error
 #include <string_view>  // for std::string_view
 #include <thread>
-#include "core/cache.h"
 #include "core/dpu_map_type_selector.h"
 #include "core/logger.h"  // for Logger::error()
 #include "core/utils.h"   // for get_env_vars()
@@ -30,6 +29,7 @@
 #include "inference/preprop_factory.h"
 #include "inference/vpunn_runtime.h"
 #include "vpu/cycles_interface_types.h"
+#include "vpu/nn_cost_cache_manager.h"
 #include "vpu/nn_cost_provider_execution_context.h"
 #include "vpu/serialization/l1_cost_serialization_wrapper.h"
 #include "vpu/types.h"  // for DPUWorkload, VPUDevice
@@ -39,19 +39,17 @@ namespace VPUNN {
 
 class NNCostProvider {
 public:
-    NNCostProvider(const std::string& filename = "", const unsigned int batch_size = 1, bool profile = false,
-                   const unsigned int cache_size = 16384, const std::string& dpu_cache_filename = "",
-                   bool tryToLoadPairedCache = false)
+    NNCostProvider(VPUDevice model_device, const std::string& filename = "", const unsigned int batch_size = 1,
+                   bool profile = false, const unsigned int cache_size = 16384,
+                   const std::string& dpu_cache_filename = "", bool tryToLoadPairedCache = false)
             : vpunn_runtime(filename, profile),
               preprocessing_factory{},
               postprocessing_factory{},
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), filename)),
               results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
               post_processing(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), filename)),
-              cache(cache_size /*, preprocessing.output_size()*/, dpu_cache_filename,
-                    (tryToLoadPairedCache ? filename : "")),
-              new_cache(cache_size, dpu_cache_filename,
-                        (tryToLoadPairedCache ? filename : "")),  // New cache for newer devices
+              cache_manager(use_new_hash_method_for_device(model_device), cache_size, dpu_cache_filename,
+                            (tryToLoadPairedCache ? filename : "")),
               cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
                                             .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE"),
               batch_size(batch_size) {
@@ -64,18 +62,18 @@ public:
         cache_miss_serializer.initialize(cache_miss_file_naming(), FileMode::READ_WRITE, get_names_for_serializer());
     };
 
-    NNCostProvider(const char* model_data, size_t model_data_length, const unsigned int batch_size,
-                   bool copy_model_data, bool profile = false, const unsigned int cache_size = 16384,
-                   const char* dpu_cache_data = nullptr, size_t dpu_cache_data_length = 0)
+    NNCostProvider(VPUDevice model_device, const char* model_data, size_t model_data_length,
+                   const unsigned int batch_size, bool copy_model_data, bool profile = false,
+                   const unsigned int cache_size = 16384, const char* dpu_cache_data = nullptr,
+                   size_t dpu_cache_data_length = 0)
             : vpunn_runtime(model_data, model_data_length, copy_model_data, profile),
               preprocessing_factory{},
               postprocessing_factory{},
               preprocessing(init_preproc(preprocessing_factory, vpunn_runtime.model_version_info(), "")),
               results_config(vpunn_runtime.model_version_info().get_output_interface_version()),
               post_processing(init_postproc(postprocessing_factory, vpunn_runtime.model_version_info(), "")),
-              cache(cache_size, /* preprocessing.output_size(),*/ dpu_cache_data, dpu_cache_data_length),
-              new_cache(cache_size, dpu_cache_data,
-                        dpu_cache_data_length),  // New cache for newer devices
+              cache_manager(use_new_hash_method_for_device(model_device), cache_size, dpu_cache_data,
+                            dpu_cache_data_length),
               cache_miss_serializer(get_env_vars({"ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION"})
                                             .at("ENABLE_VPUNN_CACHE_MISS_DATA_SERIALIZATION") == "TRUE"),
               batch_size(batch_size) {
@@ -97,12 +95,7 @@ public:
     }
 
     const AccessCounter& getPreloadedCacheCounter() const {
-        // Assumption is that only one of the legacy or new cache is used at a time,
-        // thus, we have to select the one that is in use by looking if there were any accesses to it.
-        // return the one with bigger number of accesses
-        return (cache.getPreloadedCacheCounter().getAccesses() >= new_cache.getPreloadedCacheCounter().getAccesses())
-                       ? cache.getPreloadedCacheCounter()
-                       : new_cache.getPreloadedCacheCounter();
+        return cache_manager.getPreloadedCacheCounter();
     }
 
     /// @brief provides the nickname of the model, used for cache and serializer
@@ -112,10 +105,15 @@ public:
     }
 
 protected:
-    // Helper to determine if workload should use new hash method (newer devices)
-    static bool use_new_hash_method(const DPUWorkload& workload) {
-        // For newer device versions, use new hash method
-        return workload.device >= VPUDevice::NPU_RESERVED;
+    /// @brief Determines whether the new hash method should be used for a given device.
+    /// @param model_device The device to check.
+    /// @return `true` (use the new `WorkloadCache`, keyed on `DPUWorkload`) for devices newer than
+    /// `VPUDevice::NPU_5_0_W`; `false` (use the legacy `DescriptorCache`, keyed on the preprocessing descriptor)
+    /// for `VPUDevice::NPU_5_0_W` and older devices, as well as for`VPUDevice::__size`.
+    static bool use_new_hash_method_for_device(VPUDevice model_device) {
+        // __size comes after the last device, so it must be excluded explicitly to keep the
+        // descriptor cache as default for unbound models
+        return model_device > VPUDevice::NPU_5_0_W && model_device != VPUDevice::__size;
     }
 
     float infer_raw_input(const DPUWorkload& workload) const {
@@ -126,9 +124,11 @@ protected:
         }
 
         // Helper lambdas for cache access and update
-        auto compute_and_cache = [&](auto& cache_ref, auto&& key, const std::vector<float>& descriptor) -> float {
+        // captures by reference: `workload` and `cache_miss_serializer` are only used for the miss-log entry below,
+        // not for the actual cache key (that's `key`, either the workload itself or its descriptor)
+        auto compute_and_cache = [&](auto&& key, const std::vector<float>& descriptor) -> float {
             const auto infered_value = vpunn_runtime.predict<float>(descriptor, ctx.runtime_buffer_data)[0];
-            cache_ref.add(key, infered_value);
+            cache_manager.add(key, infered_value);  // template specialization will decide what add method is used
 
             L1CostSerializationWrap serialization_handler(cache_miss_serializer);
             serialization_handler.serializeInfoAndComputeWorkloadUid(workload, true /*serializer close line*/);
@@ -136,22 +136,21 @@ protected:
             return infered_value;
         };
 
-        if (use_new_hash_method(workload)) {
-            const auto cached_value = new_cache.get(workload);
+        if (cache_manager.uses_workload_hash_cache()) {
+            const auto cached_value = cache_manager.get(workload);
             if (cached_value) {
-                return cached_value.value();
+                return *cached_value;
             }
             const std::vector<float> descriptor{preprocessing.transformSingle(workload)};
-            return compute_and_cache(new_cache, workload, descriptor);
+            return compute_and_cache(workload, descriptor);  // workload is the key
         } else {
             // Older devices or non-hashable: Use preprocessing-based caching
             const std::vector<float> descriptor{preprocessing.transformSingle(workload)};
-            const auto cached_value = cache.get(descriptor);
+            const auto cached_value = cache_manager.get(descriptor);
             if (cached_value) {
-                return cached_value.value();
+                return *cached_value;
             }
-
-            return compute_and_cache(cache, descriptor, descriptor);
+            return compute_and_cache(descriptor, descriptor);  // descriptor is the key
         }
     }
 
@@ -283,15 +282,9 @@ public:
             return Cycles::ERROR_CACHE_MISS;
         }
 
-        std::optional<float> cached_value;
-
-        // For newer devices, check new cache; otherwise use old cache
-        if (use_new_hash_method(workload)) {
-            cached_value = new_cache.get(workload, source);
-        } else {
-            const std::vector<float> vector = preprocessing.transformSingle(workload);
-            cached_value = cache.get(vector, source);
-        }
+        const auto cached_value = cache_manager.uses_workload_hash_cache()
+                                          ? cache_manager.get(workload, source)
+                                          : cache_manager.get(preprocessing.transformSingle(workload), source);
 
         if (!cached_value) {
             return Cycles::ERROR_CACHE_MISS;
@@ -311,12 +304,11 @@ public:
             return;
         }
 
-        // For newer devices, add to new cache; otherwise use old cache
-        if (use_new_hash_method(workload)) {
-            new_cache.add(workload, value);
+        if (cache_manager.uses_workload_hash_cache()) {
+            cache_manager.add(workload, value);
         } else {
-            const std::vector<float> vector = preprocessing.transformSingle(workload);
-            cache.add(vector, value);
+            const std::vector<float> descriptor{preprocessing.transformSingle(workload)};
+            cache_manager.add(descriptor, value);
         }
     }
 
@@ -371,10 +363,8 @@ private:
     const Preprocessing<float>& preprocessing;  ///< prepares the input vector for the runtime, configured at ctor
     const PostProcessSupport results_config;
     const IPostProcess& post_processing;
-    mutable LRUCache<std::vector<float>, float>
-            cache;  ///< cache for inferred values (preprocessing-based, for backward compatibility with older devices)
-    mutable LRUCache<DPUWorkload, float>
-            new_cache;  ///< cache for newer devices using direct DPUWorkload hashing (O(1) with unordered_map)
+    mutable NNCostCacheManager
+            cache_manager;  ///< one cache for all situations. its flavor it is decided at constructor
     mutable CSVSerializer cache_miss_serializer;              ///< serializer for missed cache
     const std::string model_nickname{make_model_nickname()};  ///< nickname for the model, used for cache and serializer
     const float default_NN_output{-1.0F};  ///< this is the value used in no NN output is present (like not loaded).
@@ -429,7 +419,7 @@ private:
      * @brief check post config will check if we either have an empty model, or the output version is supported
      *
      * If we have an empty ideal model or we got the output version supported this function will be exited with
-     * no errors. In case that we got a model with an unsupported output version this function will throw a runtime
+     * no errors. In case of that we got a model with an unsupported output version this function will throw a runtime
      * error specifying the output version and the full raw name of it.
      *
      * @throws std::runtime_error In case that we got a model with an unsupported output version you will get a runtime
@@ -497,4 +487,4 @@ private:
 
 }  // namespace VPUNN
 
-#endif
+#endif  // VPUNN_NN_COST_PROVIDER_H_

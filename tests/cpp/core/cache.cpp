@@ -9,6 +9,7 @@
 
 #include "core/cache.h"
 #include "core/persistent_cache.h"
+#include "core/vecdescriptor_map_type_selector.h"  // for LRUCache<std::vector<float>, float>
 
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -18,8 +19,10 @@
 #include <vector>
 #include "common/common_helpers.h"
 #include "core/serializer.h"
+#include "logger/logger.h"
 #include "vpu/compatibility/types11.h"
 #include "vpu/compatibility/types14.h"
+#include "vpu/nn_cost_cache_manager.h"
 #include "vpu/validation/serializable_dpu.h"
 #include "vpu_cost_model.h"
 
@@ -366,19 +369,19 @@ TEST_F(VPUNNCachePreloadedTest, EmptyBasicTest) {
 
 TEST_F(VPUNNCachePreloadedTest, FolderBasicTest) {
     std::string model4_folder{VPU_4_0_MODEL_PATH};
-    std::cout << "Model 4 folder is : " << model4_folder << std::endl;
+    utest_log::debug() << "Model 4 folder is : " << model4_folder << std::endl;
 
     auto pathC = std::filesystem::current_path();  // getting path
-    std::cout << "Current path is : " << pathC << std::endl;
+    utest_log::debug() << "Current path is : " << pathC << std::endl;
 
     std::filesystem::path pathM = model4_folder;
-    std::cout << "PathMOdel: " << pathM << " Has FilenameL " << pathM.has_filename() << std::endl;
+    utest_log::debug() << "PathMOdel: " << pathM << " Has FilenameL " << pathM.has_filename() << std::endl;
     // pathM.remove_filename();
-    // std::cout << "PathMOdelFOlder: " << pathM << " Has Filename: " << pathM.has_filename() << std::endl;
+    // utest_log::debug() << "PathMOdelFOlder: " << pathM << " Has Filename: " << pathM.has_filename() << std::endl;
     // pathM /= "cache.bin";
     pathM.replace_extension("cache_bin");
-    std::cout << "PathModelCache: " << pathM << " Has Filename: " << pathM.has_filename()
-              << " Exists: " << std::filesystem::exists(pathM) << std::endl;
+    utest_log::debug() << "PathModelCache: " << pathM << " Has Filename: " << pathM.has_filename()
+                       << " Exists: " << std::filesystem::exists(pathM) << std::endl;
 
     const auto cache_file{pathM.string()};
 
@@ -390,7 +393,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
     auto& preprop_now = pp_4011;  // irelevant since we create our own cache
     FixedCache the_cache{/*size_of_descriptor_INterface11,*/ ""};
     auto pathC = std::filesystem::current_path();  // getting path
-    std::cout << "Current path is : " << pathC << std::endl;
+    utest_log::debug() << "Current path is : " << pathC << std::endl;
 
     const std::string test_cache_file{"test_cache.bin"};
     const ScopedFileCleanup cleanup{test_cache_file};
@@ -423,8 +426,8 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
         EXPECT_EQ(*the_cache.get(mkhsh(desc2)), 2.0f);
 
         std::filesystem::path fileOne{pathC /= test_cache_file};
-        std::cout << "Current test cache is : " << fileOne << std::endl;
-        std::cout << "File exists?: " << std::filesystem::exists(fileOne) << std::endl;
+        utest_log::debug() << "Current test cache is : " << fileOne << std::endl;
+        utest_log::debug() << "File exists?: " << std::filesystem::exists(fileOne) << std::endl;
 
         if (std::filesystem::exists(fileOne)) {
             // delete it
@@ -472,9 +475,10 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
 
             const auto& cacheStats{read_cache.getCounter()};
             // print cache statistics
-            std::cout << "\nCache statistics for Binary load section: " << cacheStats.printString() << std::endl;
+            utest_log::info() << "\nCache statistics for Binary load section: " << cacheStats.printString()
+                              << std::endl;
             cacheStats.reset();
-            std::cout << "\nCache statistics After Reset " << cacheStats.printString() << std::endl;
+            utest_log::info() << "\nCache statistics After Reset " << cacheStats.printString() << std::endl;
         }
     }
     // EXPECT_TRUE(false);
@@ -483,7 +487,7 @@ TEST_F(VPUNNCachePreloadedTest, SmokeBasicTest) {
 TEST_F(VPUNNCachePreloadedTest, DISABLED_SearchTimeTest) {
     auto& preprop_now = pp_5014;
     FixedCache the_cache(cache_file_51);
-    std::cout << "Cache size: " << the_cache.getMap().size() << std::endl;
+    utest_log::debug() << "Cache size: " << the_cache.getMap().size() << std::endl;
 
     // generate a descriptor for the wl
     const std::vector<float> desc1{preprop_now.transformSingle(wl_conv1)};
@@ -520,8 +524,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SearchTimeTest) {
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     auto avg_duration = static_cast<double>(duration) / num_iterations;
-    std::cout << "Average search time for " << num_iterations << " iterations using new direct hash: " << avg_duration
-              << " microseconds" << std::endl;
+    utest_log::info() << "Average search time for " << num_iterations
+                      << " iterations using new direct hash: " << avg_duration << " microseconds" << std::endl;
 
     start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < num_iterations; ++i) {
@@ -530,8 +534,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SearchTimeTest) {
     end_time = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     avg_duration = static_cast<double>(duration) / num_iterations;
-    std::cout << "Average search time for " << num_iterations
-              << " iterations using old vec2int and hash: " << avg_duration << " microseconds" << std::endl;
+    utest_log::info() << "Average search time for " << num_iterations
+                      << " iterations using old vec2int and hash: " << avg_duration << " microseconds" << std::endl;
 
     const auto hash1 = fnv1a_hash(desc1);
     start_time = std::chrono::high_resolution_clock::now();
@@ -541,8 +545,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SearchTimeTest) {
     end_time = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     avg_duration = static_cast<double>(duration) / num_iterations;
-    std::cout << "Average search time for " << num_iterations << " iterations precomputed hash: " << avg_duration
-              << " microseconds" << std::endl;
+    utest_log::info() << "Average search time for " << num_iterations
+                      << " iterations precomputed hash: " << avg_duration << " microseconds" << std::endl;
 
     EXPECT_TRUE(false);
 }
@@ -550,7 +554,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SearchTimeTest) {
 TEST_F(VPUNNCachePreloadedTest, SparsityLevelsTest) {
     auto& preprop_now = pp_5014;
     FixedCache the_cache(cache_file_51);
-    std::cout << "Cache size: " << the_cache.getMap().size() << std::endl;
+    utest_log::debug() << "Cache size: " << the_cache.getMap().size() << std::endl;
 
     const DPUWorkload wl_1 = {
             VPUDevice::NPU_5_0,
@@ -600,8 +604,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SmokeSparsityFloatBasicTest_40) {
 
     std::filesystem::path pathNN = normalConfig.NN_CM_to_use;  // teh vpunn
     std::filesystem::path cache_file_now{pathNN.replace_extension("cache_bin")};
-    std::cout << "Current test cache is : " << cache_file_now << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_now << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
 
     const std::string test_cache_file{cache_file_now.string()};
 
@@ -653,8 +657,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SmokeSparsityFloatBasicTest_40) {
     DPUWorkload convSparse2{convSparse1};
     convSparse2.weight_sparsity = f2;
 
-    std::cout << "WTS sparsity  values: " << convSparse1.weight_sparsity << " , " << convSparse2.weight_sparsity
-              << std::endl;
+    utest_log::debug() << "WTS sparsity  values: " << convSparse1.weight_sparsity << " , "
+                       << convSparse2.weight_sparsity << std::endl;
 
     ASSERT_NE(convSparse1.weight_sparsity, convSparse2.weight_sparsity);
 
@@ -674,7 +678,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SmokeSparsityFloatBasicTest_40) {
         const float v1 = *the_cache.get(mkhsh(desc1));
         const float v2 = *the_cache.get(mkhsh(desc2));
 
-        std::cout << "Cache values: " << v1 << " , " << v2 << std::endl;
+        utest_log::debug() << "Cache values: " << v1 << " , " << v2 << std::endl;
     }
 
     // EXPECT_TRUE(false);
@@ -694,19 +698,19 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
-    std::cout << " \n initial Cache contains  :" << the_cache.getMap().size()
-              << " entries, CSV file: " << test_config.csv_file << " \n\n";
+    utest_log::debug() << " \n initial Cache contains  :" << the_cache.getMap().size()
+                       << " entries, CSV file: " << test_config.csv_file << " \n\n";
 
     bool allGood{true};
     // iterate in CSV
     int i = 1;
-    std::cout << "Pos starts from " << i << " \n";
+    utest_log::debug() << "Pos starts from " << i << " \n";
     while (serializer_IN.deserialize(readFieldsAll, wl_buff, gt_SPRUN_buff)) {
         auto dpu_wl = wl_buff.clone_as_DPUWorkload();
         const std::string gt{gt_SPRUN_buff.value};
         const float gt_value{(float)std::atof(gt.c_str())};
         if (gt.length() <= 0) {
-            std::cout << "NO GT at pos: " << i << std::endl;
+            utest_log::debug() << "NO GT at pos: " << i << std::endl;
         } else {
             EXPECT_TRUE(gt_value > 0) << "GT ZERO or lower: " << gt_value << " -> at pos: " << i << std::endl;
             if (gt_value > 0 && gt_value < four_bilion) {
@@ -727,14 +731,15 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
                     if (cache_hit) {
                         const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                         const auto delta = abs(gt_value - prevVal);
-                        std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
-                                  << " , Prev  value: " << prevVal << ", Delta: " << delta
-                                  << "  WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                  << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
-                                  << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                  << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                  << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
-                                  << std::endl;
+                        utest_log::debug()
+                                << "Cache already contains value at pos: " << i << " , New value: " << gt_value
+                                << " , Prev  value: " << prevVal << ", Delta: " << delta
+                                << "  WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
+                                << std::endl;
 
                         allGood = false;
                     }
@@ -742,25 +747,26 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
                         if (!cache_hit) {
                             the_cache.insert(mkhsh(descriptorNN), gt_value);
                         } else {
-                            std::cout << "   ------hit! value not set: " << gt_value << std::endl;
+                            utest_log::debug() << "   ------hit! value not set: " << gt_value << std::endl;
                         }
                     } else {
-                        std::cout << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
-                                  << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                  << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
-                                  << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                  << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                  << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
-                                  << std::endl;
+                        utest_log::debug()
+                                << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
+                                << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
+                                << std::endl;
                         allGood = false;
                     }
                 } else {
                     const auto err{sanityInfo.value()};
-                    std::cout << "Sanity failed at pos: " << i << "  Code: " << err
-                              << " meaning: " << Cycles::toErrorText(err) << std::endl;
+                    utest_log::debug() << "Sanity failed at pos: " << i << "  Code: " << err
+                                       << " meaning: " << Cycles::toErrorText(err) << std::endl;
                 }
             } else {
-                std::cout << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value << std::endl;
+                utest_log::debug() << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value << std::endl;
                 allGood = false;
             }
         }
@@ -768,13 +774,13 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerate_OneCache) {
         ++i;  // finally
     }
 
-    std::cout << "\n Collected :" << i << " workloads from csv \n";
-    std::cout << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << "\n Collected :" << i << " workloads from csv \n";
+    utest_log::debug() << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     std::filesystem::path csv_file_now{test_config.csv_file};
     std::filesystem::path cache_file_now{csv_file_now.replace_extension("cache_bin")};
-    std::cout << "Current test cache is : " << cache_file_now << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_now << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
 
     // ASSERT_FALSE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot overwrite: " << cache_file_now;
     // bool const appendIfExists{false};
@@ -788,8 +794,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
     std::filesystem::path cache_file_input{normalConfig.cache_file_input};
     cache_file_input.replace_extension("cache_bin");
 
-    std::cout << "Current test cache is : " << cache_file_input << ", CSV file: " << cache_file_input << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_input) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_input << ", CSV file: " << cache_file_input
+                       << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_input) << std::endl << std::endl;
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_input))
             << "ABORT: Cannot read NON existent cache: " << cache_file_input;
@@ -805,19 +812,19 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
-    std::cout << " \n initial Cache contains  :" << the_cache.getMap().size()
-              << " entries, CSV file: " << normalConfig.csv_file << " \n\n";
+    utest_log::debug() << " \n initial Cache contains  :" << the_cache.getMap().size()
+                       << " entries, CSV file: " << normalConfig.csv_file << " \n\n";
 
     bool allGood{true};
     // iterate in CSV
     int i = 1;
-    std::cout << "Pos starts from " << i << " \n";
+    utest_log::debug() << "Pos starts from " << i << " \n";
     while (serializer_IN.deserialize(readFieldsAll, wl_buff, gt_SPRUN_buff)) {
         auto dpu_wl = wl_buff.clone_as_DPUWorkload();
         const std::string gt{gt_SPRUN_buff.value};
         const float gt_value{(float)std::atof(gt.c_str())};
         if (gt.length() <= 0) {
-            std::cout << "NO GT at pos: " << i << std::endl;
+            utest_log::debug() << "NO GT at pos: " << i << std::endl;
         } else {
             EXPECT_TRUE(gt_value > 0) << "GT ZERO or lower: " << gt_value << " -> at pos: " << i << std::endl;
             if (gt_value > 0 && gt_value < four_bilion) {
@@ -838,35 +845,37 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
                     if (cache_hit) {
                         const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                         const auto delta = abs(gt_value - prevVal);
-                        std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
-                                  << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
-                                  << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                  << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
-                                  << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                  << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
+                        utest_log::debug()
+                                << "Cache already contains value at pos: " << i << " , New value: " << gt_value
+                                << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
+                                << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
                         allGood = false;
                     }
                     if (isRelevant) {
                         if (!cache_hit) {
                             the_cache.insert(mkhsh(descriptorNN), gt_value);
                         } else {
-                            std::cout << "   ------hit! value not set: " << gt_value << std::endl;
+                            utest_log::debug() << "   ------hit! value not set: " << gt_value << std::endl;
                         }
                     } else {
-                        std::cout << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
-                                  << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                  << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
-                                  << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                  << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
+                        utest_log::debug()
+                                << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
+                                << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
                         allGood = false;
                     }
                 } else {
                     const auto err{sanityInfo.value()};
-                    std::cout << "Sanity failed at pos: " << i << "  Code: " << err
-                              << " meaning: " << Cycles::toErrorText(err) << std::endl;
+                    utest_log::debug() << "Sanity failed at pos: " << i << "  Code: " << err
+                                       << " meaning: " << Cycles::toErrorText(err) << std::endl;
                 }
             } else {
-                std::cout << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value << std::endl;
+                utest_log::debug() << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value << std::endl;
                 allGood = false;
             }
         }
@@ -874,13 +883,13 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvGenerateExtented_OneCache) {
         ++i;  // finally
     }
 
-    std::cout << "\n Collected :" << i << " workloads from csv \n";
-    std::cout << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << "\n Collected :" << i << " workloads from csv \n";
+    utest_log::debug() << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     std::filesystem::path csv_file_now{normalConfig.csv_file};
     std::filesystem::path cache_file_output{csv_file_now.replace_extension("cache_bin")};
-    std::cout << "Current test cache is : " << cache_file_output << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_output << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
 
     // ASSERT_FALSE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot overwrite: " << cache_file_now;
     // bool const appendIfExists{false};
@@ -896,8 +905,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
     std::filesystem::path cache_file_input{test_config.cache_file_input};
     cache_file_input.replace_extension("cache_bin");
 
-    std::cout << "Current test cache is : " << cache_file_input << ", CSV file: " << cache_file_input << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_input) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_input << ", CSV file: " << cache_file_input
+                       << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_input) << std::endl << std::endl;
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_input))
             << "ABORT: Cannot read NON existent cache: " << cache_file_input;
@@ -905,7 +915,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
     FixedCache the_cache{""};
     EXPECT_TRUE(the_cache.read_cache(cache_file_input.string()));
 
-    std::cout << " \n ***** Initial Cache contains  :" << the_cache.getMap().size() << std::endl;
+    utest_log::debug() << " \n ***** Initial Cache contains  :" << the_cache.getMap().size() << std::endl;
 
     bool allGood{true};
     for (const auto& one_csv : multiple_csv_files) {
@@ -919,12 +929,12 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
         SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
         Series readFieldsAll{};
 
-        std::cout << " \n initial Cache contains  :" << the_cache.getMap().size()
-                  << " entries, Before reading CSV file: " << i_csv_file << " \n\n";
+        utest_log::debug() << " \n initial Cache contains  :" << the_cache.getMap().size()
+                           << " entries, Before reading CSV file: " << i_csv_file << " \n\n";
 
         // iterate in CSV
         int i = 1;
-        std::cout << "Pos starts from " << i << " \n";
+        utest_log::debug() << "Pos starts from " << i << " \n";
         while (serializer_IN.deserialize(readFieldsAll, wl_buff, gt_SPRUN_buff)) {
             auto dpu_wl = wl_buff.clone_as_DPUWorkload();
             const std::string gt{gt_SPRUN_buff.value};
@@ -946,9 +956,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
             const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
 
             if (gt.length() <= 0) {
-                std::cout << "NO GT at pos: " << i << ", gt: #" << gt << "#"
-                          << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
-                          << std::endl;
+                utest_log::debug() << "NO GT at pos: " << i << ", gt: #" << gt << "#"
+                                   << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
+                                   << std::endl;
             } else {
                 EXPECT_TRUE(gt_value > 0) << "GT ZERO or lower: " << gt_value << " -> at pos: " << i
                                           << ", sane: " << sane << ", Relevant:" << isRelevant
@@ -958,15 +968,15 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
                         if (cache_hit) {
                             const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(gt_value - prevVal);
-                            std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
-                                      << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
-                                      << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                      << "Swizzling :"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                      << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
-                                      << std::endl;
+                            utest_log::debug()
+                                    << "Cache already contains value at pos: " << i << " , New value: " << gt_value
+                                    << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
+                                    << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                    << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                    << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                    << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                    << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
+                                    << std::endl;
                             ;
                             allGood = false;
                         }
@@ -974,31 +984,31 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
                             if (!cache_hit) {
                                 the_cache.insert(mkhsh(descriptorNN), gt_value);
                             } else {
-                                std::cout << "   ------hit! value not set: " << gt_value << std::endl;
+                                utest_log::debug() << "   ------hit! value not set: " << gt_value << std::endl;
                             }
                         } else {
-                            std::cout << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
-                                      << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                      << "Swizzling :"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                      << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
-                                      << ", sane: " << sane << ", Relevant:" << isRelevant
-                                      << ", Cache hit: " << cache_hit << std::endl;
+                            utest_log::debug()
+                                    << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
+                                    << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                    << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                    << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                    << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                    << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
+                                    << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
+                                    << std::endl;
                             ;
                             allGood = false;
                         }
                     } else {
                         const auto err{sanityInfo.value()};
-                        std::cout << "Sanity failed at pos: " << i << "  Code: " << err
-                                  << " meaning: " << Cycles::toErrorText(err) << ", sane: " << sane
-                                  << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit << std::endl;
+                        utest_log::debug() << "Sanity failed at pos: " << i << "  Code: " << err
+                                           << " meaning: " << Cycles::toErrorText(err) << ", sane: " << sane
+                                           << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit << std::endl;
                     }
                 } else {
-                    std::cout << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value
-                              << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
-                              << ", gt: #" << gt << "#" << std::endl;
+                    utest_log::debug() << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value
+                                       << ", sane: " << sane << ", Relevant:" << isRelevant
+                                       << ", Cache hit: " << cache_hit << ", gt: #" << gt << "#" << std::endl;
                     allGood = false;
                 }
             }
@@ -1006,18 +1016,18 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_Multiple_CsvGenExtented_OneCache_ACTIVE
             ++i;  // finally
         }
 
-        std::cout << "\n Collected :" << i << " workloads from csv: " << i_csv_file << " \n";
-        std::cout << " Cache contains now  :" << the_cache.getMap().size() << " entries \n\n";
+        utest_log::debug() << "\n Collected :" << i << " workloads from csv: " << i_csv_file << " \n";
+        utest_log::debug() << " Cache contains now  :" << the_cache.getMap().size() << " entries \n\n";
     }  // csv iteration
 
-    std::cout << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     // std::filesystem::path csv_file_now{csv_file};
     std::filesystem::path cache_file_output{std::move(cache_file_input)};
     cache_file_output.replace_filename(cache_file_output.stem() += "_output");
     cache_file_output.replace_extension("cache_bin");
-    std::cout << "Current test cache is : " << cache_file_output << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_output << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
 
     ASSERT_FALSE(std::filesystem::exists(cache_file_output)) << "ABORT: Cannot overwrite: " << cache_file_output;
     /*bool const appendIfExists{false};*/
@@ -1034,8 +1044,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
     std::filesystem::path cache_file_input{test_config.cache_file_input};
     cache_file_input.replace_extension("cache_bin");
 
-    std::cout << "Current test cache is : " << cache_file_input << ", CSV file: " << cache_file_input << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_input) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_input << ", CSV file: " << cache_file_input
+                       << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_input) << std::endl << std::endl;
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_input))
             << "ABORT: Cannot read NON existent cache: " << cache_file_input;
@@ -1043,7 +1054,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
     FixedCache the_cache{""};
     EXPECT_TRUE(the_cache.read_cache(cache_file_input.string()));
 
-    std::cout << " \n ***** Initial Cache contains  :" << the_cache.getMap().size() << std::endl;
+    utest_log::debug() << " \n ***** Initial Cache contains  :" << the_cache.getMap().size() << std::endl;
 
     bool allGood{true};
     for (const auto& one_csv : multiple_csv_files) {
@@ -1057,12 +1068,12 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
         SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
         Series readFieldsAll{};
 
-        std::cout << " \n initial Cache contains  :" << the_cache.getMap().size()
-                  << " entries, Before reading CSV file: " << i_csv_file << " \n\n";
+        utest_log::debug() << " \n initial Cache contains  :" << the_cache.getMap().size()
+                           << " entries, Before reading CSV file: " << i_csv_file << " \n\n";
 
         // iterate in CSV
         int i = 1;
-        std::cout << "Pos starts from " << i << " \n";
+        utest_log::debug() << "Pos starts from " << i << " \n";
         while (serializer_IN.deserialize(readFieldsAll, wl_buff, gt_SPRUN_buff)) {
             auto dpu_wl = wl_buff.clone_as_DPUWorkload();
 
@@ -1085,9 +1096,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
             const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
 
             if (gt.length() <= 0) {
-                std::cout << "NO GT at pos: " << i << ", gt: #" << gt << "#"
-                          << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
-                          << std::endl;
+                utest_log::debug() << "NO GT at pos: " << i << ", gt: #" << gt << "#"
+                                   << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
+                                   << std::endl;
             } else {
                 EXPECT_TRUE(gt_value > 0) << "GT ZERO or lower: " << gt_value << " -> at pos: " << i
                                           << ", sane: " << sane << ", Relevant:" << isRelevant
@@ -1097,15 +1108,15 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
                         if (cache_hit) {
                             const auto prevVal = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(gt_value - prevVal);
-                            std::cout << "Cache already contains value at pos: " << i << " , New value: " << gt_value
-                                      << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
-                                      << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                      << "Swizzling :"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                      << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
-                                      << std::endl;
+                            utest_log::debug()
+                                    << "Cache already contains value at pos: " << i << " , New value: " << gt_value
+                                    << " , Prev  value: " << prevVal << ", Delta: " << delta << ".             "
+                                    << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                    << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                    << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                    << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                    << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
+                                    << std::endl;
                             ;
                             allGood = false;
                         }
@@ -1113,31 +1124,31 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
                             if (!cache_hit) {
                                 the_cache.insert(mkhsh(descriptorNN), gt_value);
                             } else {
-                                std::cout << "   ------hit! value not set: " << gt_value << std::endl;
+                                utest_log::debug() << "   ------hit! value not set: " << gt_value << std::endl;
                             }
                         } else {
-                            std::cout << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
-                                      << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                      << "Swizzling :"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                      << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                      << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
-                                      << ", sane: " << sane << ", Relevant:" << isRelevant
-                                      << ", Cache hit: " << cache_hit << std::endl;
+                            utest_log::debug()
+                                    << "WL NOT RELEVANT value at pos: " << i << " ,Not adding to cache "
+                                    << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                    << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                    << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                    << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                    << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
+                                    << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
+                                    << std::endl;
                             ;
                             allGood = false;
                         }
                     } else {
                         const auto err{sanityInfo.value()};
-                        std::cout << "Sanity failed at pos: " << i << "  Code: " << err
-                                  << " meaning: " << Cycles::toErrorText(err) << ", sane: " << sane
-                                  << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit << std::endl;
+                        utest_log::debug() << "Sanity failed at pos: " << i << "  Code: " << err
+                                           << " meaning: " << Cycles::toErrorText(err) << ", sane: " << sane
+                                           << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit << std::endl;
                     }
                 } else {
-                    std::cout << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value
-                              << ", sane: " << sane << ", Relevant:" << isRelevant << ", Cache hit: " << cache_hit
-                              << ", gt: #" << gt << "#" << std::endl;
+                    utest_log::debug() << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value
+                                       << ", sane: " << sane << ", Relevant:" << isRelevant
+                                       << ", Cache hit: " << cache_hit << ", gt: #" << gt << "#" << std::endl;
                     allGood = false;
                 }
             }
@@ -1145,18 +1156,18 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
             ++i;  // finally
         }
 
-        std::cout << "\n Collected :" << i << " workloads from csv: " << i_csv_file << " \n";
-        std::cout << " Cache contains now  :" << the_cache.getMap().size() << " entries \n\n";
+        utest_log::debug() << "\n Collected :" << i << " workloads from csv: " << i_csv_file << " \n";
+        utest_log::debug() << " Cache contains now  :" << the_cache.getMap().size() << " entries \n\n";
     }  // csv iteration
 
-    std::cout << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << "**** Final Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     // std::filesystem::path csv_file_now{csv_file};
     std::filesystem::path cache_file_output{std::move(cache_file_input)};
     cache_file_output.replace_filename(cache_file_output.stem() += "_output");
     cache_file_output.replace_extension("cache_bin");
-    std::cout << "Current test cache is : " << cache_file_output << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_output << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_output) << std::endl << std::endl;
 
     ASSERT_FALSE(std::filesystem::exists(cache_file_output)) << "ABORT: Cannot overwrite: " << cache_file_output;
     // bool const appendIfExists{false};
@@ -1170,8 +1181,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_SWIZZ_transparent_Multiple_CsvGenExtent
 TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
     std::filesystem::path csv_file_now{normalConfig.csv_file};
     std::filesystem::path cache_file_now{csv_file_now.replace_extension("cache_bin")};
-    std::cout << "Current test cache is : " << cache_file_now << ", CSV file: " << normalConfig.csv_file << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_now << ", CSV file: " << normalConfig.csv_file
+                       << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
@@ -1186,19 +1198,19 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
-    std::cout << " \n initial Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << " \n initial Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     bool allGood{true};
 
     // iterate in CSV
     int i = 1;
-    std::cout << "Pos starts from " << i << " \n";
+    utest_log::debug() << "Pos starts from " << i << " \n";
     while (serializer_IN.deserialize(readFieldsAll, wl_buff, gt_SPRUN_buff)) {
         auto dpu_wl = wl_buff.clone_as_DPUWorkload();
         const std::string gt{gt_SPRUN_buff.value};
         const float gt_value{(float)std::atof(gt.c_str())};
         if (gt.length() <= 0) {
-            std::cout << "NO GT at pos: " << i << std::endl;
+            utest_log::debug() << "NO GT at pos: " << i << std::endl;
         } else {
             EXPECT_TRUE(gt_value > 0) << "GT ZERO or lower: " << gt_value << " -> at pos: " << i << std::endl;
             if ((gt_value) > 0 && (gt_value < four_bilion)) {
@@ -1216,7 +1228,7 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
                         const auto cache_hit = the_cache.contains(mkhsh(descriptorNN));
                         EXPECT_TRUE(cache_hit) << "Cache miss at pos: " << i << std::endl;
                         if (!cache_hit) {
-                            std::cout << "Cache miss at pos: " << i << std::endl;
+                            utest_log::debug() << "Cache miss at pos: " << i << std::endl;
                             allGood = false;
                         } else {
                             // check hit is the gt match
@@ -1226,28 +1238,29 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
                                     << " ,Cache: " << cache_value << std::endl;
                         }
                     } else {
-                        std::cout << "WL NOT RELEVANT value at pos: " << i << " ,Not checking  cache "
-                                  << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                  << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
-                                  << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                  << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
+                        utest_log::debug()
+                                << "WL NOT RELEVANT value at pos: " << i << " ,Not checking  cache "
+                                << "WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
                     }
 
                 } else {
                     const auto err{sanityInfo.value()};
-                    std::cout << "Sanity failed at pos: " << i << "  Code: " << err
-                              << " meaning: " << Cycles::toErrorText(err) << std::endl;
+                    utest_log::debug() << "Sanity failed at pos: " << i << "  Code: " << err
+                                       << " meaning: " << Cycles::toErrorText(err) << std::endl;
                 }
             } else {
-                std::cout << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value << std::endl;
+                utest_log::debug() << "Negative or zero, or big GT at pos: " << i << " , GT: " << gt_value << std::endl;
             }
         }
 
         ++i;  // finally
     }
 
-    std::cout << "\n Processed :" << i << " workloads from csv \n";
-    std::cout << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << "\n Processed :" << i << " workloads from csv \n";
+    utest_log::debug() << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     EXPECT_TRUE(allGood);
 }
@@ -1257,8 +1270,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyContent_OneCache) {
 TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
     std::filesystem::path csv_file_now{normalConfig.csv_file};
     std::filesystem::path cache_file_now{csv_file_now.replace_extension("cache_bin")};
-    std::cout << "Current test cache is : " << cache_file_now << ", CSV file: " << normalConfig.csv_file << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_now << ", CSV file: " << normalConfig.csv_file
+                       << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
@@ -1276,19 +1290,19 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
-    std::cout << " \n initial Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << " \n initial Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     bool allGood{true};
 
     // iterate in CSV
     int i = 1;
-    std::cout << "Pos starts from " << i << " \n";
+    utest_log::debug() << "Pos starts from " << i << " \n";
     while (serializer_IN.deserialize(readFieldsAll, wl_buff, gt_SPRUN_buff)) {
         auto dpu_wl = wl_buff.clone_as_DPUWorkload();
         const std::string gt{gt_SPRUN_buff.value};
         const float gt_value{(float)std::atof(gt.c_str())};
         if (gt.length() <= 0) {
-            std::cout << "NO GT at pos: " << i << std::endl;
+            utest_log::debug() << "NO GT at pos: " << i << std::endl;
         } else {
             EXPECT_TRUE(gt_value > 0) << "GT ZERO or lower: " << gt_value << " -> at pos: " << i << std::endl;
             if ((gt_value) > 0 && (gt_value < four_bilion)) {
@@ -1309,36 +1323,37 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
                     if (isRelevant) {
                         EXPECT_TRUE(cache_hit) << "Reference Cache miss at pos: " << i << std::endl;
                         if (!cache_hit) {
-                            std::cout << "Reference Cache miss at pos: " << i << std::endl;
+                            utest_log::debug() << "Reference Cache miss at pos: " << i << std::endl;
                             allGood = false;
                         } else {  // check that cache hit is the same as the model
                             const float cache_value = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(cache_value - (float)cycleTime);
 
                             if (delta > cache_delta_tolerance) {
-                                std::cout << "Model cycles Mismatch cache value  at pos: " << i
-                                          << ", MOdel:" << cycleTime << " ,Cache: " << cache_value
-                                          << ", Delta: " << (long int)delta << std::endl;
+                                utest_log::debug()
+                                        << "Model cycles Mismatch cache value  at pos: " << i << ", MOdel:" << cycleTime
+                                        << " ,Cache: " << cache_value << ", Delta: " << (long int)delta << std::endl;
                                 allGood = false;
                             }
                         }
                     } else {
-                        std::cout << "WL NOT RELEVANT value at pos: " << i
-                                  << " ,Not checking! cache hit:  " << std::to_string(cache_hit)
-                                  << "  WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                  << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
-                                  << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                  << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
+                        utest_log::debug()
+                                << "WL NOT RELEVANT value at pos: " << i
+                                << " ,Not checking! cache hit:  " << std::to_string(cache_hit)
+                                << "  WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0])) << std::endl;
                     }
 
                 } else {
                     const auto err{sanityInfo.value()};
-                    std::cout << "Sanity (csv WL) failed at pos: " << i << "  Code: " << err
-                              << " meaning: " << Cycles::toErrorText(err) << std::endl;
+                    utest_log::debug() << "Sanity (csv WL) failed at pos: " << i << "  Code: " << err
+                                       << " meaning: " << Cycles::toErrorText(err) << std::endl;
                     allGood = false;
                 }
             } else {
-                std::cout << "Negative or zero GT at pos: " << i << " , GT: " << gt_value << std::endl;
+                utest_log::debug() << "Negative or zero GT at pos: " << i << " , GT: " << gt_value << std::endl;
                 allGood = false;
             }
         }
@@ -1346,8 +1361,8 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
         ++i;  // finally
     }
 
-    std::cout << "\n Processed :" << i << " workloads from csv \n";
-    std::cout << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << "\n Processed :" << i << " workloads from csv \n";
+    utest_log::debug() << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
 
     EXPECT_TRUE(allGood);
 }
@@ -1355,8 +1370,9 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyPairedCacheHit_OneCache) {
 TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache) {
     std::filesystem::path csv_file_now{normalConfig.csv_file};
     std::filesystem::path cache_file_now{csv_file_now.replace_extension("cache_bin")};
-    std::cout << "Current test cache is : " << cache_file_now << ", CSV file: " << normalConfig.csv_file << std::endl;
-    std::cout << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
+    utest_log::debug() << "Current test cache is : " << cache_file_now << ", CSV file: " << normalConfig.csv_file
+                       << std::endl;
+    utest_log::debug() << "File exists?: " << std::filesystem::exists(cache_file_now) << std::endl << std::endl;
 
     ASSERT_TRUE(std::filesystem::exists(cache_file_now)) << "ABORT: Cannot read NON existent cache: " << cache_file_now;
 
@@ -1376,21 +1392,21 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
     SerializableField<std::string> gt_SPRUN_buff{gtSPRUN_tag, ""};  // Ground truth
     Series readFieldsAll{};
 
-    std::cout << " \n initial Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::debug() << " \n initial Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
     const auto& cacheStats{model_active_cache.getPreloadedCacheCounter()};
-    std::cout << "\nCache statistics for COST MODEL loaded cache: " << cacheStats.printString() << std::endl;
+    utest_log::info() << "\nCache statistics for COST MODEL loaded cache: " << cacheStats.printString() << std::endl;
 
     bool allGood{true};
 
     // iterate in CSV
     int i = 1;
-    std::cout << "Pos starts from " << i << " \n";
+    utest_log::debug() << "Pos starts from " << i << " \n";
     while (serializer_IN.deserialize(readFieldsAll, wl_buff, gt_SPRUN_buff)) {
         auto dpu_wl = wl_buff.clone_as_DPUWorkload();
         const std::string gt{gt_SPRUN_buff.value};
         const float gt_value{(float)std::atof(gt.c_str())};
         // if (gt.length() <= 0) {
-        //     std::cout << "NO GT at pos: " << i << std::endl;
+        //     utest_log::debug() << "NO GT at pos: " << i << std::endl;
         // } else
         {
             // EXPECT_TRUE(gt_value > 0) << "GT ZERO or lower: " << gt_value << " -> at pos: " << i << std::endl;
@@ -1412,48 +1428,49 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
                     if (isRelevant) {
                         // EXPECT_TRUE(cache_hit) << "Reference Cache miss at pos: " << i << std::endl;
                         if (!cache_hit) {
-                            std::cout << "Reference Cache miss at pos: " << i << " GT from CSV is: " << gt_value
-                                      << std::endl;
+                            utest_log::debug() << "Reference Cache miss at pos: " << i
+                                               << " GT from CSV is: " << gt_value << std::endl;
                             allGood = false;
                         } else {  // check that cache hit is the same as the model
                             const float cache_value = the_cache.get(mkhsh(descriptorNN)).value();
                             const auto delta = abs(cache_value - (float)cycleTime);
 
                             if (delta > 2.0f /*cache_delta_tolerance*/) {
-                                std::cout << "Model cycles Mismatch cache value  at pos: " << i
-                                          << ", MOdel:" << cycleTime << " ,Cache: " << cache_value
-                                          << ", Delta: " << (long int)delta
-                                          << " WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                          << "Swizzling :"
-                                          << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0])) << " ,"
-                                          << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                          << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                          << ", WSparse: " << dpu_wl.weight_sparsity
-                                          << " ,ASparse: " << dpu_wl.act_sparsity << std::endl;
+                                utest_log::debug()
+                                        << "Model cycles Mismatch cache value  at pos: " << i << ", MOdel:" << cycleTime
+                                        << " ,Cache: " << cache_value << ", Delta: " << (long int)delta
+                                        << " WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                        << "Swizzling :"
+                                        << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0])) << " ,"
+                                        << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                        << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                        << ", WSparse: " << dpu_wl.weight_sparsity
+                                        << " ,ASparse: " << dpu_wl.act_sparsity << std::endl;
 
                                 allGood = false;
                             }
                         }
                     } else {
-                        std::cout << "WL NOT RELEVANT value at pos: " << i
-                                  << " ,Not checking! cache hit:  " << std::to_string(cache_hit)
-                                  << "  WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
-                                  << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
-                                  << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
-                                  << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
-                                  << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
-                                  << ", DPU Cycle Time: " << cycleTime << std::endl;
+                        utest_log::debug()
+                                << "WL NOT RELEVANT value at pos: " << i
+                                << " ,Not checking! cache hit:  " << std::to_string(cache_hit)
+                                << "  WL Operation: " << Operation_ToText.at(static_cast<int>(dpu_wl.op))
+                                << "Swizzling :" << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[0]))
+                                << " ," << Swizzling_ToText.at(static_cast<int>(dpu_wl.input_swizzling[1])) << " ,"
+                                << Swizzling_ToText.at(static_cast<int>(dpu_wl.output_swizzling[0]))
+                                << ", WSparse: " << dpu_wl.weight_sparsity << " ,ASparse: " << dpu_wl.act_sparsity
+                                << ", DPU Cycle Time: " << cycleTime << std::endl;
                         allGood = false;
                     }
 
                 } else {
                     const auto err{sanityInfo.value()};
-                    std::cout << "Sanity (csv WL) failed at pos: " << i << "  Code: " << err
-                              << " meaning: " << Cycles::toErrorText(err) << std::endl;
+                    utest_log::debug() << "Sanity (csv WL) failed at pos: " << i << "  Code: " << err
+                                       << " meaning: " << Cycles::toErrorText(err) << std::endl;
                     allGood = false;
                 }
             } else {
-                std::cout << "Negative or zero GT at pos: " << i << " , GT: " << gt_value << std::endl;
+                utest_log::debug() << "Negative or zero GT at pos: " << i << " , GT: " << gt_value << std::endl;
                 allGood = false;
             }
         }
@@ -1461,12 +1478,146 @@ TEST_F(VPUNNCachePreloadedTest, DISABLED_CsvVerifyMISSES_PairedCacheHit_OneCache
         ++i;  // finally
     }
 
-    std::cout << "\n Processed :" << i << " workloads from csv \n";
-    std::cout << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
-    std::cout << "\nCache statistics for COST MODEL loaded cache: " << cacheStats.printString() << std::endl;
-    std::cout << "\nCache statistics for reference cache: " << the_cache.getCounter().printString() << std::endl;
+    utest_log::debug() << "\n Processed :" << i << " workloads from csv \n";
+    utest_log::debug() << " Cache contains  :" << the_cache.getMap().size() << " entries \n\n";
+    utest_log::info() << "\nCache statistics for COST MODEL loaded cache: " << cacheStats.printString() << std::endl;
+    utest_log::info() << "\nCache statistics for reference cache: " << the_cache.getCounter().printString()
+                      << std::endl;
 
     EXPECT_TRUE(allGood);
+}
+
+class VPUNNCacheManagerTest : public testing::Test {
+protected:
+    void SetUp() override {
+    }
+
+    /// @brief Helper to determine if a device should use the new workload-hash cache backend
+    /// (as opposed to the legacy descriptor-key cache).
+    /// Matches the logic in NNCostProvider::use_new_hash_method_for_device()
+    static bool use_new_hash_method_for_device(VPUDevice model_device) {
+        // __size comes after the last device, so it must be excluded explicitly to keep the
+        // descriptor cache as default for unbound models
+        return model_device > VPUDevice::NPU_5_0_W && model_device != VPUDevice::__size;
+    }
+
+    DPUWorkload make_test_wl(VPUDevice device) {
+        return DPUWorkload{device,
+                           Operation::CONVOLUTION,
+                           {VPUTensor(16, 16, 32, 1, DataType::UINT8)},
+                           {VPUTensor(16, 16, 32, 1, DataType::UINT8)},
+                           {3, 3},
+                           {1, 1},
+                           {1, 1, 1, 1},
+                           ExecutionMode::CUBOID_16x16};
+    }
+};
+
+// Legacy device: a descriptor key round-trips through the descriptor cache.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_LegacyBackend_UsesDescriptor) {
+    // Device: VPU_4_0 (legacy, uses descriptor cache)
+    NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::VPU_4_0), 16, "", "");
+
+    const std::vector<float> descriptor{1.0F, 2.0F, 3.0F};
+
+    manager.add(descriptor, 123.0F);
+
+    std::string source;
+    const auto value = manager.get(descriptor, &source);
+
+    ASSERT_TRUE(value.has_value());
+    EXPECT_EQ(*value, 123.0F);
+    EXPECT_EQ(source, "dyn_cache");
+}
+
+
+// A zero-capacity cache never retains an entry, for either backend.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_ZeroCapacity_BothBackendsMiss) {
+    // Device: VPU_4_0 (legacy, uses descriptor cache)
+    NNCostCacheManager legacy_manager(use_new_hash_method_for_device(VPUDevice::VPU_4_0), 0, "", "");
+
+    const std::vector<float> legacy_descriptor{1.0F};
+    legacy_manager.add(legacy_descriptor, 1.0F);
+
+    const auto legacy_value = legacy_manager.get(legacy_descriptor);
+
+    EXPECT_FALSE(legacy_value.has_value());
+}
+
+// getPreloadedCacheCounter() forwards to the active backend and keeps counting across calls.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_PreloadedCounter_IsAccessibleAndMonotonic) {
+    // Device: VPU_4_0 (legacy, uses descriptor cache)
+    NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::VPU_4_0), 16, "", "");
+    const std::vector<float> descriptor{1.0F};
+
+    const auto accesses_before = manager.getPreloadedCacheCounter().getAccesses();
+
+    (void)manager.get(descriptor);
+    (void)manager.get(descriptor);
+
+    const auto accesses_after = manager.getPreloadedCacheCounter().getAccesses();
+    EXPECT_EQ(accesses_after, accesses_before + 2U);
+}
+
+// Only the descriptor cache variant alternative is ever built for a legacy device.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_LegacyBackend_OnlyDescriptorCacheIsConstructed) {
+    // Device: VPU_4_0 (legacy, uses descriptor cache)
+    const NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::VPU_4_0), 16, "", "");
+
+    EXPECT_FALSE(manager.uses_workload_hash_cache());
+    EXPECT_TRUE(manager.has_descriptor_cache());
+    EXPECT_FALSE(manager.has_workload_cache());
+}
+
+
+// The unbound __size sentinel device must default to the legacy descriptor cache, not the workload-hash cache.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_EmptySentinelDevice_UsesDescriptorCacheNotWorkloadHash) {
+    // Device: __size (sentinel, defaults to descriptor cache)
+    const NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::__size), 16, "", "");
+
+    EXPECT_FALSE(manager.uses_workload_hash_cache());
+    EXPECT_TRUE(manager.has_descriptor_cache());
+    EXPECT_FALSE(manager.has_workload_cache());
+}
+
+// Sweeps every real device to confirm the backend split is exactly at VPUDevice::NPU_5_0_W.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_SelectsBackendForEveryDevice) {
+    for (int device_value = static_cast<int>(VPUDevice::VPU_2_0); device_value < static_cast<int>(VPUDevice::__size);
+         ++device_value) {
+        const auto device = static_cast<VPUDevice>(device_value);
+        const bool uses_descriptor_hash_cache = device <= VPUDevice::NPU_5_0_W;
+        // Comment: device determines which cache backend to use
+        const NNCostCacheManager manager(use_new_hash_method_for_device(device), 16, "", "");
+
+        EXPECT_EQ(manager.uses_workload_hash_cache(), !uses_descriptor_hash_cache);
+        EXPECT_EQ(manager.has_descriptor_cache(), uses_descriptor_hash_cache);
+        EXPECT_EQ(manager.has_workload_cache(), !uses_descriptor_hash_cache);
+    }
+}
+
+// Misuse guard: a workload key against a legacy manager must trigger the assertion.
+// assert() is compiled out under NDEBUG (release), so the guard only fires in debug builds.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_LegacyBackend_WorkloadKeyAssertsOnGetAndAdd) {
+#ifndef NDEBUG
+    // Device: VPU_4_0 (legacy, uses descriptor cache)
+    NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::VPU_4_0), 16, "", "");
+    const DPUWorkload wl = make_test_wl(VPUDevice::VPU_4_0);
+
+    EXPECT_DEATH((void)manager.get(wl), "");
+    EXPECT_DEATH(manager.add(wl, 1.0F), "");
+#else
+    GTEST_SKIP() << "assert() is compiled out under NDEBUG; this guard only exists in debug builds";
+#endif
+}
+
+// Confirms the guard doesn't false-positive for the correctly typed legacy key.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_LegacyBackend_DescriptorKeyDoesNotAssert) {
+    // Device: VPU_4_0 (legacy, uses descriptor cache)
+    NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::VPU_4_0), 16, "", "");
+    const std::vector<float> descriptor{1.0F, 2.0F, 3.0F};
+
+    EXPECT_NO_THROW(manager.add(descriptor, 1.0F));
+    EXPECT_NO_THROW((void)manager.get(descriptor));
 }
 
 }  // namespace VPUNN_unit_tests

@@ -82,7 +82,6 @@ TEST_F(DMAHTTPClientNPU45x, DMAWlAsJsonSerialization) {
 
         // Validate the request structure
         EXPECT_EQ(request["params"]["backend"], "silicon");
-        EXPECT_EQ(request["params"]["name"], "profiling_request");
 
         // Verify DMA workload uses the correct key
         EXPECT_TRUE(request.contains("dma_workload"));

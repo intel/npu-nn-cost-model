@@ -12,6 +12,7 @@
 #include <sstream>  // for error formating
 #include "common/common_helpers.h"
 
+#include "logger/logger.h"
 #include <optional>
 #include <variant>
 
@@ -49,7 +50,7 @@ protected:
 
     void check_Cluster_vs_SOH(const DPUWorkload& wl_base, const std::string& t_header) {
         DPUWorkload wl{wl_base};
-        std::cout << "\n****** TEST : " << t_header << "\n";
+        utest_log::debug() << "\n****** TEST : " << t_header << "\n";
         wl.isi_strategy = ISIStrategy::CLUSTERING;
         auto cycles_clu = model_2_7.DPU(wl, info);
         check_for_noError(cycles_clu, wl, "CLUSTERING" + t_header + info);
@@ -76,13 +77,13 @@ protected:
                                    << "cost soh       : " << cycles_soh << "\n"
                                    << "delta%         : " << deltapercent << "\n"
                                    << wl_base;
-        std::cout << "\n--------- END TEST : " << t_header << " cost clustering: " << cycles_clu
-                  << ", cost soh: " << cycles_soh << ", delta%: " << (int)(deltapercent) << " % \n";
+        utest_log::info() << "\n--------- END TEST : " << t_header << " cost clustering: " << cycles_clu
+                         << ", cost soh: " << cycles_soh << ", delta%: " << (int)(deltapercent) << " % \n";
     }
 
     void check_Cluster_vs_SOK(const DPUWorkload& wl_base, const std::string& t_header) {
         DPUWorkload wl{wl_base};
-        std::cout << "\n****** TEST : " << t_header << "\n";
+        utest_log::debug() << "\n****** TEST : " << t_header << "\n";
         wl.isi_strategy = ISIStrategy::CLUSTERING;
         auto cycles_clu = model_2_7.DPU(wl, info);
         check_for_noError(cycles_clu, wl, "CLUSTERING" + t_header + info);
@@ -110,8 +111,8 @@ protected:
                                    << "cost sok       : " << cycles_soh << "\n"
                                    << "delta%         : " << deltapercent << "\n"
                                    << wl_base;
-        std::cout << "\n--------- END TEST : " << t_header << " cost clustering: " << cycles_clu
-                  << ", cost sok: " << cycles_soh << ", delta%: " << (int)(deltapercent) << " % \n";
+        utest_log::info() << "\n--------- END TEST : " << t_header << " cost clustering: " << cycles_clu
+                         << ", cost sok: " << cycles_soh << ", delta%: " << (int)(deltapercent) << " % \n";
     }
 };
 TEST_F(TestSplitMethodsComparisonsVPU2x, Convolution_3x3) {

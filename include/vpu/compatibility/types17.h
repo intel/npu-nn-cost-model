@@ -106,6 +106,7 @@ static const EnumTextLogicalMap dtype_logical_map{
         link_logical("INT1", "UINT8"),        // not supported
         link_logical("FLOAT32", "FLOAT32"),   // same
         link_logical("INT32", "INT32"),       // same, new in this version
+        link_logical("UINT32", "INT32"),      // mapped, unsigned counterpart shares the INT32 one-hot bit
         link_logical("UINT16", "UINT16"),     // mapped
         link_logical("INT16", "UINT16"),      // mapped
         link_logical("FLOAT4", "FLOAT4"),     // mapped new

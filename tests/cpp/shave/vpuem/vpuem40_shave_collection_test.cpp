@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 
+#include "logger/logger.h"
 #include "vpu/types.h"
 
 namespace VPUNN_unit_tests {
@@ -16,7 +17,9 @@ struct ShvCollectionTestData {
     std::string name_;
     std::vector<int> expected_cycles_;
 
-    ShvCollectionTestData(const std::string& name, const std::vector<int> & expected_cycles) : name_(name), expected_cycles_(expected_cycles) {}
+    ShvCollectionTestData(const std::string& name, const std::vector<int>& expected_cycles)
+            : name_(name), expected_cycles_(expected_cycles) {
+    }
 };
 
 class VPUEM40ShvCollectionTest : public ::testing::TestWithParam<ShvCollectionTestData> {
@@ -64,12 +67,11 @@ TEST_P(VPUEM40ShvCollectionTest, ReturnCyclesTest) {
     const ShvCollectionTestData operation_param = GetParam();
 
     const DeviceShaveContainer& list = ih.getContainer();
-    
+
     const auto& shaveOp = list.getShaveExecutor(operation_param.name_);
-    std::cout << shaveOp.toString() << std::endl;
-    for (size_t idx = 0; idx < test_vectors.size(); idx++) {  
+    utest_log::debug() << shaveOp.toString() << std::endl;
+    for (size_t idx = 0; idx < test_vectors.size(); idx++) {
         EXPECT_EQ(shaveOp.dpuCycles(test_vectors[idx], 1700, 971), operation_param.expected_cycles_[idx]);
-                
     }
 }
 
@@ -79,14 +81,14 @@ TEST_P(VPUEM40ShvCollectionTest, ReturnCyclesTestNominalFreq) {
     const DeviceShaveContainer& list = ih.getContainer();
 
     const auto& shaveOp = list.getShaveExecutor(operation_param.name_);
-    std::cout << shaveOp.toString() << std::endl;
+    utest_log::debug() << shaveOp.toString() << std::endl;
     for (size_t idx = 0; idx < test_vectors.size(); idx++) {
         EXPECT_EQ(shaveOp.dpuCycles(test_vectors[idx]), operation_param.expected_cycles_[idx]);
     }
 }
 
 INSTANTIATE_TEST_SUITE_P(VPUEM40ShvCollectionTests, VPUEM40ShvCollectionTest,
-                         ::testing::Values(ShvCollectionTestData{"vpuem.sigmoid", {7528, 1920, 707, 2382, 6276}}, 
+                         ::testing::Values(ShvCollectionTestData{"vpuem.sigmoid", {7528, 1920, 707, 2382, 6276}},
                                            ShvCollectionTestData{"vpuem.add", {7192, 1819, 679, 2253, 5998}},
                                            ShvCollectionTestData{"vpuem.softmax", {7528, 1920, 707, 2382, 6276}},
                                            ShvCollectionTestData{"vpuem.gelu", {38245, 8892, 2641, 11273, 31716}},
@@ -94,7 +96,6 @@ INSTANTIATE_TEST_SUITE_P(VPUEM40ShvCollectionTests, VPUEM40ShvCollectionTest,
                                            ShvCollectionTestData{"vpuem.log", {7528, 1920, 707, 2382, 6276}},
                                            ShvCollectionTestData{"vpuem.mul", {7192, 1819, 679, 2253, 5998}},
                                            ShvCollectionTestData{"vpuem.swish", {12463, 3104, 1118, 3860, 10383}},
-                                           ShvCollectionTestData{"vpuem.tanh", {7528, 1920, 707, 2382, 6276}}
-                                           ));
+                                           ShvCollectionTestData{"vpuem.tanh", {7528, 1920, 707, 2382, 6276}}));
 
 }  // namespace VPUNN_unit_tests

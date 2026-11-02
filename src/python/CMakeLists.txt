@@ -55,7 +55,7 @@ set_target_properties(vpunn_python_bindings
 )
 
 add_custom_target(vpunn_python_create_init_file ALL
-    COMMAND echo "from . import VPUNN; from .VPUNN import DPUWorkload, VPUCostModel, DMAWorkload, DMACostModel_NPU27, DMACostModel_NPU40_50, DMANNWorkload_NPU27, DMANNWorkload_NPU40_50, VPUTensor; VPUNN_lib = VPUNN; bindings = VPUNN" > ${COST_MODEL_BINARY_DIR}/lib/__init__.py
+    COMMAND echo "from ._VPUNN import *; from . import _VPUNN; VPUNN = _VPUNN; VPUNN_lib = _VPUNN; bindings = _VPUNN" > ${COST_MODEL_BINARY_DIR}/lib/__init__.py
     VERBATIM
 )
 

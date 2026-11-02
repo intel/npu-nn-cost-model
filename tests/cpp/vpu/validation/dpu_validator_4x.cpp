@@ -7,6 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 #include "dpu_validator.h"
+#include "logger/logger.h"
 #include "vpu_cost_model.h"
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -147,8 +148,8 @@ TEST_F(DPU_OperationValidator_TestNPU4x, Output_tensor_memory_computation_test_f
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
-            std::cout << "Test case "
-                      << " " << i << ": " << test_info(wl_ref) << "\n";
+            utest_log::debug() << "Test case "
+                              << " " << i << ": " << test_info(wl_ref) << "\n";
 
             MemorySize memory;
             {
@@ -245,7 +246,7 @@ TEST_F(DPU_OperationValidator_TestNPU4x, Input1_memory_computation_and_cycles_in
     };
 
     VPUNN::DPUWorkload wl_ref{wl};
-    std::cout << "Test case " << test_info(wl_ref) << "\n";
+    utest_log::debug() << "Test case " << test_info(wl_ref) << "\n";
 
     long long mem = 0;
     const auto& config = dut.get_config(wl.device);
@@ -320,8 +321,8 @@ TEST_F(DPU_OperationValidator_TestNPU4x, Input1_memory_computation_test) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
-            std::cout << "Test case "
-                      << " " << i << ": " << test_info(wl_ref) << "\n";
+            utest_log::debug() << "Test case "
+                              << " " << i << ": " << test_info(wl_ref) << "\n";
 
             {
                 long long mem = 0;

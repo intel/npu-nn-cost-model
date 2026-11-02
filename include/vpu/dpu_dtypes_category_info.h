@@ -19,6 +19,7 @@ public:
     /// @brief True when dtype is any floating-point format used by the model.
     static inline constexpr bool is_any_float_dtype(const DataType dtype) noexcept {
         switch (dtype) {
+        case DataType::FLOAT64:
         case DataType::FLOAT32:
         case DataType::FLOAT16:
         case DataType::BFLOAT16:
@@ -31,10 +32,9 @@ public:
         }
     }
 
-    /// @brief True when dtype belongs to FP16/BF16/FP32 native-compute family.
+    /// @brief True when dtype belongs to FP16/BF16 native-compute family.
     static inline constexpr bool is_fp16family_dtype(const DataType dtype) noexcept {
         switch (dtype) {
-        case DataType::FLOAT32:  // not supported, but kept to have all types coverage
         case DataType::FLOAT16:
         case DataType::BFLOAT16:
             return true;
@@ -54,6 +54,26 @@ public:
         }
     }
 
+    /// @brief True when dtype is FLOAT32. 
+    static inline constexpr bool is_fp32family_dtype(const DataType dtype) noexcept {
+        switch (dtype) {
+        case DataType::FLOAT32:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// @brief True when dtype is FLOAT64.
+    static inline constexpr bool is_fp64family_dtype(const DataType dtype) noexcept {
+        switch (dtype) {
+        case DataType::FLOAT64:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     /// @brief True when dtype belongs to 16-bit integer family.
     static inline constexpr bool is_i16family_dtype(const DataType dtype) noexcept {
         switch (dtype) {
@@ -65,7 +85,7 @@ public:
         }
     }
 
-    /// @brief True when dtype belongs to i8/sub-8/INT32 family used by native i8 path.
+    /// @brief True when dtype belongs to i8/sub-8 family used by native i8 path.
     static inline constexpr bool is_i8family_dtype(const DataType dtype) noexcept {
         switch (dtype) {
         case DataType::UINT8:
@@ -76,11 +96,28 @@ public:
         case DataType::INT2:
         case DataType::UINT1:
         case DataType::INT1:
+            return true;
+        default:
+            return false;
+        }
+    }
 
-        // No support for operations in DPU with these types yet
+    /// @brief True when dtype is INT32/UINT32.
+    static inline constexpr bool is_i32family_dtype(const DataType dtype) noexcept {
+        switch (dtype) {
         case DataType::INT32:
+        case DataType::UINT32:
+            return true;
+        default:
+            return false;
+        }
+    }
 
-            // Note: UINT16/INT16 are excluded here - they use is_i16family_dtype() for power factor lookup
+    /// @brief True when dtype is INT64/UINT64.
+    static inline constexpr bool is_i64family_dtype(const DataType dtype) noexcept {
+        switch (dtype) {
+        case DataType::INT64:
+        case DataType::UINT64:
             return true;
         default:
             return false;
@@ -99,6 +136,9 @@ public:
         case DataType::UINT1:
         case DataType::INT1:
         case DataType::INT32:
+        case DataType::UINT32:
+        case DataType::INT64:
+        case DataType::UINT64:
         case DataType::UINT16:
         case DataType::INT16:
             return true;

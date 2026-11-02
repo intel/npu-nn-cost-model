@@ -7,6 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 #include "costmodel/cost_model.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -32,9 +33,10 @@ protected:
 
         EXPECT_TRUE(!Cycles::isErrorCode(cost_cyc)) << info << wl << errInfo << details;
 
-        std::cout << details
-                  << "-X-------------------------------------------------------------------------------------------"
-                     "-\n";
+        utest_log::debug()
+                << details
+                << "-X-------------------------------------------------------------------------------------------"
+                   "-\n";
     }
     void basicNOKTest(const DPUWorkload& workload, VPUCostModel& crt_model, const CyclesInterfaceType errcode_expected,
                       std::string info = "") {
@@ -52,9 +54,10 @@ protected:
         EXPECT_TRUE(Cycles::isErrorCode(cost_cyc)) << info << wl << errInfo << details;
         EXPECT_EQ(errcode_expected, cost_cyc) << info << wl << errInfo << details;
 
-        std::cout << details
-                  << "-X-------------------------------------------------------------------------------------------"
-                     "-\n";
+        utest_log::debug()
+                << details
+                << "-X-------------------------------------------------------------------------------------------"
+                   "-\n";
     }
 
 private:
@@ -368,7 +371,7 @@ TEST_F(TestCostModelNPU4x, Weigths_types_NPU40_test) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << " Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << " Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     };
@@ -443,7 +446,7 @@ TEST_F(TestCostModelNPU4x, Weigths_types_CONV_NPU40_test) {
 
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }
@@ -493,7 +496,7 @@ TEST_F(TestCostModelNPU4x, Weigths_types_CONV_NPU40_test) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }
@@ -543,7 +546,7 @@ TEST_F(TestCostModelNPU4x, Weigths_types_CONV_NPU40_test) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }
@@ -593,7 +596,7 @@ TEST_F(TestCostModelNPU4x, Weigths_types_CONV_NPU40_test) {
         MemorySize mem;
         EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
 
-        std::cout << ttl << "Cycles: " << cycles << std::endl;
+        utest_log::debug() << ttl << "Cycles: " << cycles << std::endl;
 
         EXPECT_EQ(mem.input_1, wl_wts_align_full_size) << ttl << "\nMemory size: " << mem << wl << std::endl;
     }

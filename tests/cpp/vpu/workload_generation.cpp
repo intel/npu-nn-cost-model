@@ -12,6 +12,7 @@
 #include <tuple>
 #include <vector>
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 class WorkloadGeneration : public testing::Test {
@@ -58,7 +59,8 @@ protected:
         );
     }
 
-    // std::vector<std::tuple<maxWorkloads, maxLatencyUs, nDPU, runtimeOverhead, VPUNN::VPUSplitStrategy, VPUNN::VPUSplitStrategy>>
+    // std::vector<std::tuple<maxWorkloads, maxLatencyUs, nDPU, runtimeOverhead, VPUNN::VPUSplitStrategy,
+    // VPUNN::VPUSplitStrategy>>
     typedef std::vector<std::tuple<unsigned int, unsigned int, unsigned int, unsigned int, VPUNN::VPUSplitStrategy,
                                    VPUNN::VPUSplitStrategy>>
             list;
@@ -188,14 +190,15 @@ TEST_F(WorkloadGeneration, WorkloadGenerationCreateTilerMultipleWLs) {
             } catch (std::out_of_range const& err) {
                 // this is here to catch the situation when the WL is not usable with this NN
                 //@todo: rewrite the test to consider the VPUNNmodel particularities.
-                std::cout << "\n  OUT of RANGE exception when intraTileSplit(), probably bad "
-                             "WL input for the VPUNN \n ERR: "
-                          << err.what() << std::endl
-                          << layer << " \n availableStrategies:" << (int)options.availableStrategies[0]
-                          << " \n maxWorkloads:" << options.maxWorkloads << " \n maxLatencyUs:" << options.maxLatencyUs
-                          << " \n nDPU:" << options.nDPU << " \n runtimeOverhead:" << options.runtimeOverhead
-                          << " \n Model: " << what_model_is(model) << std::endl
-                          << std::endl;
+                utest_log::debug() << "\n  OUT of RANGE exception when intraTileSplit(), probably bad "
+                                     "WL input for the VPUNN \n ERR: "
+                                  << err.what() << std::endl
+                                  << layer << " \n availableStrategies:" << (int)options.availableStrategies[0]
+                                  << " \n maxWorkloads:" << options.maxWorkloads
+                                  << " \n maxLatencyUs:" << options.maxLatencyUs << " \n nDPU:" << options.nDPU
+                                  << " \n runtimeOverhead:" << options.runtimeOverhead
+                                  << " \n Model: " << what_model_is(model) << std::endl
+                                  << std::endl;
             }
         }
     }

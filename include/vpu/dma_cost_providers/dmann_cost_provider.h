@@ -11,6 +11,7 @@
 #define DMANN_COST_PROVIDER_H_
 
 #include "core/cache.h"
+#include "core/vecdescriptor_map_type_selector.h"// for LRUCache<std::vector<float>, float>
 #include "dma_cost_provider_interface.h"
 #include "inference/dma_post_process.h"
 #include "inference/dma_postprocessing_factory.h"

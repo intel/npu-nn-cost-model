@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 #include <sstream>  // for error formating
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -61,7 +62,6 @@ TEST_F(TestCyclesInterfaceType, Extrapolated_cost_function_test) {
     const unsigned int y_expected_manual = y1 + ((y2 - y1) * (x - x1)) / (x2 - x1);
 
     EXPECT_EQ(y_expected, y_expected_manual);
-
 }
 
 class CycleAdderCheckerTest : public ::testing::Test {
@@ -91,7 +91,7 @@ protected:
     void checkerTest(const TestInput& t_in, const bool& t_exp, const std::string& test_case = "") {
         std::string t_header{"** Test Case: " + test_case + "\n"};
         auto input_0 = t_in.in0;
-        std::cout << t_header << std::endl;
+        utest_log::debug() << t_header << std::endl;
 
         EXPECT_EQ(Cycles::isErrorCode(input_0), t_exp)
                 << "Expected result: " << t_exp << ", instead received: " << Cycles::isErrorCode(input_0);
@@ -104,13 +104,13 @@ protected:
         auto input_0 = t_in.in0;
         auto input_1 = t_in.in1;
 
-        std::cout << t_header << std::endl;
+        utest_log::debug() << t_header << std::endl;
 
         EXPECT_EQ(Cycles::cost_adder(input_0, input_1), result_cycle)
                 << "Expected result: " << result_cycle
                 << ", instead received: " << Cycles::cost_adder(input_0, input_1);
 
-        std::cout << "------------------------------------------------------------------------" << std::endl;
+        utest_log::debug() << "------------------------------------------------------------------------" << std::endl;
     }
 
     void executeTests(const TestsVector& tests) {

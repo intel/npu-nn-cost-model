@@ -7,6 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 #include "dpu_validator.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -171,8 +172,8 @@ TEST_F(DPU_OperationValidator_TestVPU2x, InputSparsity_and_SEP_memory_test) {
     auto verify_input0_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << "Test case:"
-                      << " " << i << "\n";
+            utest_log::debug() << "Test case:"
+                              << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
 
@@ -354,8 +355,8 @@ TEST_F(DPU_OperationValidator_TestVPU2x, OutputSparsity_and_SEP_memory_test) {
     auto verify_output0_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << "Test case:"
-                      << " " << i << "\n";
+            utest_log::debug() << "Test case:"
+                              << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
 
@@ -566,8 +567,8 @@ TEST_F(DPU_OperationValidator_TestVPU2x, Output_sparsity_memory_computation_test
     auto verify_output0_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << "Test case:"
-                      << " " << i << "\n";
+            utest_log::debug() << "Test case:"
+                              << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
 
@@ -844,7 +845,7 @@ TEST_F(DPU_OperationValidator_TestVPU2x, InputHALOTest) {
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << "Case " << t.test_case << " " << i << "\n";
+            utest_log::debug() << "Case " << t.test_case << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;
@@ -1048,7 +1049,7 @@ TEST_F(DPU_OperationValidator_TestVPU2x, OutputHALOTest) {
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << t.test_case << " " << i << "\n";
+            utest_log::debug() << t.test_case << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;
@@ -1356,7 +1357,7 @@ TEST_F(DPU_OperationValidator_TestVPU2x, OutputHALO_Inbound_Test) {
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << t.test_case << " " << i << "\n";
+            utest_log::debug() << t.test_case << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;
@@ -1463,7 +1464,7 @@ TEST_F(DPU_OperationValidator_TestVPU2x, InputHALOTest_different_H_and_W_wl) {
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << t.test_case << " " << i << "\n";
+            utest_log::debug() << t.test_case << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;
@@ -1615,7 +1616,7 @@ TEST_F(DPU_OperationValidator_TestVPU2x, OutputHALOTest_different_H_and_W_wl) {
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << t.test_case << " " << i << "\n";
+            utest_log::debug() << t.test_case << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;
@@ -1839,7 +1840,7 @@ TEST_F(DPU_OperationValidator_TestVPU2x, OutputHALO_Inbound_Test_different_H_and
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << t.test_case << " " << i << "\n";
+            utest_log::debug() << t.test_case << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;
@@ -1946,8 +1947,8 @@ TEST_F(DPU_OperationValidator_TestVPU2x, Weight_sparsity_memory_test) {
     auto verify_memory = [this](const TestsVector& tests) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
-            std::cout << "Test case:"
-                      << " " << i << "\n";
+            utest_log::debug() << "Test case:"
+                              << " " << i << "\n";
 
             VPUNN::DPUWorkload wl_sparse{t.t_in.wl};
             wl_sparse.weight_sparsity = t.t_in.sparse_weight;
@@ -2075,7 +2076,7 @@ TEST_F(DPU_OperationValidator_TestVPU2x, Check_halo_inputs_test) {
         std::string info;
 
         for (const auto& t : tests) {
-            std::cout << "TEST " << i << ": " << t.test_case << "\n";
+            utest_log::debug() << "TEST " << i << ": " << t.test_case << "\n";
 
             VPUNN::DPUWorkload wl_ref_halo{t.t_in.wl};
             wl_ref_halo.halo = t.t_in.halo_ref;

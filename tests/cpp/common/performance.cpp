@@ -21,6 +21,7 @@
 
 #include "nn_models.h"
 
+#include "logger/logger.h"
 #include "common_helpers.h"
 #include "vpu/sample_generator/random_task_generator.h"
 #include "vpu_shave_cost_model.h"
@@ -72,10 +73,10 @@ protected:
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device));
 
-        std::cout << std::endl
-                  << "** WL Latency Info for " << model_path << "   Target Latency:" << target_latency
-                  << " milliseconds,  Samples desired: " << n_workloads  // << std::endl
-                  << " Compiled in a time relevant mode (NDEBUG): " << time_relevance << std::endl;
+        utest_log::info() << std::endl
+                         << "** WL Latency Info for " << model_path << "   Target Latency:" << target_latency
+                         << " milliseconds,  Samples desired: " << n_workloads  // << std::endl
+                         << " Compiled in a time relevant mode (NDEBUG): " << time_relevance << std::endl;
         for (int r = 1; r <= 1; ++r) {  // repeat runs
 
             {  // separate execution
@@ -122,12 +123,13 @@ protected:
                             << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
 
                     /// cout anyway
-                    std::cout << " >>  Tout: 1xN: 1 wl avg latency [ms]: " << wl_latency
-                              << " Test with: " << latencies_count << " sequentially executed. "
-                              << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat << ", Med: " << median
-                              << "\n\t First: " << first << ", Last: " << last << ",  10th%: " << at10percentile
-                              << ",  90th%: " << at90percentile << std::endl
-                              << "     Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
+                    utest_log::info() << " >>  Tout: 1xN: 1 wl avg latency [ms]: " << wl_latency
+                                     << " Test with: " << latencies_count << " sequentially executed. "
+                                     << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat
+                                     << ", Med: " << median << "\n\t First: " << first << ", Last: " << last
+                                     << ",  10th%: " << at10percentile << ",  90th%: " << at90percentile << std::endl
+                                     << "     Compiled in a time relevant mode: (NDEBUG)" << time_relevance
+                                     << std::endl;
                 }
                 {
                     auto& latencies{individual_latencies_werror};
@@ -149,11 +151,12 @@ protected:
                         const auto at90percentile = latencies[(int)(latencies_count * 0.9F)];
 
                         /// cout anyway for Error latencies
-                        std::cout << " >>X  ERROR LATENCY: 1xN: 1 wl avg latency [ms]: " << wl_latency
-                                  << " Test with: " << latencies_count << " sequentially executed. "
-                                  << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat
-                                  << ", Med: " << median << "\n\t First: " << first << ", Last: " << last
-                                  << ",  10th%: " << at10percentile << ",  90th%: " << at90percentile << std::endl;
+                        utest_log::info() << " >>X  ERROR LATENCY: 1xN: 1 wl avg latency [ms]: " << wl_latency
+                                         << " Test with: " << latencies_count << " sequentially executed. "
+                                         << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat
+                                         << ", Med: " << median << "\n\t First: " << first << ", Last: " << last
+                                         << ",  10th%: " << at10percentile << ",  90th%: " << at90percentile
+                                         << std::endl;
                     }
                 }
             }
@@ -174,7 +177,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Standard_InferenceLatency_stochastic) {
         runModelLatency(model_info, population_size);
 
         // do it again
-        std::cout << "         ------------------\n";
+        utest_log::debug() << "         ------------------\n";
     }
 }
 TEST_F(VPUNNPerformanceTest, DISABLED_FAST_InferenceLatencyStrict_stochastic) {
@@ -193,10 +196,10 @@ TEST_F(VPUNNPerformanceTest, DISABLED_FAST_InferenceLatencyStrict_stochastic) {
         auto workloads = std::vector<VPUNN::DPUWorkload>(n_workloads);
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device));
 
-        std::cout << std::endl
-                  << "** WL Latency Info for " << model_path << "   Target Latency[ms]:" << strict_target_latency
-                  << std::endl
-                  << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
+        utest_log::info() << std::endl
+                         << "** WL Latency Info for " << model_path << "   Target Latency[ms]:" << strict_target_latency
+                         << std::endl
+                         << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
         for (int r = 1; r <= 1; ++r) {  // repeat runs
 
             {  // separate execution
@@ -224,12 +227,12 @@ TEST_F(VPUNNPerformanceTest, DISABLED_FAST_InferenceLatencyStrict_stochastic) {
                 const auto at10percentile = individual_latencies[(int)(individual_latencies.size() * 0.1F)];
                 const auto at90percentile = individual_latencies[(int)(individual_latencies.size() * 0.9F)];
 
-                std::cout << "   T: 1xN: 1 wl avg latency[ms]: " << wl_latency << " Test with: " << n_workloads
-                          << " sequentially executed. "
-                          << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat << ", Med: " << median
-                          << "\n\t First: " << first << ", Last: " << last << ",  10th%: " << at10percentile
-                          << ",  90th%: " << at90percentile << std::endl
-                          << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
+                utest_log::info() << "   T: 1xN: 1 wl avg latency[ms]: " << wl_latency << " Test with: " << n_workloads
+                                 << " sequentially executed. "
+                                 << "Batch : " << 1 << ". Min: " << min_lat << ", Max: " << max_lat
+                                 << ", Med: " << median << "\n\t First: " << first << ", Last: " << last
+                                 << ",  10th%: " << at10percentile << ",  90th%: " << at90percentile << std::endl
+                                 << "Compiled in a time relevant mode: (NDEBUG)" << time_relevance << std::endl;
 
                 EXPECT_LE(wl_latency, strict_target_latency)
                         << " WL Latency Info for " << model_path << "   Target Latency[ms]:" << strict_target_latency
@@ -243,7 +246,7 @@ TEST_F(VPUNNPerformanceTest, DISABLED_FAST_InferenceLatencyStrict_stochastic) {
             }
 
             // do it again
-            std::cout << "\n";
+            utest_log::debug() << "\n";
         }
     }
 }
@@ -381,27 +384,31 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelInstantiationVsInstanceQue
 
     const double ratio_instantiate_to_static = (avg_static_query > 0.0) ? (avg_instantiate / avg_static_query) : 0.0;
     const double ratio_construct_plus_query_to_static =
-         (avg_static_query > 0.0) ? (avg_construct_plus_query / avg_static_query) : 0.0;
+            (avg_static_query > 0.0) ? (avg_construct_plus_query / avg_static_query) : 0.0;
     const double average_improvement_instantiate_to_static =
-         (ratio_instantiate_to_static > 0.0) ? (1.0 - 1.0 / ratio_instantiate_to_static) * 100.0 : 0.0;
+            (ratio_instantiate_to_static > 0.0) ? (1.0 - 1.0 / ratio_instantiate_to_static) * 100.0 : 0.0;
     const double average_improvement_construct_plus_query_to_static =
-         (ratio_construct_plus_query_to_static > 0.0) ? (1.0 - 1.0 / ratio_construct_plus_query_to_static) * 100.0 : 0.0;
+            (ratio_construct_plus_query_to_static > 0.0) ? (1.0 - 1.0 / ratio_construct_plus_query_to_static) * 100.0
+                                                         : 0.0;
 
-    std::cout << "\n[Runtime] VPUCostModel split timing: instantiate vs instance query vs static query"
-              << "\n  iterations: " << iterations << "\n  device: " << VPUDevice_ToText.at(static_cast<int>(device))
-              << "\n  model path: " << model_path << "\n  avg(instantiate_only)   [us]: " << std::fixed
-              << std::setprecision(2) << avg_instantiate
-              << "\n  avg(construct+query)    [us]: " << avg_construct_plus_query
-              << "\n  avg(instance_query_only)[us]: " << avg_instance_query
-              << "\n  avg(static_query_only)  [us]: " << avg_static_query
-              << "\n  med(instantiate_only)   [us]: " << med_instantiate
-              << "\n  med(construct+query)    [us]: " << med_construct_plus_query
-              << "\n  med(instance_query_only)[us]: " << med_instance_query
-              << "\n  med(static_query_only)  [us]: " << med_static_query
-              << "\n  ratio avg(instantiate/static): " << ratio_instantiate_to_static << "x"
-              << "\n  ratio avg(construct+query/static): " << ratio_construct_plus_query_to_static << "x"
-              << "\n  average improvement instantiate->static: " << average_improvement_instantiate_to_static << "%"
-              << "\n  average improvement construct+query->static: " << average_improvement_construct_plus_query_to_static << "%\n";
+    utest_log::info() << "\n[Runtime] VPUCostModel split timing: instantiate vs instance query vs static query"
+                     << "\n  iterations: " << iterations
+                     << "\n  device: " << VPUDevice_ToText.at(static_cast<int>(device))
+                     << "\n  model path: " << model_path << "\n  avg(instantiate_only)   [us]: " << std::fixed
+                     << std::setprecision(2) << avg_instantiate
+                     << "\n  avg(construct+query)    [us]: " << avg_construct_plus_query
+                     << "\n  avg(instance_query_only)[us]: " << avg_instance_query
+                     << "\n  avg(static_query_only)  [us]: " << avg_static_query
+                     << "\n  med(instantiate_only)   [us]: " << med_instantiate
+                     << "\n  med(construct+query)    [us]: " << med_construct_plus_query
+                     << "\n  med(instance_query_only)[us]: " << med_instance_query
+                     << "\n  med(static_query_only)  [us]: " << med_static_query
+                     << "\n  ratio avg(instantiate/static): " << ratio_instantiate_to_static << "x"
+                     << "\n  ratio avg(construct+query/static): " << ratio_construct_plus_query_to_static << "x"
+                     << "\n  average improvement instantiate->static: " << average_improvement_instantiate_to_static
+                     << "%"
+                     << "\n  average improvement construct+query->static: "
+                     << average_improvement_construct_plus_query_to_static << "%\n";
 
     EXPECT_GT(avg_instantiate, 0.0);
     EXPECT_GT(avg_construct_plus_query, 0.0);
@@ -430,8 +437,8 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelConstructPlusQueryVsStatic
     double ratio_cqp_sum = 0.0;
     int ratio_count = 0;
 
-    std::cout << "\n[Runtime] VPUCostModel construct+instance-query vs static query (multi-device)"
-              << "\n  iterations/device: " << iterations << "\n";
+    utest_log::debug() << "\n[Runtime] VPUCostModel construct+instance-query vs static query (multi-device)"
+                      << "\n  iterations/device: " << iterations << "\n";
 
     for (const auto& selected : candidates) {
         const std::string model_path = selected.first;
@@ -540,24 +547,28 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelConstructPlusQueryVsStatic
         const double average_improvement_instantiate_to_static =
                 (ratio_instantiate_to_static > 0.0) ? (1.0 - 1.0 / ratio_instantiate_to_static) * 100.0 : 0.0;
         const double average_improvement_construct_plus_query_to_static =
-                (ratio_construct_plus_query_to_static > 0.0) ? (1.0 - 1.0 / ratio_construct_plus_query_to_static) * 100.0 : 0.0;
+                (ratio_construct_plus_query_to_static > 0.0)
+                        ? (1.0 - 1.0 / ratio_construct_plus_query_to_static) * 100.0
+                        : 0.0;
 
-        std::cout << "\n[Runtime] VPUCostModel split timing: instantiate vs instance query vs static query"
-                  << "\n  iterations: " << iterations
-                  << "\n  device: " << VPUDevice_ToText.at(static_cast<int>(device))
-                  << "\n  model path: " << model_path
-                  << "\n  avg(instantiate_only)   [us]: " << std::fixed << std::setprecision(2) << avg_instantiate
-                  << "\n  avg(construct+query)    [us]: " << avg_construct_plus_query
-                  << "\n  avg(instance_query_only)[us]: " << avg_instance_query
-                  << "\n  avg(static_query_only)  [us]: " << avg_static
-                  << "\n  med(instantiate_only)   [us]: " << med_instantiate
-                  << "\n  med(construct+query)    [us]: " << med_construct_plus_query
-                  << "\n  med(instance_query_only)[us]: " << med_instance_query
-                  << "\n  med(static_query_only)  [us]: " << med_static
-                  << "\n  ratio avg(instantiate/static): " << ratio_instantiate_to_static << "x"
-                  << "\n  ratio avg(construct+query/static): " << ratio_construct_plus_query_to_static << "x"
-                  << "\n  average improvement instantiate->static: " << average_improvement_instantiate_to_static << "%"
-                  << "\n  average improvement construct+query->static: " << average_improvement_construct_plus_query_to_static << "%\n";
+        utest_log::info() << "\n[Runtime] VPUCostModel split timing: instantiate vs instance query vs static query"
+                         << "\n  iterations: " << iterations
+                         << "\n  device: " << VPUDevice_ToText.at(static_cast<int>(device))
+                         << "\n  model path: " << model_path << "\n  avg(instantiate_only)   [us]: " << std::fixed
+                         << std::setprecision(2) << avg_instantiate
+                         << "\n  avg(construct+query)    [us]: " << avg_construct_plus_query
+                         << "\n  avg(instance_query_only)[us]: " << avg_instance_query
+                         << "\n  avg(static_query_only)  [us]: " << avg_static
+                         << "\n  med(instantiate_only)   [us]: " << med_instantiate
+                         << "\n  med(construct+query)    [us]: " << med_construct_plus_query
+                         << "\n  med(instance_query_only)[us]: " << med_instance_query
+                         << "\n  med(static_query_only)  [us]: " << med_static
+                         << "\n  ratio avg(instantiate/static): " << ratio_instantiate_to_static << "x"
+                         << "\n  ratio avg(construct+query/static): " << ratio_construct_plus_query_to_static << "x"
+                         << "\n  average improvement instantiate->static: " << average_improvement_instantiate_to_static
+                         << "%"
+                         << "\n  average improvement construct+query->static: "
+                         << average_improvement_construct_plus_query_to_static << "%\n";
 
         EXPECT_GT(avg_instantiate, 0.0);
         EXPECT_GT(avg_construct_plus_query, 0.0);
@@ -572,9 +583,10 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_VPUModelConstructPlusQueryVsStatic
 
     const double avg_ratio_inst = (ratio_count > 0) ? (ratio_inst_sum / static_cast<double>(ratio_count)) : 0.0;
     const double avg_ratio_cqp = (ratio_count > 0) ? (ratio_cqp_sum / static_cast<double>(ratio_count)) : 0.0;
-    std::cout << "\n  Summary: average ratio instantiate/static across devices = " << std::fixed
-              << std::setprecision(2) << avg_ratio_inst << "x"
-              << "\n  Summary: average ratio construct+query/static across devices = " << avg_ratio_cqp << "x\n";
+    utest_log::debug() << "\n  Summary: average ratio instantiate/static across devices = " << std::fixed
+                      << std::setprecision(2) << avg_ratio_inst << "x"
+                      << "\n  Summary: average ratio construct+query/static across devices = " << avg_ratio_cqp
+                      << "x\n";
 }
 
 TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_NPU5_ConstructPlusQueryVsStaticQuery_ThreeInitModes) {
@@ -668,17 +680,15 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_NPU5_ConstructPlusQueryVsStaticQue
         const double ratio = (avg_static > 0.0) ? (avg_cqp / avg_static) : 0.0;
         const double average_improvement = (ratio > 0.0) ? (1.0 - 1.0 / ratio) * 100.0 : 0.0;
 
-        std::cout << "\n[Runtime][NPU5] Construct+query vs static query"
-                  << "\n  mode: " << mode_name
-                  << "\n  iterations: " << iterations
-                  << "\n  device: " << VPUDevice_ToText.at(static_cast<int>(device))
-                  << "\n  model path: " << model_path
-                  << "\n  avg(construct+query) [us]: " << std::fixed << std::setprecision(2) << avg_cqp
-                  << "\n  avg(static_query)    [us]: " << avg_static
-                  << "\n  med(construct+query) [us]: " << med_cqp
-                  << "\n  med(static_query)    [us]: " << med_static
-                  << "\n  ratio avg(construct+query/static): " << ratio << "x"
-                  << "\n  average improvement construct+query->static: " << average_improvement << "%\n";
+        utest_log::debug() << "\n[Runtime][NPU5] Construct+query vs static query"
+                          << "\n  mode: " << mode_name << "\n  iterations: " << iterations
+                          << "\n  device: " << VPUDevice_ToText.at(static_cast<int>(device))
+                          << "\n  model path: " << model_path << "\n  avg(construct+query) [us]: " << std::fixed
+                          << std::setprecision(2) << avg_cqp << "\n  avg(static_query)    [us]: " << avg_static
+                          << "\n  med(construct+query) [us]: " << med_cqp
+                          << "\n  med(static_query)    [us]: " << med_static
+                          << "\n  ratio avg(construct+query/static): " << ratio << "x"
+                          << "\n  average improvement construct+query->static: " << average_improvement << "%\n";
 
         EXPECT_GT(avg_cqp, 0.0);
         EXPECT_GT(avg_static, 0.0);
@@ -711,8 +721,8 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_NPU5_ConstructPlusQueryVsStaticQue
 
     const auto measure_cache_memory = [&]() -> MeasureResult {
         const auto t0 = Clock::now();
-        auto model = std::make_unique<VPUCostModel>(device, model_buffer.data(), model_buffer.size(), false, false, 16384, 1,
-                                                    cache_buffer.data(), cache_buffer.size());
+        auto model = std::make_unique<VPUCostModel>(device, model_buffer.data(), model_buffer.size(), false, false,
+                                                    16384, 1, cache_buffer.data(), cache_buffer.size());
         const auto ops = model->getShaveSupportedOperations(device);
         const auto t1 = Clock::now();
         const bool initialized = model->nn_initialized();
@@ -724,10 +734,10 @@ TEST_F(VPUNNPerformanceTest, DISABLED_Runtime_NPU5_ConstructPlusQueryVsStaticQue
     const double ratio_cache_file = run_mode("cache from file", measure_cache_file);
     const double ratio_cache_memory = run_mode("cache from memory", measure_cache_memory);
 
-    std::cout << "\n[Runtime][NPU5] Summary (construct+query/static)"
-              << "\n  no cache: " << std::fixed << std::setprecision(2) << ratio_no_cache << "x"
-              << "\n  cache from file: " << ratio_cache_file << "x"
-              << "\n  cache from memory: " << ratio_cache_memory << "x\n";
+    utest_log::info() << "\n[Runtime][NPU5] Summary (construct+query/static)"
+                     << "\n  no cache: " << std::fixed << std::setprecision(2) << ratio_no_cache << "x"
+                     << "\n  cache from file: " << ratio_cache_file << "x"
+                     << "\n  cache from memory: " << ratio_cache_memory << "x\n";
 }
 
 // Parameterized test fixture using ModelDescriptor as parameter

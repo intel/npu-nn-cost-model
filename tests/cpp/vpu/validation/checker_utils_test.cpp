@@ -3,6 +3,7 @@
 #include "vpu/validation/checker_utils.h"
 
 #include "vpu_cost_model.h"
+// #include "logger/logger.h"
 
 #include <gtest/gtest.h>
 
@@ -51,17 +52,21 @@ TEST(CheckerUtilsTest, RecreateTicketErrors_Tags) {
     std::string info;
     const auto cycles = model.DPU(wl, info);
 
-    //std::cout << info << std::endl;
+    // utest_log::debug() << info << std::endl;
 
     EXPECT_EQ(cycles, Cycles::ERROR_INVALID_INPUT_CONFIGURATION);
-    EXPECT_EQ(info,
-              "[CHECK FAILED]: input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16! [END CHECK]; "
-              "[CHECK FAILED]: input_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in interval [1, 1] [END CHECK]; "
-              "[CHECK FAILED]: output_0.width with value: 65 is not found in interval: [32, 32] [END CHECK]; "
-              "[CHECK FAILED]: output_0.height with value: 1 is not found in interval: [2, 2] [END CHECK]; "
-              "[CHECK FAILED]: output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16! [END CHECK]; "
-              "[CHECK FAILED]: output_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in interval [1, 1] [END CHECK]; "
-              "[CHECK FAILED]: Execution_Order with value: 4 {CUBOID_8x16} is not found in allowed list: [ 3 {CUBOID_16x16} , ] [END CHECK]");
+    EXPECT_EQ(info, "[CHECK FAILED]: input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not "
+                    "divisible by 16! [END CHECK]; "
+                    "[CHECK FAILED]: input_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in "
+                    "interval [1, 1] [END CHECK]; "
+                    "[CHECK FAILED]: output_0.width with value: 65 is not found in interval: [32, 32] [END CHECK]; "
+                    "[CHECK FAILED]: output_0.height with value: 1 is not found in interval: [2, 2] [END CHECK]; "
+                    "[CHECK FAILED]: output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not "
+                    "divisible by 16! [END CHECK]; "
+                    "[CHECK FAILED]: output_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in "
+                    "interval [1, 1] [END CHECK]; "
+                    "[CHECK FAILED]: Execution_Order with value: 4 {CUBOID_8x16} is not found in allowed list: [ 3 "
+                    "{CUBOID_16x16} , ] [END CHECK]");
 }
 
 TEST(CheckerUtilsTest, RecreateTicketErrors_NoTags) {
@@ -72,17 +77,16 @@ TEST(CheckerUtilsTest, RecreateTicketErrors_NoTags) {
     std::string info;
     const auto cycles = model.DPU(wl, info);
 
-    //std::cout << info << std::endl;
+    // utest_log::debug() << info << std::endl;
 
     EXPECT_EQ(cycles, Cycles::ERROR_INVALID_INPUT_CONFIGURATION);
-    EXPECT_EQ(info,
-              "input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!; "
-              "input_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in interval [1, 1]; "
-              "output_0.width with value: 65 is not found in interval: [32, 32]; "
-              "output_0.height with value: 1 is not found in interval: [2, 2]; "
-              "output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!; "
-              "output_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in interval [1, 1]; "
-              "Execution_Order with value: 4 {CUBOID_8x16} is not found in allowed list: [ 3 {CUBOID_16x16} , ]");
+    EXPECT_EQ(info, "input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!; "
+                    "input_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in interval [1, 1]; "
+                    "output_0.width with value: 65 is not found in interval: [32, 32]; "
+                    "output_0.height with value: 1 is not found in interval: [2, 2]; "
+                    "output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!; "
+                    "output_0.batch is not ok because:  Range 0 check failed:  Value :15 is not in interval [1, 1]; "
+                    "Execution_Order with value: 4 {CUBOID_8x16} is not found in allowed list: [ 3 {CUBOID_16x16} , ]");
 }
 
 TEST(CheckerUtilsTest, RecreateTicketErrors_VPU2_7_Tags) {
@@ -93,14 +97,15 @@ TEST(CheckerUtilsTest, RecreateTicketErrors_VPU2_7_Tags) {
     std::string info;
     const auto cycles = model.DPU(wl, info);
 
-    //std::cout << info << std::endl;
+    // utest_log::debug() << info << std::endl;
 
     EXPECT_EQ(cycles, Cycles::ERROR_INVALID_INPUT_CONFIGURATION);
-    EXPECT_EQ(info,
-              "[CHECK FAILED]: input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16! [END CHECK]; "
-              "[CHECK FAILED]: output_0.width with value: 65 is not found in interval: [32, 32] [END CHECK]; "
-              "[CHECK FAILED]: output_0.height with value: 1 is not found in interval: [2, 2] [END CHECK]; "
-              "[CHECK FAILED]: output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16! [END CHECK]");
+    EXPECT_EQ(info, "[CHECK FAILED]: input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not "
+                    "divisible by 16! [END CHECK]; "
+                    "[CHECK FAILED]: output_0.width with value: 65 is not found in interval: [32, 32] [END CHECK]; "
+                    "[CHECK FAILED]: output_0.height with value: 1 is not found in interval: [2, 2] [END CHECK]; "
+                    "[CHECK FAILED]: output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not "
+                    "divisible by 16! [END CHECK]");
 }
 
 TEST(CheckerUtilsTest, RecreateTicketErrors_VPU2_7_NestedTags) {
@@ -113,18 +118,19 @@ TEST(CheckerUtilsTest, RecreateTicketErrors_VPU2_7_NestedTags) {
     std::string info;
     const auto cycles = model.DPU(wl, info);
 
-    //std::cout << info << std::endl;
+    // utest_log::debug() << info << std::endl;
 
     EXPECT_EQ(cycles, Cycles::ERROR_INVALID_INPUT_CONFIGURATION);
     EXPECT_EQ(info.find("[CHECK FAILED]: [CHECK FAILED]"), std::string::npos);
     EXPECT_EQ(info.find("[END CHECK] [END CHECK]"), std::string::npos);
-    EXPECT_EQ(info,
-              "[CHECK FAILED]: input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16! [END CHECK]; "
-              "[CHECK FAILED]: output_0.width with value: 65 is not found in interval: [32, 32] [END CHECK]; "
-              "[CHECK FAILED]: output_0.height with value: 1 is not found in interval: [2, 2] [END CHECK]; "
-              "[CHECK FAILED]: output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16! [END CHECK]; "
-              "[CHECK FAILED]: input_1 sparsity_enabled   with value: 1 is not equal to : 0 [END CHECK]; "
-              "[CHECK FAILED]: input_1 sparsity   with value: 1 is not equal to : 0 [END CHECK]");
+    EXPECT_EQ(info, "[CHECK FAILED]: input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not "
+                    "divisible by 16! [END CHECK]; "
+                    "[CHECK FAILED]: output_0.width with value: 65 is not found in interval: [32, 32] [END CHECK]; "
+                    "[CHECK FAILED]: output_0.height with value: 1 is not found in interval: [2, 2] [END CHECK]; "
+                    "[CHECK FAILED]: output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not "
+                    "divisible by 16! [END CHECK]; "
+                    "[CHECK FAILED]: input_1 sparsity_enabled   with value: 1 is not equal to : 0 [END CHECK]; "
+                    "[CHECK FAILED]: input_1 sparsity   with value: 1 is not equal to : 0 [END CHECK]");
 }
 
 TEST(CheckerUtilsTest, RecreateTicketErrors_VPU2_7_NoTags) {
@@ -135,16 +141,13 @@ TEST(CheckerUtilsTest, RecreateTicketErrors_VPU2_7_NoTags) {
     std::string info;
     const auto cycles = model.DPU(wl, info);
 
-    //std::cout << info << std::endl;
+    // utest_log::debug() << info << std::endl;
 
     EXPECT_EQ(cycles, Cycles::ERROR_INVALID_INPUT_CONFIGURATION);
-    EXPECT_EQ(info,
-              "input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!; "
-              "output_0.width with value: 65 is not found in interval: [32, 32]; "
-              "output_0.height with value: 1 is not found in interval: [2, 2]; "
-              "output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!");
+    EXPECT_EQ(info, "input_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!; "
+                    "output_0.width with value: 65 is not found in interval: [32, 32]; "
+                    "output_0.height with value: 1 is not found in interval: [2, 2]; "
+                    "output_0.channels is not ok because:  Range 0 check failed:  Value :21 is not divisible by 16!");
 }
-
-
 
 }  // namespace VPUNN_unit_tests

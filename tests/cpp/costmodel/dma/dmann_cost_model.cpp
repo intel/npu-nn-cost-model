@@ -8,6 +8,7 @@
 // Software Package for additional details.
 // #include "vpu_cost_model.h"
 #include "dmann_cost_model.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -129,21 +130,21 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
         const float exp_CMX{(float)exp_dpu * f_cmx / f_dpu};
         const float dma_CMX_cyc{(float)dma_cyc * f_cmx / f_dpu};
 
-        std::cout << "\n"
-                  << tc.t_name << ",\t"                                            //
-                  << "DPU frq: " << f_dpu << " , CMX frq: " << f_cmx << " MHz.  "  //
-                  << "*** Expecting: DPUCyc " << exp_dpu << ", microsec :" << computeMicroseconds(exp_dpu, d)
-                  << " VPU cyc: " << exp_CMX
-                  << ", microsec: " << computeMicroseconds((unsigned)std::ceil(exp_CMX), f_cmx)
-                  << " ----->  Obtained: DPUCyc : " << dma_cyc << ", microsec :" << computeMicroseconds(dma_cyc, d)
-                  << " VPU cyc: " << dma_CMX_cyc
-                  << ", microsec: " << computeMicroseconds((unsigned)std::ceil(dma_CMX_cyc), f_cmx);
+        utest_log::debug() << "\n"
+                          << tc.t_name << ",\t"                                            //
+                          << "DPU frq: " << f_dpu << " , CMX frq: " << f_cmx << " MHz.  "  //
+                          << "*** Expecting: DPUCyc " << exp_dpu << ", microsec :" << computeMicroseconds(exp_dpu, d)
+                          << " VPU cyc: " << exp_CMX
+                          << ", microsec: " << computeMicroseconds((unsigned)std::ceil(exp_CMX), f_cmx)
+                          << " ----->  Obtained: DPUCyc : " << dma_cyc
+                          << ", microsec :" << computeMicroseconds(dma_cyc, d) << " VPU cyc: " << dma_CMX_cyc
+                          << ", microsec: " << computeMicroseconds((unsigned)std::ceil(dma_CMX_cyc), f_cmx);
         ;
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
 
     {
-        std::cout << "\n\n NPU50 \n";
+        utest_log::debug() << "\n\n NPU50 \n";
         const VPUDevice device{VPUDevice::NPU_5_0};
         const int p = (50 * evoX * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::NPU_5_0)) /
                       (int)GlobalHarwdwareCharacteristics::get_cmx_fclk(VPUDevice::NPU_5_0);
@@ -189,7 +190,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
     }
 
     {
-        std::cout << "\n\n NPU40 \n";
+        utest_log::debug() << "\n\n NPU40 \n";
         VPUDevice device{VPUDevice::VPU_4_0};
         const int p = (50 * evoX * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::VPU_4_0)) /
                       (int)GlobalHarwdwareCharacteristics::get_cmx_fclk(VPUDevice::VPU_4_0);
@@ -228,7 +229,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Theoretical_Debug) {
     }
 
     {
-        std::cout << "\n\n NPU27\n";
+        utest_log::debug() << "\n\n NPU27\n";
         VPUDevice device{VPUDevice::VPU_2_7};
 
         const std::vector<TestCase> tc_27{
@@ -278,21 +279,21 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
         const float exp_CMX{(float)exp_dpu * f_cmx / f_dpu};
         const float dma_CMX_cyc{(float)dma_cyc * f_cmx / f_dpu};
 
-        std::cout << "\n"
-                  << tc.t_name << ",\t"                                            //
-                  << "DPU frq: " << f_dpu << " , CMX frq: " << f_cmx << " MHz.  "  //
-                  << "*** Expecting: DPUCyc " << exp_dpu << ", microsec :" << computeMicroseconds(exp_dpu, d)
-                  << " VPU cyc: " << exp_CMX
-                  << ", microsec: " << computeMicroseconds((unsigned)std::ceil(exp_CMX), f_cmx)
-                  << " ----->  Obtained: DPUCyc : " << dma_cyc << ", microsec :" << computeMicroseconds(dma_cyc, d)
-                  << " VPU cyc: " << dma_CMX_cyc
-                  << ", microsec: " << computeMicroseconds((unsigned)std::ceil(dma_CMX_cyc), f_cmx);
+        utest_log::debug() << "\n"
+                          << tc.t_name << ",\t"                                            //
+                          << "DPU frq: " << f_dpu << " , CMX frq: " << f_cmx << " MHz.  "  //
+                          << "*** Expecting: DPUCyc " << exp_dpu << ", microsec :" << computeMicroseconds(exp_dpu, d)
+                          << " VPU cyc: " << exp_CMX
+                          << ", microsec: " << computeMicroseconds((unsigned)std::ceil(exp_CMX), f_cmx)
+                          << " ----->  Obtained: DPUCyc : " << dma_cyc
+                          << ", microsec :" << computeMicroseconds(dma_cyc, d) << " VPU cyc: " << dma_CMX_cyc
+                          << ", microsec: " << computeMicroseconds((unsigned)std::ceil(dma_CMX_cyc), f_cmx);
         ;
         EXPECT_EQ(dma_cyc, tc.t_exp) << tc.t_name << "\n" << tc.t_in;
     };
 
     {
-        std::cout << "\n\n NPU50 \n";
+        utest_log::debug() << "\n\n NPU50 \n";
         const VPUDevice device{VPUDevice::NPU_5_0};
         const int p = (50 * evoX * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::NPU_5_0)) /
                       (int)GlobalHarwdwareCharacteristics::get_cmx_fclk(VPUDevice::NPU_5_0);
@@ -315,7 +316,7 @@ TEST_F(TestDMA_TH_CostModel, DMA_Th_Smoke_E162767_Legacy) {
     }
 
     {
-        std::cout << "\n\n NPU40 \n";
+        utest_log::debug() << "\n\n NPU40 \n";
         const VPUDevice device{VPUDevice::VPU_4_0};
 
         TestCase case1{mkwl(4864, MemoryLocation::DRAM, MemoryLocation::CMX, device),

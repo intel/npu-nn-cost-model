@@ -22,4 +22,4 @@ struct VPULayerExecutionConfig {
 
 } // namespace VPUNN
 
-#endif
+#endif // VPUNN_VPU_LAYER_EXECUTION_CONFIG_H

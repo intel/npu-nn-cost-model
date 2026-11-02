@@ -101,6 +101,7 @@ static const EnumTextLogicalMap dtype_logical_map{
         link_logical("INT1", "UINT8"),        // not supported
         link_logical("FLOAT32", "FLOAT32"),   // same
         link_logical("INT32", "FLOAT16"),     // not supported
+        link_logical("UINT32", "FLOAT16"),    // not supported
         link_logical("UINT16", "FLOAT16"),    // mapped // until trained NNs exist
         link_logical("INT16", "FLOAT16"),     // mapped // until trained NNs exist
 };

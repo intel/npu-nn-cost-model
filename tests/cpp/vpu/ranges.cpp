@@ -16,6 +16,7 @@
 #include <type_traits>
 #include <utility>
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -409,26 +410,28 @@ TEST_F(SmartRangesTest, IncrementAssumingIsValid_Test) {
         };
 
         for (const auto& r : test_ranges) {
-            std::cout << "Testing range [" << r.getLowerBound() << ", " << r.getUpperBound()
-                      << "],  begin is: " << ((r.begin() != r.end()) ? (*r.begin()) : -100000000) << "\n";
+            utest_log::debug() << "Testing range [" << r.getLowerBound() << ", " << r.getUpperBound()
+                              << "],  begin is: " << ((r.begin() != r.end()) ? (*r.begin()) : -100000000) << "\n";
             // Build expected sequence by brute-force is_in scan
             std::vector<int> expected;
             for (int v = r.getLowerBound(); v <= r.getUpperBound(); ++v) {
-                // std::cout << "Checking value " << v << ": is_in=" << r.is_in(v) << "\n";
+                // utest_log::debug() << "Checking value " << v << ": is_in=" << r.is_in(v) << "\n";
                 if (r.is_in(v)) {
                     expected.push_back(v);
                 }
             }
-            // std::cout << "Expected valid values DONE \n ";
+            // utest_log::debug() << "Expected valid values DONE \n ";
 
             // Build actual sequence via incrementAssumingIsValid
             std::vector<int> actual;
             auto val = r.roundToNextLarger(r.getLowerBound());
-            // std::cout << "First valid value is: " << (val.has_value() ? std::to_string(*val) : "nullopt") << "\n";
+            // utest_log::debug() << "First valid value is: " << (val.has_value() ? std::to_string(*val) : "nullopt") <<
+            // "\n";
             while (val.has_value()) {
                 actual.push_back(*val);
                 val = r.incrementAssumingIsValid(val);
-                // std::cout << "Next valid value is: " << (val.has_value() ? std::to_string(*val) : "nullopt") << "\n";
+                // utest_log::debug() << "Next valid value is: " << (val.has_value() ? std::to_string(*val) : "nullopt")
+                // << "\n";
             }
 
             EXPECT_EQ(actual, expected) << "Mismatch for range [" << r.getLowerBound() << ", " << r.getUpperBound()

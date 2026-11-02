@@ -122,8 +122,8 @@ private:
  * @brief Test case: Detects if computation uses FP16 precision
  *
  * Tests the native_comp_on_fp16() function which should return true for:
- * - FLOAT16, BFLOAT16, FLOAT32 input types (16-bit or higher precision FP)
- * - Should return false for FP8 types (HF8, BF8) and FP4 types (FLOAT4) as they use different precision
+ * - FLOAT16, BFLOAT16 input types (16-bit precision FP)
+ * - Should return false for FP8 types (HF8, BF8), FP4 types (FLOAT4) and FLOAT32 (own is_fp32family_dtype now)
  */
 TEST_F(NativeComputationTest, DetectFP16FamilyInputTypes) {
     TestVector fp16 = {
@@ -134,13 +134,13 @@ TEST_F(NativeComputationTest, DetectFP16FamilyInputTypes) {
              true},  // UINT8 -> UINT8 (FP16 weights): compute is done on larger type FP16
             {{DataType::FLOAT16, DataType::UINT8}, true},   // FLOAT16 -> UINT8: Input is FP16
             {{DataType::BFLOAT16, DataType::UINT8}, true},  // BFLOAT16 -> UINT8: Input is FP16-class
-            {{DataType::FLOAT32, DataType::UINT8}, true},   // FLOAT32 -> UINT8: Input is higher precision FP
+            {{DataType::FLOAT32, DataType::UINT8}, false},  // FLOAT32 -> UINT8: FP32 is its own family, not FP16
             {{DataType::HF8, DataType::UINT8}, false},      // HF8 -> UINT8: Input is FP8, not FP16
             {{DataType::HF8, DataType::UINT8, DataType::FLOAT16},
              true},  // HF8 -> UINT8 (FP16 weights): Input is FP8, but due to weights on FP16 op is done on larger type
             {{DataType::BF8, DataType::UINT8}, false},  // BF8 -> UINT8: Input is FP8, not FP16
             {{DataType::FLOAT32, DataType::INT8, DataType::INT4},
-             true},  // FLOAT32 -> INT8 (INT4 weights): Input is FP32
+             false},  // FLOAT32 -> INT8 (INT4 weights): Input is FP32, not FP16
             {{DataType::UINT8, DataType::BF8, DataType::UINT8},
              false},  // UINT8 -> BF8 (UINT8 weights): Input is not FP
             {{DataType::FLOAT16, DataType::BFLOAT16, DataType::HF8},
@@ -209,7 +209,7 @@ TEST_F(NativeComputationTest, DetectI8InputWithNonFloatWeights) {
     TestVector i8 = {
             //   Input Type     |    Output Type    |    Weights Type    | Expectation
             {{DataType::INT32, DataType::INT32},
-             true},  // INT32 -> INT32: 32-bit integer (may be treated as I8-compatible)
+             false},  // INT32 -> INT32: 32-bit integer has its own is_i32family_dtype(), not I8
             {{DataType::UINT8, DataType::UINT8}, true},  // UINT8 -> UINT8: Pure 8-bit integer computation
             {{DataType::UINT8, DataType::UINT8, DataType::FLOAT16},
              false},  // UINT8 -> UINT8 (FP16 weights): Mixed precision with FP weights
@@ -261,7 +261,7 @@ TEST_F(NativeComputationTest, DetectI8ForTensors) {
             {{DataType::INT2, DataType::INT2}, true},           // INT2 input is I8
             {{DataType::UINT1, DataType::UINT1}, true},         // UINT1 input is I8
             {{DataType::INT1, DataType::INT1}, true},           // INT1 input is I8
-            {{DataType::INT32, DataType::INT32}, true},         // INT32 input is considered I8 family here
+            {{DataType::INT32, DataType::INT32}, false},        // INT32 input is I32 family, not I8
             {{DataType::UINT16, DataType::UINT16}, false},      // UINT16 input is NOW I16 family, not I8
             {{DataType::INT16, DataType::INT16}, false},        // INT16 input is NOW I16 family, not I8
             {{DataType::FLOAT4, DataType::FLOAT4}, false},      // FLOAT4 input is FP, not I8
@@ -361,6 +361,62 @@ TEST_F(NativeComputationTest, DetectI16ForTensors) {
         const VPUTensor wts({1, 1, 1, 1}, wl.get_weight_type());
         return DTypeCategoryInfo::is_i16family_dtype(wts.get_dtype());
     });
+}
+
+/**
+ * @brief Test case: Validates I32/I64/FP32/FP64 classification helpers.
+ *
+ * INT32/UINT32/INT64/UINT64/FLOAT32/FLOAT64 are not valid DPU input/weight dtypes today (INT32/UINT32/
+ * FLOAT32 only ever appear as ODU output dtypes; INT64/UINT64/FLOAT64 don't appear at all), so
+ * is_i32family_dtype()/is_i64family_dtype()/is_fp32family_dtype()/is_fp64family_dtype() are exercised
+ * directly here instead of through native_comp_on_*().
+ */
+TEST_F(NativeComputationTest, DetectI32I64Fp32Fp64Classification) {
+    EXPECT_TRUE(DTypeCategoryInfo::is_i32family_dtype(DataType::INT32));
+    EXPECT_TRUE(DTypeCategoryInfo::is_i32family_dtype(DataType::UINT32));
+    EXPECT_FALSE(DTypeCategoryInfo::is_i32family_dtype(DataType::INT8));
+    EXPECT_FALSE(DTypeCategoryInfo::is_i32family_dtype(DataType::INT64));
+    EXPECT_FALSE(DTypeCategoryInfo::is_i32family_dtype(DataType::FLOAT32));
+
+    EXPECT_TRUE(DTypeCategoryInfo::is_i64family_dtype(DataType::INT64));
+    EXPECT_TRUE(DTypeCategoryInfo::is_i64family_dtype(DataType::UINT64));
+    EXPECT_FALSE(DTypeCategoryInfo::is_i64family_dtype(DataType::INT32));
+    EXPECT_FALSE(DTypeCategoryInfo::is_i64family_dtype(DataType::INT8));
+    EXPECT_FALSE(DTypeCategoryInfo::is_i64family_dtype(DataType::FLOAT64));
+
+    EXPECT_TRUE(DTypeCategoryInfo::is_fp32family_dtype(DataType::FLOAT32));
+    EXPECT_FALSE(DTypeCategoryInfo::is_fp32family_dtype(DataType::FLOAT64));
+    EXPECT_FALSE(DTypeCategoryInfo::is_fp32family_dtype(DataType::FLOAT16));
+    EXPECT_FALSE(DTypeCategoryInfo::is_fp32family_dtype(DataType::INT32));
+
+    EXPECT_TRUE(DTypeCategoryInfo::is_fp64family_dtype(DataType::FLOAT64));
+    EXPECT_FALSE(DTypeCategoryInfo::is_fp64family_dtype(DataType::FLOAT32));
+    EXPECT_FALSE(DTypeCategoryInfo::is_fp64family_dtype(DataType::FLOAT16));
+    EXPECT_FALSE(DTypeCategoryInfo::is_fp64family_dtype(DataType::UINT64));
+
+    // None of these dtypes belong to any other family.
+    for (const DataType dt : {DataType::INT32, DataType::UINT32}) {
+        EXPECT_FALSE(DTypeCategoryInfo::is_i8family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i16family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i64family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_fp16family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_fp8family_dtype(dt));
+    }
+    for (const DataType dt : {DataType::INT64, DataType::UINT64}) {
+        EXPECT_FALSE(DTypeCategoryInfo::is_i8family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i16family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i32family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_fp16family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_fp8family_dtype(dt));
+    }
+    for (const DataType dt : {DataType::FLOAT32, DataType::FLOAT64}) {
+        EXPECT_FALSE(DTypeCategoryInfo::is_fp16family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_fp8family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i8family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i16family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i32family_dtype(dt));
+        EXPECT_FALSE(DTypeCategoryInfo::is_i64family_dtype(dt));
+    }
 }
 
 }  // namespace VPUNN_unit_tests

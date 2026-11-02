@@ -82,6 +82,8 @@ private:
 
     static constexpr int alignement_size_bytes_def{16384};  // 16KB or 32KB?
 
+    inline static const Values<MPEEngine> valid_mpe_engines_def{MPEEngine::SCL};  // no dCIM support
+
     // input datatypes. smaller than output
     inline static const Values<DataType> valid_in_datatypes{
             DataType::INT8,      //
@@ -168,7 +170,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def) {};
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def) {};
 
     /// constructor with link to operations dynamic behavior, input channels rules and restrictions
     VPU4_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,
@@ -187,7 +190,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def),
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def),
               input_channels_restrictions{input_channels_restrictions_} {};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden (and input channels
@@ -209,7 +213,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def),
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def),
               input_channels_restrictions{input_channels_restrictions_} {};
 
     MultiSmartRanges get_output_channels_restriction(const DPUOperation&) const override {

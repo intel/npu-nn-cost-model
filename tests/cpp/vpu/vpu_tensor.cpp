@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 #include "vpu/dpu_types.h"
 #include "vpu/validation/interface_valid_values.h"
 
@@ -408,7 +409,7 @@ TEST_F(VPUTensorTest, Contiguous_Element_Count_And_Size_Test) {
     auto lambda = [test_message](const TestsVector& tests) {
         for (const auto& t : tests) {
             VPUTensor tensor{t.t_in.dim, t.t_in.dtype};
-            std::cout << test_message(tensor);
+            utest_log::debug() << test_message(tensor);
 
             std::pair<const int, const int> result = computeContigElemCntAndSize(tensor);
 
@@ -458,7 +459,7 @@ TEST_F(VPUTensorTest, Aligned_Sequences_Size_Test) {
     auto lambda = [test_message](const TestsVector& tests) {
         for (const auto& t : tests) {
             VPUTensor tensor{t.t_in.dim, t.t_in.dtype};
-            std::cout << test_message(tensor);
+            utest_log::debug() << test_message(tensor);
 
             for (int i = 0; i < 3; i++) {
                 int result = alignedSequencesSize(tensor, tensor.get_shape()[i]);
@@ -509,7 +510,7 @@ TEST_F(VPUTensorTest, RemainingElem_Test) {
     auto lambda = [test_message](const TestsVector& tests) {
         for (const auto& t : tests) {
             VPUTensor tensor{t.t_in.dim, t.t_in.dtype};
-            std::cout << test_message(tensor);
+            utest_log::debug() << test_message(tensor);
 
             for (int i = 0; i < 3; i++) {
                 int result = remainingElem(tensor, tensor.get_shape()[i]);

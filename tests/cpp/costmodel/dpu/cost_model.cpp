@@ -8,6 +8,7 @@
 // Software Package for additional details.
 
 #include "costmodel/cost_model.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -53,7 +54,7 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
     auto verify_cyc = [](const TestsVector& tests) {
         int i = 1;  // test case index
         for (const auto& t : tests) {
-            std::cout << "Test case: " << i << "\n";
+            utest_log::debug() << "Test case: " << i << "\n";
             VPUNN::VPUCostModel model{t.t_in.wl.device, t.t_in.model_path};
             auto cyc = model.DPU(t.t_in.wl);
 
@@ -70,34 +71,35 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
 
     /// for VPUDevice::VPU2_0, VPUDevice::VPU2_7, VPUDevice::VPU4_0 we accept any value for batch (ex: 1, 2, 3, ...)
     /// but for VPUDevice::NPU5_0 batch is restricted to 1
-    const TestsVector tests = {{{mkWl(VPUDevice::VPU_2_0, 0U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "VPU2_0, B=0"},
-                               {{mkWl(VPUDevice::VPU_2_0, 1U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
-                                {Cycles::NO_ERROR},
-                                "VPU2_0, B=1"},
-                               {{mkWl(VPUDevice::VPU_2_0, 2U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
-                                {Cycles::NO_ERROR},
-                                "VPU2_0, B=2"},
+    const TestsVector tests = {
+            {{mkWl(VPUDevice::VPU_2_0, 0U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+             {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+             "VPU2_0, B=0"},
+            {{mkWl(VPUDevice::VPU_2_0, 1U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+             {Cycles::NO_ERROR},
+             "VPU2_0, B=1"},
+            {{mkWl(VPUDevice::VPU_2_0, 2U, ExecutionMode::VECTOR), VPU_2_0_MODEL_PATH},
+             {Cycles::NO_ERROR},
+             "VPU2_0, B=2"},
 
-                               {{mkWl(VPUDevice::VPU_2_7, 0U), VPU_2_7_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "VPU2_7, B=0"},
-                               {{mkWl(VPUDevice::VPU_2_7, 1U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=1"},
-                               {{mkWl(VPUDevice::VPU_2_7, 2U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=2"},
+            {{mkWl(VPUDevice::VPU_2_7, 0U), VPU_2_7_MODEL_PATH},
+             {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+             "VPU2_7, B=0"},
+            {{mkWl(VPUDevice::VPU_2_7, 1U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=1"},
+            {{mkWl(VPUDevice::VPU_2_7, 2U), VPU_2_7_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU2_7, B=2"},
 
-                               {{mkWl(VPUDevice::VPU_4_0, 0U), VPU_4_0_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "VPU4_0, B=0"},
-                               {{mkWl(VPUDevice::VPU_4_0, 1U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=1"},
-                               {{mkWl(VPUDevice::VPU_4_0, 2U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=2"},
-                               {{mkWl(VPUDevice::NPU_5_0, 0U), NPU_5_0_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "NPU5_0, B=0"},
-                               {{mkWl(VPUDevice::NPU_5_0, 1U), NPU_5_0_MODEL_PATH}, {Cycles::NO_ERROR}, "NPU5_0, B=1"},
-                               {{mkWl(VPUDevice::NPU_5_0, 2U), NPU_5_0_MODEL_PATH},
-                                {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
-                                "NPU5_0, B=2"},
+            {{mkWl(VPUDevice::VPU_4_0, 0U), VPU_4_0_MODEL_PATH},
+             {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+             "VPU4_0, B=0"},
+            {{mkWl(VPUDevice::VPU_4_0, 1U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=1"},
+            {{mkWl(VPUDevice::VPU_4_0, 2U), VPU_4_0_MODEL_PATH}, {Cycles::NO_ERROR}, "VPU4_0, B=2"},
+            {{mkWl(VPUDevice::NPU_5_0, 0U), NPU_5_0_MODEL_PATH},
+             {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+             "NPU5_0, B=0"},
+            {{mkWl(VPUDevice::NPU_5_0, 1U), NPU_5_0_MODEL_PATH}, {Cycles::NO_ERROR}, "NPU5_0, B=1"},
+            {{mkWl(VPUDevice::NPU_5_0, 2U), NPU_5_0_MODEL_PATH},
+             {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+             "NPU5_0, B=2"},
 
     };
 
@@ -190,7 +192,7 @@ TEST_F(TestCostModel, Establish_unique_swizz_Test) {
     auto lambda = [](TestsVector& tests) {
         int i = 1;
         for (auto& t : tests) {
-            // std::cout << "\nTestCase: "<<i <<" Op:" << Operation_ToText.at(static_cast<int>(t.t_in.op));
+            // utest_log::debug() << "\nTestCase: "<<i <<" Op:" << Operation_ToText.at(static_cast<int>(t.t_in.op));
             std::tuple<Swizzling, Swizzling, Swizzling> result_swizz =
                     NN40InputAdapter::establishUniqueSwizzling(t.t_in.in0, t.t_in.in1, t.t_in.out0, t.t_in.op);
 
@@ -486,8 +488,8 @@ TEST_F(TestCostModel, Ideal_cycles_based_on_MAC_operations_Test) {
     ///@brief this lambda function executes a given lambda function as a parameter on each test case in a test vector
     ///@param tests a test vector
     ///@param testChecker is a lambda function
-    auto run_Tests = [](const TestsVector& tests, VPUCostModel& test_model,
-                        const HWPerformanceModel& performance, auto testCheck) {
+    auto run_Tests = [](const TestsVector& tests, VPUCostModel& test_model, const HWPerformanceModel& performance,
+                        auto testCheck) {
         for (const auto& t : tests) {
             testCheck(t, test_model, performance);
         }

@@ -149,6 +149,39 @@ To run the test suite: `ctest --test-dir build/tests/cpp/`
 
 Example: running only cost model integration test: `./tests/cpp/test_cost_model`
 
+All C++ tests in a test executable use the same global `utest_log` logger. It is created once per test process and is configured before the test suite starts. Tests should use `utest_log` for test logging rather than creating another global test logger.
+
+For example, these tests write through the same logger instance:
+
+```cpp
+TEST(LoggerExample, FirstTest) {
+  utest_log::info() << "Message from the first test";
+}
+
+TEST(LoggerExample, SecondTest) {
+  utest_log::LogLevelScope log_level(utest_log::Level::debug);
+  utest_log::debug() << "Debug message enabled only in this scope";
+}
+```
+
+The logger stream object is `utest_log::Stream`; it is intended for temporary use only. It buffers output until destruction, so a static or long-lived stream could outlive the shared logger and emit after shutdown. Use the normal temporary helpers such as `utest_log::info()` and `utest_log::debug()` instead. `Stream` is neither copyable nor movable, since a moved-from stream would still emit its (now stale) buffered content when destroyed.
+
+By default, the test logger uses the `info` level. To change the global logger level, use the `--logger_level` command-line option when running the test executable:
+
+```shell
+./tests/cpp/test_cost_model --logger_level debug
+```
+
+When running tests through `ctest`, set the `LOGGER_LEVEL` environment variable instead:
+
+```shell
+LOGGER_LEVEL=debug ctest --test-dir build/tests/cpp/
+```
+
+Valid levels are `trace`, `debug`, `info`, `warn`, `err`, `critical`, and `off`. The command-line option takes precedence over `LOGGER_LEVEL`; if neither is specified, `info` is used. Invalid values are treated as `off`.
+
+To change the logger level for a specific test, use a `utest_log::LogLevelScope` guard with a `utest_log::Level::level_enum` value (equivalently, a `spdlog::level::level_enum` value). This temporarily changes the shared logger level for the scope and restores the previous level when the guard is destroyed. The guard is intended for the current GoogleTest execution model, where test bodies run sequentially within a test process. It must not be used by overlapping test bodies or by concurrent scopes that change the logger level in the same process. Tests may still use worker threads that only log while the guard is active; the level is shared by those threads. Running CTest with parallelism uses separate processes, each with its own logger.
+
 ### E2E Python test
 
 `pytest tests/python/test_e2e.py -v`

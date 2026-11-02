@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 
@@ -43,7 +44,7 @@ protected:
         return details;
     }
     void printH(const std::vector<int>& histo) const {
-        std::cout << streamH(histo);
+        utest_log::debug() << streamH(histo);
     }
 
 private:

@@ -7,9 +7,9 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-#include "http_client/http_cost_provider.h"
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include "http_client/http_cost_provider.h"
 
 #ifdef NO_ERROR
 #undef NO_ERROR  // winerror.h defines NO_ERROR, which is enum member for Cycles type
@@ -41,7 +41,7 @@ protected:
 
         // Wait for the server to start
         auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-        while(!_mock_server.is_running()) {
+        while (!_mock_server.is_running()) {
             if (std::chrono::steady_clock::now() > timeout) {
                 FAIL() << "Server failed to start";
             }
@@ -51,10 +51,10 @@ protected:
 
     void TearDown() override {
         // Prevent stopping the thread if it is still running
-        if(_mock_server.is_running()) {
+        if (_mock_server.is_running()) {
             _mock_server.stop();
         }
-       
+
         if (_mock_server_thread.joinable()) {
             _mock_server_thread.join();
         }
@@ -77,6 +77,8 @@ protected:
 template <typename WlT>
 class HTTPClientTest : public HTTPClientTestBase {
 protected:
+    // KNOWN PARAMS KEYS: 'status', 'bypass_validation', 'bypass_heuristic','override', 'backend', 'offset'
+
     /**
      * @brief Helper function to handle status check requests.
      * Returns true if this was a status request that was handled, false otherwise.
@@ -103,9 +105,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint with a successful response
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             nlohmann::json response;
             response["info"] = "success";
             response["latencies"] = std::vector<CyclesInterfaceType>{1234};
@@ -135,9 +138,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint returning a profiling error
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             nlohmann::json response;
             response["info"] = "profiling_error";
             response["msg"] = "Profiling service failed";
@@ -167,9 +171,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint returning malformed JSON
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             // Missing required fields
             nlohmann::json response;
             response["unexpected_field"] = "no_cycles";
@@ -199,9 +204,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint returning invalid JSON
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             res.set_content("Invalid JSON Response", "application/json");
             res.status = 200;
         });
@@ -226,11 +232,13 @@ protected:
         // Setup mock handler for /generate_workload endpoint to handle invalid backend
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
-            // getCost cannot set invalid backend directly, because ProfilingServiceBackend::__size gets mapped to SILICON
-            // So to simulate invalid backend, server will return profiling_error with Invalid backend, no matter what backend is sent
+
+            if (HandleStatusCheck(request, res))
+                return;
+
+            // getCost cannot set invalid backend directly, because ProfilingServiceBackend::__size gets mapped to
+            // SILICON So to simulate invalid backend, server will return profiling_error with Invalid backend, no
+            // matter what backend is sent
             if (request.contains("params") && request["params"].contains("backend")) {
                 nlohmann::json response;
                 response["info"] = "profiling_error";
@@ -271,9 +279,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint with multiple latencies
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             nlohmann::json response;
             response["info"] = "success";
             response["latencies"] = std::vector<CyclesInterfaceType>{1000, 2000, 1500};
@@ -303,9 +312,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint with empty latencies
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             nlohmann::json response;
             response["info"] = "success";
             response["latencies"] = std::vector<CyclesInterfaceType>{};
@@ -335,9 +345,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint returning a warning
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             nlohmann::json response;
             response["info"] = "success";
             response["latencies"] = std::vector<CyclesInterfaceType>{1234};
@@ -370,9 +381,10 @@ protected:
         // Setup mock handler for /generate_workload endpoint returning an error with trace
         _mock_server.Post("/generate_workload", [&](const httplib::Request& req, httplib::Response& res) {
             nlohmann::json request = nlohmann::json::parse(req.body);
-            
-            if (HandleStatusCheck(request, res)) return;
-            
+
+            if (HandleStatusCheck(request, res))
+                return;
+
             nlohmann::json response;
             response["error"] = {{"msg", "Execution failed"}, {"trace", "Traceback (most recent call last): ..."}};
             response["path"] = "/execute";

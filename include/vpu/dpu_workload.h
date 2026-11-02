@@ -1,4 +1,4 @@
-// Copyright © 2024 Intel Corporation
+// Copyright © 2024-2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -116,8 +116,8 @@ struct DPUWorkload {
 
     /// MPE engine to be used, SCL by default -- It's a required field for both l2 and l1 APIs.
     /// Controls also what execution order can be used / is valid
-    /// In case of dCIM, the execution order is set automatically during sanitization, therefore no optimization is
-    /// allowed at layer level.
+    /// dCIM workloads must provide a dCIM execution order; incompatible execution orders are rejected during
+    /// sanitization.
     MPEEngine mpe_engine{MPEEngine::SCL};
 
     /// this flag indicates if current operation does also the reduce min/max along with the main operation

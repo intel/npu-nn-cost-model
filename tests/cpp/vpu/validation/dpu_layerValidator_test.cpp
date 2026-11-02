@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -110,38 +111,34 @@ TEST_F(LayersValidationTest, BatchValues_Layer_and_SplitLayer_check_consistency_
 
     auto check_err_splitLayer = [&dut](TestsVector& tests) {
         SanityReport sane;
-        std::cout << "---------------- check_splitLayer_consistency ---------------- \n";
+        utest_log::debug() << "---------------- check_splitLayer_consistency ---------------- \n";
         for (auto& t : tests) {
-            std::cout << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
-                      << " Batch:" << t.t_in.layer.inputs[0].b() << " ---------\n";
+            utest_log::debug() << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
+                              << " Batch:" << t.t_in.layer.inputs[0].b() << " ---------\n";
 
-         
-                dut.check_splitLayer_consistency(t.t_in.layer, sane);
+            dut.check_splitLayer_consistency(t.t_in.layer, sane);
 
-                EXPECT_EQ(sane.value(), (t.t_exp.err_expected))
-                        << sane.info << "\n error is : " << Cycles::toErrorText(sane.value())
-                        << "\n";
+            EXPECT_EQ(sane.value(), (t.t_exp.err_expected))
+                    << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n";
         }
-        std::cout << "----------------------------------------------------------------------\n\n";
+        utest_log::debug() << "----------------------------------------------------------------------\n\n";
     };
 
     auto check_err_completeLayer = [&dut](TestsVector& tests) {
         SanityReport sane;
-        std::cout << "---------------- check_completeLayer_consistency ---------------- \n";
+        utest_log::debug() << "---------------- check_completeLayer_consistency ---------------- \n";
         for (auto& t : tests) {
-            std::cout << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
-                      << " Batch:" << t.t_in.layer.inputs[0].b() << " ---------\n";
+            utest_log::debug() << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
+                              << " Batch:" << t.t_in.layer.inputs[0].b() << " ---------\n";
 
-                dut.check_completeLayer_consistency(t.t_in.layer, sane, VPUNN::ISIStrategy::CLUSTERING, 1);
+            dut.check_completeLayer_consistency(t.t_in.layer, sane, VPUNN::ISIStrategy::CLUSTERING, 1);
 
-                EXPECT_EQ(sane.value(), (t.t_exp.err_expected))
-                        << sane.info << "\n error is : " << Cycles::toErrorText(sane.value())
-                        << "\n";
+            EXPECT_EQ(sane.value(), (t.t_exp.err_expected))
+                    << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n";
         }
-        std::cout << "----------------------------------------------------------------------\n\n";
+        utest_log::debug() << "----------------------------------------------------------------------\n\n";
     };
 
-   
     {
         /// for VPUDevice::VPU2_0 we accept any value for batch at layer level and split layer level (ex: 1, 2, 3, ...)
         VPUDevice device{VPUDevice::VPU_2_0};
@@ -170,10 +167,9 @@ TEST_F(LayersValidationTest, BatchValues_Layer_and_SplitLayer_check_consistency_
                 {{mkLayer(device, 10U, Layout::ZMAJOR)},  {Cycles::NO_ERROR}}
                     // clang-format on
             };
-            
+
             check_err_completeLayer(tests);
         }
-        
     }
 
     {
@@ -306,10 +302,11 @@ TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
 
     auto check_err_splitLayer = [&dut](TestsVector& tests) {
         SanityReport sane;
-        std::cout << "---------------- check_splitLayer_consistency ---------------- \n";
+        utest_log::debug() << "---------------- check_splitLayer_consistency ---------------- \n";
         for (auto& t : tests) {
-            std::cout << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
-                      << " Operation:" << Operation_ToText.at(static_cast<int>(t.t_in.layer.op)) << " ---------\n";
+            utest_log::debug() << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
+                              << " Operation:" << Operation_ToText.at(static_cast<int>(t.t_in.layer.op))
+                              << " ---------\n";
 
             for (auto exec : t.t_in.all_exec_modes) {
                 t.t_in.layer.execution_order = exec;
@@ -320,17 +317,18 @@ TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
                         << " Exec order:" << ExecutionMode_ToText.at(static_cast<int>(t.t_in.layer.execution_order))
                         << "\n";
             }
-            std::cout << "-------------------------------------------------------\n\n";
+            utest_log::debug() << "-------------------------------------------------------\n\n";
         }
-        std::cout << "----------------------------------------------------------------------\n\n";
+        utest_log::debug() << "----------------------------------------------------------------------\n\n";
     };
 
     auto check_err_completeLayer = [&dut](TestsVector& tests) {
         SanityReport sane;
-        std::cout << "---------------- check_completeLayer_consistency ---------------- \n";
+        utest_log::debug() << "---------------- check_completeLayer_consistency ---------------- \n";
         for (auto& t : tests) {
-            std::cout << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
-                      << " Operation:" << Operation_ToText.at(static_cast<int>(t.t_in.layer.op)) << " --------\n";
+            utest_log::debug() << "-------- Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.layer.device))
+                              << " Operation:" << Operation_ToText.at(static_cast<int>(t.t_in.layer.op))
+                              << " --------\n";
 
             for (auto exec : t.t_in.all_exec_modes) {
                 t.t_in.layer.execution_order = exec;
@@ -341,9 +339,9 @@ TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
                         << " Exec order:" << ExecutionMode_ToText.at(static_cast<int>(t.t_in.layer.execution_order))
                         << "\n";
             }
-            std::cout << "-------------------------------------------------------\n\n";
+            utest_log::debug() << "-------------------------------------------------------\n\n";
         }
-        std::cout << "----------------------------------------------------------------------\n\n";
+        utest_log::debug() << "----------------------------------------------------------------------\n\n";
     };
 
     {
@@ -455,7 +453,8 @@ TEST_F(LayersValidationTest, Check_layer_with_big_shape) {
         SanityReport sane;
 
         for (auto& t : tests) {
-            std::cout << t.test_case << " " << VPUTilingStrategy_ToText.at(static_cast<int>(t.t_in.t_str)) << "\n";
+            utest_log::debug() << t.test_case << " " << VPUTilingStrategy_ToText.at(static_cast<int>(t.t_in.t_str))
+                              << "\n";
 
             dut.check_completeLayer_consistency(t.t_in.wl, sane, t.t_in.strategy, t.t_in.nTiles, t.t_in.t_str);
 
@@ -524,23 +523,23 @@ TEST_F(LayersValidationTest, Check_layer_with_autopad) {
     wl_ref.superdense_memory = true;
 
     DPUWorkload wl_ref2{
-        VPUDevice::NPU_5_0,
-        Operation::AVEPOOL,
-        {VPUTensor(32, 80, 16, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
-        {VPUTensor(32, 80, 2, 1, DataType::UINT8, Layout::XYZ)},   // output dimensions
-        {1, 1},                                                    // kernels
-        {1, 1},                                                    // strides
-        {0, 0, 0, 0},                                              // padding
-        ExecutionMode::CUBOID_16x16,                               // execution mode
-        ActivationFunction::NONE,                                  // activation
-        0.0F,                                                      // act_sparsity
-        0.0F,                                                      // weight_sparsity
-        {swz_def, swz_def},                                        // input_swizzling
-        {swz_def},                                                 // output_swizzling
-        1,                                                         // output_write_tiles
-        {0, 0, 0, 0},                                              // offsets
-        ISIStrategy::CLUSTERING,                                   // isi_strategy
-        false,                                                     // weight_sparsity_enabled
+            VPUDevice::NPU_5_0,
+            Operation::AVEPOOL,
+            {VPUTensor(32, 80, 16, 1, DataType::UINT8, Layout::ZXY)},  // input dimensions
+            {VPUTensor(32, 80, 2, 1, DataType::UINT8, Layout::XYZ)},   // output dimensions
+            {1, 1},                                                    // kernels
+            {1, 1},                                                    // strides
+            {0, 0, 0, 0},                                              // padding
+            ExecutionMode::CUBOID_16x16,                               // execution mode
+            ActivationFunction::NONE,                                  // activation
+            0.0F,                                                      // act_sparsity
+            0.0F,                                                      // weight_sparsity
+            {swz_def, swz_def},                                        // input_swizzling
+            {swz_def},                                                 // output_swizzling
+            1,                                                         // output_write_tiles
+            {0, 0, 0, 0},                                              // offsets
+            ISIStrategy::CLUSTERING,                                   // isi_strategy
+            false,                                                     // weight_sparsity_enabled
     };
 
     DPUWorkload wl_output_autopad{wl_ref};
@@ -590,7 +589,38 @@ TEST_F(LayersValidationTest, Check_layer_with_autopad) {
     EXPECT_EQ(sane.value(), V(VPUNN::Cycles::NO_ERROR))
             << sane.info << "\n error is : " << VPUNN::Cycles::toErrorText(sane.value()) << "\n"
             << wl2_layer_autopad;
+}
 
+/// VPU_4_0 has no dCIM support at all. Both layer-level consistency checks must explicitly reject
+/// MPEEngine::DCIM for it - layer-level validation otherwise skips Execution_Order checks entirely,
+/// so without this explicit guard such a layer would silently pass as valid.
+TEST_F(LayersValidationTest, LayerConsistencyChecks_RejectDcimEngine_WhenDeviceHasNoDcimSupport) {
+    LayersValidation dut;
+    SanityReport sane;
+
+    DPUWorkload wl{
+            VPUDevice::VPU_4_0,
+            Operation::CONVOLUTION,
+            {VPUTensor(32, 32, 16, 1, DataType::UINT8)},  // input dimensions
+            {VPUTensor(32, 32, 16, 1, DataType::UINT8)},  // output dimensions
+            {1, 1},                                       // kernels
+            {1, 1},                                       // strides
+            {0, 0, 0, 0},                                 // padding
+            ExecutionMode::CUBOID_16x16,                  // execution mode
+    };
+    wl.mpe_engine = MPEEngine::DCIM;
+    DPULayer layer(wl);
+    layer.mpe_engine = MPEEngine::DCIM;  // DPULayer(const DPUWorkload&) recomputes execution_order, not mpe_engine
+
+    dut.check_splitLayer_consistency(layer, sane);
+    EXPECT_EQ(sane.value(), V(Cycles::ERROR_INVALID_INPUT_CONFIGURATION))
+            << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+            << layer;
+
+    dut.check_completeLayer_consistency(layer, sane, ISIStrategy::CLUSTERING, 1U, VPUTilingStrategy::NONE);
+    EXPECT_EQ(sane.value(), V(Cycles::ERROR_INVALID_LAYER_CONFIGURATION))
+            << sane.info << "\n error is : " << Cycles::toErrorText(sane.value()) << "\n"
+            << layer;
 }
 
 }  // namespace VPUNN_unit_tests

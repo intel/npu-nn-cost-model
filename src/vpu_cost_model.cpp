@@ -1,4 +1,4 @@
-// Copyright © 2024 Intel Corporation
+// Copyright © 2024-2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the "Software Package")
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -89,7 +89,7 @@ VPUCostModel::VPUCostModel(VPUDevice device, const std::string& filename, bool p
                            const unsigned int batch_size, const std::string& dpu_cache_filename,
                            const std::string& shave_cache_filename, bool tryToLoadPairedCache)
                 : model_device(device),
-                  dpu_nn_cost_provider(filename, batch_size, profile, cache_size, dpu_cache_filename,
+                  dpu_nn_cost_provider(device, filename, batch_size, profile, cache_size, dpu_cache_filename,
                                        tryToLoadPairedCache),
           ptr_internal_shave_cost_model(std::make_shared<SHAVECostModel>(shave_cache_filename, cache_size)),
           http_dpu_cost_provider(HttpCostProviderFactory::create()) {
@@ -109,7 +109,7 @@ VPUCostModel::VPUCostModel(VPUDevice device, const char* model_data, size_t mode
                            const unsigned int cache_size, const unsigned int batch_size, const char* dpu_cache_data,
                            size_t dpu_cache_data_length, const char* shave_cache_data, size_t shave_cache_data_length)
                 : model_device(device),
-          dpu_nn_cost_provider(model_data, model_data_length, batch_size, copy_model_data, profile,
+          dpu_nn_cost_provider(device, model_data, model_data_length, batch_size, copy_model_data, profile,
                        cache_size, dpu_cache_data, dpu_cache_data_length),
           ptr_internal_shave_cost_model(
                   std::make_shared<SHAVECostModel>(shave_cache_data, shave_cache_data_length, cache_size)),
@@ -317,13 +317,6 @@ CyclesInterfaceType VPUCostModel::DPU(DPUWorkload wl, std::string& info) const {
 
 CyclesInterfaceType VPUCostModel::DPU_and_sanitize(DPUWorkload& wl, std::string& info) const {
     swizzling_turn_OFF(wl);  // swizz guard sanitization
-
-    // force this consistency here, before serialization, so we serialize a more normal workload.
-    if (wl.mpe_engine == MPEEngine::DCIM) {
-        if (!is_dcim_execution_mode(wl.execution_order)) {
-            wl.execution_order = ExecutionMode::dCIM_32x128;  // safe default
-        }
-    }
 
     L1CostSerializationWrap serialization_handler(serializer);
 

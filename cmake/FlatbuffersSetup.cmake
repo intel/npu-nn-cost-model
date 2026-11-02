@@ -49,7 +49,12 @@ else()
         # For ther compilers that are not clang (GNU)
         else()
             target_compile_options(flatbuffers PRIVATE -Wno-suggest-override)
-            target_compile_options(flatc PRIVATE -Wno-suggest-override)  
+            target_compile_options(flatc PRIVATE -Wno-suggest-override)
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+                # false positive in flatbuffers::AddFlatBuffer, GCC loses track of vector::insert bounds after inlining
+                target_compile_options(flatbuffers PRIVATE -Wno-stringop-overflow)
+                target_compile_options(flatc PRIVATE -Wno-stringop-overflow)
+            endif()
         endif()
     endif()
 

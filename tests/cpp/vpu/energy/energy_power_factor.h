@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 #include "vpu/cycles_interface_types.h"
 #include "vpu/dpu_theoretical_cost_provider.h"
 
@@ -68,9 +69,10 @@ protected:
 
         EXPECT_NEAR(energy, (float)util_idealCyc * operation_pf, 1) << details;
 
-        std::cout << details
-                  << "-X-------------------------------------------------------------------------------------------"
-                     "-\n";
+        utest_log::debug()
+                << details
+                << "-X-------------------------------------------------------------------------------------------"
+                   "-\n";
     }
 
     void basicDPUPackEquivalenceTest(const DPUWorkload& workload, VPUCostModel& crt_model, std::string info = "") {
@@ -113,9 +115,10 @@ protected:
         EXPECT_EQ(allinfo.efficiency_ideal_cycles, efficiency_idealCyc) << info << wl << errInfo << details << allinfo;
         EXPECT_EQ(allinfo.hw_theoretical_cycles, theorCyc) << info << wl << errInfo << details << allinfo;
 
-        std::cout << details
-                  << "-X-------------------------------------------------------------------------------------------"
-                     "-\n";
+        utest_log::debug()
+                << details
+                << "-X-------------------------------------------------------------------------------------------"
+                   "-\n";
     }
 
     void basicSparseTest(const DPUWorkload& workload, VPUCostModel& crt_model, std::string info = "") {
@@ -172,9 +175,10 @@ protected:
             EXPECT_EQ(dpuD_W.hw_theoretical_cycles, dpu.hw_theoretical_cycles);  // unimplemented part
         }
 
-        std::cout << details << "\t" << dpuD_W
-                  << "-X-------------------------------------------------------------------------------------------"
-                     "-\n";
+        utest_log::debug()
+                << details << "\t" << dpuD_W
+                << "-X-------------------------------------------------------------------------------------------"
+                   "-\n";
     }
 
 private:

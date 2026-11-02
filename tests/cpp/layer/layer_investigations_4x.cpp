@@ -14,6 +14,7 @@
 #include "common/common_helpers.h"
 
 #include "layer.h"
+#include "logger/logger.h"
 #include "vpu/shave/layers.h"
 
 namespace VPUNN_unit_tests {
@@ -65,11 +66,13 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_ELTWISE_1662_EISXW_126389_NPU4
         const DPULayer tst_layer(wl_ref);
         // TODO: test should be SOHO wins,
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1000, fail * 1000 + 1000},  // 1082  v17:1593  GTvpux:2232.95cyc
                  "SOHO /4 + no broadcast, no memmove, "},
 
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 2100 - 300, fail * 2100 + 300},  // 1082  v17:1593  GTvpux:4600cyc
                  "SOHO B /4 +HK broadcast, no memmove, "},
 
@@ -92,7 +95,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_ELTWISE_1662_EISXW_126389_NPU4
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //  EXPECT_TRUE(false);  // something has to fail to  see couts
@@ -132,7 +135,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_ELTWISE_1662_EISXW_126389_NPU4
             std::string err_info;
 
             {  // SOHO SPLITS
-                std::cout << "\n ------- SOHO SPLITS: ------- ";
+                utest_log::debug() << "\n ------- SOHO SPLITS: ------- ";
                 // case_run(wl_SOHO_16x16, "TEST of: SOHO exec 16x16 ");  // 1089
                 case_run(wl_SOHO_8x16, "\nTEST of: SOHO exec 8x16 ");  // 1082
                 //  case_run(wl_SOHO_4x16, "TEST of: SOHO exec 4x16 ");    // 1476
@@ -174,17 +177,19 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4634_4662_EISXW_126389_NP
 
     //  DPUWorkload wl_4662{wl_4634};
     // wl_4634 is equivalent with wl_4662
-    std::cout << "\n ------- wl_4634 ------- \n";
+    utest_log::debug() << "\n ------- wl_4634 ------- \n";
     {
         const DPULayer tst_layer(wl_4634);
 
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 3850 - 385 * 2,
                   fail * 3850 + 509},  // 4416 v17:4358  GTvpux:4168.05cyc GTL 3850  (intra_tile: 1)
                  "SOHO /4 , no memmove, "},
 
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 3933 - 2 * 350,
                   fail * 3933 + 620},  //  v17:  GTvpux:4168.05cyc GTL3933  (intra_tile: 1)
                  "SOHO HK /4 , no memmove, "},
@@ -194,7 +199,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4634_4662_EISXW_126389_NP
                   fail * 3435 + 800},  // 3138 v17:4233  GTvpux:4214.3cyc  (intra_tile: 1)
                  "SOK /4 , no memmove, "},
 
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK_NO_BROADCAST, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOK_NO_BROADCAST, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 2200,
                   fail * 3435 + 800},  // 3138 v17:4233  GTvpux:4214.3cyc  (intra_tile: 1)
                  "SOK noB /4 , no memmove, "},
@@ -240,7 +246,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4634_4662_EISXW_126389_NP
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     auto mod_execution = [](const DPUWorkload& wl, ExecutionMode em) -> DPUWorkload {
@@ -342,7 +348,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4634_4662_EISXW_126389_NP
             std::string err_info;
 
             {
-                std::cout << "\n ------- SPLITS: ------- ";
+                utest_log::debug() << "\n ------- SPLITS: ------- ";
                 case_run(SOHO_8x16, "\nTEST of: SOHO 8x16 ");  // v17:4358  4921
                 case_run(SOK_8x16, "TEST of: SOK 8x16 ");      // v17:4914  3610
                 case_run(SOK_8x16_noB, "TEST of: SOK_noB 8x16 ");
@@ -360,7 +366,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4634_4662_EISXW_126389_NP
             }
 
             {
-                std::cout << "\n ------- SPLITS: (intra tiles) ------- ";
+                utest_log::debug() << "\n ------- SPLITS: (intra tiles) ------- ";
                 case_run(SOHO_K64_8x16, "\nTEST of: SOHO k64 8x16 ");  // v17:2172  2239  New NN:2116
                 case_run(SOHO_K64_16x16, "TEST of: SOHO k64 16x16 ");  // v17:2261  2126  New NN:2153
                 case_run(SOHO_K64_4x16, "TEST of: SOHO k64 4x16 ");    //                 New NN:2531
@@ -428,12 +434,13 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4648_4676_EISXW_126389_NP
 
     const bool prefetch{true};
 
-    std::cout << "\n ------- wl_4648 ------- \n";
+    utest_log::debug() << "\n ------- wl_4648 ------- \n";
     {
         const DPULayer tst_layer(wl_4648);
         // TODO: test should be like SOK wins
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 3000, fail * 3900 + 1000},  // v17:4495
                  "SOHO /4 , no memmove, "},
 
@@ -444,12 +451,13 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4648_4676_EISXW_126389_NP
         executeTests(tests);
     }
 
-    std::cout << "\n ------- wl_4676 ------- \n";
+    utest_log::debug() << "\n ------- wl_4676 ------- \n";
     {
         const DPULayer tst_layer(wl_4676);
         // TODO: test should be like SOHO wins
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 18000 - 3000, fail * 18500 + 1000},  // v17:18556
                  "SOHO /4 , no memmove, "},
 
@@ -471,7 +479,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4648_4676_EISXW_126389_NP
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     auto mod_execution = [](const DPUWorkload& wl, ExecutionMode em) -> DPUWorkload {
@@ -617,7 +625,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4648_4676_EISXW_126389_NP
             std::string err_info;
 
             {
-                std::cout << "\n ------- SPLITS: wl_4648 ------- \n";
+                utest_log::debug() << "\n ------- SPLITS: wl_4648 ------- \n";
                 /////////////////////////////// SOHO /////////////////////////////////
                 case_run(SOHO_4648_16x16, "TEST of: SOHO 16x16 ");  // v17:4645  4779
                 case_run(SOHO_4648_8x16, "TEST of: SOHO 8x16  ");   // v17:4495  5175
@@ -635,7 +643,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MEXP_C2_CONV_4648_4676_EISXW_126389_NP
             }
 
             {
-                std::cout << "\n ------- SPLITS: wl_4676 ------- \n";
+                utest_log::debug() << "\n ------- SPLITS: wl_4676 ------- \n";
                 /////////////////////////////// SOHO /////////////////////////////////
                 case_run(SOHO_4676_T_M_16x16, "TEST of: SOHO top and middle 16x16 ");  // v17:20036  17596
                 case_run(SOHO_4676_B_16x16, "TEST of: SOHO bottom 16x16 ");            // v17:19195  17372
@@ -702,7 +710,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MoreTiles_MAXP_EISXW_99246_NPU40) {
                 // {VPUNN::Cycles::NO_ERROR, true, 11000, 11000 + 1000},  // v17 11164    v159NN:11612
                 // "SOHO /2, no memmove, "},
 
-                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer),
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 4000 /*6000*/, 4500 + 500},  // v17 6132    v159NN:6234/ GTL:4500
                  "SOHO /4 , no memmove, "},
 
@@ -719,8 +728,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, MoreTiles_MAXP_EISXW_99246_NPU40) {
     const std::string nline{"\n ------------- NEW TEST------------------------------------ ------------------"};
     auto verify_cost_cyc = [&nline, &wl_MXP_layer, prefetch, &theModel](unsigned int nTiles,
                                                                         CyclesInterfaceType& cost_cyc) {
-        std::cout << nline;
-        std::cout << "\n TILES: " << nTiles << "\n";
+        utest_log::debug() << nline;
+        utest_log::debug() << "\n TILES: " << nTiles << "\n";
 
         VPUNN::DPULayer tst_layer(wl_MXP_layer);
         const VPULayerStrategy strategy{1U,    1U,    nTiles,  VPUNN::VPUTilingStrategy::SOH_Overlapped,
@@ -806,7 +815,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
 
         const std::vector<TestCase> tests{
                 // no sparsity
-                {{tst_layer_no_spars, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer_no_spars,
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 16500,
                   fail * (20000)},  // v17:18409   v159nn:18301   // GTM:18754  //GTL: 19300 (16x16)
                  "SOHO, No sparsity "},
@@ -819,7 +829,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
                 ////////////////////////////////////////////////////////////////
 
                 // input sparsity
-                {{tst_layer_input_spars, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer_input_spars,
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 8000,
                   fail * (9500 + 13000)},    // v17:13151   v159nn:18301 (NA)  //GTM: 13145 GTL 9500
                  "SOHO , Input sparsity "},  // HUGE error
@@ -832,7 +843,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
                 ////////////////////////////////////////////////////////////////
 
                 // weight sparsity
-                {{tst_layer_weight_spars, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer_weight_spars,
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 12000, fail * (12000 + 4000)},  // v17:12190   v159nn:14519  // GTML::14189
                  "SOHO , Weight sparsity "},
 
@@ -844,7 +856,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
                 ////////////////////////////////////////////////////////////////
 
                 // dualsparsity
-                {{tst_layer_dualspars, VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer_dualspars,
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 10500,
                   fail * (8100 + 5000)},  // v17:12190 VPUNNticket: 15249  VPUXGT: 4734ns
                                           // cyc:8047 @1700    v159nn:14519  GTM: 10481 GTL: 8000?
@@ -931,7 +944,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     {
@@ -1013,7 +1026,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
         wl_SOK_Dualspars_owt1.isi_strategy = ISIStrategy::CLUSTERING;
 
         {  // SOHO SPLITS
-            std::cout << "\n ------- SOHO SPLITS: ------- ";
+            utest_log::debug() << "\n ------- SOHO SPLITS: ------- ";
 
             case_run(wl_SOHO_Top_No_spars,
                      "\nTEST of: SOHO TOP, no sparsity\n");  //   v17: 18154  GTM:18754  v159nn:18237    GTL:19440
@@ -1026,7 +1039,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
                                                               //   (19204)
             // Top mid bot are in parallel=  (18154)||(18409)||(18206) ==> 18409
             // GTM:18754
-            std::cout << "\n ------- : ------- ";
+            utest_log::debug() << "\n ------- : ------- ";
 
             // input sparsity
             case_run(wl_SOHO_Top_Input_spars,
@@ -1037,7 +1050,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
                      "\nTEST of :SOHO BOT, input sparsity \n");  //   v17: 13025  GTM:12904 (intrp) v159nn:18240
             // Top mid bot are in parallel=  (13107)||(13151)||(13025) ==> 13151
             // GTM: 13145
-            std::cout << "\n ------- : ------- ";
+            utest_log::debug() << "\n ------- : ------- ";
 
             // weight sparsity
             case_run(wl_SOHO_Top_Weight_spars,
@@ -1048,7 +1061,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
                      "\nTEST of :SOHO BOT, weight sparsity \n");  //   v17: 12190  GTM:14186 v159nn:14449
             // Top mid bot are in parallel=  (11878)||(12012)||(12190) ==> 12190
             // GTM::14189
-            std::cout << "\n ------- : ------- ";
+            utest_log::debug() << "\n ------- : ------- ";
 
             //  dualsparsity
             case_run(wl_SOHO_Top_Dualspars,
@@ -1064,7 +1077,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
 
         // SOK GTM to be reanalyzed/redone!
         {  /// SOK splits owt=4
-            std::cout << "\n ------- SOK SPLITS: owt 4 ------- ";
+            utest_log::debug() << "\n ------- SOK SPLITS: owt 4 ------- ";
             case_run(wl_SOK_No_spars,
                      "\nTEST of:SOK, no sparsity, owt4\n");  // v17: 31631(19318)  GTM:19472 v159nn:17898
             case_run(wl_SOK_Input_spars,
@@ -1076,7 +1089,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
         }
 
         {  /// SOK splits owt=3
-            std::cout << "\n ------- SOK SPLITS: owt 3 ------- ";
+            utest_log::debug() << "\n ------- SOK SPLITS: owt 3 ------- ";
             case_run(wl_SOK_No_spars_owt3, "\nTEST of:SOK, no sparsity, owt3\n");  // v17: 19537(!)  GTM:na v159nn:17953
             case_run(wl_SOK_Input_spars_owt3,
                      "\nTEST of:SOK, input sparsity, owt3\n");  // v17: 9071   GTM: v159nn:17953
@@ -1088,7 +1101,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
         //(!) before owr lim to 2!
 
         {  /// SOK splits owt=2
-            std::cout << "\n ------- SOK SPLITS: owt 2 ------- ";
+            utest_log::debug() << "\n ------- SOK SPLITS: owt 2 ------- ";
             case_run(wl_SOK_No_spars_owt2, "\nTEST of:SOK, no sparsity, owt2\n");  // v17: 19134  GTM:18915 v159nn:18019
             case_run(wl_SOK_Input_spars_owt2,
                      "\nTEST of:SOK, input sparsity, owt2\n");  // v17: 8685   GTM:8717  v159nn:  18019
@@ -1099,7 +1112,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, CONV_Act_sparsity_EISXW_117195_INT_NPU
         }
 
         {  /// SOK splits owt=1 + CLU
-            std::cout << "\n ------- SOK SPLITS: owt 1 + CLU ------- ";
+            utest_log::debug() << "\n ------- SOK SPLITS: owt 1 + CLU ------- ";
             case_run(wl_SOK_No_spars_owt1,
                      "\nTEST of:SOK, no sparsity, owt1 + CLU\n");  // v17: 19134  GTM:18738 v159nn:18020
             case_run(wl_SOK_Input_spars_owt1,
@@ -1155,7 +1168,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, DWConv_SOK_SOH_decision_EISXW_117314_2
     {  // note: Real LNL NN has big delta vs GTL
         const DPULayer tst_layer(wl_2d_3);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 5000,  // optimized for LNL 3x3 K32x4
                   fail * 5001 + 1500},  // 2T:22396  4T: 12120  GTM:12596  (intratile: K64x2)   VPUXVPUNN(old
                                         // v):11630. v159NN: 12220  GTL: 9518 (K64x2), 5648 (K32x4)
@@ -1168,7 +1182,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, DWConv_SOK_SOH_decision_EISXW_117314_2
                  "SOK , no memmove, "},
 
                 //// note: SOHH is not possible on NPU40!
-                //{{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false, prefetch}},
+                //{{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_HaloRead, false, false,
+                //prefetch}},
                 // {VPUNN::Cycles::NO_ERROR, true, 6000,  // optimized for LNL 3x3 K32x4
                 //  fail * 6500 + 2000},                  // 2T: 23556    4T:14410:15816  GTM:? v159NN: 13760
                 // "SOH Halo , no memmove, "},
@@ -1194,7 +1209,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, DWConv_SOK_SOH_decision_EISXW_117314_2
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //     EXPECT_TRUE(on);  // something has to fail to  see couts
@@ -1274,7 +1289,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, DWConv_SOK_SOH_decision_EISXW_117314_2
             std::string err_info;
 
             {  // SOHO SPLITS
-                std::cout << "\n ------- SOHO SPLITS: ------- ";
+                utest_log::debug() << "\n ------- SOHO SPLITS: ------- ";
 
                 case_run(wl_SOHO_Top_K64x2,
                          "\nTEST of: SOHO TOP K=64 X2\n");  //   v17: 5927 (lM:4386)    GTM 6044   v159nn:6179  GTL:4795
@@ -1289,7 +1304,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, DWConv_SOK_SOH_decision_EISXW_117314_2
             }
 
             {  /// SOK splits
-                std::cout << "\n ------- SOK SPLITS: ------- ";
+                utest_log::debug() << "\n ------- SOK SPLITS: ------- ";
 
                 case_run(wl_SOK_All_K32x1,
                          "\nTEST of:SOK K=32 owt=4\n");  // v17:11721 (11026 owt2) (lM:5513)  GT ?10752 (owt=2)
@@ -1383,8 +1398,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, DWConv_SOK_SOH_decision_EISXW_117314_2
 
         {  // SOH H variants
 
-            std::cout << "\n ------------------------       SOH H         ----------------------------------";
-            std::cout << "\n SOH H like SPLITS  from Layer  (same compute tensor , but isi SOH + halo)";
+            utest_log::debug() << "\n ------------------------       SOH H         ----------------------------------";
+            utest_log::debug() << "\n SOH H like SPLITS  from Layer  (same compute tensor , but isi SOH + halo)";
 
             case_run(real_SOHH_Top_K64x2,
                      "\nTEST of: SOHH TOP K=64 X2\n");  //   v17: 6767:7018     GTM 7398 v159nn:6914
@@ -1395,7 +1410,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, DWConv_SOK_SOH_decision_EISXW_117314_2
             // Top mid bot are in parallel (X2 intra tile) =  (2x )||(2x7205:7398 )||(2x ) = ()|(14410: 14800 )|()  =
             // 14410 GT parallelism (2x )||(2x7400 )||( 2x ) = ()|()|()  = 14800
 
-            std::cout << "\n FAKE SOH H like SPLITS  from Layer  (memo tensor as compute , but isi SOH + halo)";
+            utest_log::debug() << "\n FAKE SOH H like SPLITS  from Layer  (memo tensor as compute , but isi SOH + halo)";
             // this tries also alternative , asking the NN using the memo tensor instead
 
             case_run(fake_SOHH_Top_K64x2, "\nTEST of:fake SOHH TOP K=64 X2\n");  //   v17: 7018     GTM 7398 v159nn:7651
@@ -1489,7 +1504,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, SOHO_ELTWISE_EISXW_127594_MIneeva10Jun
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "*" << whatTest << dpu_cost << " =" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "*" << whatTest << dpu_cost << " =" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //     EXPECT_TRUE(on);  // something has to fail to  see couts
@@ -1536,20 +1551,20 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, SOHO_ELTWISE_EISXW_127594_MIneeva10Jun
             std::string err_info;
 
             {  // SOHO SPLITS
-                std::cout << "\n ------- SOHO SPLITS: ------- \n";
+                utest_log::debug() << "\n ------- SOHO SPLITS: ------- \n";
 
                 case_run(wl_H7_16x16, "TEST of: SOHO H = 7  16x16: ");  //   v17: 3402  GTL:?
                 case_run(wl_H6_16x16, "TEST of: SOHO H = 6  16x16: ");  //   v17: 3395  GTL:?
 
-                std::cout << std::endl;
+                utest_log::debug() << std::endl;
                 case_run(wl_H7_8x16, "TEST of: SOHO H = 7  8x16: ");  //   v17:3484  GTL:?
                 case_run(wl_H6_8x16, "TEST of: SOHO H = 6  8x16: ");  //   v17:3498  GTL:?
 
-                std::cout << std::endl;
+                utest_log::debug() << std::endl;
                 case_run(wl_H7_4x16, "TEST of: SOHO H = 7  4x16: ");  //   v17:4045  GTL:?
                 case_run(wl_H6_4x16, "TEST of: SOHO H = 6  4x16: ");  //   v17:4075  GTL:?
 
-                // std::cout << wl_H6_4x16;
+                // utest_log::debug() << wl_H6_4x16;
             }
         }
     }
@@ -1609,10 +1624,11 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_N_v1_CONV_EISXW_127644_NPU40) {
     const bool prefetch{true};
 
     {  //
-        std::cout << "\n ------- CONV_34 full K =160 ------- \n";
+        utest_log::debug() << "\n ------- CONV_34 full K =160 ------- \n";
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 7000,
                   fail * 7001 +
                           2000},  // V17: 7509   v159NN:8606/8572 ? GTVPUX:8400ns (2x 4200ns)   GTL: 7385   split: x1?
@@ -1628,10 +1644,11 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_N_v1_CONV_EISXW_127644_NPU40) {
         executeTests(tests);
     }
     {  //
-        std::cout << "\n ------- CONV_34 half  K =80 outputs ------- \n";
+        utest_log::debug() << "\n ------- CONV_34 half  K =80 outputs ------- \n";
         const DPULayer tst_layer(wl_halfK);
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer),
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 3500,
                   fail * 3501 + 1000},  // V17: 3889 *2 = 7778    v159NN: 4234 *2=8468 GTVPUX:8400ns (2x 4200ns)
                                         // GTL:3811 *2 = 7622
@@ -1654,7 +1671,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_N_v1_CONV_EISXW_127644_NPU40) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << whatTest << ": " << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << whatTest << ": " << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //     EXPECT_TRUE(on);  // something has to fail to  see couts
@@ -1783,48 +1800,48 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_N_v1_CONV_EISXW_127644_NPU40) {
             std::string err_info;
 
             {  // SOHO SPLITS
-                std::cout << "\n ------- SOHO SPLITS: ------- \n";
+                utest_log::debug() << "\n ------- SOHO SPLITS: ------- \n";
                 // clang-format off
                 case_run(wl_SOHO_K160_Top_x1, "SOHO T_K160X1");  // V17:8141 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K160_Mid_x1, "SOHO M_K160X1");  // V17:8346 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K160_Bot_x1, "SOHO B_K160X1");  // V17:8259 x   v159NN: ? GTVPUX:   GTL: ??
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(wl_SOHO_K160_Top_em8x16, "SOHO T_K160_em8x16");  // V17:7433   v159NN: 8562 GTVPUX:   GTL: 7382
                 case_run(wl_SOHO_K160_Mid_em8x16, "SOHO M_K160_em8x16");  // V17:7509 ! v159NN: 8606 GTVPUX:   GTL: 7384,80
                 case_run(wl_SOHO_K160_Bot_em8x16, "SOHO B_K160_em8x16");  // V17:7483   v159NN: 8572 GTVPUX:   GTL: 7385
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(wl_SOHO_K160_Top_em4x16, "SOHO T_K160_em4x16");  // V17:8301 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K160_Mid_em4x16, "SOHO M_K160_em4x16");  // V17:8377 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K160_Bot_em4x16, "SOHO B_K160_em4x16");  // V17:8333 x   v159NN: ? GTVPUX:   GTL: ??
 
-                std::cout << "\nK80 output\n";
+                utest_log::debug() << "\nK80 output\n";
 
                 case_run(wl_SOHO_K80_Top_x2, "SOHO T_K80 X2");  // V17:4655 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K80_Mid_x2, "SOHO M_K80 X2");  // V17:4766 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K80_Bot_x2, "SOHO B_K80 X2");  // V17:4718 x   v159NN: ? GTVPUX:   GTL: ??
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(wl_SOHO_K80_Top_em8x16, "SOHO T_K80_em8x16");  // V17:3832 x   v159NN: 4211 GTVPUX:   GTL: 3811
                 case_run(wl_SOHO_K80_Mid_em8x16, "SOHO M_K80_em8x16");  // V17:3889 W   v159NN: 4234 GTVPUX:   GTL: 3810,
                 case_run(wl_SOHO_K80_Bot_em8x16, "SOHO B_K80_em8x16");  // V17:3841 x   v159NN: 4222 GTVPUX:   GTL: 3810
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(wl_SOHO_K80_Top_em4x16, "SOHO T_K80_em4x16");  // V17:4797 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K80_Mid_em4x16, "SOHO M_K80_em4x16");  // V17:4898 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_K80_Bot_em4x16, "SOHO B_K80_em4x16");  // V17:4858 x   v159NN: ? GTVPUX:   GTL: ??
-                std::cout << "\n";
+                utest_log::debug() << "\n";
 
 
-                std::cout << "\n ------- SOK SPLITS: ------- \n";
+                utest_log::debug() << "\n ------- SOK SPLITS: ------- \n";
                 case_run(wl_SOK_K48, "SOK  K=48 em 16x16");  // V17:8456 Wx3 v159NN: 10158 GTVPUX:   GTL: 9406,9350,9407
                 case_run(wl_SOK_K32, "SOK  K=32 em 16x16");  // V17:5619     v159NN: 6777  GTVPUX:   GTL: ??
                 case_run(wl_SOK_K16, "SOK  K=16 em 16x16");  // V17:4399 W   v159NN: 4931  GTVPUX:   GTL: 3435
                 case_run(wl_SOK_K64, "SOK  K=64 em 16x16");  // V17:11194    v159NN: 13492 GTVPUX:   GTL: 12291
-                std::cout << "\n";
+                utest_log::debug() << "\n";
 
                 case_run(wl_SOK_K48_em8x16, "SOK  K=48 em 8x16");  // V17:9562 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOK_K32_em8x16, "SOK  K=32 em 8x16");  // V17:7834 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOK_K16_em8x16, "SOK  K=16 em 8x16");  // V17:7580 x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOK_K64_em8x16, "SOK  K=64 em 8x16");  // V17:12591    v159NN: ? GTVPUX:   GTL: ??
-                std::cout << "\n";
+                utest_log::debug() << "\n";
 
                 case_run(wl_SOK_K48_em4x16, "SOK  K=48 em 4x16");  // V17:11117   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOK_K32_em4x16, "SOK  K=32 em 4x16");  // V17:9761    v159NN: ? GTVPUX:   GTL: ??
@@ -1891,11 +1908,12 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_E_v9_CONV_EISXW_127649_NPU40) {
     };
 
     const bool prefetch{true};
-    std::cout << "\n ------- CONV4 not sparse ------- \n";
+    utest_log::debug() << "\n ------- CONV4 not sparse ------- \n";
     {  //
         const DPULayer tst_layer(conv4);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 8297 - 1500,
                   fail * (8297 +
                           829)},  // V17:8493 (HK 8588)     v159NN:9153 (HK 9118)  ? GTVPUX:4527ns (HK 4579us) GTL:8297
@@ -1909,11 +1927,12 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_E_v9_CONV_EISXW_127649_NPU40) {
         };
         executeTests(tests);
     }
-    std::cout << "\n ------- CONV4  sparse ------- \n";
+    utest_log::debug() << "\n ------- CONV4  sparse ------- \n";
     {  //
         const DPULayer tst_layer(conv4s);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 6500,
                   fail * 7001 + 2000},  // V17:8162 (HK 8261)    v159NN:8999 (HK 8845)  ?VPU:8356 GTVPUX:4527ns GTL:8332
                  "CONV4s SOHO"},
@@ -1930,11 +1949,12 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_E_v9_CONV_EISXW_127649_NPU40) {
     //  note:v17: SOHO always wins, HK(slower) also vs SOK
     // v159  wins
 
-    std::cout << "\n ------- CONV8 ------- \n";
+    utest_log::debug() << "\n ------- CONV8 ------- \n";
     {  //
         const DPULayer tst_layer(conv8);
         const std::vector<TestCase> tests{
-                {{tst_layer, VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 4748 - 500,
                   fail * (4748 + 500)},  // V17: 5058 (HK 5144)   v159NN:5538 (HK 5564) ? VPU:5358    GTVPUX: 2620ns
                                          // GTL: 4748  split in 6 (5*3+1)
@@ -1946,7 +1966,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_E_v9_CONV_EISXW_127649_NPU40) {
                                                   // or 37xx   split:in 6, !! WHAT is the MTL GT?!!
                  "CONV8 SOK "},
 
-                {{tst_layer, VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
+                {{tst_layer,
+                  VPULayerStrategy{1U, 1U, 6U, VPUNN::VPUTilingStrategy::SOHO_K_SWITCH, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 4838 - 600,
                   fail * (4838 + 600)},  // V17: (HK 5144)   v159NN: (HK 5564) ? VPU:    GTVPUX: 2620ns
                                          // GTL: 4838  split in 6 (5*3+1)
@@ -1970,7 +1991,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_E_v9_CONV_EISXW_127649_NPU40) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << whatTest << ": " << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << whatTest << ": " << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //     EXPECT_TRUE(on);  // something has to fail to  see couts
@@ -2048,36 +2069,36 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Model_E_v9_CONV_EISXW_127649_NPU40) {
             std::string err_info;
 
             {  // SOHO SPLITS
-                std::cout << "\n ------- SOHO SPLITS CONV4(s?): ------- \n";
+                utest_log::debug() << "\n ------- SOHO SPLITS CONV4(s?): ------- \n";
                 // clang-format off
                 case_run(conv4_SOHO_T, "conv4_SOHO_T");  // V17:8439   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv4_SOHO_M, "conv4_SOHO_M");  // V17:8652   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv4_SOHO_B, "conv4_SOHO_B");  // V17:5166   v159NN: ? GTVPUX:   GTL: ??
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(conv4_SOHO_T_em8x16, "Sconv4_SOHO_T_em8x16");  // V17: 7958  v159NN:  GTVPUX:   GTL: 8329
                 case_run(conv4_SOHO_M_em8x16, "Sconv4_SOHO_M_em8x16");  // V17: 8162! v159NN:  GTVPUX:   GTL: 8330,
                 case_run(conv4_SOHO_B_em8x16, "Sconv4_SOHO_B_em8x16");  // V17:4178   v159NN:  GTVPUX:   GTL: 4335
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(conv4_SOHO_T_em4x16, "conv4_SOHO_T_em4x16");  // V17: 8753   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv4_SOHO_M_em4x16, "conv4_SOHO_M_em4x16");  // V17: 9139   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv4_SOHO_B_em4x16, "conv4_SOHO_B_em4x16");  // V17: 6218   v159NN: ? GTVPUX:   GTL: ??
 
-                std::cout << "\n ------- SOHO SPLITS conv8: ------- \n";
+                utest_log::debug() << "\n ------- SOHO SPLITS conv8: ------- \n";
                 case_run(conv8_SOHO_T, "conv8_SOHO_T");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv8_SOHO_M, "conv8_SOHO_M");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv8_SOHO_B, "conv8_SOHO_B");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(conv8_SOHO_T_em8x16, "Sconv8_SOHO_T_em8x16");  // V17:   v159NN:  GTVPUX:   GTL: 
                 case_run(conv8_SOHO_M_em8x16, "Sconv8_SOHO_M_em8x16");  // V17: ! v159NN:  GTVPUX:   GTL: ,
                 case_run(conv8_SOHO_B_em8x16, "Sconv8_SOHO_B_em8x16");  // V17:   v159NN:  GTVPUX:   GTL: 
-                std::cout << "\n";
+                utest_log::debug() << "\n";
                 case_run(conv8_SOHO_T_em4x16, "conv8_SOHO_T_em4x16");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv8_SOHO_M_em4x16, "conv8_SOHO_M_em4x16");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv8_SOHO_B_em4x16, "conv8_SOHO_B_em4x16");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
 
 
 
-                std::cout << "\n ------- SOK SPLITS conv8: ------- \n";
+                utest_log::debug() << "\n ------- SOK SPLITS conv8: ------- \n";
                 case_run(conv8_SOK_K16, "SOK conv8  K=16 em 16x16");  // V17: Wx3 v159NN:  GTVPUX:   GTL: 
                 case_run(conv8_SOK_K16_em8x16, "SOK conv8  K=16 em 8x16");  // V17:x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(conv8_SOK_K16_em4x16, "SOK conv8 K=16 em 4x16");  // V17:   v159NN: ? GTVPUX:   GTL: ??
@@ -2141,7 +2162,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, WhisperFP16_BIG_CONV_EISXW_131119_NPU4
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //     EXPECT_TRUE(on);  // something has to fail to  see couts
@@ -2190,7 +2211,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, WhisperFP16_BIG_CONV_EISXW_131119_NPU4
             std::string err_info;
 
             {  // SOK  SPLITS
-                std::cout << "\n ------- SOK SPLITS: ------- \n";
+                utest_log::debug() << "\n ------- SOK SPLITS: ------- \n";
 
                 case_run(wl_SOK_TOP_CLU_16x,
                          "TEST of: _16x SOK CLU no broadcast TOP K=128 ");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
@@ -2211,46 +2232,47 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, WhisperFP16_BIG_CONV_EISXW_131119_NPU4
         }
 
         {
-            std::cout << "\n ------- SOK SPLITS: MEMORY ASPECTS ------- ";
+            utest_log::debug() << "\n ------- SOK SPLITS: MEMORY ASPECTS ------- ";
             DPU_OperationValidator dut;
             // DPU_SplitLayersValidator dut2;
 
             MemorySize mem;
             {
-                std::cout << "\n   ---- SOK , CLU, no halo  ------- ";
+                utest_log::debug() << "\n   ---- SOK , CLU, no halo  ------- ";
                 DPUWorkload wl{std::move(wl_SOK_TOP_CLU_16x)};
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
                 EXPECT_LE(mem.cmx, (1024 * 1024 + 1024 * 512)) << "\nMemory size: " << mem << wl << std::endl;
-                std::cout << mem << std::endl;
+                utest_log::debug() << mem << std::endl;
             }
             {
-                std::cout << "\n   ---- SOK broadcast, no halo  ------- ";
+                utest_log::debug() << "\n   ---- SOK broadcast, no halo  ------- ";
                 DPUWorkload wl = wl_SOK_TOP_16x;
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
                 EXPECT_LE(mem.cmx, (1024 * 1024 + 1024 * 512)) << "\nMemory size: " << mem << wl << std::endl;
-                std::cout << mem << std::endl;
+                utest_log::debug() << mem << std::endl;
             }
             {
-                std::cout << "\n   ---- SOK broadcast, WITH halo  ------- ";
+                utest_log::debug() << "\n   ---- SOK broadcast, WITH halo  ------- ";
                 DPUWorkload wl{std::move(wl_SOK_TOP_halo_16x)};
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
                 EXPECT_GE(mem.cmx, (1024 * 1024 + 1024 * 512)) << "\nMemory size: " << mem << wl << std::endl;
-                std::cout << mem << std::endl;
+                utest_log::debug() << mem << std::endl;
             }
             {
-                std::cout << "\n   ---- FULL LAYER  no halo  ------- ";
+                utest_log::debug() << "\n   ---- FULL LAYER  no halo  ------- ";
                 DPUWorkload wl = std::move(wl_);
                 EXPECT_NO_THROW(mem = dut.compute_wl_memory(wl)) << wl << std::endl;
                 EXPECT_GE(mem.cmx, (1024 * 1024 + 1024 * 512)) << "\nMemory size: " << mem << wl << std::endl;
-                std::cout << mem << std::endl;
+                utest_log::debug() << mem << std::endl;
             }
         }
         {
-            std::cout << "\n   ------- LAYER Again, but on already split clusters.   ------- ";
+            utest_log::debug() << "\n   ------- LAYER Again, but on already split clusters.   ------- ";
             {                                              // note: Real LNL NN has big delta vs GTL
                 const DPULayer tst_layer(wl_SOK_TOP_16x);  // has owt so it will force a broadcast
                 const std::vector<TestCase> tests{
-                        {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
+                        {{std::move(tst_layer),
+                          VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                          {Cycles::NO_ERROR, true, 340000, fail * 370000 + 30000},
                          "Tile split + CLU+ broadcast , no memmove, "},
 
@@ -2373,7 +2395,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Layer_EISXW_132141_SEP_split_Qualitati
         // todo: add HK switch as SOHO + broadcast
         // here we do not care about the runtime , but we care about NO ERROR at sanitization (fits to memory)
         const std::vector<TestCase> tests{
-                {{DPULayer(wl_layer_initial), VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{DPULayer(wl_layer_initial),
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 260000, fail * 300000 + 30000},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "SOHO full I1, no memmove, "},
 
@@ -2382,17 +2405,20 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Layer_EISXW_132141_SEP_split_Qualitati
                  {Cycles::NO_ERROR, true, 260000, fail * 300000 + 30000},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "SOHO full I1 fixed, no memmove, "},
 
-                {{DPULayer(wl_SOHO_Initial), VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{DPULayer(wl_SOHO_Initial),
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::NONE, false, false, prefetch}},
                  {Cycles::ERROR_INPUT_TOO_BIG, true, 260000,
                   fail * 300000 + 30000},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "CLU SPLIT sep initial , no memmove, "},
 
-                {{DPULayer(wl_SOHO_InitialFixed), VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{DPULayer(wl_SOHO_InitialFixed),
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::NONE, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 260000, fail * 300000 + 30000},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "CLU SPLIT sep initial fixed, no memmove, "},
 
                 // with good split of sep
-                {{DPULayer(wl_SOHO_SEP_Split_initial), VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::NONE, false, false, prefetch}},
+                {{DPULayer(wl_SOHO_SEP_Split_initial),
+                  VPULayerStrategy{1U, 1U, 4U, VPUTilingStrategy::NONE, false, false, prefetch}},
                  {Cycles::NO_ERROR, true, 260000, fail * 300000 + 30000},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "CLU SPLIT sep initial SPLIT , no memmove, "},
 
@@ -2417,7 +2443,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Layer_EISXW_132141_SEP_split_Qualitati
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //     EXPECT_TRUE(on);  // something has to fail to  see couts
@@ -2429,7 +2455,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, Layer_EISXW_132141_SEP_split_Qualitati
             std::string err_info;
 
             {  // SOHO SPLITS
-                std::cout << "\n ------- SOHO SPLITS: ------- \n";
+                utest_log::debug() << "\n ------- SOHO SPLITS: ------- \n";
 
                 case_run(wl_SOHO_Initial, "TEST of: SOHO initial SEP : ");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_InitialFixed, "TEST of: SOHO initial Fixed SEP : ");
@@ -2478,7 +2504,8 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, zTemplate_Layer_EISXW_xxxxxxx_NPUXX) {
     {  // note: Real LNL NN has big delta vs GTL
         const DPULayer tst_layer(wl_);
         const std::vector<TestCase> tests{
-                {{std::move(tst_layer), VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
+                {{std::move(tst_layer),
+                  VPULayerStrategy{1U, 1U, 4U, VPUNN::VPUTilingStrategy::SOH_Overlapped, false, false, prefetch}},
                  {VPUNN::Cycles::NO_ERROR, true, 1000, fail * 5001 + 1500},  // 2// V17: x   v159NN: ? GTVPUX:   GTL: ??
                  "SOHO , no memmove, "},
 
@@ -2498,7 +2525,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, zTemplate_Layer_EISXW_xxxxxxx_NPUXX) {
             EXPECT_EQ(dpu_cost, 10) << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n"
                                     << tst_layer << err_info << "END ERR";
         }
-        std::cout << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
+        utest_log::debug() << "  " << whatTest << dpu_cost << "=" << Cycles::toErrorText(dpu_cost) << "\n";
     };
 
     //     EXPECT_TRUE(on);  // something has to fail to  see couts
@@ -2536,7 +2563,7 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, zTemplate_Layer_EISXW_xxxxxxx_NPUXX) {
             std::string err_info;
 
             {  // SOHO SPLITS
-                std::cout << "\n ------- SOHO SPLITS: ------- \n";
+                utest_log::debug() << "\n ------- SOHO SPLITS: ------- \n";
 
                 case_run(wl_SOHO_Top_K64x2, "TEST of: SOHO TOP K=64 X2");  // V17: x   v159NN: ? GTVPUX:   GTL: ??
                 case_run(wl_SOHO_Mid_K64x2, "TEST of: SOHO MID K=64 X2");
@@ -2548,4 +2575,4 @@ TEST_F(VPULayerCM_InvestigationTestNPU4x, zTemplate_Layer_EISXW_xxxxxxx_NPUXX) {
     }
 }
 
-}
+}  // namespace VPUNN_unit_tests

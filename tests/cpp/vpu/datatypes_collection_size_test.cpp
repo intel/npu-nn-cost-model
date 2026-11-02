@@ -47,7 +47,12 @@ TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bytes_Test) {
     EXPECT_EQ(DTypeDimensionInfo::dtype_to_bytes(DataType::HF8), 1);
 
     EXPECT_EQ(DTypeDimensionInfo::dtype_to_bytes(DataType::INT32), 4);
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bytes(DataType::UINT32), 4);
     EXPECT_EQ(DTypeDimensionInfo::dtype_to_bytes(DataType::FLOAT32), 4);
+
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bytes(DataType::INT64), 8);
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bytes(DataType::UINT64), 8);
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bytes(DataType::FLOAT64), 8);
 }
 
 TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bits_Test) {
@@ -74,7 +79,12 @@ TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bits_Test) {
     EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(DataType::HF8), 8);
 
     EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(DataType::INT32), 32);
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(DataType::UINT32), 32);
     EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(DataType::FLOAT32), 32);
+
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(DataType::INT64), 64);
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(DataType::UINT64), 64);
+    EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(DataType::FLOAT64), 64);
 }
 
 TEST_F(DataTypes_Collection_Size_Test, Number_of_DTypes_per_byte) {
@@ -101,7 +111,12 @@ TEST_F(DataTypes_Collection_Size_Test, Number_of_DTypes_per_byte) {
     EXPECT_EQ(DTypeDimensionInfo::types_per_byte(DataType::INT16), 0);
 
     EXPECT_EQ(DTypeDimensionInfo::types_per_byte(DataType::INT32), 0);    //?
+    EXPECT_EQ(DTypeDimensionInfo::types_per_byte(DataType::UINT32), 0);   //?
     EXPECT_EQ(DTypeDimensionInfo::types_per_byte(DataType::FLOAT32), 0);  //?
+
+    EXPECT_EQ(DTypeDimensionInfo::types_per_byte(DataType::INT64), 0);
+    EXPECT_EQ(DTypeDimensionInfo::types_per_byte(DataType::UINT64), 0);
+    EXPECT_EQ(DTypeDimensionInfo::types_per_byte(DataType::FLOAT64), 0);
 }
 
 // Test is_same_datatype_footprint function
@@ -131,6 +146,9 @@ TEST_F(DataTypes_Collection_Size_Test, IsSameDatatypeFootprint) {
     EXPECT_TRUE(DTypeDimensionInfo::is_same_datatype_footprint(DataType::FLOAT4, DataType::UINT4));
 
     EXPECT_TRUE(DTypeDimensionInfo::is_same_datatype_footprint(DataType::FLOAT32, DataType::INT32));
+    EXPECT_TRUE(DTypeDimensionInfo::is_same_datatype_footprint(DataType::FLOAT32, DataType::UINT32));
+    EXPECT_TRUE(DTypeDimensionInfo::is_same_datatype_footprint(DataType::FLOAT64, DataType::INT64));
+    EXPECT_TRUE(DTypeDimensionInfo::is_same_datatype_footprint(DataType::FLOAT64, DataType::UINT64));
 
     // Additional test cases with expect false
     EXPECT_FALSE(DTypeDimensionInfo::is_same_datatype_footprint(DataType::HF8, DataType::BFLOAT16));
@@ -277,7 +295,31 @@ TEST_F(DataTypes_Collection_Size_Test, Compute_elements_size_in_bytes_Test) {
         };
 
         testxbyte(DataType::INT32);
+        testxbyte(DataType::UINT32);
         testxbyte(DataType::FLOAT32);
+    }
+
+    {  // 8bytes
+        auto testxbyte = [](const DataType dt) {
+            EXPECT_EQ(DTypeDimensionInfo::types_per_byte(dt), 0);
+            EXPECT_EQ(DTypeDimensionInfo::dtype_to_bits(dt), 64);
+
+            EXPECT_EQ(compute_size_in_bytes(-1, dt), 0) << "type:" << DataType_ToText.at((int)dt);
+            EXPECT_EQ(compute_size_in_bytes(-10, dt), 0) << "type:" << DataType_ToText.at((int)dt);
+
+            EXPECT_EQ(compute_size_in_bytes(0, dt), 0);
+            EXPECT_EQ(compute_size_in_bytes(1, dt), 8);
+            EXPECT_EQ(compute_size_in_bytes(2, dt), 16);
+            EXPECT_EQ(compute_size_in_bytes(3, dt), 24);
+            EXPECT_EQ(compute_size_in_bytes(63, dt), 63 * 8);
+            EXPECT_EQ(compute_size_in_bytes(128, dt), 128 * 8);
+            EXPECT_EQ(compute_size_in_bytes(256, dt), 256 * 8);
+            EXPECT_EQ(compute_size_in_bytes(125436, dt), 125436 * 8);
+        };
+
+        testxbyte(DataType::INT64);
+        testxbyte(DataType::UINT64);
+        testxbyte(DataType::FLOAT64);
     }
 }
 
@@ -337,6 +379,27 @@ TEST_F(DataTypes_Collection_Size_Test, Compute_elements_number_from_bytes_Test) 
     EXPECT_EQ(compute_elements_count_from_bytes(103, DataType::FLOAT32), 25);
     EXPECT_EQ(compute_elements_count_from_bytes(104, DataType::FLOAT32), 26);
 
+    EXPECT_EQ(compute_elements_count_from_bytes(0, DataType::FLOAT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(1, DataType::FLOAT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(7, DataType::FLOAT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(8, DataType::FLOAT64), 1);
+    EXPECT_EQ(compute_elements_count_from_bytes(100, DataType::FLOAT64), 12);
+    EXPECT_EQ(compute_elements_count_from_bytes(104, DataType::FLOAT64), 13);
+
+    EXPECT_EQ(compute_elements_count_from_bytes(0, DataType::INT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(1, DataType::INT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(7, DataType::INT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(8, DataType::INT64), 1);
+    EXPECT_EQ(compute_elements_count_from_bytes(100, DataType::INT64), 12);
+    EXPECT_EQ(compute_elements_count_from_bytes(104, DataType::INT64), 13);
+
+    EXPECT_EQ(compute_elements_count_from_bytes(0, DataType::UINT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(1, DataType::UINT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(7, DataType::UINT64), 0);
+    EXPECT_EQ(compute_elements_count_from_bytes(8, DataType::UINT64), 1);
+    EXPECT_EQ(compute_elements_count_from_bytes(100, DataType::UINT64), 12);
+    EXPECT_EQ(compute_elements_count_from_bytes(104, DataType::UINT64), 13);
+
     EXPECT_EQ(compute_elements_count_from_bytes(-1, DataType::INT16), 0);
     EXPECT_EQ(compute_elements_count_from_bytes(-10, DataType::INT16), 0);
 
@@ -346,8 +409,8 @@ TEST_F(DataTypes_Collection_Size_Test, Compute_elements_number_from_bytes_Test) 
 }
 
 TEST_F(DataTypes_Collection_Size_Test, Dtype_to_bits_and_Dtype_to_bytes_DefaultCase) {
-    EXPECT_EQ(-1, DTypeDimensionInfo::dtype_to_bits(static_cast<DataType>(20)));
-    EXPECT_EQ(-1, DTypeDimensionInfo::dtype_to_bytes(static_cast<DataType>(20)));
+    EXPECT_EQ(-1, DTypeDimensionInfo::dtype_to_bits(static_cast<DataType>(100)));
+    EXPECT_EQ(-1, DTypeDimensionInfo::dtype_to_bytes(static_cast<DataType>(100)));
 }
 
 TEST_F(DataTypes_Collection_Size_Test, DatatypeFamiliesClassification) {
@@ -357,37 +420,60 @@ TEST_F(DataTypes_Collection_Size_Test, DatatypeFamiliesClassification) {
         bool any_int;
         bool fp16_family;
         bool fp8_family;
+        bool fp32_family;
+        bool fp64_family;
         bool i16_family;
         bool i8_family;
+        bool i32_family;
+        bool i64_family;
     };
 
-    const std::array<FamilyCase, 17> cases{{
-            {DataType::UINT8, false, true, false, false, false, true},
-            {DataType::INT8, false, true, false, false, false, true},
-            {DataType::FLOAT16, true, false, true, false, false, false},
-            {DataType::BFLOAT16, true, false, true, false, false, false},
-            {DataType::BF8, true, false, false, true, false, false},
-            {DataType::HF8, true, false, false, true, false, false},
-            {DataType::UINT4, false, true, false, false, false, true},
-            {DataType::INT4, false, true, false, false, false, true},
-            {DataType::UINT2, false, true, false, false, false, true},
-            {DataType::INT2, false, true, false, false, false, true},
-            {DataType::UINT1, false, true, false, false, false, true},
-            {DataType::INT1, false, true, false, false, false, true},
-            {DataType::INT32, false, true, false, false, false, true},
-            {DataType::FLOAT32, true, false, true, false, false, false},
-            {DataType::UINT16, false, true, false, false, true, false},
-            {DataType::INT16, false, true, false, false, true, false},
-            {DataType::FLOAT4, true, false, false, false, false, false},
+    const std::array<FamilyCase, 21> cases{{
+            //             dtype              any_float any_int fp16   fp8    fp32   fp64   i16    i8     i32    i64
+            {DataType::UINT8, false, true, false, false, false, false, false, true, false, false},
+            {DataType::INT8, false, true, false, false, false, false, false, true, false, false},
+            {DataType::FLOAT16, true, false, true, false, false, false, false, false, false, false},
+            {DataType::BFLOAT16, true, false, true, false, false, false, false, false, false, false},
+            {DataType::BF8, true, false, false, true, false, false, false, false, false, false},
+            {DataType::HF8, true, false, false, true, false, false, false, false, false, false},
+            {DataType::UINT4, false, true, false, false, false, false, false, true, false, false},
+            {DataType::INT4, false, true, false, false, false, false, false, true, false, false},
+            {DataType::UINT2, false, true, false, false, false, false, false, true, false, false},
+            {DataType::INT2, false, true, false, false, false, false, false, true, false, false},
+            {DataType::UINT1, false, true, false, false, false, false, false, true, false, false},
+            {DataType::INT1, false, true, false, false, false, false, false, true, false, false},
+            {DataType::INT32, false, true, false, false, false, false, false, false, true, false},
+            {DataType::FLOAT32, true, false, false, false, true, false, false, false, false, false},
+            {DataType::UINT16, false, true, false, false, false, false, true, false, false, false},
+            {DataType::INT16, false, true, false, false, false, false, true, false, false, false},
+            {DataType::FLOAT4, true, false, false, false, false, false, false, false, false, false},
+            {DataType::INT64, false, true, false, false, false, false, false, false, false, true},
+            {DataType::UINT64, false, true, false, false, false, false, false, false, false, true},
+            {DataType::FLOAT64, true, false, false, false, false, true, false, false, false, false},
+            {DataType::UINT32, false, true, false, false, false, false, false, false, true, false},
     }};
 
     for (const auto& tc : cases) {
-        EXPECT_EQ(DTypeCategoryInfo::is_any_float_dtype(tc.dtype), tc.any_float) << DataType_ToText.at(static_cast<int>(tc.dtype));
-        EXPECT_EQ(DTypeCategoryInfo::is_any_int_dtype(tc.dtype), tc.any_int) << DataType_ToText.at(static_cast<int>(tc.dtype));
-        EXPECT_EQ(DTypeCategoryInfo::is_fp16family_dtype(tc.dtype), tc.fp16_family) << DataType_ToText.at(static_cast<int>(tc.dtype));
-        EXPECT_EQ(DTypeCategoryInfo::is_fp8family_dtype(tc.dtype), tc.fp8_family) << DataType_ToText.at(static_cast<int>(tc.dtype));
-        EXPECT_EQ(DTypeCategoryInfo::is_i16family_dtype(tc.dtype), tc.i16_family) << DataType_ToText.at(static_cast<int>(tc.dtype));
-        EXPECT_EQ(DTypeCategoryInfo::is_i8family_dtype(tc.dtype), tc.i8_family) << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_any_float_dtype(tc.dtype), tc.any_float)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_any_int_dtype(tc.dtype), tc.any_int)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_fp16family_dtype(tc.dtype), tc.fp16_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_fp8family_dtype(tc.dtype), tc.fp8_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_fp32family_dtype(tc.dtype), tc.fp32_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_fp64family_dtype(tc.dtype), tc.fp64_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_i16family_dtype(tc.dtype), tc.i16_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_i8family_dtype(tc.dtype), tc.i8_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_i32family_dtype(tc.dtype), tc.i32_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
+        EXPECT_EQ(DTypeCategoryInfo::is_i64family_dtype(tc.dtype), tc.i64_family)
+                << DataType_ToText.at(static_cast<int>(tc.dtype));
     }
 }
 

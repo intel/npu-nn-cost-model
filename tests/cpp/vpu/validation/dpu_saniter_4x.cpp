@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -34,6 +35,44 @@ protected:
 private:
 };
 
+/// VPU_4_0 has no dCIM support at all (empty valid dCIM mode list). check_and_sanitize must reject
+/// MPEEngine::DCIM explicitly for such devices, without touching execution_order or relying on the
+/// (unrelated) Execution_Order check further down to catch it as a side effect.
+TEST_F(DPU_OperationSanitizerTestNPU4x, CheckAndSanitize_RejectsDcimEngine_WhenDeviceHasNoDcimSupport) {
+    DPU_OperationSanitizer dut;
+    SanityReport sane;
+
+    DPUWorkload wl{
+            VPUDevice::VPU_4_0,
+            Operation::CONVOLUTION,
+            {VPUTensor(32, 32, 16, 1, DataType::UINT8)},  // input dimensions
+            {VPUTensor(32, 32, 16, 1, DataType::UINT8)},  // output dimensions
+            {1, 1},                                       // kernels
+            {1, 1},                                       // strides
+            {0, 0, 0, 0},                                 // padding
+            ExecutionMode::CUBOID_16x16,                  // execution mode
+            ActivationFunction::NONE,                     // activation
+            0.0F,                                         // act_sparsity
+            0.0F,                                         // weight_sparsity
+            {swz_def, swz_def},                           // input_swizzling
+            {swz_def},                                    // output_swizzling
+            1,                                            // output_write_tiles
+            {0, 0, 0, 0},                                 // offsets
+            ISIStrategy::CLUSTERING,                      // isi_strategy
+            false,                                        // weight_sparsity_enabled
+    };
+    wl.mpe_engine = MPEEngine::DCIM;
+
+    dut.check_and_sanitize(wl, sane);
+
+    EXPECT_EQ(wl.execution_order, ExecutionMode::CUBOID_16x16)
+            << "execution_order must be left untouched; rejection must be explicit, not via sanitization";
+    EXPECT_EQ(sane.value(), V(Cycles::ERROR_INVALID_INPUT_CONFIGURATION))
+            << sane.info << "\n error is: " << Cycles::toErrorText(sane.value());
+    EXPECT_NE(sane.info.find("dCIM"), std::string::npos)
+            << "info should explain that DCIM is not supported on this device, got: " << sane.info;
+}
+
 class DPU_WorkloadValidatorTestNPU4x : public ::testing::Test {
 public:
 protected:
@@ -42,7 +81,6 @@ protected:
 
 private:
 };
-
 
 TEST_F(DPU_WorkloadValidatorTestNPU4x, basicCheckerTest_VPU40) {
     VPUNN::DPU_OperationSanitizer dut;
@@ -171,7 +209,7 @@ TEST_F(DPU_WorkloadValidatorTestNPU4x, outputWriteTilesCheckerTest_VPU40) {
     // this lambda function checks if number_of_tiles exists in output_write_tiles={1,2,3,4,5,6,7,8}
     auto verify_nr_of_tiles = [&sane, &dut](TestsVector& tests) {
         for (auto& t : tests) {
-            std::cout << t.test_case << "\n";
+            utest_log::debug() << t.test_case << "\n";
 
             t.t_in.wl.output_write_tiles = static_cast<unsigned int>(t.t_in.number_of_tiles);
             dut.check_data_consistency(t.t_in.wl, sane);

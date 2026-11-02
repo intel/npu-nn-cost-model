@@ -8,6 +8,7 @@
 // Software Package for additional details.
 // #include "vpu_cost_model.h"
 #include "dmann_cost_model.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -56,8 +57,7 @@ TEST_F(TestDMANNCostModelVPU2x, LoadModels_BasicAssertions) {
 TEST_F(TestDMANNCostModelVPU2x, LoadModels_NN_Valid_Interval) {
     float down_exp = -0.1F;
     float up_exp = 1.1F;
-    
-    
+
     {  // empty models
         DMANNCostProvider<DMANNWorkload_NPU27> empty_model{};
         ASSERT_FALSE(empty_model.is_initialized());
@@ -135,7 +135,7 @@ TEST_F(TestDMANNCostModelVPU2x, SmokeTestDMA_RAWNN) {
 
     ASSERT_TRUE(dma_model.is_initialized());
 
-   auto dma_raw = dma_model.computeBandwidthMsg(wl);
+    auto dma_raw = dma_model.computeBandwidthMsg(wl);
 
     // Expect equality.
     EXPECT_NEAR(std::get<0>(dma_raw), 0.42211675643920898F, 0.01) << wl;  // gear4:0.347663F
@@ -184,9 +184,10 @@ TEST_F(TestDMANNCostModelVPU2x, DISABLED_SweepDMATime_27) {
         const DMANNWorkload_NPU27 dmaNN_CC = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_CC);
         const DMANNWorkload_NPU27 dmaNN_DD = DMAWorkloadTransformer::create_workload<DMANNWorkload_NPU27>(dmaOld_DD);
 
-        // std::cout << "\n--------------------------------------------------------------------------------------";
-        // std::cout << dmaNN_DC << std::endl << dmaNN_CD << std::endl << dmaNN_CC << std::endl << dmaNN_DD;
-        // std::cout << "\n--------------------------------------------------------------------------------------";
+        // utest_log::debug() <<
+        // "\n--------------------------------------------------------------------------------------"; utest_log::debug()
+        // << dmaNN_DC << std::endl << dmaNN_CD << std::endl << dmaNN_CC << std::endl << dmaNN_DD; utest_log::debug() <<
+        // "\n--------------------------------------------------------------------------------------";
 
         auto cycles_NN_DC = model_2_7.computeCycles(dmaNN_DC);
         auto cycles_NN_CD = model_2_7.computeCycles(dmaNN_CD);
@@ -208,21 +209,24 @@ TEST_F(TestDMANNCostModelVPU2x, DISABLED_SweepDMATime_27) {
     auto show = [](const DMAData& d, const std::string& s, const auto& div) {
         const int w{8};
         const int p{3};
-        std::cout << "\n *** " << s;
-        std::cout << "\n BYTES      NN: DRAM>CMX  CMX>DRAM  CMX>CMX  DRAM>DRAM     \tOld: DRAM>CMX  CMX>DRAM  CMX>CMX  "
-                     "DRAM>DRAM";
+        utest_log::debug() << "\n *** " << s;
+        utest_log::debug()
+                << "\n BYTES      NN: DRAM>CMX  CMX>DRAM  CMX>CMX  DRAM>DRAM     \tOld: DRAM>CMX  CMX>DRAM  CMX>CMX  "
+                   "DRAM>DRAM";
         for (const auto& m : d) {
-            std::cout << "\n "                                   //
-                      << std::setprecision(p)                    //
-                      << std::setw(w) << std::get<0>(m) << "\t"  //
-                      << std::setw(w) << std::get<1>(m) / div << "\t" << std::setw(w) << std::get<2>(m) / div << "\t"
-                      << std::setw(w) << std::get<3>(m) / div << "\t" << std::setw(w) << std::get<4>(m) / div  //
-                      << "\t\t"                                                                                //
-                      << std::setw(w) << std::get<5>(m) / div << "\t" << std::setw(w) << std::get<6>(m) / div << "\t"
-                      << std::setw(w) << std::get<7>(m) / div << "\t" << std::setw(w) << std::get<8>(m) / div  //
+            utest_log::debug() << "\n "                                   //
+                              << std::setprecision(p)                    //
+                              << std::setw(w) << std::get<0>(m) << "\t"  //
+                              << std::setw(w) << std::get<1>(m) / div << "\t" << std::setw(w) << std::get<2>(m) / div
+                              << "\t" << std::setw(w) << std::get<3>(m) / div << "\t" << std::setw(w)
+                              << std::get<4>(m) / div  //
+                              << "\t\t"                //
+                              << std::setw(w) << std::get<5>(m) / div << "\t" << std::setw(w) << std::get<6>(m) / div
+                              << "\t" << std::setw(w) << std::get<7>(m) / div << "\t" << std::setw(w)
+                              << std::get<8>(m) / div  //
                     ;
         }
-        std::cout << "\n ------------------------------";
+        utest_log::debug() << "\n ------------------------------";
         /* coverity[end_of_path] */
     };
     EXPECT_TRUE(false);
@@ -381,16 +385,16 @@ TEST_F(TestDMANNCostModelVPU2x, SweepGT_DMATime_27) {
             }
         }
 
-        std::cout << "\nBYTES:, " << dmaNN_.getAccessedBytes() << " , " << (int)dmaNN_.transfer_direction << ":"
-                  << MemoryDirection_ToText.at((int)dmaNN_.transfer_direction) << " ,gt:  " << exp
-                  << " , inferred: " << cycles_ << " , delta: " << delta << " ,rel err:  " << rel_err << " ,  "
-                  << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
+        utest_log::debug() << "\nBYTES:, " << dmaNN_.getAccessedBytes() << " , " << (int)dmaNN_.transfer_direction << ":"
+                          << MemoryDirection_ToText.at((int)dmaNN_.transfer_direction) << " ,gt:  " << exp
+                          << " , inferred: " << cycles_ << " , delta: " << delta << " ,rel err:  " << rel_err << " ,  "
+                          << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
     };
 
     // EXPECT_TRUE(false);
 
-    std::cout << "\nMax Relative error allowed: " << rel_err_max;
-    std::cout << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
+    utest_log::debug() << "\nMax Relative error allowed: " << rel_err_max;
+    utest_log::debug() << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
 
     for (const auto& t : tc) {
         runTest(t);
@@ -535,15 +539,16 @@ TEST_F(TestDMANNCostModelVPU2x, SweepGT_DMATime_27_GEAR4) {
             }
         }
 
-        std::cout << "\nBYTES:, " << dmaNN_.getAccessedBytes() << " , " << (int)dmaNN_.transfer_direction << ":"
-                  << MemoryDirection_ToText.at((int)dmaNN_.transfer_direction) << " , " << exp << " , " << cycles_
-                  << " , " << delta << " , " << rel_err << " ,  " << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
+        utest_log::debug() << "\nBYTES:, " << dmaNN_.getAccessedBytes() << " , " << (int)dmaNN_.transfer_direction << ":"
+                          << MemoryDirection_ToText.at((int)dmaNN_.transfer_direction) << " , " << exp << " , "
+                          << cycles_ << " , " << delta << " , " << rel_err << " ,  "
+                          << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
     };
 
     // EXPECT_TRUE(false);
 
-    std::cout << "\nMax Relative error allowed: " << rel_err_max;
-    std::cout << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
+    utest_log::debug() << "\nMax Relative error allowed: " << rel_err_max;
+    utest_log::debug() << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
 
     for (const auto& t : tc) {
         runTest(t);

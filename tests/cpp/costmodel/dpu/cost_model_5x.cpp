@@ -7,6 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 #include "costmodel/cost_model.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -175,9 +176,10 @@ protected:
 
         EXPECT_TRUE(!Cycles::isErrorCode(cost_cyc)) << info << wl << errInfo << details;
 
-        std::cout << details
-                  << "-X-------------------------------------------------------------------------------------------"
-                     "-\n";
+        utest_log::debug()
+                << details
+                << "-X-------------------------------------------------------------------------------------------"
+                   "-\n";
     }
 
 private:
@@ -577,7 +579,7 @@ TEST_F(TestCostModel, Compute_Input1_size_TestNPU5X) {
     const DPU_OperationSanitizer sanitizer;
     auto run_tests = [&sanitizer, &test_message](const TestsVector& tests) {
         for (auto& t : tests) {
-            std::cout << test_message(t.t_in.wl);
+            utest_log::debug() << test_message(t.t_in.wl);
             auto wl_op = DPUOperation(t.t_in.wl, sanitizer.getDeviceConfiguration(t.t_in.wl.device));
 
             EXPECT_EQ(wl_op.input_1.width, t.t_exp.inpu1_W) << test_message(t.t_in.wl);

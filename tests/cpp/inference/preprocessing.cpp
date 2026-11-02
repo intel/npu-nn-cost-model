@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -214,12 +215,12 @@ TEST_F(TestPreprocessing_Interface11, DescriptorContentTest) {
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
+    utest_log::debug() << "\n descriptor\n";
 
     for (auto x : result) {
-        std::cout << " " << std::lround(x) << " ";
+        utest_log::debug() << " " << std::lround(x) << " ";
     }
-    std::cout << "\n" << wl2 << "\n";
+    utest_log::debug() << "\n" << wl2 << "\n";
 
     EXPECT_EQ(std::lround(result[dev_idx + (int)wl2.device]), 1);  // as long as no enum change in specific interface
 
@@ -289,12 +290,12 @@ TEST_F(TestPreprocessing_Interface11, Test_spatial_memory_tensor_input_2_7) {
         EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
         EXPECT_EQ(result.size(), data_written);
-        std::cout << "\n descriptor\n";
+        utest_log::debug() << "\n descriptor\n";
 
         for (auto x : result) {
-            std::cout << " " << std::lround(x) << " ";
+            utest_log::debug() << " " << std::lround(x) << " ";
         }
-        std::cout << "\n" << wl_ref << "\n";
+        utest_log::debug() << "\n" << wl_ref << "\n";
 
         EXPECT_EQ(std::lround(result[width_idx]), in_w);
         EXPECT_EQ(std::lround(result[height_idx]), in_h);
@@ -423,18 +424,18 @@ TEST_F(TestPreprocessing_Interface11, Test_limit_owt_to_2_mechanism_2_7) {
 
     // case when owt is changed
     std::vector<float> result_owt_change = generate_des(wl_ref);
-    std::cout << "\n descriptor when owt change\n";
+    utest_log::debug() << "\n descriptor when owt change\n";
     for (auto x : result_owt_change) {
-        std::cout << " " << std::lround(x) << " ";
+        utest_log::debug() << " " << std::lround(x) << " ";
     }
     EXPECT_EQ(std::lround(result_owt_change[owt_idx]), 2);
 
     // case when owt is not changed
     wl_ref.output_write_tiles = 1;
     std::vector<float> result_owt_not_change = generate_des(wl_ref);
-    std::cout << "\n descriptor when owt does not change\n";
+    utest_log::debug() << "\n descriptor when owt does not change\n";
     for (auto x : result_owt_not_change) {
-        std::cout << " " << std::lround(x) << " ";
+        utest_log::debug() << " " << std::lround(x) << " ";
     }
     EXPECT_EQ(std::lround(result_owt_not_change[owt_idx]), 1);
 }
@@ -485,10 +486,10 @@ TEST_F(TestPreprocessing_Interface11, SwizzlingContentTest) {
         size_t data_written = 0;
         std::vector<float> result = pp.generate_descriptor(tin, data_written);
 
-        // std::cout << "\n descriptor\n";
+        // utest_log::debug() << "\n descriptor\n";
 
         // for (auto x : result) {
-        //    std::cout << " " << std::lround(x) << " ";
+        //    utest_log::debug() << " " << std::lround(x) << " ";
         //}
 
         const int swzi0_idx{swizz_idx + 0 * swizz_size};
@@ -593,12 +594,12 @@ TEST_F(TestPreprocessing_Interface11, MAXPOOLContentTest) {
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
+    utest_log::debug() << "\n descriptor\n";
 
     for (auto x : result) {
-        std::cout << " " << std::lround(x) << " ";
+        utest_log::debug() << " " << std::lround(x) << " ";
     }
-    std::cout << "\n" << wl2 << "\n";
+    utest_log::debug() << "\n" << wl2 << "\n";
 
     EXPECT_EQ(std::lround(result[dev_idx + (int)wl2.device]),
               1);  // as long as no enum change in specific interface
@@ -699,9 +700,9 @@ TEST_F(TestPreprocessing_Interface11, DescriptorContentTest_FLOAT_INT) {
     const DPUWorkload wl_int_float{Builder::makeSameWl(DataType::UINT8, DataType::FLOAT16)};
 
     auto show_desc = [](const std::vector<float>& result, std::string prefix) {
-        std::cout << prefix;
+        utest_log::debug() << prefix;
         for (auto x : result) {
-            std::cout << " " << std::lround(x) << " ";
+            utest_log::debug() << " " << std::lround(x) << " ";
         }
     };
 
@@ -712,13 +713,13 @@ TEST_F(TestPreprocessing_Interface11, DescriptorContentTest_FLOAT_INT) {
     std::vector<float> result_i_f = pp.generate_descriptor(wl_int_float, data_written);
     std::vector<float> result_f_f = pp.generate_descriptor(wl_float_float, data_written);
 
-    std::cout << "\n descriptors\n";
+    utest_log::debug() << "\n descriptors\n";
 
     show_desc(result_i_i, "\nii:");
     show_desc(result_f_i, "\nfi:");
     show_desc(result_i_f, "\nif:");
     show_desc(result_f_f, "\nff:");
-    std::cout << std::endl;
+    utest_log::debug() << std::endl;
 
     // EXPECT_EQ(result_i_i, result_i_f);
 
@@ -887,12 +888,12 @@ TEST_F(TestPreprocessing_Interface12, DescriptorContentTest) {
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
+    utest_log::debug() << "\n descriptor\n";
 
     for (auto x : result) {
-        std::cout << " " << x /*std::lround(x) */ << " ";
+        utest_log::debug() << " " << x /*std::lround(x) */ << " ";
     }
-    std::cout << "\n" << wl2 << "\n";
+    utest_log::debug() << "\n" << wl2 << "\n";
 
     EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]), 1);  // as long as no enum change in specific interface
 
@@ -968,9 +969,9 @@ TEST_F(TestPreprocessing_Interface12, DescriptorContentTest_FLOAT_INT) {
     const DPUWorkload wl_bf8_float{Builder::makeSameWl(DataType::BF8, DataType::FLOAT16)};
 
     auto show_desc = [](const std::vector<float>& result, std::string prefix) {
-        std::cout << prefix;
+        utest_log::debug() << prefix;
         for (auto x : result) {
-            std::cout << " " << std::lround(x) << " ";
+            utest_log::debug() << " " << std::lround(x) << " ";
         }
     };
 
@@ -983,7 +984,7 @@ TEST_F(TestPreprocessing_Interface12, DescriptorContentTest_FLOAT_INT) {
     std::vector<float> result_i4_f = pp.generate_descriptor(wl_int4_float, data_written);
     std::vector<float> result_bf8_f = pp.generate_descriptor(wl_bf8_float, data_written);
 
-    std::cout << "\n descriptors\n";
+    utest_log::debug() << "\n descriptors\n";
 
     show_desc(result_i_i, "\nii:");
     show_desc(result_f_i, "\nfi:");
@@ -991,7 +992,7 @@ TEST_F(TestPreprocessing_Interface12, DescriptorContentTest_FLOAT_INT) {
     show_desc(result_f_f, "\nff:");
     show_desc(result_i4_f, "\ni4f:");
     show_desc(result_bf8_f, "\nbf8f:");
-    std::cout << std::endl;
+    utest_log::debug() << std::endl;
 
     // EXPECT_EQ(result_i_i, result_i_f);
 
@@ -1184,12 +1185,12 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest) {
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
+    utest_log::debug() << "\n descriptor\n";
 
     for (auto x : result) {
-        std::cout << " " << x /*std::lround(x) */ << " ";
+        utest_log::debug() << " " << x /*std::lround(x) */ << " ";
     }
-    std::cout << "\n" << wl2 << "\n";
+    utest_log::debug() << "\n" << wl2 << "\n";
 
     EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]), 1);  // as long as no enum change in specific interface
 
@@ -1274,12 +1275,12 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest_AddedTypes) {
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
+    utest_log::debug() << "\n descriptor\n";
 
     for (auto x : result) {
-        std::cout << " " << x /*std::lround(x) */ << " ";
+        utest_log::debug() << " " << x /*std::lround(x) */ << " ";
     }
-    std::cout << "\n" << wl2 << "\n";
+    utest_log::debug() << "\n" << wl2 << "\n";
 
     EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]), 1);  // as long as no enum change in specific interface
 
@@ -1376,9 +1377,9 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest_FLOAT_INT) {
     const DPUWorkload wl_bf8_float{Builder::makeSameWl(DataType::BF8, DataType::FLOAT16)};
 
     auto show_desc = [](const std::vector<float>& result, std::string prefix) {
-        std::cout << prefix;
+        utest_log::debug() << prefix;
         for (auto x : result) {
-            std::cout << " " << std::lround(x) << " ";
+            utest_log::debug() << " " << std::lround(x) << " ";
         }
     };
 
@@ -1391,7 +1392,7 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest_FLOAT_INT) {
     std::vector<float> result_i4_f = pp.generate_descriptor(wl_int4_float, data_written);
     std::vector<float> result_bf8_f = pp.generate_descriptor(wl_bf8_float, data_written);
 
-    std::cout << "\n descriptors\n";
+    utest_log::debug() << "\n descriptors\n";
 
     show_desc(result_i_i, "\nii:");
     show_desc(result_f_i, "\nfi:");
@@ -1399,7 +1400,7 @@ TEST_F(TestPreprocessing_Interface13, DescriptorContentTest_FLOAT_INT) {
     show_desc(result_f_f, "\nff:");
     show_desc(result_i4_f, "\ni4f:");
     show_desc(result_bf8_f, "\nbf8f:");
-    std::cout << std::endl;
+    utest_log::debug() << std::endl;
 
     // EXPECT_EQ(result_i_i, result_i_f);
 
@@ -1593,12 +1594,12 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest) {
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
+    utest_log::debug() << "\n descriptor\n";
 
     for (auto x : result) {
-        std::cout << " " << x /*std::lround(x) */ << " ";
+        utest_log::debug() << " " << x /*std::lround(x) */ << " ";
     }
-    std::cout << "\n" << wl2 << "\n";
+    utest_log::debug() << "\n" << wl2 << "\n";
 
     EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]), 1);  // as long as no enum change in specific interface
 
@@ -1683,12 +1684,12 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest_AddedTypes) {
     EXPECT_EQ(data_written, pp.output_size());  // this is the actual filled dimension
 
     EXPECT_EQ(result.size(), data_written);
-    std::cout << "\n descriptor\n";
+    utest_log::debug() << "\n descriptor\n";
 
     for (auto x : result) {
-        std::cout << " " << x /*std::lround(x) */ << " ";
+        utest_log::debug() << " " << x /*std::lround(x) */ << " ";
     }
-    std::cout << "\n" << wl2 << "\n";
+    utest_log::debug() << "\n" << wl2 << "\n";
 
     EXPECT_EQ(std::lround(result[op_idx + (int)wl2.op]), 1);  // as long as no enum change in specific interface
 
@@ -1788,9 +1789,9 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest_FLOAT_INT) {
     const DPUWorkload wl_bf8_float{Builder::makeSameWl(DataType::BF8, DataType::FLOAT16)};
 
     auto show_desc = [](const std::vector<float>& result, std::string prefix) {
-        std::cout << prefix;
+        utest_log::debug() << prefix;
         for (auto x : result) {
-            std::cout << " " << std::lround(x) << " ";
+            utest_log::debug() << " " << std::lround(x) << " ";
         }
     };
 
@@ -1803,7 +1804,7 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest_FLOAT_INT) {
     std::vector<float> result_i4_f = pp.generate_descriptor(wl_int4_float, data_written);
     std::vector<float> result_bf8_f = pp.generate_descriptor(wl_bf8_float, data_written);
 
-    std::cout << "\n descriptors\n";
+    utest_log::debug() << "\n descriptors\n";
 
     show_desc(result_i_i, "\nii:");
     show_desc(result_f_i, "\nfi:");
@@ -1811,7 +1812,7 @@ TEST_F(TestPreprocessing_Interface14, DescriptorContentTest_FLOAT_INT) {
     show_desc(result_f_f, "\nff:");
     show_desc(result_i4_f, "\ni4f:");
     show_desc(result_bf8_f, "\nbf8f:");
-    std::cout << std::endl;
+    utest_log::debug() << std::endl;
 
     // EXPECT_EQ(result_i_i, result_i_f);
 
@@ -2198,6 +2199,29 @@ TEST_F(TestPreprocessing_Interface15, TransformOnlyInsertAutopadding) {
     EXPECT_EQ(desc_already_16plus[out_0_idx + 2], 32) << "Output with channels=32 should remain 32";
 }
 
+
+/// UINT32 has no dedicated one-hot slot in itf 15, it is mapped to
+/// the same dtype as INT32 ("not supported" -> FLOAT16), so both must produce an
+/// identical descriptor and neither must throw.
+TEST_F(TestPreprocessing_Interface15, UINT32OutputMapsLikeINT32) {
+    DPUWorkload wl_int32{wl};
+    wl_int32.outputs[0].change_datatype_superficial(DataType::INT32);
+    DPUWorkload wl_uint32{wl};
+    wl_uint32.outputs[0].change_datatype_superficial(DataType::UINT32);
+
+    auto pp = Preprocessing_Interface15<float>();
+    size_t data_written = 0;
+    const std::vector<float> result_int32 = pp.generate_descriptor(wl_int32, data_written);
+    const std::vector<float> result_uint32 = pp.generate_descriptor(wl_uint32, data_written);
+
+    EXPECT_EQ(result_int32, result_uint32);
+
+    for (int i = 0; i < (int)intf_15::DataType::__size; ++i) {
+        EXPECT_EQ(std::lround(result_uint32[out_0_idx + tensor_Dtype_idx + i]),
+                  std::lround(result_int32[out_0_idx + tensor_Dtype_idx + i]))
+                << "out_0 dtype pos " << i;
+    }
+}
 
 // end ITF15
 

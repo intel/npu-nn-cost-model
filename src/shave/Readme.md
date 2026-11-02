@@ -297,3 +297,4 @@ Available Softmax Operations from VPUEM:
 
 Available Spatial Operations from VPUEM:
 * vpuem.mvn (draft) - depends on the layout, the model does not require normalization axes
+

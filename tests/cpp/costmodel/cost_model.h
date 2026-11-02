@@ -16,14 +16,15 @@
 #include <string>
 #include <vector>
 
-#include "vpu/sample_generator/random_task_generator.h"
-#include "vpu/cycles_interface_types.h"
 #include "core/logger.h"
+#include "vpu/cycles_interface_types.h"
 #include "vpu/dpu_types.h"
 #include "vpu/dpu_workload.h"
+#include "vpu/sample_generator/random_task_generator.h"
 #include "vpu/vpu_tensor.h"
 
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -71,7 +72,7 @@ protected:
 
     void SetUp() override {
         Logger::clear2ndlog();
-        // Logger::activate2ndlog();        
+        // Logger::activate2ndlog();
     }
     void TearDown() override {
         Logger::clear2ndlog();
@@ -204,7 +205,7 @@ protected:
         DPUWorkload w1{t_in.w};
 
         std::string t_header{"** Test Case: " + test_case};
-        // std::cout << ">> " << t_header << std::endl;
+        // utest_log::debug() << ">> " << t_header << std::endl;
 
         Logger::clear2ndlog();
 
@@ -303,16 +304,17 @@ protected:
 
         std::string exception_info = "PASSED BY EXCEPTION!";
 
-        std::cout << t_header << (Cycles::isErrorCode(cost_cyc) ? " *** ERROR code: " : " *** Cycles code: ")
-                  << cost_cyc << " " << ((Cycles::isErrorCode(cost_cyc)) ? Cycles::toErrorText(cost_cyc) : "")
-                  << " expected in " << interval << ((-1 != t_in.GT_val) ? std::move(delta_info) : "")
-                  << (((-1 != t_in.GT_val) && (is_excep_allowed) && (t_exp.e_min_cyc != 0 && t_exp.e_max_cyc != 0) &&
-                       ((t_exp.e_min_cyc <= cost_cyc && t_exp.min_cyc > cost_cyc) ||
-                        (t_exp.e_max_cyc >= cost_cyc && t_exp.max_cyc < cost_cyc)))
-                              ? std::move(exception_info)
-                              : "")
-                  << Logger::get2ndlog() << (show_info ? std::move(info) : "\n") << std::endl
-                  << "------------------------------------------------------------------------" << std::endl;
+        utest_log::debug() << t_header << (Cycles::isErrorCode(cost_cyc) ? " *** ERROR code: " : " *** Cycles code: ")
+                          << cost_cyc << " " << ((Cycles::isErrorCode(cost_cyc)) ? Cycles::toErrorText(cost_cyc) : "")
+                          << " expected in " << interval << ((-1 != t_in.GT_val) ? std::move(delta_info) : "")
+                          << (((-1 != t_in.GT_val) && (is_excep_allowed) &&
+                               (t_exp.e_min_cyc != 0 && t_exp.e_max_cyc != 0) &&
+                               ((t_exp.e_min_cyc <= cost_cyc && t_exp.min_cyc > cost_cyc) ||
+                                (t_exp.e_max_cyc >= cost_cyc && t_exp.max_cyc < cost_cyc)))
+                                      ? std::move(exception_info)
+                                      : "")
+                          << Logger::get2ndlog() << (show_info ? std::move(info) : "\n") << std::endl
+                          << "------------------------------------------------------------------------" << std::endl;
     }
 
     void executeTests(const GTestsVector& tests) {

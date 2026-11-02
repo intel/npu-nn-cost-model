@@ -24,7 +24,13 @@ public:
     static inline constexpr int dtype_to_bytes(const DataType dtype) noexcept {
         // intermediate 1+ bytes are not handled, will be when present
         switch (dtype) {
+        case DataType::INT64:
+        case DataType::UINT64:
+        case DataType::FLOAT64:
+            return 8;
+
         case DataType::INT32:
+        case DataType::UINT32:
         case DataType::FLOAT32:
             return 4;
 
@@ -61,7 +67,12 @@ public:
     static inline constexpr int dtype_to_bits(const DataType dtype) noexcept {
         //@todo: handle all possible types from the enum
         switch (dtype) {
+        case DataType::INT64:
+        case DataType::UINT64:
+        case DataType::FLOAT64:
+            return 64;
         case DataType::INT32:
+        case DataType::UINT32:
         case DataType::FLOAT32:
             return 32;
         case DataType::UINT16:

@@ -10,6 +10,9 @@
 #include "core/logger.h"
 #include <gtest/gtest.h>
 
+#include <iostream>
+#include <sstream>
+#include <string>
 #include <thread>
 
 namespace VPUNN_unit_tests {
@@ -22,6 +25,17 @@ protected:
         Logger::clear2ndlog();
         Logger::deactivate2ndlog();
     }
+
+    /// Swaps std::cout's stream buffer for the object's lifetime to capture what's printed.
+    /// Replacement for gtest's CaptureStdout() that redirects the file descriptor instead, which invalidates
+    /// the console handle cached by spdlog and silently kills utest_log output for the rest of the run.
+    struct CoutCapture {
+        std::ostringstream captured; 
+        std::streambuf* previous;
+        CoutCapture() : previous(std::cout.rdbuf(captured.rdbuf())) {}
+        ~CoutCapture() { std::cout.rdbuf(previous); }
+        std::string str() const { return captured.str(); }
+    };
 };
 
 // Demonstrate some basic assertions.
@@ -40,46 +54,58 @@ TEST_F(VPUNNLoggerTest, BasicAssertions) {
 
     // TEST ERROR
 
-    testing::internal::CaptureStdout();
-    Logger::error() << "error";
-    output = testing::internal::GetCapturedStdout();
+    {
+        CoutCapture capture;
+        Logger::error() << "error";
+        output = capture.str();
+    }
 #ifdef VPUNN_ENABLE_LOGGING
     EXPECT_EQ(output, "[VPUNN ERROR]: error\n");
 #else
     EXPECT_EQ(output, "");
 #endif
 
-    testing::internal::CaptureStdout();
-    Logger::fatal() << "fatal";
-    output = testing::internal::GetCapturedStdout();
+    {
+        CoutCapture capture;
+        Logger::fatal() << "fatal";
+        output = capture.str();
+    }
 #ifdef VPUNN_ENABLE_LOGGING
     EXPECT_EQ(output, "[VPUNN FATAL]: fatal\n");
 #else
     EXPECT_EQ(output, "");
 #endif
 
-    testing::internal::CaptureStdout();
-    Logger::warning() << "warning";
-    output = testing::internal::GetCapturedStdout();
+    {
+        CoutCapture capture;
+        Logger::warning() << "warning";
+        output = capture.str();
+    }
 #ifdef VPUNN_ENABLE_LOGGING
     EXPECT_EQ(output, "[VPUNN WARNING]: warning\n");
 #else
     EXPECT_EQ(output, "");
 #endif
 
-    testing::internal::CaptureStdout();
-    Logger::info() << "info";
-    output = testing::internal::GetCapturedStdout();
+    {
+        CoutCapture capture;
+        Logger::info() << "info";
+        output = capture.str();
+    }
     EXPECT_EQ(output, "");
 
-    testing::internal::CaptureStdout();
-    Logger::debug() << "debug";
-    output = testing::internal::GetCapturedStdout();
+    {
+        CoutCapture capture;
+        Logger::debug() << "debug";
+        output = capture.str();
+    }
     EXPECT_EQ(output, "");
 
-    testing::internal::CaptureStdout();
-    Logger::trace() << "trace";
-    output = testing::internal::GetCapturedStdout();
+    {
+        CoutCapture capture;
+        Logger::trace() << "trace";
+        output = capture.str();
+    }
     EXPECT_EQ(output, "");
 }
 

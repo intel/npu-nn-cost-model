@@ -14,6 +14,11 @@
 # Needed variablea are CBLAS_LIB and BLAS_LIBRARIES
 
 if(NOT BLAS_SETUP_DONE)
+    # nvpl (NVIDIA Performance Libraries, ARM/Grace-only per NVIDIA's docs) triggers a noisy
+    # "could not find nvplConfig.cmake" warning during BLAS auto-detection; skip probing for it.
+    # If this is ever built on real Grace/ARM hardware with nvpl installed, CBLAS_LIB=auto will
+    # no longer pick it up automatically and will fall back to openblas/internal instead.
+    set(CMAKE_DISABLE_FIND_PACKAGE_nvpl ON)
     find_package(BLAS)
     # make it default if not set
     if(NOT DEFINED CBLAS_LIB)

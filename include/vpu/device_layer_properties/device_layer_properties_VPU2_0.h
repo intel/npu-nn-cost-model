@@ -17,6 +17,64 @@
 
 namespace VPUNN {
 
+/// @brief Device-specific layer property implementation for VPU 2.0/2.1.
+///
+/// This template class provides the layer property interface for VPU 2.0 and VPU 2.1 devices.
+/// It implements custom logic for execution mode selection and default execution mode, and
+/// inherits tiling strategies from the provided template parameter.
+///
+/// @tparam TilingStrategies The tiling strategies provider.
+template <class TilingStrategiesX>
+class LayerProperties_Device20 : public ILayerProperties, public TilingStrategiesX {
+public:
+    /// @brief Get the valid ExecutionMode for VPU_2_0
+    ///
+    /// @param wl the DPULayer
+    /// @return std::vector<ExecutionMode>
+    const std::vector<ExecutionMode> getValidTilingExecutionMode(const DPULayer& wl) const override {
+        // Float input or output -> ExecutionMode::VECTOR_FP16
+        // FLOAT32/INT32 not expected here: not valid in/out datatypes for VPU_2_0/2_1.
+        if (DTypeCategoryInfo::is_fp16family_dtype(wl.inputs[0].get_dtype()) ||
+            DTypeCategoryInfo::is_fp16family_dtype(wl.outputs[0].get_dtype()))
+            return {ExecutionMode::VECTOR_FP16};
+        // Find the optimal Execution Mode given output tensor layout
+        auto shape = wl.outputs[0].get_shape();
+        const double W = static_cast<double>(shape[Dim::Act::X]);
+        const double H = static_cast<double>(shape[Dim::Act::Y]);
+        // ExecutionMode::MATRIX process tensor using a W=4 H=4 grid, calculate grid cells count for it
+        const double matrixPartsCount = std::ceil(W / 4.0) * std::ceil(H / 4.0);
+        // ExecutionMode::VECTOR process tensor using a W=16 H=1 grid, calculate grid cells count for it
+        const double vectorPartsCount = std::ceil(W / 16.0) * H;
+        // Cells count is in direct ratio with work size, so choose smaller one
+        if (vectorPartsCount <= matrixPartsCount) {
+            return {ExecutionMode::VECTOR};
+        }
+        return {ExecutionMode::MATRIX};
+    }
+
+    /// @brief Returns the default execution mode for a given tensor.
+    ///
+    /// For float tensors, returns VECTOR_FP16. Otherwise, returns MATRIX.
+    ///
+    /// @param tensor the VPUTensor
+    /// @return the default ExecutionMode
+    ExecutionMode getValidDefaultExecutionMode(const VPUTensor& tensor) const override {
+        if (DTypeCategoryInfo::is_any_float_dtype(tensor.get_dtype())) {
+            return ExecutionMode::VECTOR_FP16;
+        } else {
+            return ExecutionMode::MATRIX;
+        }
+    }
+
+    /// @brief Returns the valid tiling strategies for a certain device
+    /// @return A vector of supported VPUTilingStrategy values
+    const std::vector<VPUTilingStrategy> getValidTilingStrategies() const override {
+        return TilingStrategiesX::getValidTilingStrategies();
+    }
+
+    // LayerProperties_Device20() = default;
+};
+
 /// @brief data holder for VPU 2.0/2.1 layer properties
 ///
 /// This class encapsulates device-specific static configuration data for VPU 2.0 and VPU 2.1.
@@ -36,5 +94,6 @@ struct VPU2_0_LayerPropertiesData {
 
 /// Used by LayerPropertiesHolder to get the proper layer properties for a certain device
 using VPU2_0_LayerProperties = LayerProperties_Device20<TilingStrategies<VPU2_0_LayerPropertiesData>>;
+
 }  // namespace VPUNN
 #endif

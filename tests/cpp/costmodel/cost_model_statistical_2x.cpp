@@ -7,6 +7,7 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 #include "cost_model_statistical.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -15,7 +16,6 @@ using namespace VPUNN;
 class CostModelStochasticVPU2x : public CostModelStochastic {
 public:
 protected:
-
     void SetUp() override {
     }
 
@@ -34,8 +34,6 @@ protected:
     constexpr static float VPU20_outOfRange_ratio_threshold_NORM{0.015F};  // 15 in 1000
 
     constexpr static float VPU27_outOfRange_ratio_threshold{0.0F};  // strict
-
-    
 
 private:
 };
@@ -128,7 +126,7 @@ TEST_F(CostModelStochasticVPU2x, DISABLED_Inference_output_in_Interval_Test_2_0_
         EXPECT_LE(undervalues + overvalues, (int)(ratio_accepted_out_of_range * (float)n_workloads))
                 << "\n FAILED count:" << undervalues << " <LOW, " << overvalues << " >HIGH, "
                 << "  problems out of all: " << n_workloads << " for model: " << model_info.first << std::endl;
-        std::cout << " Normal NN Step DONE !\n";
+        utest_log::debug() << " Normal NN Step DONE !\n";
     }
 
     {  // fast
@@ -141,7 +139,7 @@ TEST_F(CostModelStochasticVPU2x, DISABLED_Inference_output_in_Interval_Test_2_0_
         EXPECT_LE(undervalues + overvalues, (int)(ratio_accepted_out_of_range * (float)n_workloads))
                 << "\n FAILED count:" << undervalues << " <LOW, " << overvalues << " >HIGH, "
                 << "  problems out of all: " << n_workloads << " for model: " << model_info.first << std::endl;
-        std::cout << " Fast NN Step DONE !\n";
+        utest_log::debug() << " Fast NN Step DONE !\n";
     }
 }
 
@@ -174,7 +172,7 @@ TEST_F(CostModelStochasticVPU2x, Inference_output_in_Interval_Test_2_7_all_stoch
         EXPECT_LE(undervalues + overvalues, max_deviations_allowed)
                 << "\n FAILED count:" << undervalues << " <LOW, " << overvalues << " >HIGH, "
                 << "  problems out of all: " << n_workloads << " for model: " << model_info.first << std::endl;
-        std::cout << " Normal NN Step DONE !\n";
+        utest_log::debug() << " Normal NN Step DONE !\n";
     }
 
     //{  // fast
@@ -186,7 +184,7 @@ TEST_F(CostModelStochasticVPU2x, Inference_output_in_Interval_Test_2_7_all_stoch
     //    EXPECT_LE(undervalues + overvalues, max_deviations_allowed)
     //            << "\n FAILED count:" << undervalues << " <LOW, " << overvalues << " >HIGH, "
     //            << "  problems out of all: " << n_workloads << " for model: " << model_info.first << std::endl;
-    //    std::cout << " Fast NN Step DONE !\n";
+    //    utest_log::debug() << " Fast NN Step DONE !\n";
     //}
 }
 
@@ -268,9 +266,10 @@ TEST_F(CostModelStochasticVPU2x, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) 
 
     auto comp_lambda = [&](const std::string nn1, const std::string nn2, const int silence,
                            ResultMap& resultAccumulator) {
-        std::cout << "\n ----------------------------------------------------------------------------------------";
-        std::cout << "\n COMPARING VPUNNS:"
-                  << "\n NN1:  " << nn1 << "\n NN2:  " << nn2 << "\n";
+        utest_log::debug()
+                << "\n ----------------------------------------------------------------------------------------";
+        utest_log::debug() << "\n COMPARING VPUNNS:"
+                          << "\n NN1:  " << nn1 << "\n NN2:  " << nn2 << "\n";
 
         const auto expected_failures{std::lround(std::ceil(expected_deviation_ratio * n_workloads))};  // how
         const std::string key = std::string(nn1 + nn2);
@@ -288,36 +287,36 @@ TEST_F(CostModelStochasticVPU2x, DISABLED_Comparative_MATRIX_VPUNNs_stochastic) 
     };
 
     auto results_table_show_lambda = [&](auto& nn_list, ResultMap& results) {
-        std::cout << "\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        utest_log::debug() << "\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
         const auto default_precision{std::cout.precision()};
-        std::cout << "\n ERRORS matrix: how many samples (out of: " << n_workloads
-                  << " ) have big delta (larger than: " << (int)(max_ratio_delta * 100) << "% )";
+        utest_log::debug() << "\n ERRORS matrix: how many samples (out of: " << n_workloads
+                          << " ) have big delta (larger than: " << (int)(max_ratio_delta * 100) << "% )";
         for (const auto& nn1 : nn_list) {
-            std::cout << "\n " << std::setw(100) << nn1 << "\t";
+            utest_log::debug() << "\n " << std::setw(100) << nn1 << "\t";
             for (const auto& nn2 : nn_list) {
                 const std::string key = std::string(nn1 + nn2);
                 auto& val = results[key];
                 if (val.errors_cnt >= 0)
-                    std::cout << "\t " << std::setw(5) << val.errors_cnt;
+                    utest_log::debug() << "\t " << std::setw(5) << val.errors_cnt;
                 else
-                    std::cout << "\t " << std::setw(5) << "-";
+                    utest_log::debug() << "\t " << std::setw(5) << "-";
             }
         }
 
-        std::cout << "\n CORRELATION matrix";
+        utest_log::debug() << "\n CORRELATION matrix";
         for (const auto& nn1 : nn_list) {
-            std::cout << "\n " << std::setw(100) << nn1 << "\t";
+            utest_log::debug() << "\n " << std::setw(100) << nn1 << "\t";
             for (const auto& nn2 : nn_list) {
                 const std::string key = std::string(nn1 + nn2);
                 auto& val = results[key];
                 if (val.correlation >= -5.0)
-                    std::cout << "\t " << std::setw(5) << std::setprecision(3) << val.correlation;
+                    utest_log::debug() << "\t " << std::setw(5) << std::setprecision(3) << val.correlation;
                 else
-                    std::cout << "\t " << std::setw(5) << "-";
+                    utest_log::debug() << "\t " << std::setw(5) << "-";
             }
         }
-        std::cout << std::setprecision(default_precision)
-                  << "\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        utest_log::debug() << std::setprecision(default_precision)
+                          << "\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
         /* coverity[end_of_path] */
     };
 

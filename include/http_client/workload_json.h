@@ -7,8 +7,8 @@
 // Please refer to the "third-party-programs.txt" or other similarly-named text file included with the
 // Software Package for additional details.
 
-#ifndef HTTP_WORKLOAD_JSON_H_
-#define HTTP_WORKLOAD_JSON_H_
+#ifndef VPUNN_HTTP_WORKLOAD_JSON_H_
+#define VPUNN_HTTP_WORKLOAD_JSON_H_
 
 #include <nlohmann/json.hpp>
 #include "vpu/dma_types.h"
@@ -71,4 +71,4 @@ nlohmann::json toJson<DMANNWorkload_NPU40_50>(const DMANNWorkload_NPU40_50& wl);
 template <>
 nlohmann::json toJson<SHAVEWorkload>(const SHAVEWorkload& wl);
 }  // namespace VPUNN
-#endif  // HTTP_WORKLOAD_JSON_H_
+#endif  // VPUNN_HTTP_WORKLOAD_JSON_H_

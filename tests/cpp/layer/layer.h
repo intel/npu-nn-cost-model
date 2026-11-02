@@ -16,6 +16,7 @@
 #include <sstream>  // for error formating
 #include "common/common_helpers.h"
 
+#include "logger/logger.h"
 #include "vpu/shave/layers.h"
 
 namespace VPUNN_unit_tests {
@@ -40,7 +41,8 @@ inline std::string toStringLayerSplitInfo(const LayerSplitInfo& d) {
         {
             int j = 1;
             for (const auto& s : l.all_intra_tile_splits) {
-                CyclesInterfaceType sum{std::accumulate(s.cycles.cbegin(), s.cycles.cend(), Cycles::NO_ERROR, Cycles::cost_adder)};
+                CyclesInterfaceType sum{
+                        std::accumulate(s.cycles.cbegin(), s.cycles.cend(), Cycles::NO_ERROR, Cycles::cost_adder)};
                 stream << "# " << j << ", Cost: = " << sum << " [ " << Cycles::toErrorText(sum) << "] "
                        << "  Workloads number: " << s.workloads.size() << "\n";
                 j++;
@@ -113,13 +115,13 @@ protected:
     VPULayerStrategy makeDefaultLayerStrategy(bool input_fetching = false, bool output_spilling = false,
                                               bool prefetching = true) {
         return VPULayerStrategy{
-                1U,                         ///< nDPUs
-                1U,                         ///< nSHVs
-                1U,                         ///< nTiles
-                VPUTilingStrategy::NONE,    ///< tiling_strategy
-                input_fetching,             ///< input_fetching
-                output_spilling,            ///< output_spilling
-                prefetching                 ///< prefetching
+                1U,                       ///< nDPUs
+                1U,                       ///< nSHVs
+                1U,                       ///< nTiles
+                VPUTilingStrategy::NONE,  ///< tiling_strategy
+                input_fetching,           ///< input_fetching
+                output_spilling,          ///< output_spilling
+                prefetching               ///< prefetching
         };
     }
 
@@ -128,31 +130,31 @@ protected:
                                                           bool input_fetching = false, bool output_spilling = false,
                                                           bool prefetching = true) {
         return VPULayersPreSplitStrategy{
-                1U,                 ///< nDPUs
-                tiling,             ///< tiling_strategy
-                input_fetching,     ///< input_fetching
-                output_spilling,    ///< output_spilling
-                prefetching         ///< prefetching
+                1U,               ///< nDPUs
+                tiling,           ///< tiling_strategy
+                input_fetching,   ///< input_fetching
+                output_spilling,  ///< output_spilling
+                prefetching       ///< prefetching
         };
     }
 
     /// Helper: create a valid DPU layer for batched tests
     DPULayer makeBatchTestLayer(VPUDevice dev, unsigned int width = 16, unsigned int height = 16,
-                                    unsigned int channels = 64) {
+                                unsigned int channels = 64) {
         VPUNN::DPUWorkload wl{
                 dev,
                 Operation::CONVOLUTION,
-                {VPUNN::VPUTensor(width, height, channels, 1, VPUNN::DataType::UINT8)},   // input
-                {VPUNN::VPUTensor(width, height, channels, 1, VPUNN::DataType::UINT8)},   // output
-                {1, 1},                                                                   // kernels
-                {1, 1},                                                                   // strides
-                {0, 0, 0, 0},                                                             // padding
-                ExecutionMode::CUBOID_16x16,                                              // execution mode
-                ActivationFunction::NONE,                                                 // activation
-                0.0F,                                                                     // act_sparsity
-                0.0F,                                                                     // weight_sparsity
-                {Swizzling::KEY_0, Swizzling::KEY_0},                                     // input_swizzling
-                {Swizzling::KEY_0},                                                       // output_swizzling
+                {VPUNN::VPUTensor(width, height, channels, 1, VPUNN::DataType::UINT8)},  // input
+                {VPUNN::VPUTensor(width, height, channels, 1, VPUNN::DataType::UINT8)},  // output
+                {1, 1},                                                                  // kernels
+                {1, 1},                                                                  // strides
+                {0, 0, 0, 0},                                                            // padding
+                ExecutionMode::CUBOID_16x16,                                             // execution mode
+                ActivationFunction::NONE,                                                // activation
+                0.0F,                                                                    // act_sparsity
+                0.0F,                                                                    // weight_sparsity
+                {Swizzling::KEY_0, Swizzling::KEY_0},                                    // input_swizzling
+                {Swizzling::KEY_0},                                                      // output_swizzling
         };
         return DPULayer(wl);
     }
@@ -162,7 +164,7 @@ protected:
         VPULayerStrategy strategy{t_in.strategy};
 
         std::string t_header{"** Test Case: " + test_case + "\n"};
-        std::cout << ">> " << t_header << std::endl;
+        utest_log::debug() << ">> " << t_header << std::endl;
 
         Logger::clear2ndlog();
         unsigned cost_cyc{};
@@ -171,8 +173,7 @@ protected:
         std::replace(test_info_str.begin(), test_info_str.end(), ',', '_');
         test_info_str.erase(std::remove(test_info_str.begin(), test_info_str.end(), '\n'), test_info_str.end());
         const std::string info_layer{current_test_fixture_name() + "::" + current_test_name() + "::" + test_info_str +
-                         "::" + std::to_string(t_exp.min_cyc) + "<->" +
-                         std::to_string(t_exp.max_cyc)};
+                                     "::" + std::to_string(t_exp.min_cyc) + "<->" + std::to_string(t_exp.max_cyc)};
         l1.set_layer_info(info_layer);
 
         LayerSplitInfo detailed_split;
@@ -217,9 +218,9 @@ protected:
             }
         }
 
-        std::cout << t_header << " *** ERROR/Cycles code: " << cost_cyc << " : " << Cycles::toErrorText(cost_cyc)
-                  << std::endl
-                  << "------------------------------------------------------------------------" << std::endl;
+        utest_log::debug() << t_header << " *** ERROR/Cycles code: " << cost_cyc << " : "
+                          << Cycles::toErrorText(cost_cyc) << std::endl
+                          << "------------------------------------------------------------------------" << std::endl;
     }
 
     struct TestCase {
@@ -254,7 +255,8 @@ protected:
         );
     }
 
-    VPUNN::SHVSigmoid generate_helper_sw_layer(const VPUNN::VPUDevice device, const unsigned int dim, const unsigned int channels) {
+    VPUNN::SHVSigmoid generate_helper_sw_layer(const VPUNN::VPUDevice device, const unsigned int dim,
+                                               const unsigned int channels) {
         return VPUNN::SHVSigmoid(device,                                                             // VPU device
                                  VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16),  // Input tensor
                                  VPUNN::VPUTensor(dim, dim, channels, 1, VPUNN::DataType::FLOAT16)   // Output tensor

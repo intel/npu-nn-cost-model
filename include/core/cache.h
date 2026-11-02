@@ -118,8 +118,8 @@ public:
  * @tparam K is the Key type
  * @tparam V is the Value type
  * 
- * Uses std::unordered_map for O(1) average lookup when specialized (e.g., DPUWorkload, std::vector<float>)
- * Falls back to std::map for other types (O(log n) lookup)
+ * Uses std::unordered_map for O(1) average lookup via a MapTypeSelector<K> specialization (e.g., DPUWorkload, std::vector<float>)
+ * K without such a specialization fails to compile (no fallback map type is provided)
  */
 template <typename K, typename V>
 class LRUCache : public FixedCacheAddON<K, V> {
@@ -127,9 +127,7 @@ private:
     typedef std::list<std::pair<K, V>> List;
     typedef typename List::const_iterator List_Iter_cnst;
 
-    // Select map type based on key type
-    // Uses unordered_map with custom hasher when MapTypeSelector is specialized (O(1) lookup)
-    // Falls back to std::map for other types (O(log n) lookup)
+    // Map type comes from the required MapTypeSelector<K> specialization; unspecialized K fails to compile here
     typedef typename MapTypeSelector<K>::template type<List_Iter_cnst> Map;
     typedef typename Map::const_iterator Map_Iter_cnst;
 

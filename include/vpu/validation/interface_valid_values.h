@@ -128,7 +128,8 @@ protected:
                        const Values<Operation>& valid_operations_,                             //
                        const int& alignement_size_bytes_,        // page size, NPU specific
                        const int& out_innermost_dim_alignment_,  // bytes
-                       const bool& legacy_samples_alignment_weights_)
+                       const bool& legacy_samples_alignment_weights_,
+                       const Values<MPEEngine>& valid_mpe_engines_)
             : operations_dynamic_behavior{op_dynamic_constraints},                          //
               valid_execution_order_map{valid_execution_order_},                            //
               valid_swizzlings{valid_swizzlings_},                                          //
@@ -143,7 +144,8 @@ protected:
               valid_operations{valid_operations_},
               alignement_size_bytes{alignement_size_bytes_},
               out_innermost_dim_alignment_B{out_innermost_dim_alignment_},
-              legacy_samples_alignment_weights{legacy_samples_alignment_weights_} {
+              legacy_samples_alignment_weights{legacy_samples_alignment_weights_},
+              valid_mpe_engines{valid_mpe_engines_} {
     }
 
 protected:
@@ -322,6 +324,11 @@ public:
         return valid_operations;
     };
 
+    /// @brief valid MPEEngine values for this device
+    const Values<MPEEngine>& get_valid_engines() const {
+        return valid_mpe_engines;
+    }
+
     virtual const Values<ExecutionMode>& get_valid_execution_order(const DPUOperation& dpu) const {
         const auto& ch_map{valid_execution_order_map.execution_modes};
         return ch_map.at(dpu.operation);
@@ -400,6 +407,8 @@ protected:
                                               ///< output_0 tensor's memory
     const bool legacy_samples_alignment_weights;  ///< legacy alignment for weights in samples (not bytes). applies to
                                                   ///< weigths_alignment_B interpretation
+
+    const Values<MPEEngine> valid_mpe_engines;  ///< valid MPEEngine values for this device
 
     // const fixed here
 private:
@@ -499,6 +508,10 @@ public:
 
     bool is_valid_operation(const Operation op) const {
         return contains_value(valid_operations, op);
+    }
+
+    bool is_valid_engine(const MPEEngine engine) const {
+        return contains_value(valid_mpe_engines, engine);
     }
 };
 

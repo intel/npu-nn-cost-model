@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 // #include "vpu/compatibility/types01.h"
 // #include "vpu/cycles_interface_types.h"
 // #include "vpu/sample_generator/random_task_generator.h"
@@ -78,9 +79,10 @@ protected:
         SanityReport sane;
 
         for (auto& t : tests) {
-            std::cout << "Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.wl.device))
-                      << " Operation:" << Operation_ToText.at(static_cast<int>(t.t_in.wl.op))
-                      << " Exec order:" << ExecutionMode_ToText.at(static_cast<int>(t.t_in.wl.execution_order)) << "\n";
+            utest_log::debug() << "Device:" << VPUDevice_ToText.at(static_cast<int>(t.t_in.wl.device))
+                              << " Operation:" << Operation_ToText.at(static_cast<int>(t.t_in.wl.op))
+                              << " Exec order:" << ExecutionMode_ToText.at(static_cast<int>(t.t_in.wl.execution_order))
+                              << "\n";
 
             dut.check_data_consistency(t.t_in.wl, sane);
 

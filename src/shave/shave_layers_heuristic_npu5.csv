@@ -160,4 +160,5 @@ PopulateWeightTable,,,0,0.7,0.8,0.0,1000,1
 DynamicDataMask,,,0,0.7,0.8,0.0,1000,1
 SDPA,,,0,0.7,0.8,0.0,1000,1
 FlashSDPA,,,0,0.7,0.8,0.0,1000,1
-SDPAExtended,,,0,0.7,0.8,0.0,1000,1
+GroupQuantCorrection,1.92,,0,1.0,1.0,0.0,1907,0
+Attention,,,0,0.7,0.8,0.0,1000,1

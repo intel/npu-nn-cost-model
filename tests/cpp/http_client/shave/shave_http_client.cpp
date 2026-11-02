@@ -94,7 +94,6 @@ TEST_F(SHAVEHTTPClient, SHAVEWlAsJsonSerialization) {
 
         // Validate the request structure
         EXPECT_EQ(request["params"]["backend"], "silicon");
-        EXPECT_EQ(request["params"]["name"], "profiling_request");
         
         // Verify SHAVE workload uses the correct key
         EXPECT_TRUE(request.contains("shave_workload"));

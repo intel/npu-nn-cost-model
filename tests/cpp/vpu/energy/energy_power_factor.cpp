@@ -7,6 +7,7 @@
 // Please refer to the "third-party-programs.txt" or other similarly-named text file included with the
 // Software Package for additional details.
 #include "energy_power_factor.h"
+#include "logger/logger.h"
 #include "vpu/energy/power.h"
 
 #include <map>
@@ -122,8 +123,8 @@ TEST_F(TestVPUPowerFactorLUTStructure, CheckUniqueDeviceUsedForPowerFactorLUT) {
 
         if (count == 0) {
             // Device is absent: acceptable (e.g. embargo not enabled), but warn
-            std::cout << "NOTE: Device " << name << " has no power LUT entry (embargo macro may be disabled)"
-                      << std::endl;
+            utest_log::warn() << "NOTE: Device " << name << " has no power LUT entry (embargo macro may be disabled)"
+                              << std::endl;
         } else {
             // Device must be covered by exactly one LUT entry
             EXPECT_EQ(count, 1) << "Device " << name << " should appear in exactly one dev_lut entry, but found in "

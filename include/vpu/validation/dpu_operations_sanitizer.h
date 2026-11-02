@@ -1,4 +1,4 @@
-// Copyright © 2024 Intel Corporation
+// Copyright © 2024-2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -52,22 +52,26 @@ public:
 
         const auto& config = get_config(wl.device);
 
-        // Assign a default dCIM execution mode only when the engine is DCIM and
-        // the caller has not already provided a dCIM-family execution mode.
-        // Preserving an explicitly set dCIM mode (e.g. dCIM_64x128) is intentional:
-        // the two modes have different hardware behaviour and the caller must be
-        // able to select between them.
-        if (wl.mpe_engine == MPEEngine::DCIM) {
-            if (!is_dcim_execution_mode(wl.execution_order)) {
-                wl.execution_order = ExecutionMode::dCIM_32x128;  // safe default
-            }
-        }
-
-        // check ahead
+        // check ahead, todo: refactoring to consider MPEEngine
         if (!config.is_valid_operation(wl.op)) {
             result.mark_unknown_operation();
             return;
         }
+        // explicitly reject MPEEngine values not supported on this device
+        if (!config.is_valid_engine(wl.mpe_engine)) {
+            result.mark_invalid_DPU_workload();
+
+            const auto engine_it = MPEEngine_ToText.find(static_cast<int>(wl.mpe_engine));
+            const auto device_it = VPUDevice_ToText.find(static_cast<int>(wl.device));
+            const std::string engine_text =
+                    (engine_it != MPEEngine_ToText.end()) ? engine_it->second : "UNKNOWN_MPE_ENGINE";
+            const std::string device_text =
+                    (device_it != VPUDevice_ToText.end()) ? device_it->second : "UNKNOWN_DEVICE";
+
+            result.info = "MPEEngine::" + engine_text + " is not supported on this device: " + device_text;
+            return;
+        }
+        // check ahead done
 
         // apply data restriction for input and output tensor types. device/config dependent
         {
@@ -142,7 +146,9 @@ public:
         }
     }
 
-    void check_data_consistency(DPUWorkload& wl, SanityReport& result) const {
+    /// This is like check_and_sanitize but without any sanitization and memory size check.
+    /// to be refactored
+    void check_data_consistency(const DPUWorkload& wl, SanityReport& result) const {
         result.resetOK();  // all OK
         if (!is_supported(wl.device)) {
             result.mark_unknown_device();
@@ -150,11 +156,26 @@ public:
         }
         const auto& config = get_config(wl.device);  // previous if prevents throwing
 
-        // check ahead
+        // check ahead, todo: refactoring to consider MPEEngine
         if (!config.is_valid_operation(wl.op)) {
             result.mark_unknown_operation();
             return;
         }
+        // explicitly reject MPEEngine values not supported on this device
+        if (!config.is_valid_engine(wl.mpe_engine)) {
+            result.mark_invalid_DPU_workload();
+
+            const auto engine_it = MPEEngine_ToText.find(static_cast<int>(wl.mpe_engine));
+            const auto device_it = VPUDevice_ToText.find(static_cast<int>(wl.device));
+            const std::string engine_text =
+                    (engine_it != MPEEngine_ToText.end()) ? engine_it->second : "UNKNOWN_MPE_ENGINE";
+            const std::string device_text =
+                    (device_it != VPUDevice_ToText.end()) ? device_it->second : "UNKNOWN_DEVICE";
+
+            result.info = "MPEEngine::" + engine_text + " is not supported on this device: " + device_text;
+            return;
+        }
+        // check ahead done
 
         try {
             const DPUOperation w(wl, config);                                  // workload internal representation

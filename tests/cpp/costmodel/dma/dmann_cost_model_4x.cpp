@@ -8,6 +8,7 @@
 // Software Package for additional details.
 // #include "vpu_cost_model.h"
 #include "dmann_cost_model.h"
+#include "logger/logger.h"
 
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
@@ -16,9 +17,9 @@ using namespace VPUNN;
 class TestDMANNCostModelNPU4x : public TestDMANNCostModel {
 public:
 protected:
-	void SetUp() override {
+    void SetUp() override {
         TestDMANNCostModel::SetUp();
-	}
+    }
 };
 
 class TestDMA_TH_CostModelNPU4x : public TestDMA_TH_CostModel {
@@ -49,7 +50,7 @@ TEST_F(TestDMANNCostModelNPU4x, SmokeTestDMA_40) {
         DMANNWorkload_NPU40 wl{wl_glob_40};
         auto dma_cycles = dma_model.computeCycles(wl);
 
-        // std::cout << wl << Cycles::toErrorText(dma_cycles);
+        // utest_log::debug() << wl << Cycles::toErrorText(dma_cycles);
         //  value chosen by hand to detect problems without changing the DMANN
         EXPECT_EQ(dma_cycles, 455 /*@1700MHZ*/) << wl << Cycles::toErrorText(dma_cycles);
     }
@@ -65,7 +66,7 @@ TEST_F(TestDMANNCostModelNPU4x, SmokeTestDMA_40) {
         };
         auto dma_cycles = dma_model.computeCycles(wl);
 
-        // std::cout << wl << Cycles::toErrorText(dma_cycles);
+        // utest_log::debug() << wl << Cycles::toErrorText(dma_cycles);
         //  value chosen by hand to detect problems without changing the DMANN
         EXPECT_EQ(dma_cycles, 2041 /*@1700MHz*/) << wl << Cycles::toErrorText(dma_cycles);
     }
@@ -363,16 +364,16 @@ TEST_F(TestDMANNCostModelNPU4x, SweepGT_DMATime_40) {
             }
         }
 
-        std::cout << "\nBYTES:, " << dmaNN_.getAccessedBytes() << " , " << (int)dmaNN_.transfer_direction << ":"
-                  << MemoryDirection_ToText.at((int)dmaNN_.transfer_direction) << " ,gt:  " << exp
-                  << " , inferred: " << cycles_ << " , delta: " << delta << " ,rel err:  " << rel_err << " ,  "
-                  << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
+        utest_log::debug() << "\nBYTES:, " << dmaNN_.getAccessedBytes() << " , " << (int)dmaNN_.transfer_direction << ":"
+                          << MemoryDirection_ToText.at((int)dmaNN_.transfer_direction) << " ,gt:  " << exp
+                          << " , inferred: " << cycles_ << " , delta: " << delta << " ,rel err:  " << rel_err << " ,  "
+                          << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
     };
 
     EXPECT_TRUE(!force_fail);
 
-    std::cout << "\nMax Relative error allowed: " << rel_err_max;
-    std::cout << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
+    utest_log::debug() << "\nMax Relative error allowed: " << rel_err_max;
+    utest_log::debug() << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
 
     for (const auto& t : tc) {
         runTest(t);
@@ -589,7 +590,7 @@ TEST_F(TestDMANNCostModelNPU4x, SweepGT_DMATime_40_Theoretical) {
     constexpr bool ignore_relative_errors_failures{false};  // no t allowing this failures
 
     auto runTest = [=, &old_model](const TestCase& tc) {
-        const auto & dmaNN_{tc.t_in};
+        const auto& dmaNN_{tc.t_in};
 
         std::string info{"NA"};
         // const auto cycles_ = model_4_0.computeCycles(dmaNN_, info);
@@ -628,15 +629,16 @@ TEST_F(TestDMANNCostModelNPU4x, SweepGT_DMATime_40_Theoretical) {
             }
         }
 
-        std::cout << "\nBYTES:, " << bytesAccesed << " , " << (int)txDir << ":" << MemoryDirection_ToText.at((int)txDir)
-                  << " ,gt:  " << exp << " , inferred: " << cycles_ << " , delta: " << delta
-                  << " ,rel err:  " << rel_err << " ,  " << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
+        utest_log::debug() << "\nBYTES:, " << bytesAccesed << " , " << (int)txDir << ":"
+                          << MemoryDirection_ToText.at((int)txDir) << " ,gt:  " << exp << " , inferred: " << cycles_
+                          << " , delta: " << delta << " ,rel err:  " << rel_err << " ,  "
+                          << (rel_err > rel_err_max ? "     TOO BIG%!" : "");
     };
 
     EXPECT_TRUE(!force_fail);
 
-    std::cout << "\nMax Relative error allowed: " << rel_err_max;
-    std::cout << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
+    utest_log::debug() << "\nMax Relative error allowed: " << rel_err_max;
+    utest_log::debug() << "\nBYTES,   , Direction    ,  GT  , inferred  , delta  ,  err \n";
 
     for (const auto& t : tc) {
         if constexpr (!PerformanceMode::forceLegacy_G4) {

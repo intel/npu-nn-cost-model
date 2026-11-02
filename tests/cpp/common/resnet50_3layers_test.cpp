@@ -10,10 +10,11 @@
 #include "vpu_dma_cost_model.h"
 
 #include <gtest/gtest.h>
-#include <sstream>  // for error formating
 #include <optional>
+#include <sstream>  // for error formating
 #include <variant>
 
+#include "logger/logger.h"
 #include "common_helpers.h"
 #include "costmodel/cost_model.h"
 
@@ -27,7 +28,8 @@ public:
         std::string info;
         std::array<unsigned int, 3> tolerance;
 
-        TestData(const DPUWorkload& wl_, const std::string& info_, const std::array<unsigned int, 3> tolerance_ = {0,0,0})
+        TestData(const DPUWorkload& wl_, const std::string& info_,
+                 const std::array<unsigned int, 3> tolerance_ = {0, 0, 0})
                 : wl(wl_), info(info_), tolerance(tolerance_) {
         }
     };
@@ -218,7 +220,7 @@ protected:
             {Swizzling::KEY_0},                                          // output_swizzling
             1,                                                           // output_write_tiles
             {0, 0, 0, 0},                                                // offsets
-            ISIStrategy::CLUSTERING,                                   // isi_strategy
+            ISIStrategy::CLUSTERING,                                     // isi_strategy
             false,                                                       // weight_sparsity_enabled
     };
     inline static const DPUWorkload s5_elmws_c1{s5_elmws_c0};
@@ -263,46 +265,46 @@ TEST_F(TestResnet50_3Layers, DPUInfo_DPU_ResNet50F3_EISXW_91782) {
     // EXPECT_EQ(1, 0);  // force fail, uncomment to have the log in tests
 
     {
-        std::cout << "\n----------------------CLUSTER "
-                     "0---------------------------------------------------------------------------  ";
+        utest_log::debug() << "\n----------------------CLUSTER "
+                             "0---------------------------------------------------------------------------  ";
         for (const auto& wl : named_cluster_0) {
             auto pInfo = test_model.DPUInfo(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
-            std::cout << "\n---------------------------------------------------------  ";
-            std::cout << "\n " << wl.first;
-            std::cout << "\n " << wl.second;
-            std::cout << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
-                      << WLHelp::toDictString(wl.second);  // dictionary style output for wl
-            std::cout << "\n " << pInfo;
+            utest_log::debug() << "\n---------------------------------------------------------  ";
+            utest_log::debug() << "\n " << wl.first;
+            utest_log::debug() << "\n " << wl.second;
+            utest_log::debug() << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
+                              << WLHelp::toDictString(wl.second);  // dictionary style output for wl
+            utest_log::debug() << "\n " << pInfo;
         }
 
-        std::cout << "\n----------------------CLUSTER "
-                     "1-----------------------------------------------------------------------------  ";
+        utest_log::debug() << "\n----------------------CLUSTER "
+                             "1-----------------------------------------------------------------------------  ";
         for (const auto& wl : named_cluster_1) {
             auto pInfo = test_model.DPUInfo(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
-            std::cout << "\n---------------------------------------------------------  ";
-            std::cout << "\n " << wl.first;
-            std::cout << "\n " << wl.second;
-            std::cout << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
-                      << WLHelp::toDictString(wl.second);  // dictionary style output for wl
-            std::cout << "\n " << pInfo;
+            utest_log::debug() << "\n---------------------------------------------------------  ";
+            utest_log::debug() << "\n " << wl.first;
+            utest_log::debug() << "\n " << wl.second;
+            utest_log::debug() << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
+                              << WLHelp::toDictString(wl.second);  // dictionary style output for wl
+            utest_log::debug() << "\n " << pInfo;
         }
     }
     {
-        std::cout << "\nName, \t Cycles,\t Energy,   ";
-        std::cout << "\n----------------------CLUSTER 0-----------------------------------  ";
+        utest_log::debug() << "\nName, \t Cycles,\t Energy,   ";
+        utest_log::debug() << "\n----------------------CLUSTER 0-----------------------------------  ";
         for (const auto& wl : named_cluster_0) {
             auto pInfo = test_model.DPUInfo(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
-            std::cout << "\n " << wl.first << ": \t\t\t\t\t " << pInfo.DPUCycles << " \t " << pInfo.energy;
+            utest_log::debug() << "\n " << wl.first << ": \t\t\t\t\t " << pInfo.DPUCycles << " \t " << pInfo.energy;
         }
 
-        std::cout << "\n----------------------CLUSTER 1-----------------------------------  ";
+        utest_log::debug() << "\n----------------------CLUSTER 1-----------------------------------  ";
         for (const auto& wl : named_cluster_1) {
             auto pInfo = test_model.DPUInfo(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(pInfo.DPUCycles)) << pInfo;
-            std::cout << "\n " << wl.first << ": \t\t\t\t\t " << pInfo.DPUCycles << " \t " << pInfo.energy;
+            utest_log::debug() << "\n " << wl.first << ": \t\t\t\t\t " << pInfo.DPUCycles << " \t " << pInfo.energy;
         }
     }
 }
@@ -331,8 +333,8 @@ TEST_F(TestResnet50_3Layers, DMA_ResNet50F3_EISXW_91782) {
     // EXPECT_EQ(1, 0);  // force fail
 
     {
-        std::cout << "\n----------------------DMA list "
-                     "0---------------------------------------------------------------------------  ";
+        utest_log::debug() << "\n----------------------DMA list "
+                             "0---------------------------------------------------------------------------  ";
         for (const auto& wl : named_DMA) {
             CyclesInterfaceType cycles = test_model.DMA(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
@@ -341,20 +343,20 @@ TEST_F(TestResnet50_3Layers, DMA_ResNet50F3_EISXW_91782) {
             CyclesInterfaceType cycles_dmann = dma_model_2_7.computeCycles(dmawl);
             EXPECT_FALSE(Cycles::isErrorCode(cycles_dmann)) << cycles_dmann;
 
-            std::cout << "\n---------------------------------------------------------  ";
-            std::cout << "\n Cycles OLD: " << cycles << ", Cycles dmann: " << cycles_dmann;  // cycles
-            std::cout << "\n " << wl.first;                                                  // name
-            std::cout << "\n " << wl.second;                                                 // DMA
-            std::cout << "\n " << dmawl;                                                     // DMA wl
-            // std::cout << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
+            utest_log::debug() << "\n---------------------------------------------------------  ";
+            utest_log::debug() << "\n Cycles OLD: " << cycles << ", Cycles dmann: " << cycles_dmann;  // cycles
+            utest_log::debug() << "\n " << wl.first;                                                  // name
+            utest_log::debug() << "\n " << wl.second;                                                 // DMA
+            utest_log::debug() << "\n " << dmawl;                                                     // DMA wl
+            // utest_log::debug() << "\n ***** ALT FORMAT Tile LAYER: ******** \n"
             //           << WLHelp::toDictString(wl.second);  // dictionary style output for wl
-            // std::cout << "\n " << pInfo;
+            // utest_log::debug() << "\n " << pInfo;
         }
     }
     {
-        std::cout << "\n----------------------DMA list SHORT "
-                     "---------------------------------------------------------------------------  ";
-        std::cout << "\n name \t\t cycles OLD  \t cycles DMANN 1 plane ";
+        utest_log::debug() << "\n----------------------DMA list SHORT "
+                             "---------------------------------------------------------------------------  ";
+        utest_log::debug() << "\n name \t\t cycles OLD  \t cycles DMANN 1 plane ";
         for (const auto& wl : named_DMA) {
             CyclesInterfaceType cycles = test_model.DMA(wl.second);
             EXPECT_FALSE(Cycles::isErrorCode(cycles)) << cycles;
@@ -363,7 +365,7 @@ TEST_F(TestResnet50_3Layers, DMA_ResNet50F3_EISXW_91782) {
             CyclesInterfaceType cycles_dmann = dma_model_2_7.computeCycles(dmawl);
             EXPECT_FALSE(Cycles::isErrorCode(cycles_dmann)) << cycles_dmann;
 
-            std::cout << "\n " << wl.first << "\t" << cycles << "\t" << cycles_dmann;  // name plus values
+            utest_log::debug() << "\n " << wl.first << "\t" << cycles << "\t" << cycles_dmann;  // name plus values
         }
     }
 }
@@ -404,7 +406,7 @@ TEST_F(TestResnet50_3Layers, Energy_ResNet50F3_EISXW_101805) {
                                              float energy_min_necessary_abs_diff, float energy_tol_percent) {
         int i = 1;
         for (auto& test : tests_cluster) {
-            std::cout << "\n------ Test case " << i << " " << test.t_in.name_wl << "-------------\n";
+            utest_log::debug() << "\n------ Test case " << i << " " << test.t_in.name_wl << "-------------\n";
             auto pInfo = test_model.DPUInfo(test.t_in.wl);
             EXPECT_TRUE(CompareValues::isEqual(pInfo.DPUCycles, test.t_exp.cyc, cyc_min_necessary_abs_diff,
                                                test.c_tol_percent))
@@ -413,8 +415,8 @@ TEST_F(TestResnet50_3Layers, Energy_ResNet50F3_EISXW_101805) {
                                                energy_tol_percent))
                     << "Inferred: " << pInfo.energy << ", Expected : " << test.t_exp.energy;
 
-            std::cout << "\n T: " << test.t_in.name_wl << ", NN Cycles: " << pInfo.DPUCycles
-                      << ", Energy: " << pInfo.energy << ", NN expected: " << test.t_exp.cyc;
+            utest_log::debug() << "\n T: " << test.t_in.name_wl << ", NN Cycles: " << pInfo.DPUCycles
+                              << ", Energy: " << pInfo.energy << ", NN expected: " << test.t_exp.cyc;
             i++;
         }
     };
@@ -444,22 +446,22 @@ TEST_F(TestResnet50_3Layers, Energy_ResNet50F3_EISXW_101805) {
     test_energy_and_cyc(std::move(tests_cluster_1), 50U, 50.0F, 5.0F);
 
     /*
-        std::cout << "\n ------------------------------------------------------------------------\n ";
-        std::cout << "\n\n" << s1_elmws_name << "\n" << s1_elmws_c0;
-        std::cout << "\n\n" << s2_mult_name << "\n" << s2_mult_c0;
-        std::cout << "\n\n" << s3_maxp_name << "\n" << s3_maxp_c0;
-        std::cout << "\n\n" << s4_conv_name << "\n" << s4_conv_c0;
-        std::cout << "\n\n" << s5_elmws_name << "\n" << s5_elmws_c0;
+        utest_log::debug() << "\n ------------------------------------------------------------------------\n ";
+        utest_log::debug() << "\n\n" << s1_elmws_name << "\n" << s1_elmws_c0;
+        utest_log::debug() << "\n\n" << s2_mult_name << "\n" << s2_mult_c0;
+        utest_log::debug() << "\n\n" << s3_maxp_name << "\n" << s3_maxp_c0;
+        utest_log::debug() << "\n\n" << s4_conv_name << "\n" << s4_conv_c0;
+        utest_log::debug() << "\n\n" << s5_elmws_name << "\n" << s5_elmws_c0;
 
-        std::cout << "\n ------------------------------------------------------------------------\n ";
+        utest_log::debug() << "\n ------------------------------------------------------------------------\n ";
 
-        std::cout << "\n\n" << s1_elmws_name << "\n" << s1_elmws_c1;
-        std::cout << "\n\n" << s2_mult_name << "\n" << s2_mult_c1;
-        std::cout << "\n\n" << s3_maxp_name << "\n" << s3_maxp_c1;
-        std::cout << "\n\n" << s4_conv_name << "\n" << s4_conv_c1;
-        std::cout << "\n\n" << s5_elmws_name << "\n" << s5_elmws_c1;
+        utest_log::debug() << "\n\n" << s1_elmws_name << "\n" << s1_elmws_c1;
+        utest_log::debug() << "\n\n" << s2_mult_name << "\n" << s2_mult_c1;
+        utest_log::debug() << "\n\n" << s3_maxp_name << "\n" << s3_maxp_c1;
+        utest_log::debug() << "\n\n" << s4_conv_name << "\n" << s4_conv_c1;
+        utest_log::debug() << "\n\n" << s5_elmws_name << "\n" << s5_elmws_c1;
 
-        std::cout << "\n ------------------------------------------------------------------------\n ";
+        utest_log::debug() << "\n ------------------------------------------------------------------------\n ";
     */
 }
 
@@ -481,7 +483,7 @@ protected:
         return wl;
     }
 
-    std::string wl_info(const DPUWorkload &wl) {
+    std::string wl_info(const DPUWorkload& wl) {
         return " Op: " + Operation_ToText.at(static_cast<int>(wl.op)) +
                " in0_swizz: " + Swizzling_ToText.at(static_cast<int>(wl.input_swizzling[0])) +
                " out0_swizz: " + Swizzling_ToText.at(static_cast<int>(wl.output_swizzling[0])) + "\n ";
@@ -529,16 +531,18 @@ TEST_P(DifferentSwizz, Diff_In_Out_Swizz_Cycles_Comparing_NPU40) {
     std::array<DPUWorkload, 4> wls{std::move(wl_K00), std::move(wl_K05), std::move(wl_K50), std::move(wl_K55)};
     std::array<std::string, 4> named_wls{name_wl(wls)};
 
-    auto lambda = [this, &tst_info, &tolerance](const std::array<DPUWorkload, 4>& wls, std::array<std::string, 4> &named_wls) {
+    auto lambda = [this, &tst_info, &tolerance](const std::array<DPUWorkload, 4>& wls,
+                                                std::array<std::string, 4>& named_wls) {
         unsigned cost_cyc{};
         std::string info;
         std::array<unsigned int, 4> wls_cost_cyc;
 
-        std::cout << "-----------------------------------------------------" << tst_info
-                  << "-----------------------------------------------------\n";
+        utest_log::debug() << "-----------------------------------------------------" << tst_info
+                          << "-----------------------------------------------------\n";
 
         for (int i = 0; i < 4; i++) {
-            ASSERT_NO_THROW(cost_cyc = cost_models.getModel(wls[i].device).DPU(wls[i], info)) << named_wls[i] << "\n" << wls[i];
+            ASSERT_NO_THROW(cost_cyc = cost_models.getModel(wls[i].device).DPU(wls[i], info)) << named_wls[i] << "\n"
+                                                                                              << wls[i];
             wls_cost_cyc[i] = cost_cyc;
         }
 
@@ -547,7 +551,7 @@ TEST_P(DifferentSwizz, Diff_In_Out_Swizz_Cycles_Comparing_NPU40) {
         int swizz05 = 1;
         int swizz50 = 2;
         int swizz55 = 3;
-        //tolerante in functie de test
+        // tolerante in functie de test
         EXPECT_GT(wls_cost_cyc[swizz00] + tolerance[0], wls_cost_cyc[swizz55])
                 << "Cost cycle for workload " << named_wls[swizz00]
                 << " should be greater than cost cycle for workload " << named_wls[swizz55] << "\n";
@@ -565,16 +569,16 @@ TEST_P(DifferentSwizz, Diff_In_Out_Swizz_Cycles_Comparing_NPU40) {
 }
 
 // these parameters are indexes we will use to access an element from this array -> test_wls
-INSTANTIATE_TEST_SUITE_P(DifferentSwizzCollectionTests, DifferentSwizz,
-                         ::testing::Values(DifferentSwizz::TestData{DifferentSwizz::s1_elmws_c0, "CLUSTER0", {0,0,0}},
-                                           // TestData{DifferentSwizz::s2_mult_c0, "CLUSTER0"},
-                                           // TestData{DifferentSwizz::s4_conv_c0, "CLUSTER0"},
-                                           DifferentSwizz::TestData{DifferentSwizz::s5_elmws_c0, "CLUSTER0", {500,500,0}},
+INSTANTIATE_TEST_SUITE_P(
+        DifferentSwizzCollectionTests, DifferentSwizz,
+        ::testing::Values(DifferentSwizz::TestData{DifferentSwizz::s1_elmws_c0, "CLUSTER0", {0, 0, 0}},
+                          // TestData{DifferentSwizz::s2_mult_c0, "CLUSTER0"},
+                          // TestData{DifferentSwizz::s4_conv_c0, "CLUSTER0"},
+                          DifferentSwizz::TestData{DifferentSwizz::s5_elmws_c0, "CLUSTER0", {500, 500, 0}},
 
-                                           DifferentSwizz::TestData{DifferentSwizz::s1_elmws_c1, "CLUSTER1", {0,0,0}},
-                                           // TestData{DifferentSwizz::s2_mult_c1, "CLUSTER1"},
-                                           // TestData{DifferentSwizz::s4_conv_c1, "CLUSTER1"},
-                                           DifferentSwizz::TestData{DifferentSwizz::s5_elmws_c1, "CLUSTER1", {500,500,0}}
-                                           ));
+                          DifferentSwizz::TestData{DifferentSwizz::s1_elmws_c1, "CLUSTER1", {0, 0, 0}},
+                          // TestData{DifferentSwizz::s2_mult_c1, "CLUSTER1"},
+                          // TestData{DifferentSwizz::s4_conv_c1, "CLUSTER1"},
+                          DifferentSwizz::TestData{DifferentSwizz::s5_elmws_c1, "CLUSTER1", {500, 500, 0}}));
 
 }  // namespace VPUNN_unit_tests

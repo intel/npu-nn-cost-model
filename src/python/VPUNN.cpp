@@ -8,13 +8,39 @@
 
 #include <vpu_cost_model.h>
 #include <vpu_dma_cost_model.h>
+#include <vpu_shave_cost_model.h>
 #include <vpu/types.h>
 #include <vpu/dma_types.h>
+#include <vpu/shave_workload.h>
+#include <vpu/cycles_interface_types.h>
+
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace py = pybind11;
 
+namespace {
+
+/// @brief The SHAVE python interface is offered only for NPU 5.0 and newer.
+/// Older devices are modelled by legacy paths that this interface does not expose.
+void check_shave_device(VPUNN::VPUDevice device) {
+    if ((device < VPUNN::VPUDevice::NPU_5_0) || (device >= VPUNN::VPUDevice::__size)) {
+        throw py::value_error("The SHAVE python interface supports only NPU_5_0 and newer devices");
+    }
+}
+
+VPUNN::SHAVEWorkload make_shave_workload(const std::string& name, VPUNN::VPUDevice device,
+                                         const std::vector<VPUNN::VPUTensor>& inputs,
+                                         const std::vector<VPUNN::VPUTensor>& outputs) {
+    check_shave_device(device);
+    return VPUNN::SHAVEWorkload{name, device, inputs, outputs};
+}
+
+}  // namespace
+
 PYBIND11_MODULE(_VPUNN, m) {
-    m.doc() = "Minimal VPUNN Python bindings for DPU and DMA cost modeling";
+    m.doc() = "Minimal VPUNN Python bindings for DPU, DMA and SHAVE cost modeling";
 
     // Core enums needed for DPUWorkload
     py::enum_<VPUNN::VPUDevice>(m, "VPUDevice")
@@ -44,7 +70,11 @@ PYBIND11_MODULE(_VPUNN, m) {
         .value("FLOAT32", VPUNN::DataType::FLOAT32)
         .value("UINT16", VPUNN::DataType::UINT16)
         .value("INT16", VPUNN::DataType::INT16)
-        .value("FLOAT4", VPUNN::DataType::FLOAT4);
+        .value("FLOAT4", VPUNN::DataType::FLOAT4)
+        .value("INT64", VPUNN::DataType::INT64)
+        .value("UINT64", VPUNN::DataType::UINT64)
+        .value("FLOAT64", VPUNN::DataType::FLOAT64)
+        .value("UINT32", VPUNN::DataType::UINT32);
 
     py::enum_<VPUNN::Operation>(m, "Operation")
         .value("CONVOLUTION", VPUNN::Operation::CONVOLUTION)
@@ -239,7 +269,114 @@ PYBIND11_MODULE(_VPUNN, m) {
              },
              "Calculate DPU ideal cycles assuming 100% MAC utilization",
              py::arg("workload"))
+        .def("SHAVE", static_cast<VPUNN::CyclesInterfaceType (VPUNN::VPUCostModel::*)(const VPUNN::SHAVEWorkload&) const>(&VPUNN::VPUCostModel::SHAVE),
+             "Calculate the cycles of a SHAVE workload",
+             py::arg("workload"))
+        .def("SHAVEMsg", [](const VPUNN::VPUCostModel& self, const VPUNN::SHAVEWorkload& workload) {
+                 std::string info{};
+                 const auto cycles = self.SHAVE(workload, info);
+                 return std::make_pair(cycles, info);
+             },
+             "Calculate the cycles of a SHAVE workload, returning (cycles, info)",
+             py::arg("workload"))
+        .def("getShaveSupportedOperations",
+             [](const VPUNN::VPUCostModel& self, VPUNN::VPUDevice device) {
+                 check_shave_device(device);
+                 return self.getShaveSupportedOperations(device);
+             },
+             "List the SHAVE operators supported for a device (NPU_5_0 and newer)",
+             py::arg("device"))
        ;
+
+    // SHAVEWorkload structure
+    // Only the operator name, the device and the tensors are exposed: call parameters, extra parameters,
+    // the location name and the profiling backend hint are intentionally not populated from python.
+    py::class_<VPUNN::SHAVEWorkload>(m, "SHAVEWorkload")
+        .def(py::init(&make_shave_workload),
+             "Create a SHAVE (software kernel) workload description, supported for NPU_5_0 and newer",
+             py::arg("name"),
+             py::arg("device"),
+             py::arg("inputs"),
+             py::arg("outputs"))
+        .def_readwrite("include_code_prefetch", &VPUNN::SHAVEWorkload::include_code_prefetch,
+             "Defaults to False (warm invocation). Set it to True to also pay the cold start code prefetch cost")
+        .def("get_name", &VPUNN::SHAVEWorkload::get_name)
+        .def("get_device", &VPUNN::SHAVEWorkload::get_device)
+        .def("get_inputs", &VPUNN::SHAVEWorkload::get_inputs)
+        .def("get_outputs", &VPUNN::SHAVEWorkload::get_outputs)
+        .def("get_include_code_prefetch", &VPUNN::SHAVEWorkload::get_include_code_prefetch)
+        .def("total_number_of_elements", &VPUNN::SHAVEWorkload::total_number_of_elements)
+        .def("total_size_in_bits", &VPUNN::SHAVEWorkload::total_size_in_bits)
+        .def("hash", &VPUNN::SHAVEWorkload::hash)
+        .def("toString", &VPUNN::SHAVEWorkload::toString)
+        .def("__repr__", &VPUNN::SHAVEWorkload::toString);
+
+    // Cycles helpers: needed to interpret the values returned by the cost models
+    py::class_<VPUNN::Cycles>(m, "Cycles")
+        .def_property_readonly_static("NO_ERROR", [](py::object) { return VPUNN::Cycles::NO_ERROR; })
+        .def_property_readonly_static("START_ERROR_RANGE", [](py::object) { return VPUNN::Cycles::START_ERROR_RANGE; })
+        .def_property_readonly_static("ERROR_SHAVE", [](py::object) { return VPUNN::Cycles::ERROR_SHAVE; })
+        .def_property_readonly_static("ERROR_SHAVE_PARAMS", [](py::object) { return VPUNN::Cycles::ERROR_SHAVE_PARAMS; })
+        .def_property_readonly_static("ERROR_SHAVE_LAYOUT", [](py::object) { return VPUNN::Cycles::ERROR_SHAVE_LAYOUT; })
+        .def_property_readonly_static("ERROR_SHAVE_INVALID_INPUT", [](py::object) { return VPUNN::Cycles::ERROR_SHAVE_INVALID_INPUT; })
+        .def_property_readonly_static("ERROR_SHAVE_OPERATOR_MISSING", [](py::object) { return VPUNN::Cycles::ERROR_SHAVE_OPERATOR_MISSING; })
+        .def_property_readonly_static("ERROR_SHAVE_PREFETCH_NOT_FOUND", [](py::object) { return VPUNN::Cycles::ERROR_SHAVE_PREFETCH_NOT_FOUND; })
+        .def_property_readonly_static("ERROR_SHAVE_PREFETCH_DEVICE_NOT_COVERED", [](py::object) { return VPUNN::Cycles::ERROR_SHAVE_PREFETCH_DEVICE_NOT_COVERED; })
+        .def_property_readonly_static("ERROR_INVALID_INPUT_DEVICE", [](py::object) { return VPUNN::Cycles::ERROR_INVALID_INPUT_DEVICE; })
+        .def_static("isErrorCode", [](VPUNN::CyclesInterfaceType value) { return VPUNN::Cycles::isErrorCode(value); },
+             "True if the value is an error code and not a cycle count", py::arg("value"))
+        .def_static("toErrorText", [](VPUNN::CyclesInterfaceType value) { return std::string(VPUNN::Cycles::toErrorText(value)); },
+             "Human readable name of the error code", py::arg("value"));
+
+    // SHAVECostModel class: standalone cost model for SHAVE (software kernel) workloads
+    py::class_<VPUNN::SHAVECostModel>(m, "SHAVECostModel")
+        .def(py::init<const std::string&, const unsigned int>(),
+             py::arg("cache_filename") = "",
+             py::arg("cache_size") = 16384)
+        .def("computeCycles",
+             static_cast<VPUNN::CyclesInterfaceType (VPUNN::SHAVECostModel::*)(const VPUNN::SHAVEWorkload&) const>(&VPUNN::SHAVECostModel::computeCycles),
+             "Estimate the execution cycles of a SHAVE workload",
+             py::arg("workload"))
+        .def("computeCyclesMsg",
+             [](const VPUNN::SHAVECostModel& self, const VPUNN::SHAVEWorkload& workload) {
+                 std::string info{};
+                 const auto cycles = self.computeCycles(workload, info);
+                 return std::make_pair(cycles, info);
+             },
+             "Estimate the execution cycles of a SHAVE workload, returning (cycles, info)",
+             py::arg("workload"))
+        .def("getShaveSupportedOperations",
+             [](const VPUNN::SHAVECostModel& self, VPUNN::VPUDevice device) {
+                 check_shave_device(device);
+                 return self.getShaveSupportedOperations(device);
+             },
+             "List the SHAVE operators supported for a device (NPU_5_0 and newer)",
+             py::arg("device"))
+        .def_static("queryDeviceMappedSupportedOperations",
+             [](VPUNN::VPUDevice device) {
+                 check_shave_device(device);
+                 return VPUNN::SHAVECostModel::queryDeviceMappedSupportedOperations(device);
+             },
+             "List the SHAVE operators supported for a device, without constructing a cost model",
+             py::arg("device"))
+        .def("getShaveInstanceInfo",
+             [](const VPUNN::SHAVECostModel& self, const std::string& name, VPUNN::VPUDevice device) -> py::object {
+                 check_shave_device(device);
+                 const auto instance = self.getShaveInstance(name, device);
+                 if (!instance.has_value()) {
+                     return py::none();
+                 }
+                 return py::str(instance->get().toString());
+             },
+             "Details of the operator implementation, or None if the operator is not available",
+             py::arg("name"), py::arg("device"))
+        .def("getCodePrefetchCost", &VPUNN::SHAVECostModel::getCodePrefetchCost,
+             "Cold start kernel code prefetch cost, in cycles",
+             py::arg("workload"))
+        .def("setProfilingEnabledForAutoHint", &VPUNN::SHAVECostModel::setProfilingEnabledForAutoHint,
+             "Enable/disable the online profiling service for cache miss queries",
+             py::arg("value"))
+        .def("isProfilingEnabledForAutoHint", &VPUNN::SHAVECostModel::isProfilingEnabledForAutoHint);
 
     // DMACostModel classes for different DMA workload types
     py::class_<VPUNN::DMACostModel<VPUNN::DMANNWorkload_NPU27>>(m, "DMACostModel_NPU27")

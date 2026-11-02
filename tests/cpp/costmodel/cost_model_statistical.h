@@ -17,6 +17,7 @@
 #include "vpu/compatibility/types01.h"
 #include "vpu/sample_generator/random_task_generator.h"
 
+#include "logger/logger.h"
 #include <unordered_map>
 
 namespace VPUNN_unit_tests {
@@ -29,7 +30,7 @@ protected:
             VPUNNModelsFiles::ModelDescriptor;  ///< make this type directly visible inside of this class
     const VPUNNModelsFiles& the_NN_models{VPUNNModelsFiles::getModels()};  ///< the paths to available NN models
 
-     std::tuple<int, int> CheckInValidIntervalCycles(const ModelDescriptor& model_info, const unsigned int low_threshold,
+    std::tuple<int, int> CheckInValidIntervalCycles(const ModelDescriptor& model_info, const unsigned int low_threshold,
                                                     const unsigned int high_threshold, unsigned int n_workloads) {
         const auto& model_path = model_info.first;
         const auto& device = model_info.second;
@@ -46,22 +47,22 @@ protected:
             const auto cycles = current_model.DPU(wl);
 
             if (cycles < low_threshold) {
-                std::cout << "\n (cycles < low_threshold): " << cycles << "threshold: " << low_threshold
-                          << "\nMeaning: " << VPUNN::Cycles::toErrorText(cycles) << " Model : " << model_path
-                          << ".i : " << ++ilow << std::endl
-                          << wl << std::endl;
+                utest_log::debug() << "\n (cycles < low_threshold): " << cycles << "threshold: " << low_threshold
+                                  << "\nMeaning: " << VPUNN::Cycles::toErrorText(cycles) << " Model : " << model_path
+                                  << ".i : " << ++ilow << std::endl
+                                  << wl << std::endl;
             }
             if (cycles > high_threshold) {
-                std::cout << "\n (cycles > high_threshold): " << cycles << "threshold: " << high_threshold
-                          << "\nMeaning: " << VPUNN::Cycles::toErrorText(cycles) << " Model: " << model_path
-                          << ". i:" << ++ihigh << std::endl
-                          << wl << std::endl;
+                utest_log::debug() << "\n (cycles > high_threshold): " << cycles << "threshold: " << high_threshold
+                                  << "\nMeaning: " << VPUNN::Cycles::toErrorText(cycles) << " Model: " << model_path
+                                  << ". i:" << ++ihigh << std::endl
+                                  << wl << std::endl;
             }
         }
         return std::make_tuple(ilow, ihigh);
     }
 
-     int CheckNoCase_InferenceOutput(const ModelDescriptor& model_info, const float not_valid_value,
+    int CheckNoCase_InferenceOutput(const ModelDescriptor& model_info, const float not_valid_value,
                                     unsigned int n_workloads = 1000) {
         const auto& model_path = model_info.first;
         const auto& device = model_info.second;
@@ -85,7 +86,7 @@ protected:
         return i;
     }
 
-      std::tuple<int, int> CheckInValidInterval_RawInference(const ModelDescriptor& model_info,
+    std::tuple<int, int> CheckInValidInterval_RawInference(const ModelDescriptor& model_info,
                                                            const float low_threshold_, const float high_threshold_,
                                                            const std::vector<VPUNN::DPUWorkload>& workloads) {
         const auto& model_path = model_info.first;
@@ -104,24 +105,24 @@ protected:
 
             // EXPECT_GT(inference, low_threshold)
             if (inference < low_threshold) {
-                std::cout << "\n (inference < low_threshold): " << inference << "threshold: " << low_threshold
-                          << "\nModel: " << model_path << ", wl-index: " << i << " / " << n << ",occurrence :" << ++ilow
-                          << std::endl
-                          << wl << std::endl;
+                utest_log::debug() << "\n (inference < low_threshold): " << inference << "threshold: " << low_threshold
+                                  << "\nModel: " << model_path << ", wl-index: " << i << " / " << n
+                                  << ",occurrence :" << ++ilow << std::endl
+                                  << wl << std::endl;
             }
             // EXPECT_LT(inference, high_threshold)
             if (inference > high_threshold) {
-                std::cout << "\n (inference > high_threshold): " << inference << "threshold: " << high_threshold
-                          << "\nModel: " << model_path << ", wl-index: " << i << " / " << n
-                          << ",occurrence :" << ++ihigh << std::endl
-                          << wl << std::endl;
+                utest_log::debug() << "\n (inference > high_threshold): " << inference << "threshold: " << high_threshold
+                                  << "\nModel: " << model_path << ", wl-index: " << i << " / " << n
+                                  << ",occurrence :" << ++ihigh << std::endl
+                                  << wl << std::endl;
             }
             i++;
         }
         return std::make_tuple(ilow, ihigh);
     }
 
-      bool is_error_code(unsigned int cycles) {
+    bool is_error_code(unsigned int cycles) {
         if (cycles > std::numeric_limits<uint32_t>::max() - 1000)
             return true;
         return false;
@@ -135,10 +136,10 @@ protected:
         std::generate_n(workloads.begin(), n_workloads, VPUNN::randDPUWorkload(device_version));
 
         VPUNN::VPUCostModel slow_model{the_NN_models.standard_model_paths[modelIndex].second,
-                           the_NN_models.standard_model_paths[modelIndex].first,
+                                       the_NN_models.standard_model_paths[modelIndex].first,
                                        false};  // with cache, batch =1
         VPUNN::VPUCostModel fast_model{the_NN_models.fast_model_paths[modelIndex].second,
-                           the_NN_models.fast_model_paths[modelIndex].first,
+                                       the_NN_models.fast_model_paths[modelIndex].first,
                                        false};  // with cache, batch =1
 
         std::map<VPUNN::Operation, int> ops_errors;
@@ -159,12 +160,12 @@ protected:
                 i_range_errs++;
                 // EXPECT_EQ(cycles_s, cycles_f)
                 if (cycles_s != cycles_f) {
-                    std::cout << "Mismatch, error codes or valid with error combination \n"
-                              << "Model: " << model_type << ", wl-index: " << i << " / " << n
-                              << ",occurrence :" << ++i_errs << " BOTH SHOULD HAVE SAME ERROR :" << std::endl
-                              << "slow: " << cycles_s << std::endl
-                              << "fast: " << cycles_f << std::endl
-                              << wl << std::endl;
+                    utest_log::debug() << "Mismatch, error codes or valid with error combination \n"
+                                      << "Model: " << model_type << ", wl-index: " << i << " / " << n
+                                      << ",occurrence :" << ++i_errs << " BOTH SHOULD HAVE SAME ERROR :" << std::endl
+                                      << "slow: " << cycles_s << std::endl
+                                      << "fast: " << cycles_f << std::endl
+                                      << wl << std::endl;
                 }
             } else {  // no errors
                 int delta_c = std::abs(((int)cycles_f - (int)cycles_s));
@@ -178,14 +179,14 @@ protected:
                     i_abs_errors++;
                     // EXPECT_LE(ratio, max_ratio_delta)
                     if (ratio >= max_ratio_delta) {
-                        std::cout << "\n*** Results with significant difference:  \n"
-                                  << "Model: " << model_type << ", wl-index: " << i << " / " << n
-                                  << ", occurrence :" << ++i_errs << " BIG DIFFERENCE :" << std::endl
-                                  << "slow: " << cycles_s << std::endl
-                                  << "fast: " << cycles_f << std::endl
-                                  << "delta: " << delta_c << std::endl
-                                  << "ratio: " << ratio << std::endl
-                                  << wl << std::endl;
+                        utest_log::debug() << "\n*** Results with significant difference:  \n"
+                                          << "Model: " << model_type << ", wl-index: " << i << " / " << n
+                                          << ", occurrence :" << ++i_errs << " BIG DIFFERENCE :" << std::endl
+                                          << "slow: " << cycles_s << std::endl
+                                          << "fast: " << cycles_f << std::endl
+                                          << "delta: " << delta_c << std::endl
+                                          << "ratio: " << ratio << std::endl
+                                          << wl << std::endl;
                         ops_errors[wl.op]++;
                     }
                 }
@@ -203,19 +204,20 @@ protected:
                 << "\t absolute threshold: " << min_absolute_delta << std::endl
                 << "\t expected_deviation_ratio: " << expected_deviation_ratio << std::endl;
 
-        std::cout << "\n Total relevant Errors: " << i_errs << "\n DIstributed on operations:";
+        utest_log::info() << "\n Total relevant Errors: " << i_errs << "\n DIstributed on operations:";
 
         for (const auto& op : ops_errors) {
             const int err_percent{(i_errs != 0) ? (int)(((float)op.second / i_errs) * 100) : 0};
-            std::cout << "\n op_id: " << (int)op.first
-                      << " OP: " << VPUNN::Operation_ToText.at(static_cast<int>(op.first))
-                      << "\t,  Count #:" << op.second << " , Count %: " << err_percent << " %";
+            utest_log::info() << "\n op_id: " << (int)op.first
+                             << " OP: " << VPUNN::Operation_ToText.at(static_cast<int>(op.first))
+                             << "\t,  Count #:" << op.second << " , Count %: " << err_percent << " %";
         }
-        std::cout << "\n\n Total operations:";
+        utest_log::info() << "\n\n Total operations:";
         for (const auto& op : all_ops) {
-            std::cout << "\n op_id: " << (int)op.first
-                      << " OP: " << VPUNN::Operation_ToText.at(static_cast<int>(op.first))
-                      << "\t,  Count #:" << op.second << " , Count %: " << (int)(((float)op.second / n) * 100) << " %";
+            utest_log::info() << "\n op_id: " << (int)op.first
+                             << " OP: " << VPUNN::Operation_ToText.at(static_cast<int>(op.first))
+                             << "\t,  Count #:" << op.second << " , Count %: " << (int)(((float)op.second / n) * 100)
+                             << " %";
         }
 
         return i_errs;
@@ -350,7 +352,7 @@ protected:
             double denom_sq = (n_workloads * sum_ss - (sum_s * sum_s)) * (n_workloads * sum_ff - (sum_f * sum_f));
 
             double corr = nom / std::sqrt(denom_sq);
-            std::cout << "\n CORRELATION : " << corr << "\n";
+            utest_log::debug() << "\n CORRELATION : " << corr << "\n";
 
             result.correlation = corr;
         }
@@ -359,10 +361,8 @@ protected:
 
         return i_errs;
     }
-
-
 };
 
-}
+}  // namespace VPUNN_unit_tests
 
 #endif

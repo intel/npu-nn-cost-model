@@ -1,4 +1,4 @@
-// Copyright © 2024 Intel Corporation
+// Copyright © 2024-2026 Intel Corporation
 // SPDX-License-Identifier: Apache 2.0
 // LEGAL NOTICE: Your use of this software and any required dependent software (the “Software Package”)
 // is subject to the terms and conditions of the software license agreements for the Software Package,
@@ -60,11 +60,26 @@ public:
 
         const auto& config = layer_validator.get_config(layer.device);  // previous if prevents throwing
 
-        // check ahead
+        // check ahead, todo: refactoring to consider MPEEngine
         if (!config.is_valid_operation(layer.op)) {
             result.mark_unknown_operation();
             return;
         }
+        // explicitly reject MPEEngine values not supported on this device
+        if (!config.is_valid_engine(layer.mpe_engine)) {
+            result.mark_invalid_LayerConfiguration();
+
+            const auto engine_it = MPEEngine_ToText.find(static_cast<int>(layer.mpe_engine));
+            const auto device_it = VPUDevice_ToText.find(static_cast<int>(layer.device));
+            const std::string engine_text =
+                    (engine_it != MPEEngine_ToText.end()) ? engine_it->second : "UNKNOWN_MPE_ENGINE";
+            const std::string device_text =
+                    (device_it != VPUDevice_ToText.end()) ? device_it->second : "UNKNOWN_DEVICE";
+
+            result.info = "MPEEngine::" + engine_text + " is not supported on this device: " + device_text;
+            return;
+        }
+        // check ahead done
 
         try {
             DPUOperation w(layer, config);  // workload internal representation
@@ -91,11 +106,26 @@ public:
         }
         const auto& config = splitLayer_validator.get_config(layer.device);  // previous if prevents throwing
 
-        // check ahead
+        // check ahead, todo: refactoring to consider MPEEngine
         if (!config.is_valid_operation(layer.op)) {
             result.mark_unknown_operation();
             return;
         }
+        // explicitly reject MPEEngine values not supported on this device
+        if (!config.is_valid_engine(layer.mpe_engine)) {
+            result.mark_invalid_DPU_workload();
+
+            const auto engine_it = MPEEngine_ToText.find(static_cast<int>(layer.mpe_engine));
+            const auto device_it = VPUDevice_ToText.find(static_cast<int>(layer.device));
+            const std::string engine_text =
+                    (engine_it != MPEEngine_ToText.end()) ? engine_it->second : "UNKNOWN_MPE_ENGINE";
+            const std::string device_text =
+                    (device_it != VPUDevice_ToText.end()) ? device_it->second : "UNKNOWN_DEVICE";
+
+            result.info = "MPEEngine::" + engine_text + " is not supported on this device: " + device_text;
+            return;
+        }
+        // check ahead done
 
         try {
             const DPUOperation w(layer, config);  // workload internal representation (throws if bad op)
@@ -137,10 +167,6 @@ public:
             wl.input_swizzling[1] = config.adapt_device_comaptible_swizzling(wl.input_swizzling[1]);
 
             wl.output_swizzling[0] = config.adapt_device_comaptible_swizzling(wl.output_swizzling[0]);
-        }
-
-        if (layer.mpe_engine == MPEEngine::DCIM) {
-            layer.execution_order = ExecutionMode::dCIM_32x128;
         }
     }
 };

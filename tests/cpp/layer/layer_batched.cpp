@@ -7,19 +7,19 @@
 // Please refer to the “third-party-programs.txt” or other similarly-named text file included with the
 // Software Package for additional details.
 
-
 #include "layer.h"
 
 #include <gtest/gtest.h>
-#include "vpu/dpu_types.h"
-#include "vpu_layer_cost_model.h"
-#include "vpu/shave/layers.h"
-#include "vpu/sample_generator/random_task_generator.h"
 #include "core/profiling.h"
+#include "vpu/dpu_types.h"
+#include "vpu/sample_generator/random_task_generator.h"
+#include "vpu/shave/layers.h"
+#include "vpu_layer_cost_model.h"
 
 #include <algorithm>
-#include <numeric>
 #include <iostream>
+#include <numeric>
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -77,8 +77,10 @@ TEST_F(VPULayerCostModelTest, LayerBatched_MultipleDPULayers) {
     auto& model = layer_models.getModel(VPUDevice::VPU_2_7);
     VPULayerStrategy strategy = makeDefaultLayerStrategy();
 
-    LayerBatchElementInfo lbi1{makeBatchTestLayer(VPUDevice::VPU_2_7, 16, 16, 64), strategy, std::make_unique<LayerSplitInfo>()};
-    LayerBatchElementInfo lbi2{makeBatchTestLayer(VPUDevice::VPU_2_7, 8, 8, 32), strategy, std::make_unique<LayerSplitInfo>()};
+    LayerBatchElementInfo lbi1{makeBatchTestLayer(VPUDevice::VPU_2_7, 16, 16, 64), strategy,
+                               std::make_unique<LayerSplitInfo>()};
+    LayerBatchElementInfo lbi2{makeBatchTestLayer(VPUDevice::VPU_2_7, 8, 8, 32), strategy,
+                               std::make_unique<LayerSplitInfo>()};
 
     BatchCostResult result = model.LayerBatched({std::ref(lbi1), std::ref(lbi2)});
 
@@ -112,12 +114,10 @@ TEST_F(VPULayerCostModelTest, LayerBatched_ErrorPropagation) {
     ASSERT_EQ(result.costs.size(), 2u);
 
     CyclesInterfaceType c_invalid = result.costs[1];
-    EXPECT_TRUE(Cycles::isErrorCode(c_invalid))
-            << "Invalid workload should produce an error code, got: " << c_invalid;
+    EXPECT_TRUE(Cycles::isErrorCode(c_invalid)) << "Invalid workload should produce an error code, got: " << c_invalid;
 
     // isValid should be false since one config is erroneous
-    EXPECT_FALSE(result.isValid)
-            << "isValid should be false when any config has error";
+    EXPECT_FALSE(result.isValid) << "isValid should be false when any config has error";
 }
 
 /// Multiple devices can each use LayerBatched
@@ -188,13 +188,12 @@ TEST_F(VPULayerCostModelTest, LayerBatched_MatchesIndividualCalls) {
 
     // Verify each per-entry cost matches the individual Layer() call
     for (size_t i = 0; i < specs.size(); ++i) {
-        DPULayer layer_copy = makeBatchTestLayer(VPUDevice::VPU_2_7, specs[i].width, specs[i].height,
-                                                 specs[i].channels);
+        DPULayer layer_copy =
+                makeBatchTestLayer(VPUDevice::VPU_2_7, specs[i].width, specs[i].height, specs[i].channels);
         LayerSplitInfo ref_split;
         CyclesInterfaceType single_cost = model.Layer(layer_copy, strategy, ref_split);
 
-        EXPECT_EQ(batched_result.costs[i], single_cost)
-                << "Mismatch for workload index " << i;
+        EXPECT_EQ(batched_result.costs[i], single_cost) << "Mismatch for workload index " << i;
     }
 }
 
@@ -381,9 +380,9 @@ TEST_F(VPULayerCostModelTest, LayersPreSplitBatched_MatchesIndividualCalls) {
 
     // Get reference cost via LayersPreSplit()
     LayerSplitInfo ref_split;
-    CyclesInterfaceType ref_cost = model.LayersPreSplit(tiles, strategy.nDPUs, strategy.input_fetching,
-                                                         strategy.output_spilling, strategy.prefetching, ref_split,
-                                                         full_layer.hash(), strategy.tiling_strategy);
+    CyclesInterfaceType ref_cost =
+            model.LayersPreSplit(tiles, strategy.nDPUs, strategy.input_fetching, strategy.output_spilling,
+                                 strategy.prefetching, ref_split, full_layer.hash(), strategy.tiling_strategy);
 
     // Get cost via LayersPreSplitBatched()
     LayersPreSplitBatchElementInfo psbi;
@@ -395,8 +394,7 @@ TEST_F(VPULayerCostModelTest, LayersPreSplitBatched_MatchesIndividualCalls) {
     BatchCostResult result = model.LayersPreSplitBatched({std::ref(psbi)});
 
     ASSERT_EQ(result.costs.size(), 1u);
-    EXPECT_EQ(result.costs[0], ref_cost)
-            << "LayersPreSplitBatched cost should match individual LayersPreSplit call";
+    EXPECT_EQ(result.costs[0], ref_cost) << "LayersPreSplitBatched cost should match individual LayersPreSplit call";
 }
 
 // ===== Non-reference_wrapper overload tests =====
@@ -408,7 +406,8 @@ TEST_F(VPULayerCostModelTest, LayerBatched_NoRefWrapper_SingleElement) {
 
     // Via non-ref-wrapper overload
     std::vector<LayerBatchElementInfo> layers_vec;
-    layers_vec.push_back(LayerBatchElementInfo{makeBatchTestLayer(VPUDevice::VPU_2_7), strategy, std::make_unique<LayerSplitInfo>()});
+    layers_vec.push_back(LayerBatchElementInfo{makeBatchTestLayer(VPUDevice::VPU_2_7), strategy,
+                                               std::make_unique<LayerSplitInfo>()});
     BatchCostResult result_vec = model.LayerBatched(layers_vec);
 
     // Via ref-wrapper overload for comparison
@@ -449,7 +448,8 @@ TEST_F(VPULayerCostModelTest, LayerBatched_NoRefWrapper_DetailedSplitPopulated) 
     VPULayerStrategy strategy = makeDefaultLayerStrategy();
 
     std::vector<LayerBatchElementInfo> layers_vec;
-    layers_vec.push_back(LayerBatchElementInfo{makeBatchTestLayer(VPUDevice::VPU_2_7), strategy, std::make_unique<LayerSplitInfo>()});
+    layers_vec.push_back(LayerBatchElementInfo{makeBatchTestLayer(VPUDevice::VPU_2_7), strategy,
+                                               std::make_unique<LayerSplitInfo>()});
 
     BatchCostResult result = model.LayerBatched(layers_vec);
 
@@ -609,12 +609,11 @@ TEST_F(VPULayerCostModelTest, DISABLED_LayerSplitInfo_Unique_Ptr_Load) {
     auto& model = layer_models.getModel(device);
     VPULayerStrategy strategy = makeDefaultLayerStrategy();
 
-    constexpr int REPS = 10;  // repetitions per variant per batch size
-    const std::vector<int> batch_sizes = {10, 100, 500}; // tested sizes for number of layers
+    constexpr int REPS = 10;                              // repetitions per variant per batch size
+    const std::vector<int> batch_sizes = {10, 100, 500};  // tested sizes for number of layers
 
     // Helper: build a batch vector + refs from a set of workloads, optionally with unique_ptr
-    auto make_batch = [&](const std::vector<DPUWorkload>& wls, bool with_ptr) 
-            -> std::vector<LayerBatchElementInfo> {
+    auto make_batch = [&](const std::vector<DPUWorkload>& wls, bool with_ptr) -> std::vector<LayerBatchElementInfo> {
         std::vector<LayerBatchElementInfo> batch;
         batch.reserve(wls.size());
         for (const auto& wl : wls) {
@@ -679,11 +678,10 @@ TEST_F(VPULayerCostModelTest, DISABLED_LayerSplitInfo_Unique_Ptr_Load) {
 
         double no_ptr_avg = compute_avg(no_ptr_acc);
         double with_ptr_avg = compute_avg(with_ptr_acc);
-        std::cout << "batch_size=" << n
-                  << " | without unique_ptr (avg over " << REPS << " reps): " << no_ptr_avg << " ms"
-                  << " | with unique_ptr (avg over " << REPS << " reps): " << with_ptr_avg << " ms"
-                  << " | delta (with - without): " << (with_ptr_avg - no_ptr_avg) << " ms"
-                  << std::endl;
+        utest_log::debug() << "batch_size=" << n << " | without unique_ptr (avg over " << REPS
+                          << " reps): " << no_ptr_avg << " ms"
+                          << " | with unique_ptr (avg over " << REPS << " reps): " << with_ptr_avg << " ms"
+                          << " | delta (with - without): " << (with_ptr_avg - no_ptr_avg) << " ms" << std::endl;
 
         // both runs must return the expected number of cost entries
         ASSERT_EQ(result_no_ptr.costs.size(), static_cast<size_t>(n))
@@ -693,4 +691,4 @@ TEST_F(VPULayerCostModelTest, DISABLED_LayerSplitInfo_Unique_Ptr_Load) {
     }
 }
 
-} // namespace VPUNN_unit_tests
+}  // namespace VPUNN_unit_tests

@@ -9,6 +9,9 @@
 
 # tests/cpp/
 
+include(${PROJECT_SOURCE_DIR}/cmake/CxxoptsSetup.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/SpdlogSetup.cmake)
+
 include(FetchContent)
 
 # Build the HTTP client library and fetch its test-only httplib dependency only when
@@ -21,15 +24,15 @@ if(VPUNN_HTTP_CLIENT_AVAILABLE)
     # httplib (header-only) is required only by the test mock server. Populate the
     # sources and consume the header directly to avoid httplib's optional zstd/OpenSSL
     # CMake probing, which is not needed for the plain-HTTP mock server used in tests.
+    # SOURCE_SUBDIR points at a non-existent path so MakeAvailable only populates
+    # the sources and never add_subdirectory()'s httplib's own CMakeLists.txt.
     FetchContent_Declare(
         httplib
         GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
         GIT_TAG        v0.20.0
+        SOURCE_SUBDIR  non-existent-do-not-build
     )
-    FetchContent_GetProperties(httplib)
-    if(NOT httplib_POPULATED)
-        FetchContent_Populate(httplib)
-    endif()
+    FetchContent_MakeAvailable(httplib)
 endif()
 
 FetchContent_Declare(
@@ -97,10 +100,12 @@ file(GLOB_RECURSE test_src
     "${CMAKE_CURRENT_SOURCE_DIR}/inference/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/kernels/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/layer/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/shave/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/vpu/*.cpp"
 )
 add_executable(test_cost_model
+    main.cpp
     ${test_src}
 )
 
@@ -129,7 +134,9 @@ target_compile_definitions(test_cost_model
 target_link_libraries(test_cost_model
     PRIVATE
         # Google Test
-        gtest_main
+        gtest
+        spdlog::spdlog
+        cxxopts::cxxopts
         # Added for EMBARGO settings from root
         vpunn_common_settings
         npu_costmodel

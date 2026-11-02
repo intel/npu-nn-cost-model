@@ -75,6 +75,8 @@ private:
 
     static constexpr int alignement_size_bytes_def{16384};  // 16KB
 
+    inline static const Values<MPEEngine> valid_mpe_engines_def{MPEEngine::SCL};  // no dCIM support
+
     // input and output data types should be the same
     inline static const Values<DataType> valid_in_out_datatypes{
             DataType::INT8,
@@ -148,7 +150,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def) {};
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def) {};
 
     /// constructor with link to operations dynamic behavior and what config can be overridden
     VPU2_0_WorkloadValidValues(const IContainer_OperationsDynamicBehavior& op_dynamic_constraints,  //
@@ -167,7 +170,8 @@ public:
                                  valid_operations_default,           //
                                  alignement_size_bytes_def,          //
                                  out_innermost_dim_alignment_def,    //
-                                 legacy_samples_alignment_weights_def) {};
+                                 legacy_samples_alignment_weights_def,
+                                 valid_mpe_engines_def) {};
 
 protected:
     MultiSmartRanges get_output_channels_restriction(const DPUOperation&) const override {

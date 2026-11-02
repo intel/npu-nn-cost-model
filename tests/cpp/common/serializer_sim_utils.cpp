@@ -21,6 +21,7 @@
 #include "vpu/validation/serializable_shave.h"
 #include "vpu/vpu_tensor.h"
 #include "vpu_cost_model.h"
+#include "logger/logger.h"
 
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -179,7 +180,7 @@ public:
     }
 
     auto Model_Resim_L1(std::string inputCSV) {
-        std::cout << "\n Processing : " << inputCSV;
+        utest_log::debug() << "\n Processing : " << inputCSV;
         // new columns in CSV
         const std::string output0_cycles_tag{"mock_cycles"};
         const std::string output2_cycles_tag{"nn40_post8_cycles"};
@@ -260,7 +261,7 @@ public:
     }
 
     auto Model_Resim_L2(std::string inputCSV) {
-        std::cout << "\n Processing : " << inputCSV;
+        utest_log::debug() << "\n Processing : " << inputCSV;
         // new columns in CSV
         const std::string output0_cycles_tag{"mock_cycles"};
         const std::string output2_cycles_tag{"nn40_post8_cycles"};
@@ -343,7 +344,7 @@ public:
     }
 
     auto Model_Resim_Generic(std::string inputCSV) {
-        std::cout << "\n Processing : " << inputCSV;
+        utest_log::debug() << "\n Processing : " << inputCSV;
         // new columns in CSV
         const std::string output0_cycles_tag{"mock_cycles_now"};
         const std::string post6_cycles_tag{"post6"};
@@ -421,7 +422,7 @@ public:
 
     auto model_Resim_Generic_ModelsList(const std::string& inputCSV, const std::string& outputCSV,
                                         const std::vector<VPUCostModel*>& models) {
-        std::cout << "\n Processing : " << inputCSV;
+        utest_log::debug() << "\n Processing : " << inputCSV;
 
         for (const auto& m : models) {
             EXPECT_FALSE(m == nullptr);
@@ -509,7 +510,7 @@ public:
     }  // method
 
     auto Shave_Resim_Generic_ModelsList(const std::string& inputCSV, const std::string& outputCSV) {
-        std::cout << "\n Processing : " << inputCSV;
+        utest_log::debug() << "\n Processing : " << inputCSV;
 
         SHAVECostModel empty_model{std::string(""), 16384};
 
@@ -578,7 +579,7 @@ public:
     }  // method
 
     auto Model_Resim_Investigation(std::string inputCSV) {
-        std::cout << "\n Processing : " << inputCSV;
+        utest_log::debug() << "\n Processing : " << inputCSV;
         // new columns in CSV
         const std::string output0_cycles_tag{"mock_cycles_now"};
         const std::string post6_cycles_tag{"post6"};
@@ -641,7 +642,7 @@ public:
 
                 if (/*Cycles::isErrorCode(cycles_LNLpost8) ||*/ (cycles_LNLpost8 == 0)) {
                     // EXPECT_FALSE(Cycles::isErrorCode(cycles_LNLpost8));
-                    std::cout << "\ni=" << i << "  " << dpu_wl << "\nPrediction: " << cycles_LNLpost8
+                    utest_log::debug() << "\ni=" << i << "  " << dpu_wl << "\nPrediction: " << cycles_LNLpost8
                               << "INterpretation: " << Cycles::toErrorText(cycles_LNLpost8) << "\nINFO: " << info_real;
                 }
 
@@ -681,7 +682,7 @@ public:
         const std::string theInputName{removeExtension(theFullName)};
         const std::string theOutputName{addSubFolderInName(theInputName, std::move(subfolderOutput))};
 
-        std::cout << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
+        utest_log::debug() << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
         model_Resim_Generic_ModelsList(theInputName, theOutputName, models);
     }
 
@@ -691,7 +692,7 @@ public:
         const std::string theInputName{removeExtension(theFullName)};
         const std::string theOutputName{addSubFolderInName(theInputName, std::move(subfolderOutput))};
 
-        std::cout << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
+        utest_log::debug() << "\n Processing CSV path : " << theInputName << "\n Output: " << theOutputName << "\n";
         Shave_Resim_Generic_ModelsList(theInputName, theOutputName);
     }
 
@@ -786,7 +787,7 @@ TEST_F(SerializerSimulator, DISABLED_Model_Merge_All) {
                                          extraTagsFields)};  // last one is special
 
     auto mergeOneFile = [this, &readFields](Serializer<FileFormat::CSV>& serIN, Serializer<FileFormat::CSV>& serOUT) {
-        std::cout << "\n Processing : " << serIN.get_file_name();
+        utest_log::debug() << "\n Processing : " << serIN.get_file_name();
         EXPECT_TRUE(serIN.is_initialized()) << " In serializer not init:" << serIN.get_file_name() << "\n";
         serIN.jump_to_beginning();
 
@@ -918,7 +919,7 @@ TEST_F(SerializerSimulator, DISABLED_Model_Merge_All_AGNOSTIC) {
     Serializer<FileFormat::CSV> serializer_out;
 
     auto mergeOneFile = [this](Serializer<FileFormat::CSV>& serIN, Serializer<FileFormat::CSV>& serOUT) {
-        std::cout << "\n Processing : " << serIN.get_file_name();
+        utest_log::debug() << "\n Processing : " << serIN.get_file_name();
         EXPECT_TRUE(serIN.is_initialized()) << " In serializer not init:" << serIN.get_file_name() << "\n";
         serIN.jump_to_beginning();
 
@@ -987,7 +988,7 @@ protected:
             models_ptr.emplace_back(&model);
         }
 
-        std::cout << "\n Processing CSV_param : " << csv_param << "\n";
+        utest_log::debug() << "\n Processing CSV_param : " << csv_param << "\n";
 
         // for (const auto& input_csv : inputs)
         const auto& input_csv = csv_param;

@@ -27,6 +27,8 @@
 
 #include "regression_test.h"
 
+#include "logger/logger.h"
+
 /// @brief namespace for Unit tests of the C++ library
 namespace VPUNN_unit_tests {
 using namespace VPUNN;
@@ -184,7 +186,7 @@ protected:
         show_wl_info = false;
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               DataType_ToText.at(static_cast<int>(wl.inputs[0].get_dtype())) + 
@@ -1242,7 +1244,7 @@ protected:
         show_wl_info = false;
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               " in_H:" + std::to_string(wl.inputs[0].get_shape()[1]) +
@@ -1551,7 +1553,7 @@ protected:
         show_wl_info = false;
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               " out_H:" + std::to_string(wl.outputs[0].get_shape()[1]) + 
@@ -2269,7 +2271,7 @@ protected:
         };
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               " in_C:" + std::to_string(wl.inputs[0].get_shape()[2]) + 
@@ -2443,7 +2445,7 @@ protected:
             false,                                                     //
     };
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type +
                               " H=:" + std::to_string(wl.inputs[0].get_shape()[1]) + 
@@ -2741,7 +2743,7 @@ protected:
         show_wl_info = false;
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               " Operation:" + Operation_ToText.at(static_cast<int>(wl.op)) + 
@@ -2758,8 +2760,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4634_4662_SOHO_test) {
     const DPUWorkload wl_SOHO_16x16{mod_execution(wl_SOHO_8x16, ExecutionMode::CUBOID_16x16)};
     const DPUWorkload wl_SOHO_4x16{mod_execution(wl_SOHO_8x16, ExecutionMode::CUBOID_4x16)};
 
-    std::cout << "*************************************************** wl_4634 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4634 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
              {tc(wl_SOHO_8x16, 3935, "SOHO 4634 _8x16")},   // v17:  GT:
@@ -2776,8 +2778,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4634_4662_HK_test) {
     const DPUWorkload wl_HK_16x16{mod_execution(wl_HK_8x16, ExecutionMode::CUBOID_16x16)};
     const DPUWorkload wl_HK_4x16{mod_execution(wl_HK_8x16, ExecutionMode::CUBOID_4x16)};
 
-    std::cout << "*************************************************** wl_4634 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4634 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
              {tc(wl_HK_8x16,   4154, "HK 4634  _8x16 "  )},  // v17:  GT: 
@@ -2793,8 +2795,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4634_4662_SOK_test) {
     const DPUWorkload wl_SOK_8x16{mod_execution(wl_SOK_16x16, ExecutionMode::CUBOID_8x16)};
     const DPUWorkload wl_SOK_4x16{mod_execution(wl_SOK_16x16, ExecutionMode::CUBOID_4x16)};
 
-    std::cout << "*************************************************** wl_4634 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4634 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
              {tc(wl_SOK_16x16,  3490, "SOK 4634 16x16", pc,36  )}, // v17:  GT:
@@ -2835,8 +2837,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4634_4662_SOHO_extra_K6
     DPUWorkload SOHO_K16_4x16{std::move(SOHO_4x16)};
     SOHO_K16_4x16.outputs[0] = VPUTensor(28, 7, 16, 1, DataType::UINT8);
 
-    std::cout << "*************************************************** wl_4634 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4634 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
 
@@ -2863,8 +2865,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4648_SOHO_test) {
     const DPUWorkload wl_SOHO_16x16{mod_execution(wl_SOHO_8x16, ExecutionMode::CUBOID_16x16)};
     const DPUWorkload wl_SOHO_4x16{mod_execution(wl_SOHO_8x16, ExecutionMode::CUBOID_4x16)};
 
-    std::cout << "*************************************************** wl_4648 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4648 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
              {tc(wl_SOHO_16x16, 3946, "SOHO 4648 16x16")}, // v17:  GT:
@@ -2884,8 +2886,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4648_HK_test) {
     const DPUWorkload wl_HK_16x16{mod_execution(wl_HK_8x16, ExecutionMode::CUBOID_16x16)};
     const DPUWorkload wl_HK_4x16{mod_execution(wl_HK_8x16, ExecutionMode::CUBOID_4x16)};
 
-    std::cout << "*************************************************** wl_4648 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4648 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
              {tc(wl_HK_16x16,   4051, "HK 4648 16x16"  )}, // v17:  GT: 
@@ -2904,8 +2906,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4648_SOK_test) {
     const DPUWorkload wl_SOK_8x16{mod_execution(wl_SOK_16x16, ExecutionMode::CUBOID_8x16)};
     const DPUWorkload wl_SOK_4x16{mod_execution(wl_SOK_16x16, ExecutionMode::CUBOID_4x16)};
 
-    std::cout << "*************************************************** wl_4648 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4648 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
              {tc(wl_SOK_16x16,  3681, "SOK 4648 16x16" , pc, 26 )}, // v17:  GT:
@@ -2994,8 +2996,8 @@ TEST_F(Regression_tests_MEXP_C2_EISXW_126389_NPU40, CONV_4676_SOK_SOHO_HK_test) 
     const DPUWorkload SOK_8x16{mod_execution(SOK_16x16, ExecutionMode::CUBOID_8x16)};
     const DPUWorkload SOK_4x16{mod_execution(SOK_16x16, ExecutionMode::CUBOID_4x16)};
 
-    std::cout << "*************************************************** wl_4676  K3x3 s =2 "
-                 "****************************************************\n ";
+    utest_log::debug() << "*************************************************** wl_4676  K3x3 s =2 "
+                         "****************************************************\n ";
     const std::vector<GTestCase> tests{
             // clang-format off
              {tc(SOK_16x16,  3681, "SOK 4676 16x16"  )}, // v17:  GT:
@@ -3100,7 +3102,7 @@ protected:
         show_wl_info = false;
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               " exec_order:" + ExecutionMode_ToText.at(static_cast<int>(wl.execution_order)) +"\n";
@@ -3280,7 +3282,7 @@ protected:
         show_wl_info = false;
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               " Operation: \t" + Operation_ToText.at(static_cast<int>(wl.op)) +"\n";
@@ -3299,7 +3301,7 @@ protected:
 //     // EXPECT_EQ(1, 0);  // force fail, uncomment to have the log in tests
 //
 //     {
-//         std::cout << "\n----------------------CLUSTER "
+//         utest_log::debug() << "\n----------------------CLUSTER "
 //                      "0---------------------------------------------------------------------------  ";
 //
 //         const std::vector<GTestCase> tests{
@@ -3316,7 +3318,7 @@ protected:
 //         executeTests(tests);
 //     }
 //     {
-//         std::cout << "\n----------------------CLUSTER "
+//         utest_log::debug() << "\n----------------------CLUSTER "
 //                      "1-----------------------------------------------------------------------------  ";
 //
 //         const std::vector<GTestCase> tests{
@@ -3519,7 +3521,7 @@ protected:
         show_wl_info = false;
     }
 
-    std::string test_message(const DPUWorkload &wl, std::string tensor_type) const override {
+    std::string test_message(const DPUWorkload& wl, std::string tensor_type) const override {
         // clang-format off
         std::string message = tensor_type + " tensor " +
                               " Op: " + Operation_ToText.at(static_cast<int>(wl.op)) +

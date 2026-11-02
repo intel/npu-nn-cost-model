@@ -1,15 +1,15 @@
 #include "vpu/shave/VPUEM_models.h"
 
 #include <gtest/gtest.h>
+#include "logger/logger.h"
 #include "vpu/types.h"
 #include "vpu/vpuem_types.h"
 
-
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <vector>
 
-namespace VPUNN_unit_tests{
+namespace VPUNN_unit_tests {
 using namespace VPUNN;
 
 struct OperationTestData {
@@ -17,37 +17,40 @@ struct OperationTestData {
     std::vector<int> expected_cycles;
 };
 
-
-class VPUEMPiecewiseShvTest : public ::testing::TestWithParam <OperationTestData> {
+class VPUEMPiecewiseShvTest : public ::testing::TestWithParam<OperationTestData> {
 protected:
-    std::vector<SHAVEWorkload> test_vectors = {
-        { "test_op",
-        VPUDevice::VPU_2_7,
-        {VPUTensor(32, 32, 32, 1, DataType::FLOAT16, Layout::ZXY)},
-        {VPUTensor(32, 32, 32, 1, DataType::FLOAT16, Layout::ZXY)},
-        },
-        {"test_op",
-        VPUDevice::VPU_2_7,
-        {VPUTensor(15, 32, 15, 1, DataType::FLOAT16, Layout::ZXY)},
-        {VPUTensor(15, 32, 15, 1, DataType::FLOAT16, Layout::ZXY)},
-        },
-        {"test_op",
-        VPUDevice::VPU_2_7,
-        {VPUTensor(8, 32, 8, 1, DataType::FLOAT16, Layout::ZXY)},
-        {VPUTensor(8, 32, 8, 1, DataType::FLOAT16, Layout::ZXY)},
-        },
-        {"test_op",
-        VPUDevice::VPU_2_7,
-        {VPUTensor(17, 32, 17, 1, DataType::FLOAT16, Layout::ZXY)},
-        {VPUTensor(17, 32, 17, 1, DataType::FLOAT16, Layout::ZXY)},
-        },
-        {"test_op",
-        VPUDevice::VPU_2_7,
-        {VPUTensor(29, 32, 29, 1, DataType::FLOAT16, Layout::ZXY)},
-        {VPUTensor(29, 32, 29, 1, DataType::FLOAT16, Layout::ZXY)},
-        }};
+    std::vector<SHAVEWorkload> test_vectors = {{
+                                                       "test_op",
+                                                       VPUDevice::VPU_2_7,
+                                                       {VPUTensor(32, 32, 32, 1, DataType::FLOAT16, Layout::ZXY)},
+                                                       {VPUTensor(32, 32, 32, 1, DataType::FLOAT16, Layout::ZXY)},
+                                               },
+                                               {
+                                                       "test_op",
+                                                       VPUDevice::VPU_2_7,
+                                                       {VPUTensor(15, 32, 15, 1, DataType::FLOAT16, Layout::ZXY)},
+                                                       {VPUTensor(15, 32, 15, 1, DataType::FLOAT16, Layout::ZXY)},
+                                               },
+                                               {
+                                                       "test_op",
+                                                       VPUDevice::VPU_2_7,
+                                                       {VPUTensor(8, 32, 8, 1, DataType::FLOAT16, Layout::ZXY)},
+                                                       {VPUTensor(8, 32, 8, 1, DataType::FLOAT16, Layout::ZXY)},
+                                               },
+                                               {
+                                                       "test_op",
+                                                       VPUDevice::VPU_2_7,
+                                                       {VPUTensor(17, 32, 17, 1, DataType::FLOAT16, Layout::ZXY)},
+                                                       {VPUTensor(17, 32, 17, 1, DataType::FLOAT16, Layout::ZXY)},
+                                               },
+                                               {
+                                                       "test_op",
+                                                       VPUDevice::VPU_2_7,
+                                                       {VPUTensor(29, 32, 29, 1, DataType::FLOAT16, Layout::ZXY)},
+                                                       {VPUTensor(29, 32, 29, 1, DataType::FLOAT16, Layout::ZXY)},
+                                               }};
 
-     inline static const std::vector<CostFunction3SlopesDescriptor> costFunction3SlopesDataSigmoid = {
+    inline static const std::vector<CostFunction3SlopesDescriptor> costFunction3SlopesDataSigmoid = {
             {8, 124.99999999999993F, {2.782608695652174F, 0.4923076923076922F, 0.04669260700389106F}},
             {16, 140.99999999999991F, {3.657142857142858F, 0.4923076923076922F, 0.04669260700389106F}},
             {32, 140.9999999999998F, {3.1999999999999993F, 0.4923076923076922F, 0.04669260700389106F}},
@@ -176,19 +179,17 @@ TEST_P(VPUEMPiecewiseShvTest, OperationTest) {
     int nr = 0;
     for (long unsigned int idx = 0; idx < test_vectors.size(); idx++) {
         ++nr;
-        std::cout << nr << std::endl;
-        EXPECT_EQ(operation_param.operation.getShaveCycles(test_vectors[idx]),
-                  operation_param.expected_cycles[idx]);
+        utest_log::debug() << nr << std::endl;
+        EXPECT_EQ(operation_param.operation.getShaveCycles(test_vectors[idx]), operation_param.expected_cycles[idx]);
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(VPUEMPiecewiseShvTests, VPUEMPiecewiseShvTest,
-                         ::testing::Values(OperationTestData{VPUEMPiecewiseShvTest::sigmoid_model(),
-                                                             {10508, 2489, 4316, 3137, 8726}},
+INSTANTIATE_TEST_SUITE_P(
+        VPUEMPiecewiseShvTests, VPUEMPiecewiseShvTest,
+        ::testing::Values(OperationTestData{VPUEMPiecewiseShvTest::sigmoid_model(), {10508, 2489, 4316, 3137, 8726}},
                           OperationTestData{VPUEMPiecewiseShvTest::add_model(), {10124, 2402, 3804, 3026, 8408}},
                           OperationTestData{VPUEMPiecewiseShvTest::softmax_model(), {10508, 2489, 4316, 3137, 8726}},
-                          OperationTestData{VPUEMPiecewiseShvTest::gelu_model(),
-                                            {54421, 12445, 9701, 15837, 45093}},
+                          OperationTestData{VPUEMPiecewiseShvTest::gelu_model(), {54421, 12445, 9701, 15837, 45093}},
                           OperationTestData{VPUEMPiecewiseShvTest::hswish_model(), {19603, 4555, 5859, 5771, 16259}},
                           OperationTestData{VPUEMPiecewiseShvTest::log_model(), {10508, 2489, 4316, 3137, 8726}},
                           OperationTestData{VPUEMPiecewiseShvTest::mul_model(), {10124, 2402, 3804, 3026, 8408}},

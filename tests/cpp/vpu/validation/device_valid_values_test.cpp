@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 
 #include "common/common_helpers.h"
+#include "logger/logger.h"
 #include "vpu/validation/dpu_operations_validator.h"  //for mock
 
 #include <algorithm>
@@ -52,7 +53,8 @@ protected:
                                             valid_operations_default,           //
                                             alignement_size_bytes_def,          //
                                             out_innermost_dim_alignment_def,    //
-                                            legacy_samples_alignment_weights_def) {
+                                            legacy_samples_alignment_weights_def,
+                                            valid_mpe_engines_def) {
         }
         DeviceValidValuesMock()
                 : VPUNN::IDeviceValidValues(specific_behaviours,
@@ -69,7 +71,8 @@ protected:
                                             valid_operations_default,           //
                                             alignement_size_bytes_def,          //
                                             out_innermost_dim_alignment_def,    //
-                                            legacy_samples_alignment_weights_def) {
+                                            legacy_samples_alignment_weights_def,
+                                            valid_mpe_engines_def) {
         }
 
         /// constructor that helps to test memory behavior for different  weights alignment
@@ -90,7 +93,8 @@ protected:
                                             valid_operations_default,           //
                                             alignement_size_bytes_def,          //
                                             out_innermost_dim_alignment_def,    //
-                                            legacy_samples_alignment_weights_def) {
+                                            legacy_samples_alignment_weights_def,
+                                            valid_mpe_engines_def) {
         }
 
         // const VPUNN::Channels& get_output_channels_range(const VPUNN::DPUOperation&) const override {
@@ -176,10 +180,12 @@ protected:
 
         inline static const int weigths_alignment_B_def{16};
         inline static const bool legacy_samples_alignment_weights_def{false};  // no alignment (samples)
-        inline static const int out_innermost_dim_alignment_def{1};  // bytes
+        inline static const int out_innermost_dim_alignment_def{1};            // bytes
         inline static const int input_heigth_start_factor_SOH_def{1};
 
         inline static const int alignement_size_bytes_def{16 * 1024};
+
+        inline static const Values<MPEEngine> valid_mpe_engines_def{MPEEngine::SCL};
 
         inline static const Values<DataType> valid_datatypes_subset{
                 {DataType::UINT8, DataType::INT8, DataType::FLOAT16, DataType::BFLOAT16}};
@@ -295,8 +301,8 @@ TEST_F(IntfDeviceValidValuesTest, Input1_memory_computation_test) {
         int i = 1;  // index of test cases
         for (const auto& t : tests) {
             VPUNN::DPUWorkload wl_ref{t.t_in.wl};
-            std::cout << "Test case "
-                      << " " << i << ": " << test_info(wl_ref) << "\n";
+            utest_log::debug() << "Test case "
+                              << " " << i << ": " << test_info(wl_ref) << "\n";
 
             {
                 long long mem = 0;
@@ -532,7 +538,7 @@ TEST_F(IntfDeviceValidValuesTest, defaultSwizz) {
     auto verify_swizz = [](const TestsVector& tests) {
         int i = 1;  // test case index
         for (const auto& t : tests) {
-            std::cout << "Test case: " << i << "\n";
+            utest_log::debug() << "Test case: " << i << "\n";
             EXPECT_EQ(t.t_in.wl.input_swizzling[0], t.t_exp.swizIn0);    // input0 swizzling
             EXPECT_EQ(t.t_in.wl.input_swizzling[1], t.t_exp.swizIn1);    // input1 swizzling
             EXPECT_EQ(t.t_in.wl.output_swizzling[0], t.t_exp.swizOut0);  // output0 swizzling
@@ -889,6 +895,40 @@ TEST_F(IntfDeviceValidValuesTest, Restrict_DataTypes_Test) {
 
     EXPECT_EQ(dut.restrict_datatype(DataType::HF8), DataType::HF8);
     EXPECT_EQ(dut.restrict_datatype(DataType::BF8), DataType::HF8);
+}
+
+/// @brief Verifies get_valid_engines()/is_valid_engine() return the expected MPEEngine set for every device.
+TEST_F(IntfDeviceValidValuesTest, GetValidEngines_PerDevice) {
+    VPUNN::DPU_OperationValidator validator;
+
+    auto expect_scl_only = [&](VPUDevice device) {
+        const auto& config = validator.get_config(device);
+        EXPECT_EQ(config.get_valid_engines(), VPUNN::Values<MPEEngine>{MPEEngine::SCL})
+                << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+        EXPECT_TRUE(config.is_valid_engine(MPEEngine::SCL)) << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+        EXPECT_FALSE(config.is_valid_engine(MPEEngine::DCIM))
+                << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+    };
+
+    auto expect_scl_and_dcim = [&](VPUDevice device) {
+        const auto& config = validator.get_config(device);
+        const auto& engines = config.get_valid_engines();
+        EXPECT_EQ(engines.size(), 2u) << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+        EXPECT_NE(std::find(engines.begin(), engines.end(), MPEEngine::SCL), engines.end())
+                << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+        EXPECT_NE(std::find(engines.begin(), engines.end(), MPEEngine::DCIM), engines.end())
+                << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+        EXPECT_TRUE(config.is_valid_engine(MPEEngine::SCL)) << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+        EXPECT_TRUE(config.is_valid_engine(MPEEngine::DCIM))
+                << "device: " << VPUDevice_ToText.at(static_cast<int>(device));
+    };
+
+    expect_scl_only(VPUDevice::VPU_2_0);
+    expect_scl_only(VPUDevice::VPU_2_1);
+    expect_scl_only(VPUDevice::VPU_2_7);
+    expect_scl_only(VPUDevice::VPU_4_0);
+    expect_scl_only(VPUDevice::NPU_5_0);
+    expect_scl_only(VPUDevice::NPU_5_0_W);
 }
 
 class DPUOperationTest : public ::testing::Test {

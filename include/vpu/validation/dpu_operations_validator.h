@@ -127,7 +127,9 @@ public:
         Checker checker;
         try {
             checker.check_is_in_list(w.device, config.get_devices(), "Device");
-            checker.check_is_in_list(w.operation, config.get_valid_operations(), "Operation");
+            checker.check_is_in_list(w.operation, config.get_valid_operations(),
+                                     "Operation");  // todo: check vs MPEEngine
+            checker.check_is_in_list(w.mpe_engine, config.get_valid_engines(), "MPEEngine");
 
             checker.check_is_in_list(w.output_write_tiles, config.get_output_write_tile_options(),
                                      "output_write_tiles");

@@ -23,6 +23,7 @@
 #include "vpu/shave/generated_shave_factors_population_heuristic.h"
 #include "vpu/shave/generated_shave_factors_population_npu5.h"
 
+#include "logger/logger.h"
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -82,7 +83,7 @@ protected:
         const ShaveOpExecutor& shvOp{t_in.shaveOp};
 
         std::string t_header{"** Test Case: " + test_case + "\n"};
-        std::cout << ">> " << t_header << std::endl;
+        utest_log::debug() << ">> " << t_header << std::endl;
 
         Logger::clear2ndlog();
         unsigned cost_cyc{};
@@ -93,9 +94,9 @@ protected:
                 << t_header << " Cost not in interval. cost: " << cost_cyc << ",  expected in [ " << t_exp.min_cyc
                 << " , " << t_exp.max_cyc << " ] \n";
 
-        std::cout << t_header << " *** ERROR/Cycles code: " << cost_cyc << " : " << Cycles::toErrorText(cost_cyc)
-                  << std::endl
-                  << "------------------------------------------------------------------------" << std::endl;
+        utest_log::debug() << t_header << " *** ERROR/Cycles code: " << cost_cyc << " : "
+                          << Cycles::toErrorText(cost_cyc) << std::endl
+                          << "------------------------------------------------------------------------" << std::endl;
     }
 
     void executeTests(const TestsVector& tests) {
@@ -382,7 +383,7 @@ protected:
         const ShaveOpExecutor& shvOp{t_in.shaveOp};
 
         std::string t_header{"** Test Case: " + test_case + "\n"};
-        std::cout << ">> " << t_header << std::endl;
+        utest_log::debug() << ">> " << t_header << std::endl;
 
         Logger::clear2ndlog();
         unsigned cost_cyc{};
@@ -393,9 +394,9 @@ protected:
                 << t_header << " Cost not in interval. cost: " << cost_cyc << ",  expected in [ " << t_exp.min_cyc
                 << " , " << t_exp.max_cyc << " ] \n";
 
-        std::cout << t_header << " *** ERROR/Cycles code: " << cost_cyc << " : " << Cycles::toErrorText(cost_cyc)
-                  << std::endl
-                  << "------------------------------------------------------------------------" << std::endl;
+        utest_log::debug() << t_header << " *** ERROR/Cycles code: " << cost_cyc << " : "
+                          << Cycles::toErrorText(cost_cyc) << std::endl
+                          << "------------------------------------------------------------------------" << std::endl;
     }
 
     void executeTests(const TestsVector& tests) {
@@ -766,14 +767,14 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
         std::vector<std::string> available_functions = list_with_factors.getShaveList();
         EXPECT_GT(available_functions.size(), 0) << "ShaveInstanceHolderWithFactors should be populated with functions";
 
-        std::cout << "NPU 4.0 ShaveInstanceHolderWithFactors populated with " << available_functions.size()
-                  << " functions" << std::endl;
+        utest_log::debug() << "NPU 4.0 ShaveInstanceHolderWithFactors populated with " << available_functions.size()
+                          << " functions" << std::endl;
 
         // Test the FactorsLookUpTable directly to see what factors are defined
         PopulatedFactorsLUT_NPU5 test_lut;
 
         size_t functions_with_non_default_factors = 0;
-        std::cout << "Functions with non-default factors:" << std::endl;
+        utest_log::debug() << "Functions with non-default factors:" << std::endl;
 
         for (const auto& fn : available_functions) {
             auto factor = test_lut.getOperatorFactor(fn);
@@ -781,13 +782,14 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
             // Check for different factor than default one
             if (factor != 1.0f) {
                 functions_with_non_default_factors++;
-                std::cout << "  " << fn << " -> " << factor << std::endl;
+                utest_log::debug() << "  " << fn << " -> " << factor << std::endl;
             }
         }
 
-        std::cout << "Total functions with non-default factors: " << functions_with_non_default_factors << std::endl;
-        std::cout << "Functions with default factors (1.0f): "
-                  << (available_functions.size() - functions_with_non_default_factors) << std::endl;
+        utest_log::info() << "Total functions with non-default factors: " << functions_with_non_default_factors
+                         << std::endl;
+        utest_log::debug() << "Functions with default factors (1.0f): "
+                          << (available_functions.size() - functions_with_non_default_factors) << std::endl;
     }
 
     // Test NPU 5.0 with factors - only check if populated
@@ -802,8 +804,8 @@ TEST_F(ShaveCollectionTest, CheckCMakeFactorExtractionAndPopulate) {
         std::vector<std::string> available_functions = list_with_factors.getShaveList();
         EXPECT_GT(available_functions.size(), 0) << "ShaveInstanceHolderWithFactors should be populated with functions";
 
-        std::cout << "NPU 5.0 ShaveInstanceHolderWithFactors populated with " << available_functions.size()
-                  << " functions" << std::endl;
+        utest_log::debug() << "NPU 5.0 ShaveInstanceHolderWithFactors populated with " << available_functions.size()
+                          << " functions" << std::endl;
     }
 
     // Verify that the FactorsLookUpTable populate() method works
@@ -879,14 +881,12 @@ TEST_F(ShaveCollectionTest, HeuristicNPU50FactorsDifferenceDirectComparison) {
         float expected_factor;
     };
 
-    std::vector<TestCase> test_cases = {{"Convert", 0.08166034723608062f}, {"Cos", 1.1482554014355923f},
-                                        {"Divide", 0.5077813213239347f},   {"GridSample", 7.727271210663582f},
-                                        {"MVN", 1.2743491540214282f},      {"Multiply", 0.31000275558004964f},
-                                        {"Power", 0.6637379189155266f},    {"SDPAExtended", 1.529963043406371f},
-                                        {"Select", 1.9981458187103271f},   {"Sin", 1.1723659585399842f},
-                                        {"Softmax", 3.033128212865472f},   {"Sqrt", 0.8798144593730005f},
-                                        {"Subtract", 0.9027251763200862f}, {"Swish", 1.3244884910485935f},
-                                        {"TopK", 0.08432105639965f}};
+    std::vector<TestCase> test_cases = {
+            {"Convert", 0.08166034723608062f},  {"Cos", 1.1482554014355923f},      {"Divide", 0.5077813213239347f},
+            {"GridSample", 7.727271210663582f}, {"MVN", 1.2743491540214282f},      {"Multiply", 0.31000275558004964f},
+            {"Power", 0.6637379189155266f},     {"Attention", 1.529963043406371f}, {"Select", 1.9981458187103271f},
+            {"Sin", 1.1723659585399842f},       {"Softmax", 3.033128212865472f},   {"Sqrt", 0.8798144593730005f},
+            {"Subtract", 0.9027251763200862f},  {"Swish", 1.3244884910485935f},    {"TopK", 0.08432105639965f}};
 
     // Create test workloads with different sizes
     std::vector<std::tuple<int, int, int, int>> test_shapes = {{10, 100, 5, 1},
@@ -1041,14 +1041,12 @@ TEST_F(ShaveCollectionTest, HeuristicNPU50FactorsDifference) {
         float expected_factor;
     };
 
-    std::vector<TestCase> test_cases = {{"Convert", 0.08166034723608062f}, {"Cos", 1.1482554014355923f},
-                                        {"Divide", 0.5077813213239347f},   {"GridSample", 7.727271210663582f},
-                                        {"MVN", 1.2743491540214282f},      {"Multiply", 0.31000275558004964f},
-                                        {"Power", 0.6637379189155266f},    {"SDPAExtended", 1.529963043406371f},
-                                        {"Select", 1.9981458187103271f},   {"Sin", 1.1723659585399842f},
-                                        {"Softmax", 3.033128212865472f},   {"Sqrt", 0.8798144593730005f},
-                                        {"Subtract", 0.9027251763200862f}, {"Swish", 1.3244884910485935f},
-                                        {"TopK", 0.08432105639965f}};
+    std::vector<TestCase> test_cases = {
+            {"Convert", 0.08166034723608062f},  {"Cos", 1.1482554014355923f},      {"Divide", 0.5077813213239347f},
+            {"GridSample", 7.727271210663582f}, {"MVN", 1.2743491540214282f},      {"Multiply", 0.31000275558004964f},
+            {"Power", 0.6637379189155266f},     {"Attention", 1.529963043406371f}, {"Select", 1.9981458187103271f},
+            {"Sin", 1.1723659585399842f},       {"Softmax", 3.033128212865472f},   {"Sqrt", 0.8798144593730005f},
+            {"Subtract", 0.9027251763200862f},  {"Swish", 1.3244884910485935f},    {"TopK", 0.08432105639965f}};
 
     // Create diverse test workloads
     std::vector<std::tuple<int, int, int, int>> test_shapes = {{10, 100, 5, 1},

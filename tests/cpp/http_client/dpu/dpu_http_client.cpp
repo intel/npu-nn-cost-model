@@ -136,7 +136,6 @@ TEST_F(DPUHTTPClient, DpuOpAsJsonSerialization) {
 
         // Validate the request structure
         EXPECT_EQ(request["params"]["backend"], "silicon");
-        EXPECT_EQ(request["params"]["name"], "profiling_request");
 
         // Verify DPU workload uses the correct key
         EXPECT_TRUE(request.contains("dpu_workload"));

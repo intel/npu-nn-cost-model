@@ -16,6 +16,7 @@
 #include <vector>
 // #include "core/cache.h"
 //  #include "vpu_cost_model.h"
+#include "logger/logger.h"
 #include "vpu/types.h"
 
 /// @brief namespace for Unit tests of the C++ library
@@ -72,10 +73,10 @@ TEST_F(SHAVECacheDescriptorTest, BasicAssertionsSHAVE) {
                                 {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
                                 {{1}, p2, p3}};
         // std::hash<int> k;
-        // std::cout << k(7);
+        // utest_log::debug() << k(7);
 
         //// std::hash<SHAVEWorkload> k1;
-        ////  std::cout << k1(wl);
+        ////  utest_log::debug() << k1(wl);
 
         // p3 < p2;
 

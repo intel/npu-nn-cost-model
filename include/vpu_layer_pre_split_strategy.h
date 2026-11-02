@@ -48,4 +48,4 @@ inline std::ostream& operator<<(std::ostream& stream, const VPULayersPreSplitStr
 
 } // namespace VPUNN
 
-#endif
+#endif // VPUNN_LAYER_PRE_SPLIT_STRATEGY_H
