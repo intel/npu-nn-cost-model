@@ -337,6 +337,10 @@ set(P1 "shave_layers_heuristic_npu5.csv")
 set(P2 "shave_heuristic_npu5.inl")
 PARSE_HEURISTIC_CSV(${P1} ${P2} "Shave Heuristic Models NPU5" 1950 1114)
 
+set(P1 "shave_layers_heuristic_npu6.csv")
+set(P2 "shave_heuristic_npu6.inl")
+PARSE_HEURISTIC_CSV(${P1} ${P2} "Shave Heuristic Models NPU6" 1950 1114)
+
 # shave library for new cpps
 if(VPUNN_BUILD_SHARED_LIB)
     add_library(vpunn_shave SHARED)
@@ -399,6 +403,14 @@ GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
     "_Heuristic"    # the class name will be PopulatedFactorsLUT_Heuristic
     "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_factors_population_heuristic.h"
 )
+
+## This is an example how you would add another factors file
+# GEN_HEADER_FILE_FOR_FACTORS_POPULATE(
+#     "${CMAKE_CURRENT_SOURCE_DIR}/shave_factors_npu6.csv"
+#     "_NPU6"         # the class name will be PopulatedFactorsLUT_NPU6
+#     "${COST_MODEL_BINARY_DIR}/include/vpu/shave/generated_shave_factors_population_npu6.h"
+# )
+
 # === Generate SHAVE Prefetch Cost Mapping from per-device CSV files === #
 
 # Returns ON only when DEVICE_VALUE exactly matches one of EXPECTED_DEVICES.
@@ -488,10 +500,13 @@ endfunction()
 # the corresponding build_npu*_lut() function body in ShavePrefetchCostPopulation.h.in.
 function(GEN_HEADER_FILE_FOR_PREFETCH_POPULATE output_file)
     set(POPULATE_CONTENT_NPU5 "")
+    set(POPULATE_CONTENT_NPU6 "")
     set(POPULATE_INFO "")
 
     # Open-source device set
     APPEND_PREFETCH_CONTENT_FROM_CSV("${CMAKE_CURRENT_SOURCE_DIR}/shave_prefetch_costs_npu5.csv" POPULATE_CONTENT_NPU5 "NPU_5_0")
+
+    APPEND_PREFETCH_CONTENT_FROM_CSV("${CMAKE_CURRENT_SOURCE_DIR}/shave_prefetch_costs_npu6.csv" POPULATE_CONTENT_NPU6 "NPU_6_0")
     configure_file(ShavePrefetchCostPopulation.h.in ${output_file})
     message(STATUS " >> Generated Shave Prefetch Population Header File: ${output_file}")
 endfunction()

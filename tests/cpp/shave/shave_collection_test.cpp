@@ -650,6 +650,71 @@ TEST_F(ShaveCollectionTest, DefaultCaseTestNPU50) {
     }
 }
 
+TEST_F(ShaveCollectionTest, DefaultCaseTestNPU60) {
+    {
+        ShaveInstanceHolder_Mock_NPU60 ih;
+        EXPECT_EQ(ih.getDevice(), VPUDevice::NPU_6_0);
+        const DeviceShaveContainer& list = ih.getContainer();
+
+        EXPECT_EQ(list.getDevice(), VPUDevice::NPU_6_0);
+        const std::string fn{"default"};
+        EXPECT_EQ(list.existsShave(fn), true);
+        const auto& shaveOp = list.getShaveExecutor(fn);
+        const auto ss = shaveOp.getName();
+        EXPECT_EQ(ss, fn);
+        EXPECT_EQ(shaveOp.getName(), fn);
+
+        ShaveInstanceHolder_Mock_NPU50 ih_npu5;
+        EXPECT_EQ(ih_npu5.getDevice(), VPUDevice::NPU_5_0);
+        const DeviceShaveContainer& list_npu5 = ih_npu5.getContainer();
+
+        EXPECT_EQ(list_npu5.getDevice(), VPUDevice::NPU_5_0);
+        const std::string fn_npu5{"default"};
+        EXPECT_EQ(list_npu5.existsShave(fn_npu5), true);
+        const auto& shaveOp_npu5 = list_npu5.getShaveExecutor(fn_npu5);
+        const auto ss_npu5 = shaveOp_npu5.getName();
+        EXPECT_EQ(ss_npu5, fn_npu5);
+        EXPECT_EQ(shaveOp_npu5.getName(), fn_npu5);
+
+        {
+            SHAVEWorkload swl_npu6("default", VPUDevice::NPU_6_0, {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                                   {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)});
+            CyclesInterfaceType cycles_npu6 = shaveOp.dpuCycles(swl_npu6);
+            EXPECT_NEAR(cycles_npu6, 5000, 10);
+
+            SHAVEWorkload swl_npu5("default", VPUDevice::NPU_5_0, {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                                   {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)});
+            CyclesInterfaceType cycles_npu5 = shaveOp_npu5.dpuCycles(swl_npu5);
+            EXPECT_NEAR(cycles_npu5, 5000, 10);
+
+            EXPECT_EQ(cycles_npu6, cycles_npu5);
+        }
+        {
+            SHAVEWorkload swl_npu6("default", VPUDevice::NPU_6_0, {VPUTensor(7, 29, 3, 1, DataType::FLOAT16)},
+                                   {VPUTensor(7, 29, 3, 1, DataType::FLOAT16)});
+            CyclesInterfaceType cycles_npu6 = shaveOp.dpuCycles(swl_npu6);
+            EXPECT_NEAR(cycles_npu6, 7 * 29 * 3, 10);
+
+            SHAVEWorkload swl_npu5("default", VPUDevice::NPU_5_0, {VPUTensor(7, 29, 3, 1, DataType::FLOAT16)},
+                                   {VPUTensor(7, 29, 3, 1, DataType::FLOAT16)});
+            CyclesInterfaceType cycles_npu5 = shaveOp_npu5.dpuCycles(swl_npu5);
+            EXPECT_NEAR(cycles_npu5, 7 * 29 * 3, 10);
+            EXPECT_EQ(cycles_npu6, cycles_npu5);
+        }
+        {
+            SHAVEWorkload swl_npu6("default", VPUDevice::NPU_6_0, {VPUTensor(101, 101, 2, 1, DataType::FLOAT16)},
+                                   {VPUTensor(101, 101, 2, 1, DataType::FLOAT16)});
+            CyclesInterfaceType cycles_npu6 = shaveOp.dpuCycles(swl_npu6);
+            EXPECT_NEAR(cycles_npu6, 101 * 101 * 2, 10);
+
+            SHAVEWorkload swl_npu5("default", VPUDevice::NPU_5_0, {VPUTensor(101, 101, 2, 1, DataType::FLOAT16)},
+                                   {VPUTensor(101, 101, 2, 1, DataType::FLOAT16)});
+            CyclesInterfaceType cycles_npu5 = shaveOp_npu5.dpuCycles(swl_npu5);
+            EXPECT_NEAR(cycles_npu5, 101 * 101 * 2, 10);
+            EXPECT_EQ(cycles_npu6, cycles_npu5);
+        }
+    }
+}
 
 TEST_F(ShaveCollectionTest, InstanceHolderWithFloatFactors) {
     // Thread-local storage for test factors (to avoid static member issues in local class)
@@ -1224,6 +1289,60 @@ TEST_F(ShaveCollectionTest, instanceHolder_Smoke_NPU_50) {
     // delete &shaveOp;  // not good
 }
 
+TEST_F(ShaveCollectionTest, instanceHolder_Smoke_NPU_60) {
+    ShaveInstanceHolder_Mock_NPU60 ih;
+    EXPECT_EQ(ih.getDevice(), VPUDevice::NPU_6_0);
+    const DeviceShaveContainer& list = ih.getContainer();
+
+    // list.find
+    EXPECT_EQ(list.getDevice(), VPUDevice::NPU_6_0);
+    // EXPECT_EQ(list.map.size(), 2);
+
+    const std::string fn{"sigmoid"};
+    // const auto it = list.map.find(fn);
+
+    // EXPECT_NE(it, list.map.end());
+    EXPECT_EQ(list.existsShave(fn), true);
+
+    // auto& shaveOp = it->second;  // list[fn];
+    const auto& shaveOp = list.getShaveExecutor(fn);
+    const auto ss = shaveOp.getName();
+    EXPECT_EQ(ss, fn);
+    EXPECT_EQ(shaveOp.getName(), fn);
+
+    SHAVEWorkload swl_npu6("sigmoid", VPUDevice::NPU_6_0, {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                           {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)});
+    CyclesInterfaceType cycles_npu6 = shaveOp.dpuCycles(swl_npu6);
+    EXPECT_GT(cycles_npu6, 0);
+    // delete &shaveOp;  // not good
+    ShaveInstanceHolder_Mock_NPU50 ih_npu5;
+    EXPECT_EQ(ih_npu5.getDevice(), VPUDevice::NPU_5_0);
+    const DeviceShaveContainer& list_npu5 = ih_npu5.getContainer();
+
+    // list.find
+    EXPECT_EQ(list_npu5.getDevice(), VPUDevice::NPU_5_0);
+    // EXPECT_EQ(list.map.size(), 2);
+
+    const std::string fn_npu5{"sigmoid"};
+    // const auto it = list.map.find(fn);
+
+    // EXPECT_NE(it, list.map.end());
+    EXPECT_EQ(list.existsShave(fn_npu5), true);
+
+    // auto& shaveOp = it->second;  // list[fn];
+    const auto& shaveOp_npu5 = list_npu5.getShaveExecutor(fn_npu5);
+    const auto ss_npu5 = shaveOp_npu5.getName();
+    EXPECT_EQ(ss_npu5, fn_npu5);
+    EXPECT_EQ(shaveOp_npu5.getName(), fn_npu5);
+
+    SHAVEWorkload swl_npu5("sigmoid", VPUDevice::NPU_5_0, {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)},
+                           {VPUTensor(10, 100, 5, 1, DataType::FLOAT16)});
+    CyclesInterfaceType cycles_npu5 = shaveOp.dpuCycles(swl_npu5);
+    EXPECT_GT(cycles_npu5, 0);
+
+    EXPECT_EQ(cycles_npu5, cycles_npu6);
+    // delete &shaveOp;  // not good
+}
 
 TEST_F(ShaveCollectionTest, instanceHolder_27_40_Smoke) {
     const VPUDevice testDev{VPUDevice::VPU_2_7};
@@ -1399,7 +1518,6 @@ TEST_F(ShaveDevicesTest, HeuristicSelectorsForEnabledNPUDevicesArePopulated) {
     // newly added mapped NPU enum values fail fast if not wired.
     const auto known_unmapped = []() {
         std::vector<VPUDevice> devices;
-        devices.push_back(VPUDevice::NPU_RESERVED);
         devices.push_back(VPUDevice::NPU_RESERVED_1);
         return devices;
     }();
@@ -1444,7 +1562,6 @@ TEST_F(ShaveDevicesTest, HeuristicSelectorsForEnabledNPUDevicesArePopulated) {
 TEST_F(ShaveDevicesTest, HeuristicSelectorNominalFrequenciesMatchHWCharacteristics) {
     const auto known_unmapped = []() {
         std::vector<VPUDevice> devices;
-        devices.push_back(VPUDevice::NPU_RESERVED);
         devices.push_back(VPUDevice::NPU_RESERVED_1);
         return devices;
     }();

@@ -39,6 +39,7 @@ protected:
     ModelMap<VPUCostModel> dcim_cost_models{""};
 
     TestDCIMCostModel() {
+        dcim_cost_models.addModel(VPUDevice::NPU_6_0, NPU_6_0_MODEL_PATH); // model path is a stub, that should be replaced with real dcim model path
     }
 
     void SetUp() override {

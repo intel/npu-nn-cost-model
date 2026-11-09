@@ -21,6 +21,16 @@ private:
         return lut_npu5;
     }
 
+    /// @brief Returns the lazily-initialized prefetch cost LUT for NPU 6.0.
+    static const OperationPrefetchLUT& get_lut_npu6() {
+        static const OperationPrefetchLUT lut_npu6 = []() {
+            OperationPrefetchLUT lut;
+@POPULATE_CONTENT_NPU6@
+            return lut;
+        }();
+        return lut_npu6;
+    }
+
 public:
     /// @brief Returns the per-device operation prefetch LUT for the given device.
     ///
@@ -33,6 +43,8 @@ public:
         switch (device) {
             case VPUDevice::NPU_5_0:
                 return get_lut_npu5();
+            case VPUDevice::NPU_6_0:
+                return get_lut_npu6();
             default:
                 return empty_lut;
         }

@@ -26,7 +26,7 @@ using namespace VPUNN;
  *
  * Provides:
  *  - `perf`        — a default-constructed HWPerformanceModel under test.
- *  - `all_devices()` — full device list, with NPU_RESERVED/NPU_RESERVED_1 behind embargo guards.
+ *  - `all_devices()` — full device list, with NPU6/NPU_RESERVED_1 behind embargo guards.
  *  - `make_wl()`   — factory for minimal CONVOLUTION workloads with configurable
  *                    device, input dtype, output dtype and optional weight dtype.
  */
@@ -43,6 +43,7 @@ protected:
     /// Returns the full device list extended by embargo-guarded devices.
     std::vector<VPUDevice> all_devices() const {
         std::vector<VPUDevice> devs = base_devices;
+        devs.push_back(VPUDevice::NPU_6_0);
         return devs;
     }
 
@@ -221,6 +222,7 @@ TEST_F(TestHWPerformanceModel_DPUCycles, IdealMAC_Conv_VPUge27_ChannelLt16_Padde
     const std::vector<VPUDevice> ge27_devices{VPUDevice::VPU_2_7, VPUDevice::VPU_4_0, VPUDevice::NPU_5_0,
                                               VPUDevice::NPU_5_0_W};
     std::vector<VPUDevice> devs = ge27_devices;
+    devs.push_back(VPUDevice::NPU_6_0);
 
     for (const auto dev : devs) {
         DPUWorkload wl{
@@ -253,6 +255,7 @@ TEST_F(TestHWPerformanceModel_DPUCycles, IdealMAC_Conv_VPUge27_ChannelGe16_UsesA
     const std::vector<VPUDevice> ge27_devices{VPUDevice::VPU_2_7, VPUDevice::VPU_4_0, VPUDevice::NPU_5_0,
                                               VPUDevice::NPU_5_0_W};
     std::vector<VPUDevice> devs = ge27_devices;
+    devs.push_back(VPUDevice::NPU_6_0);
 
     for (const auto dev : devs) {
         DPUWorkload wl{
@@ -332,6 +335,40 @@ TEST_F(TestHWPerformanceModel_DPUCycles, IdealMAC_CMConv_InputLe4_VPU27toNPU5W_P
 }
 
 /**
+ * @brief CM_CONVOLUTION with input channels <= 4 on newer devices (> NPU_5_0_W)
+ *        is padded to 4 — compress-conv space optimisation aligns input channels to 4.
+ *
+ * Formula: kernel_W*kernel_H * out_W*out_H*out_C * 4
+ *          = 1*1 * 4*4*16 * 4 = 1024
+ */
+TEST_F(TestHWPerformanceModel_DPUCycles, IdealMAC_CMConv_InputLe4_NewerDevices_PaddedTo4) {
+    std::vector<VPUDevice> target_devices;
+    target_devices.push_back(VPUDevice::NPU_6_0);
+    if (target_devices.empty()) {
+        GTEST_SKIP() << "No target devices available (embargo not enabled)";
+    }
+
+    constexpr unsigned int in_C{3};  // <= 4
+    constexpr unsigned long int expected{1U * 1U * 4U * 4U * 16U * 4U};
+
+    for (const auto dev : target_devices) {
+        DPUWorkload wl{
+                dev,
+                Operation::CM_CONVOLUTION,
+                {VPUTensor(4, 4, in_C, 1, DataType::UINT8)},  // in_C = 3
+                {VPUTensor(4, 4, 16, 1, DataType::UINT8)},    // output
+                {1, 1},                                       // kernels
+                {1, 1},                                       // strides
+                {0, 0, 0, 0},                                 // padding
+                ExecutionMode::CUBOID_16x16,
+        };
+        EXPECT_EQ(perf.compute_Ideal_MAC_operations_cnt(wl), expected)
+                << "CM_CONV in_C=" << in_C << " device=" << VPUDevice_ToText.at(static_cast<int>(dev))
+                << " - must pad to 4 (compress-conv alignment)";
+    }
+}
+
+/**
  * @brief CM_CONVOLUTION with input channels in range 5..15 (> 4, < 16) is padded to 16
  *        on all VPU >= 2.7 devices, including newer ones.
  *
@@ -348,6 +385,7 @@ TEST_F(TestHWPerformanceModel_DPUCycles, IdealMAC_CMConv_InputGt4Lt16_AllVPUge27
     const std::vector<VPUDevice> base_ge27{VPUDevice::VPU_2_7, VPUDevice::VPU_4_0, VPUDevice::NPU_5_0,
                                            VPUDevice::NPU_5_0_W};
     std::vector<VPUDevice> devs = base_ge27;
+    devs.push_back(VPUDevice::NPU_6_0);
 
     for (const auto dev : devs) {
         DPUWorkload wl{
@@ -363,6 +401,97 @@ TEST_F(TestHWPerformanceModel_DPUCycles, IdealMAC_CMConv_InputGt4Lt16_AllVPUge27
         EXPECT_EQ(perf.compute_Ideal_MAC_operations_cnt(wl), expected)
                 << "CM_CONV in_C=" << in_C << " device=" << VPUDevice_ToText.at(static_cast<int>(dev))
                 << " - in_C in 5..15 must always pad to 16 (no CM_CONV/4 special)";
+    }
+}
+
+/**
+ * @brief When `output_autopad=true`
+ *        (values > 16 that are NOT multiples of 16), `compute_Ideal_MAC_operations_cnt`
+ *        must use output channels rounded up to the next multiple of 16 — the hardware
+ *        pads the output buffer to align the channel dimension, so the MAC count must
+ *        reflect that padded work.
+ *
+ * This is exercised for three operations that have distinct formula paths:
+ *   - CONVOLUTION:    ops = kernel_W*kernel_H * out_W*out_H*out_C_aligned * in_C
+ *   - AVEPOOL:        ops = kernel_W*kernel_H * out_W*out_H*out_C_aligned  (no input-channel accumulation)
+ *   - DW_CONVOLUTION: ops = kernel_W*kernel_H * out_W*out_H*out_C_aligned  (same path as pool)
+ *
+ * Each is tested with two representative unaligned channel counts:
+ *   - out_C = 20  → aligned to 32
+ *   - out_C = 30  → aligned to 32
+ *
+ * The control assertion verifies that the same workload *without* `output_autopad` uses the
+ * raw channel count — confirming that alignment is only applied when `output_autopad=true`.
+ */
+TEST_F(TestHWPerformanceModel_DPUCycles, IdealMAC_OutputAutopad_UnalignedChannels) {
+    std::vector<VPUDevice> target_devices;
+    target_devices.push_back(VPUDevice::NPU_6_0);
+    if (target_devices.empty()) {
+        GTEST_SKIP() << "No target devices available (embargo not enabled)";
+    }
+
+    struct OpCase {
+        Operation op;
+        unsigned int out_channels;          // actual (unaligned) output channels
+        unsigned int aligned_out_channels;  // out_channels rounded up to next multiple of 16
+        const char* info;
+    };
+
+    // Geometry shared by all cases: kernel 3x3, output spatial 4x4, input channels 32 (>= 16)
+    // out_C=20 and out_C=30 both round up to 32 (next multiple of 16)
+    const unsigned int in_C{32};
+
+    const std::vector<OpCase> cases{
+            // clang-format off
+            {Operation::CONVOLUTION,    20, 32, "CONV  out_C=20"},
+            {Operation::CONVOLUTION,    30, 32, "CONV  out_C=30"},
+            {Operation::AVEPOOL,        20, 32, "AVEP  out_C=20"},
+            {Operation::AVEPOOL,        30, 32, "AVEP  out_C=30"},
+            {Operation::DW_CONVOLUTION, 20, 32, "DWCV  out_C=20"},
+            {Operation::DW_CONVOLUTION, 30, 32, "DWCV  out_C=30"},
+            // clang-format on
+    };
+
+    for (const auto dev : target_devices) {
+        for (const auto& tc : cases) {
+            // Build workload with unaligned output channels and output_autopad=true
+            DPUWorkload wl{
+                    dev,
+                    tc.op,
+                    {VPUTensor(6, 6, in_C, 1, DataType::UINT8)},             // input
+                    {VPUTensor(4, 4, tc.out_channels, 1, DataType::UINT8)},  // unaligned output channels
+                    {3, 3},                                                  // kernels
+                    {1, 1},                                                  // strides
+                    {0, 0, 0, 0},                                            // padding
+                    ExecutionMode::CUBOID_16x16,
+            };
+            wl.output_autopad = true;
+
+            // With output_autopad=true the MAC count must use the aligned (padded) channel count
+            const auto expect_autopad =
+                    (tc.op == Operation::CONVOLUTION)
+                            ? static_cast<unsigned long int>(3U * 3U * 4U * 4U * tc.aligned_out_channels * in_C)
+                            : static_cast<unsigned long int>(3U * 3U * 4U * 4U * tc.aligned_out_channels);
+
+            EXPECT_EQ(perf.compute_Ideal_MAC_operations_cnt(wl), expect_autopad)
+                    << tc.info << " output_autopad=true"
+                    << " device=" << VPUDevice_ToText.at(static_cast<int>(dev))
+                    << " - must use aligned out_C=" << tc.aligned_out_channels << " (raw=" << tc.out_channels << ")";
+
+            // Control: same workload without output_autopad must use the raw channel count
+            // (alignment is only applied when output_autopad=true)
+            DPUWorkload wl_no_pad{wl};
+            wl_no_pad.output_autopad = std::nullopt;
+
+            const auto expect_raw = (tc.op == Operation::CONVOLUTION)
+                                            ? static_cast<unsigned long int>(3U * 3U * 4U * 4U * tc.out_channels * in_C)
+                                            : static_cast<unsigned long int>(3U * 3U * 4U * 4U * tc.out_channels);
+
+            EXPECT_EQ(perf.compute_Ideal_MAC_operations_cnt(wl_no_pad), expect_raw)
+                    << tc.info << " output_autopad=false (control)"
+                    << " device=" << VPUDevice_ToText.at(static_cast<int>(dev))
+                    << " - must use raw out_C=" << tc.out_channels << " (no alignment)";
+        }
     }
 }
 
@@ -640,6 +769,7 @@ TEST_F(TestHWPerformanceModel_DPUCycles, MACCycles_DCIM_UINT16_IncreasesCycles_V
             VPUDevice::NPU_5_0,
             VPUDevice::NPU_5_0_W,
     };
+    dcim_devices.push_back(VPUDevice::NPU_6_0);
 
     // A fixed MAC geometry: 1x1 kernel, output 4x4x32, 32 input channels.
     // operations_cnt_base = 1*1 * 4*4*32 = 512
@@ -854,7 +984,7 @@ TEST_F(TestHWPerformanceModel_DtypeMacFactor, FactorFpRatio_TracksDeviceFpRatio)
  *
 
  *
- * Each TEST_F iterates over the full device list (with NPU_RESERVED/NPU_RESERVED_1 embargo guards)
+ * Each TEST_F iterates over the full device list (with NPU6/NPU_RESERVED_1 embargo guards)
  * and verifies:
  *   1. The result is consistent across all devices for the same dtype combination.
  *   2. The result matches the expected classification documented in the test cases.

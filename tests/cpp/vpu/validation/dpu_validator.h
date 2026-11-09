@@ -39,6 +39,7 @@ protected:
             {VPUDevice::VPU_4_0, 16 * 1024},  //
             {VPUDevice::NPU_5_0, 1},    // 32KB, but no tensor alignment requested
             {VPUDevice::NPU_5_0_W, 1},  // 32KB, but no tensor alignment requested
+            {VPUDevice::NPU_6_0, 1},  /// @todo: check for tensor alignment in npu6
     };
 
     int get_alignment(const VPUDevice device) const {

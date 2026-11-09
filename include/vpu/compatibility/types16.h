@@ -37,7 +37,7 @@
 
 namespace VPUNN {
 
-/** @brief type interface forNPU_RESERVED v3 named 15. This is a convention on what to contain the VPUNN's input
+/** @brief type interface forNPU6 v3 named 15. This is a convention on what to contain the VPUNN's input
  * descriptor in this namespace all the types will be stored exactly like they are required by this interface
  * vs intf14: UINT16 added to Dtypes, dCIM execution mode
  * vs intf15: FLOAT4 added to Dtypes, U16, Dcim, Fp4 have to be supported in decriptor
@@ -245,7 +245,7 @@ CompatibleEnum convert(PresentEnum present_day_value_type) {
 
 }  // namespace intf_16
 
-struct NPU_RESERVED2Capabilities {
+struct NPU62Capabilities {
     static inline const std::set<std::string> capabilities = {"DW_MXP_AVP_SupportsMoreThan64Ch", "dcim", "uint16"};
     static const std::set<std::string>& get() {
         return capabilities;
@@ -417,7 +417,7 @@ public:
 //---------------------------------------------------------
 template <class T>
 using Preprocessing_Interface16 =
-        Preprocessing_Interface16_Archetype<T, NN6XInputAdapter, NNVersions::VERSION_16_NPU_RESERVED2, NPU_RESERVED2Capabilities>;
+        Preprocessing_Interface16_Archetype<T, NN6XInputAdapter, NNVersions::VERSION_16_NPU62, NPU62Capabilities>;
 
 }  // namespace VPUNN
 

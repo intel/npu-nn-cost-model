@@ -25,6 +25,7 @@
 #include "device_valid_valuesVPU2_7.h"
 #include "device_valid_valuesVPU4.h"
 #include "device_valid_valuesVPU5.h"
+#include "device_valid_valuesVPU6.h"
 #include "dpu_operations_valid_behaviours.h"
 #include "interface_valid_values.h"
 #include "memory_calculator.h"
@@ -328,6 +329,8 @@ using OperationsContext =
                                 ,
                                 VPU5_0_WorkloadValidValues
 
+                                ,
+                                VPU6_0_WorkloadValidValues
                                 >;
 
 using DPU_OperationValidator = DPU_ConfigurableOperationValidator<OperationsContext>;

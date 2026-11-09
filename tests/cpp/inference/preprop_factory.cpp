@@ -51,9 +51,9 @@ TEST_F(RuntimeProcessingFactoryTest, SimpleChecks) {
                 << "Must be present v: " << v;
         EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_14_NPU51)), true)
                 << "Must be present v: " << v;
-        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_15_NPU_RESERVED1)), true)
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_15_NPU61)), true)
                 << "Must be present v: " << v;
-        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_16_NPU_RESERVED2)), true)
+        EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_16_NPU62)), true)
                 << "Must be present v: " << v;
         EXPECT_EQ(factory.exists_preprocessing(v = static_cast<int>(VPUNN::NNVersions::VERSION_17_NPU_RESERVED_10)), true)
                 << "Must be present v: " << v;
@@ -112,13 +112,13 @@ TEST_F(RuntimeProcessingFactoryTest, SimpleChecks) {
         EXPECT_EQ(pp->interface_version(), v);
     }
     {
-        int v = static_cast<int>(VPUNN::NNVersions::VERSION_15_NPU_RESERVED1);
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_15_NPU61);
         VPUNN::Preprocessing<float>* pp = nullptr;
         ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
         EXPECT_EQ(pp->interface_version(), v);
     }
     {
-        int v = static_cast<int>(VPUNN::NNVersions::VERSION_16_NPU_RESERVED2);
+        int v = static_cast<int>(VPUNN::NNVersions::VERSION_16_NPU62);
         VPUNN::Preprocessing<float>* pp = nullptr;
         ASSERT_NO_THROW(pp = &factory.make_preprocessing(v));
         EXPECT_EQ(pp->interface_version(), v);

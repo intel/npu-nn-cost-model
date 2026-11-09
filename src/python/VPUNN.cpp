@@ -50,7 +50,7 @@ PYBIND11_MODULE(_VPUNN, m) {
         .value("VPU_4_0", VPUNN::VPUDevice::VPU_4_0)
         .value("NPU_5_0", VPUNN::VPUDevice::NPU_5_0)
         .value("NPU_5_0_W", VPUNN::VPUDevice::NPU_5_0_W)
-        .value("NPU_RESERVED", VPUNN::VPUDevice::NPU_RESERVED)
+        .value("NPU_6_0", VPUNN::VPUDevice::NPU_6_0)
         .value("NPU_RESERVED_1", VPUNN::VPUDevice::NPU_RESERVED_1);
 
     py::enum_<VPUNN::DataType>(m, "DataType")

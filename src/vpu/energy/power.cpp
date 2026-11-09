@@ -13,6 +13,7 @@
 
 #include "vpu/energy/power_lut_5x.h"
 
+#include "vpu/energy/power_lut_6x.h"
 
 
 namespace VPUNN {
@@ -23,6 +24,7 @@ VPUPowerFactorLUT::dev_lut_t VPUPowerFactorLUT::create_pf_lut() {
     dev_lut_t result_dev_lut{
             {PowerVPU2x::make_lut()}, {PowerVPU27::make_lut()}, {PowerVPU40::make_lut()},
             {PowerVPU50::make_lut()},
+            {PowerVPU60::make_lut()},
     };
 
     // clang and gcc does not support to use std::move here, so we need suppression

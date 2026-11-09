@@ -118,6 +118,22 @@ protected:
                  DirectionModelingEntry(LinearModelingParams(1.85798372e-02, 324.7775),
                                         {256, 256})},
 
+                // NPU 6.0 — per-direction fits (R²=1.0000 for all)
+                {{VPUDevice::NPU_6_0, MemoryDirection::DDR2CMX},
+                 DirectionModelingEntry(LinearModelingParams(2.00909307e-02, 122.5641),
+                                        {256, 64})},
+                {{VPUDevice::NPU_6_0, MemoryDirection::CMX2DDR},
+                 DirectionModelingEntry(LinearModelingParams(2.00883757e-02, 111.3674),
+                                        {64, 256})},
+                {{VPUDevice::NPU_6_0, MemoryDirection::CMX2CMX},
+                 DirectionModelingEntry(LinearModelingParams(1.56250087e-02, 19.9909),
+                                        {64, 64})},
+                {{VPUDevice::NPU_6_0, MemoryDirection::DDR2DDR},
+                 DirectionModelingEntry(LinearModelingParams(2.00909307e-02, 122.5641),
+                                        {256, 256})
+                 /* DirectionModelingEntry(LinearModelingParams(1.86014383e-02, 84.6408),
+                                        {256, 256})*/},
+        // reuse max one from above (D2C)
         };
         return modeling_function;
     }
@@ -161,6 +177,7 @@ protected:
         static const std::unordered_map<VPUDevice, bool> stride_penalty_enabled = {
                 {VPUDevice::NPU_5_0, true},  // NPU 5: stride penalty enabled
                 {VPUDevice::NPU_5_0_W, true},  // NPU 5W (WildcatLake): same as NPU 5
+                {VPUDevice::NPU_6_0, true},  // NPU 6: stride penalty enabled
         };
         return stride_penalty_enabled;
     }
@@ -390,7 +407,7 @@ public:
  *   2. Derives a stride-penalty factor from the contiguous chunk size relative to the
  *      side-specific hardware threshold (CMX vs DDR):
  *      penalty = ceil(chunk/threshold) / (chunk/threshold).
- *      The penalty is only applied on devices that have it enabled
+ *      The penalty is only applied on devices that have it enabled (e.g. NPU 6.0).
  *   3. Evaluates a per-device linear model  cycles = k·size + b  on the total logical
  *      transfer size and multiplies by the penalty factor.
  *   4. Returns max(src_cycles, dst_cycles) converted to DPU clock domain via the

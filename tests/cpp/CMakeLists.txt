@@ -122,6 +122,7 @@ target_compile_definitions(test_cost_model
         VPU_4_1_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_4_1.vpunn"
         VPU_4_0_159_STRICT_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_40_159_strict.vpunn"
         NPU_5_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_5_1.vpunn"
+        NPU_6_0_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/vpu_6_1.vpunn"
         # DMA models
         VPU_DMA_2_7_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7.vpunn"
         VPU_DMA_2_7_G4_MODEL_PATH="${CMAKE_SOURCE_DIR}/models/dma_2_7_gear4.vpunn"

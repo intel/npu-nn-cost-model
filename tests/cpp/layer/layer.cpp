@@ -93,6 +93,7 @@ TEST_F(VPULayerCostModelTest, BatchValues_LayerLevel) {
                 {{mkLayer(VPUDevice::NPU_5_0, 2), VPULayerStrategy{1U, 1U, 1U, VPUNN::VPUTilingStrategy::NONE, false, false, prefetch}},
                  {VPUNN::Cycles::ERROR_INVALID_LAYER_CONFIGURATION, true, 12500, 12500 * no_fail + 1000},
                  "Device 5.0, B=2 "},
+        //@todo: to be added
         };
         executeTests(tests);
     }
@@ -1370,5 +1371,97 @@ TEST_F(VPULayerCostModelTest, Regression_sprint125_investigation_Test) {
     }
 }
 
+class ZTilingTestLayer : public ::testing::Test {};
+TEST_F(ZTilingTestLayer, ZTiling_test) {
+    auto mkLayer = [](const unsigned int ch) -> DPULayer {
+        const DPUWorkload wl = {
+                VPUDevice::NPU_6_0,
+                Operation::DW_CONVOLUTION,
+                {VPUTensor(7, 7, ch, 1, DataType::INT8)},  // input dimensions
+                {VPUTensor(7, 7, ch, 1, DataType::INT8)},  // output dimensions
+                {1, 1},                                    // kernels
+                {1, 1},                                    // strides
+                {0, 0, 0, 0},                              // padding
+                ExecutionMode::CUBOID_16x16,               // execution mode
+                ActivationFunction::NONE,                  // activation
+                0.0F,                                      // act_sparsity
+                0.0F,                                      // weight_sparsity
+                {swz_def, swz_def},                        // input_swizzling
+                {swz_def},                                 // output_swizzling
+                1,                                         // output_write_tiles
+                {0, 0, 0, 0},                              // offsets
+                ISIStrategy::CLUSTERING,                   // isi_strategy
+                true,                                      // weight_sparsity_enabled
+        };
+
+        DPULayer layer(wl);
+        return layer;
+    };
+
+    struct TestInput {
+        DPULayer l;
+        const int nWl;  // number of desired intra-tiles
+    };
+
+    // struct TestExpectation {
+    //      CyclesInterfaceType cyc_err;
+    //  };
+
+    struct TestCase {
+        TestInput t_in;
+    };
+
+    // auto print_list = [](const std::list<DPUWorkloadsWithCyclesSplit>& list) -> std::string {
+    //     std::stringstream ss;
+    //     int split_idx = 0;
+    //     if (list.empty()) {
+    //         ss << "No splits generated.\n";
+    //         return ss.str();
+    //     }
+
+    //     for (const auto& entry : list) {
+    //         ss << "Split #" << split_idx++ << ":\n";
+
+    //         /*           if (!entry.cycles.empty()) {
+    //                        ss << "  Cycles: ";
+    //                        for (const auto& c : entry.cycles) {
+    //                            ss << c << " ";
+    //                        }
+    //                        ss << "\n";
+    //                    }*/
+
+    //         ss << "  Workloads out ch:\n";
+    //         ss << "{";
+    //         for (const auto& wl : entry.workloads) {
+    //             ss << " " << wl.outputs[0].channels() << " ";
+    //         }
+    //         ss << "}\n----------------------------------------\n";
+    //     }
+    //     return ss.str();
+    // };
+
+    using TestsVector_ = std::vector<TestCase>;
+    const SmartRanges split_options{16, 256, 16, 32};
+    const auto split_options_vec = split_options.transformSmartRangetoVector<unsigned int>();
+
+    auto test_splitOverZ = [split_options_vec/*, print_list*/](const TestsVector_& tests) {
+        for (const auto& t : tests) {
+            std::list<DPUWorkloadsWithCyclesSplit> splitPool{};
+            
+            // Create ZTiling object and use the public interface tileMultipleWl
+            ZTiling ztiling(t.t_in.l, t.t_in.nWl);
+            ztiling.tileMultipleWl(splitPool, t.t_in.l.execution_order, t.t_in.nWl);
+
+            // enable this to print the splits generated for debugging
+           // EXPECT_TRUE(false) << "\nResults for " << t.t_in.nWl << " splits \n" << print_list(splitPool);
+        }
+    };
+
+    TestsVector_ tests = {
+            {mkLayer(80), 2}, {mkLayer(80), 3}, {mkLayer(80), 4}, {mkLayer(80), 5}, {mkLayer(80), 6},
+    };
+
+    test_splitOverZ(tests);
+}
 
 }  // namespace VPUNN_unit_tests

@@ -93,6 +93,11 @@ private:
         case VPUDevice::NPU_5_0_W:
             // no need to use wrapper here, since WCL uses old selector
             return createHeuristicWithOldNameMappingExtendedOpsOverride();
+        case VPUDevice::NPU_6_0:
+            // Providing frequencies enables the legacy compatibility wrapper on the core-op path.
+            return createHeuristicWithOldNameMappingCoreOpsOverride(
+                    std::make_pair(GlobalHarwdwareCharacteristics::get_dpu_fclk(device),
+                                   GlobalHarwdwareCharacteristics::get_cmx_fclk(device)));
         default: {
             const auto key = static_cast<int>(device);
             const auto it = VPUDevice_ToText.find(key);
@@ -259,6 +264,7 @@ public:
         try {
             const auto legacy_provider = createLegacyRouteProvider();
             const auto new_device_provider_npu5 = createProviderForDevice(VPUDevice::NPU_5_0);
+            const auto new_device_provider_npu6 = createProviderForDevice(VPUDevice::NPU_6_0);
 
             // Map devices to specific providers
             const std::unordered_map<VPUDevice, Shared_IShaveCostProvider> device_to_provider_map = {
@@ -268,6 +274,7 @@ public:
                     {VPUDevice::VPU_4_0, legacy_provider},
                     {VPUDevice::NPU_5_0, new_device_provider_npu5},
                     {VPUDevice::NPU_5_0_W, new_device_provider_npu5},
+                    {VPUDevice::NPU_6_0, new_device_provider_npu6},
             };
 
             return std::make_shared<DeviceMappingShaveCostProvider>(device_to_provider_map);
@@ -284,6 +291,7 @@ public:
                 // WCL returns empty table for now, this is intentional behavior
                 // prefetch support for WCL is WIP
                 {VPUDevice::NPU_5_0_W, createPrefetchStrategyForDevice(VPUDevice::NPU_5_0_W)},
+                {VPUDevice::NPU_6_0, createPrefetchStrategyForDevice(VPUDevice::NPU_6_0)},
         };
 
         return DeviceMappedPrefetchCostStrategy{
