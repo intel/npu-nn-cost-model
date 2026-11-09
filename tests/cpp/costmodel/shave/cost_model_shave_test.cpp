@@ -422,6 +422,7 @@ TEST_F(TestSHAVE, StaticQueryMatchesInstanceQueryForDefaultModel) {
             VPUDevice::NPU_5_0,
     };
     devices.push_back(VPUDevice::NPU_5_0_W);
+    devices.push_back(VPUDevice::NPU_6_0);
 
     for (const auto d : devices) {
         const auto instance_ops = empty_model.getShaveSupportedOperations(d);

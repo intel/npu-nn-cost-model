@@ -350,10 +350,10 @@ public:
             }
             return dma_theoretical_PTL.DMATheoreticalCyclesPTL_ON(wl);  // Updated theoretical model
 
-            // experiment: use strided math model for NPU_RESERVED
-            // if (wl.device < VPUDevice::NPU_RESERVED) {
+            // experiment: use strided math model for NVL
+            // if (wl.device < VPUDevice::NPU_6_0) {
             //    return dma_theoretical_PTL.DMATheoreticalCyclesPTL_ON(wl);  // classical theoretical model for
-            //    // PTL / NPU_RESERVED
+            //    // PTL / NVL
             //} else {
             //    // convert from WlT to DMANNWorkload_NPU40_50, the strided math model is only for this workload type,
             //    // so we need to do the conversion

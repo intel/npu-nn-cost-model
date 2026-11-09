@@ -20,6 +20,7 @@
 #include "device_valid_valuesVPU2_7.h"
 #include "device_valid_valuesVPU4.h"
 #include "device_valid_valuesVPU5.h"
+#include "device_valid_valuesVPU6.h"
 #include "dpu_operations_valid_behaviours.h"
 #include "dpu_operations_validator.h"
 #include "vpu_layer_validator.h"
@@ -39,6 +40,8 @@ protected:
                                                        VPU2_0_LayerOnTileValidValues, VPU2_7_LayerOnTileValidValues,
                                                        VPU4_0_LayerOnTileValidValues
                                                        , VPU5_0_LayerOnTileValidValues                                                   
+                                                       ,
+                                                       VPU6_0_LayerOnTileValidValues
                                                        >;
     using DPU_SplitLayersValidator = DPU_ConfigurableOperationValidator<SplitLayersContext>;
     DPU_SplitLayersValidator splitLayer_validator;

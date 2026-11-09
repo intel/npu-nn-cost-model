@@ -31,7 +31,7 @@ TilingAlgorithmsContainer TilingAlgorithmFactory::getTilingAlgorithms(const DPUL
     for (auto strategy : options.availableStrategies) {
         switch (strategy) {
         case VPUSplitStrategy::Z_TILING:
-            if (layer.device >= VPUDevice::NPU_RESERVED) {
+            if (layer.device >= VPUDevice::NPU_6_0) {
                 algos.push_back(std::make_unique<ZEffTiling>(layer, options.maxWorkloads));
             }
             else {

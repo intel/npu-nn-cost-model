@@ -19,6 +19,7 @@
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU2_7.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU4.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_VPU5.h"
+#include "vpu/hw_characteristics/device_HW_characteristics_VPU6.h"
 
 #include "vpu/hw_characteristics/device_HW_characteristics_base.h"
 #include "vpu/hw_characteristics/device_HW_characteristics_default.h"
@@ -34,6 +35,7 @@ using DeviceHWCharacteristicsVariant =
                      VPU2_7_HWCharacteristics_legacy,  // pre VPU4
                      VPU4_0_HWCharacteristics_v0, VPU4_0_HWCharacteristics_v1, VPU4_0_HWCharacteristics_legacy,  //
                      VPU5_0_HWCharacteristics_v0, VPU5_0_HWCharacteristics_v1, VPU5_0_HWCharacteristics_legacy,  //
+                     VPU6_0_HWCharacteristics_v0,  VPU6_0_HWCharacteristics_v1,                                  //  
                      Default_HWCharacteristics>;
 
 class DeviceHWCHaracteristicsConstRepo {
@@ -51,6 +53,7 @@ private:
                                                          VPU4_0_HWCharacteristics_v0,  // classic
                                                          VPU5_0_HWCharacteristics_v0,  // classic
                                                          VPU5_0_HWCharacteristics_v0,  // classic
+                                                         VPU6_0_HWCharacteristics_v0,  // classic   
                                                          Default_HWCharacteristics>;
 
     using MainEvo1SetTupleHWCharacteristics = std::tuple<VPU2_0_HWCharacteristics,     //
@@ -59,6 +62,7 @@ private:
                                                          VPU4_0_HWCharacteristics_v1,  // DMA update1
                                                          VPU5_0_HWCharacteristics_v1,  // DMA upd1
                                                          VPU5_0_HWCharacteristics_v1,  // DMA upd1
+                                                         VPU6_0_HWCharacteristics_v1,  // DMA upd1
                                                          Default_HWCharacteristics>;
 
     // Legacy configuration tuple type
@@ -68,6 +72,7 @@ private:
                                                       VPU4_0_HWCharacteristics_legacy,  //
                                                       VPU5_0_HWCharacteristics_legacy,  //
                                                       VPU5_0_HWCharacteristics_legacy,  //
+                                                      VPU6_0_HWCharacteristics_v0,      // classic
                                                       Default_HWCharacteristics>;
 
     static_assert(std::tuple_size_v<MainEvo0SetTupleHWCharacteristics> ==

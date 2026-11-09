@@ -44,8 +44,8 @@
 /// descriptors, so starting from a descriptor and comparing DMA(desc) against
 /// DMA(demoted_wl) crosses two different algorithms — those tests are DISABLED.
 ///
-/// Devices covered: VPU_2_7, VPU_4_0, NPU_5_0, NPU_RESERVED, NPU_RESERVED_1
-/// (NPU_5_0 / NPU_RESERVED / NPU_RESERVED_1 are compiled in only when the respective embargo guard is set.)
+/// Devices covered: VPU_2_7, VPU_4_0, NPU_5_0, NPU_6_0, NPU_RESERVED_1
+/// (NPU_5_0 / NPU_6_0 / NPU_RESERVED_1 are compiled in only when the respective embargo guard is set.)
 
 #include <gtest/gtest.h>
 
@@ -135,6 +135,7 @@ protected:
                 VPUDevice::VPU_4_0,
         };
         devs.push_back(VPUDevice::NPU_5_0);
+        devs.push_back(VPUDevice::NPU_6_0);
         return devs;
     }
 

@@ -137,7 +137,7 @@ TEST_F(SerializableDPU_Test, InPlaceOutputMemory_SetterHeuristic_AppliesCorrectl
 }
 
 TEST_F(SerializableDPU_Test, ConstructorFromWorkload_AndFromOperation_AreEquivalent) {
-    DPUWorkload wl = {VPUDevice::NPU_RESERVED,
+    DPUWorkload wl = {VPUDevice::NPU_6_0,
                       Operation::DW_CONVOLUTION,
                       {VPUTensor(28, 28, 64, 1, DataType::INT8, Layout::ZXY)},
                       {VPUTensor(28, 28, 64, 1, DataType::UINT8, Layout::ZXY)},

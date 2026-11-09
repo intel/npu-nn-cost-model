@@ -181,7 +181,6 @@ TEST_F(ShaveCostProviderTests, LightweightQueryAllDevicesInRangeAreMappedOrKnown
     // Devices that are intentionally unmapped when their embargo flag is absent.
     // Update this set when a new device is added to VPUDevice and routing policy is decided.
     const std::set<VPUDevice> known_unmapped = {
-            VPUDevice::NPU_RESERVED,
             VPUDevice::NPU_RESERVED_1,
     };
 
@@ -210,7 +209,6 @@ TEST_F(ShaveCostProviderTests, AllDevicesInRangeAreMappedOrKnownUnmapped) {
     // Devices that are intentionally unmapped when their embargo flag is absent.
     // Update this set when a new device is added to VPUDevice and routed in createProviderForDevice.
     const std::set<VPUDevice> known_unmapped = {
-            VPUDevice::NPU_RESERVED,
             VPUDevice::NPU_RESERVED_1,
     };
 
@@ -424,6 +422,7 @@ TEST_F(HeuristicCostProviderTests, LegacyShvCompatScalesHeuristicCostsOnly) {
 
     // NPU_5_0_W is excluded: it routes to the legacy old selector (no LegacyShvCompatProvider wrapper applied)
     std::vector<VPUDevice> wrapped_devices = {VPUDevice::NPU_5_0};
+    wrapped_devices.push_back(VPUDevice::NPU_6_0);
 
     for (const auto device : wrapped_devices) {
         SHAVEWorkload heuristic_workload("GridSample", device, {VPUTensor(80, 80, 4, 1, DataType::FLOAT16)},
@@ -485,6 +484,7 @@ TEST_F(HeuristicCostProviderTests, LegacyShvCompatMatchesGetCyclesEquivalentPath
 
     // NPU_5_0_W is excluded: it routes to the legacy old selector (no LegacyShvCompatProvider wrapper applied).
     std::vector<VPUDevice> wrapped_devices = {VPUDevice::NPU_5_0};
+    wrapped_devices.push_back(VPUDevice::NPU_6_0);
 
     for (const auto device : wrapped_devices) {
         SHAVEWorkload workload("GridSample", device, {VPUTensor(20, 20, 5, 1, DataType::FLOAT16)},

@@ -11,6 +11,7 @@
 
 #include "vpu/shave/shave_collection_NPU40.h"
 #include "vpu/shave/shave_collection_NPU50.h"
+#include "vpu/shave/shave_collection_NPU60.h"
 #include "vpu/shave/shave_collection_VPU27.h"
 
 namespace VPUNN {
@@ -36,6 +37,10 @@ std::unique_ptr<ShaveSelector> ShaveConfiguration::createSelectorForDevice(VPUDe
     }
     case VPUDevice::NPU_5_0_W: {
         auto holder = std::make_unique<ShaveInstanceHolder_Mock_NPU50W>();
+        return std::make_unique<ShaveSelector>(std::move(holder));
+    }
+    case VPUDevice::NPU_6_0: {
+        auto holder = std::make_unique<ShaveInstanceHolder_Mock_NPU60>();
         return std::make_unique<ShaveSelector>(std::move(holder));
     }
     default: {
@@ -68,6 +73,10 @@ std::unique_ptr<ShaveSelector> ShaveConfiguration::createOldSelectorForDevice(VP
         auto holder = std::make_unique<ShaveInstanceHolder_NPU50CLassic>();
         return std::make_unique<ShaveSelector>(std::move(holder));
     }
+    case VPUDevice::NPU_6_0: {
+        auto holder = std::make_unique<ShaveInstanceHolder_NPU60CLassic>();
+        return std::make_unique<ShaveSelector>(std::move(holder));
+    }
     default: {
         auto holder = std::make_unique<DeviceShaveContainer>(VPUDevice::__size);
         return std::make_unique<ShaveSelector>(std::move(holder));
@@ -96,6 +105,10 @@ std::unique_ptr<ShaveSelector> ShaveConfiguration::createHeuristicSelectorForDev
     case VPUDevice::NPU_5_0_W:
         // for compatibility reasons, we need to use old selector for WCL
         return createOldSelectorForDevice(device);
+    case VPUDevice::NPU_6_0: {
+        auto holder = std::make_unique<ShaveInstanceHolder_HeuristicNPU60>();
+        return std::make_unique<ShaveSelector>(std::move(holder));
+    }
     default:
         // if there is no heuristic selector for the device, return the old selector
         return createOldSelectorForDevice(device);

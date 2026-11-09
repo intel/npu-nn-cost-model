@@ -14,6 +14,7 @@
 #include "device_layer_properties_VPU2_7.h"
 #include "device_layer_properties_VPU4_0.h"
 #include "device_layer_properties_VPU5_0.h"
+#include "device_layer_properties_VPU6_0.h"
 #include "device_layer_properties_default.h"
 #include "interface_device_layer_properties.h"
 #include "vpu/tuple_indexing_helper.h"
@@ -38,6 +39,7 @@ protected:
                                              VPU4_0_LayerProperties,  //
                                              VPU5_0_LayerProperties,  //
                                              VPU5_0_LayerProperties,  //
+                                             VPU6_0_LayerProperties,  //
                                              Default_LayerProperties>;
 
     static inline const LayerProperties_Tuple const_layer_properties{};

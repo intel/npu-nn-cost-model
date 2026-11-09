@@ -67,6 +67,7 @@ protected:
     ModelMap<VPULayerCostModel> layer_models{&dma_model_invalid, ""};
     VPULayerCostModel model_2_7_no_dma{VPUDevice::VPU_2_7, VPU_2_7_MODEL_PATH};
     VPULayerCostModel model_5_0_old_shave{VPUDevice::NPU_5_0, &dma_model_5_0, NPU_5_0_MODEL_PATH};
+    /// @todo: add dma model for npu6
 
     VPULayerCostModelTest() {
         layer_models.addModel(VPUDevice::VPU_2_0, &dma_model_2_7, VPU_2_0_MODEL_PATH);

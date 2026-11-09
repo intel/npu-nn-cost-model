@@ -41,7 +41,7 @@ protected:
     //     DPUWorkload::hash = 3047471188 (0xB5A4B854)
     //     DPUOperation::hash = 1443614963 (0x560BD0F3)
     //     SerializableDPU::hash = 2348771807 (0x8C01543F)
-    //   dwconv_NPU_RESERVED_halo_sep
+    //   dwconv_npu6_halo_sep
     //     DPUWorkload::hash = 3693615666 (0xDC281A32)
     //     DPUOperation::hash = 3883484373 (0xE77944D5)
     //     SerializableDPU::hash = 1224966957 (0x4902382D)
@@ -88,7 +88,7 @@ protected:
         }
 
         {
-            DPUWorkload wl{VPUDevice::NPU_RESERVED,
+            DPUWorkload wl{VPUDevice::NPU_6_0,
                            Operation::DW_CONVOLUTION,
                            {VPUTensor(28, 28, 64, 1, DataType::INT8, Layout::ZXY)},
                            {VPUTensor(28, 28, 64, 1, DataType::UINT8, Layout::ZXY)},
@@ -109,7 +109,7 @@ protected:
             wl.mpe_engine = MPEEngine::SCL;
             wl.reduce_minmax_op = true;
 
-            cases.push_back({"dwconv_NPU_RESERVED_halo_sep", wl, static_cast<uint32_t>(3693615666U),
+            cases.push_back({"dwconv_npu6_halo_sep", wl, static_cast<uint32_t>(3693615666U),
                              static_cast<size_t>(3883484373ULL), static_cast<size_t>(1224966957ULL),
                              [](DPUOperation& op) {
                                  op.input_1.batch = 1;

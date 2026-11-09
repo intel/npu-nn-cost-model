@@ -1530,6 +1530,21 @@ TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_LegacyBackend_UsesDescriptor) {
     EXPECT_EQ(source, "dyn_cache");
 }
 
+// New device: a workload key round-trips through the workload-hash cache.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_NewBackend_IgnoresDescriptor) {
+    // Device: NPU_6_0 (new, uses workload-hash cache)
+    NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::NPU_6_0), 16, "", "");
+    const DPUWorkload wl = make_test_wl(VPUDevice::NPU_6_0);
+
+    manager.add(wl, 456.0F);
+
+    std::string source;
+    const auto value = manager.get(wl, &source);
+
+    ASSERT_TRUE(value.has_value());
+    EXPECT_EQ(*value, 456.0F);
+    EXPECT_EQ(source, "dyn_cache");
+}
 
 // A zero-capacity cache never retains an entry, for either backend.
 TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_ZeroCapacity_BothBackendsMiss) {
@@ -1542,6 +1557,15 @@ TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_ZeroCapacity_BothBackendsMiss) 
     const auto legacy_value = legacy_manager.get(legacy_descriptor);
 
     EXPECT_FALSE(legacy_value.has_value());
+    // Device: NPU_6_0 (new, uses workload-hash cache)
+    const DPUWorkload wl_new = make_test_wl(VPUDevice::NPU_6_0);
+    NNCostCacheManager new_manager(use_new_hash_method_for_device(VPUDevice::NPU_6_0), 0, "", "");
+
+    new_manager.add(wl_new, 1.0F);
+
+    const auto new_value = new_manager.get(wl_new);
+
+    EXPECT_FALSE(new_value.has_value());
 }
 
 // getPreloadedCacheCounter() forwards to the active backend and keeps counting across calls.
@@ -1569,6 +1593,15 @@ TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_LegacyBackend_OnlyDescriptorCac
     EXPECT_FALSE(manager.has_workload_cache());
 }
 
+// Only the workload-hash cache variant alternative is ever built for a new device.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_NewBackend_OnlyWorkloadHashCacheIsConstructed) {
+    // Device: NPU_6_0 (new, uses workload-hash cache)
+    const NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::NPU_6_0), 16, "", "");
+
+    EXPECT_TRUE(manager.uses_workload_hash_cache());
+    EXPECT_FALSE(manager.has_descriptor_cache());
+    EXPECT_TRUE(manager.has_workload_cache());
+}
 
 // The unbound __size sentinel device must default to the legacy descriptor cache, not the workload-hash cache.
 TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_EmptySentinelDevice_UsesDescriptorCacheNotWorkloadHash) {
@@ -1620,4 +1653,28 @@ TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_LegacyBackend_DescriptorKeyDoes
     EXPECT_NO_THROW((void)manager.get(descriptor));
 }
 
+// Misuse guard: a descriptor key against a new manager must trigger the assertion.
+// assert() is compiled out under NDEBUG (release), so the guard only fires in debug builds.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_NewBackend_DescriptorKeyAssertsOnGetAndAdd) {
+#ifndef NDEBUG
+    // Device: NPU_6_0 (new, uses workload-hash cache)
+    NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::NPU_6_0), 16, "", "");
+    const std::vector<float> descriptor{1.0F, 2.0F, 3.0F};
+
+    EXPECT_DEATH((void)manager.get(descriptor), "");
+    EXPECT_DEATH(manager.add(descriptor, 1.0F), "");
+#else
+    GTEST_SKIP() << "assert() is compiled out under NDEBUG; this guard only exists in debug builds";
+#endif
+}
+
+// Confirms the guard doesn't false-positive for the correctly typed new key.
+TEST_F(VPUNNCacheManagerTest, NNCostCacheManager_NewBackend_WorkloadKeyDoesNotAssert) {
+    // Device: NPU_6_0 (new, uses workload-hash cache)
+    NNCostCacheManager manager(use_new_hash_method_for_device(VPUDevice::NPU_6_0), 16, "", "");
+    const DPUWorkload wl = make_test_wl(VPUDevice::NPU_6_0);
+
+    EXPECT_NO_THROW(manager.add(wl, 1.0F));
+    EXPECT_NO_THROW((void)manager.get(wl));
+}
 }  // namespace VPUNN_unit_tests

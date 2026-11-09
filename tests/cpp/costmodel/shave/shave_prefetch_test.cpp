@@ -165,6 +165,31 @@ TEST_F(TestSHAVEPrefetch, PrefetchCoverage_NPU5_TablePresent_AllOpsIncluded) {
             << VPUDevice_ToText.at((int)device);
 }
 
+// Per-device prefetch table coverage: NPU 6.0 has all supported ops measured.
+TEST_F(TestSHAVEPrefetch, PrefetchCoverage_NPU6_TablePresent_AllOpsIncluded) {
+    const VPUDevice device = VPUDevice::NPU_6_0;
+    const auto& lut = PopulatedShavePrefetchCostLUT::get_lut_for_device(device);
+
+    ASSERT_FALSE(lut.empty()) << "Expected non-empty prefetch table for device: " << VPUDevice_ToText.at((int)device);
+
+    const auto supported_ops = empty_model.getShaveSupportedOperations(device);
+    ASSERT_FALSE(supported_ops.empty()) << "Expected supported operations for device: "
+                                        << VPUDevice_ToText.at((int)device);
+
+    std::set<std::string> prefetch_ops;
+    for (const auto& op_entry : lut) {
+        prefetch_ops.insert(op_entry.first);
+    }
+
+    std::set<std::string> supported_ops_exact;
+    for (const auto& op : supported_ops) {
+        supported_ops_exact.insert(op);
+    }
+
+    EXPECT_EQ(prefetch_ops, supported_ops_exact)
+            << "Prefetch table must contain exactly all supported operations for device: "
+            << VPUDevice_ToText.at((int)device);
+}
 
 
 // Prefetch lookup now requires exact operation names; aliases are not remapped.

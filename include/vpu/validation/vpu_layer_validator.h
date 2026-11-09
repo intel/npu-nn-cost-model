@@ -27,6 +27,7 @@
 #include "device_valid_valuesVPU4.h"
 
 #include "device_valid_valuesVPU5.h"
+#include "device_valid_valuesVPU6.h"
 #include "interface_operations_behavior.h"
 #include "interface_valid_values.h"
 #include "layer_operations_valid_behaviours.h"
@@ -50,6 +51,8 @@ class VPU_LayerValidator :
                                        VPU2_0_LayerValidValues, VPU2_7_LayerValidValues, VPU4_0_LayerValidValues
                                        ,
                                        VPU5_0_LayerValidValues
+                                       ,
+                                       VPU6_0_LayerValidValues
                                        > {
 protected:
 public:

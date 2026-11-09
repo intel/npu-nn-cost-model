@@ -45,6 +45,7 @@ protected:
     DPUWorkload wl_glob_40;
     DPUWorkload wl_glob_50;
 
+    DPUWorkload wl_glob_60;
 
 
     VPUCostModel empty_model{VPUNN::VPUDevice::__size, ""};
@@ -60,6 +61,8 @@ protected:
         wl_glob_50 = wl_glob_40;
         wl_glob_50.device = VPUDevice::NPU_5_0;
 
+        wl_glob_60 = wl_glob_50;
+        wl_glob_60.device = VPUDevice::NPU_6_0;
 
 
         cost_models.addModel(VPUDevice::VPU_2_0, VPU_2_0_MODEL_PATH);
@@ -68,6 +71,7 @@ protected:
         cost_models.addModel(VPUDevice::VPU_4_0, VPU_4_0_MODEL_PATH);
         cost_models.addModel(VPUDevice::NPU_5_0, NPU_5_0_MODEL_PATH);
         cost_models.addModel(VPUDevice::NPU_5_0_W, NPU_5_0_MODEL_PATH);
+        cost_models.addModel(VPUDevice::NPU_6_0, NPU_6_0_MODEL_PATH);
     }
 
     void SetUp() override {

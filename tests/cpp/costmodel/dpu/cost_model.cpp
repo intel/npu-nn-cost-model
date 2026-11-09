@@ -101,6 +101,13 @@ TEST_F(TestCostModel, BatchValues_DPU_Test) {
              {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
              "NPU5_0, B=2"},
 
+            {{mkWl(VPUDevice::NPU_6_0, 0U), NPU_6_0_MODEL_PATH},
+             {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+             "NPU6_0, B=0"},
+            {{mkWl(VPUDevice::NPU_6_0, 1U), NPU_6_0_MODEL_PATH}, {Cycles::NO_ERROR}, "NPU6_0, B=1"},
+            {{mkWl(VPUDevice::NPU_6_0, 2U), NPU_6_0_MODEL_PATH},
+             {Cycles::ERROR_INVALID_INPUT_CONFIGURATION},
+             "NPU6_0, B=2"},
     };
 
     verify_cyc(tests);
@@ -289,6 +296,20 @@ TEST_F(TestCostModel, SmokeTests_DPUInfo) {
         EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
     }
 
+    {  // 60
+        const DPUWorkload wl{wl_glob_60};
+        const std::string modelFile{NPU_6_0_MODEL_PATH};
+        const VPUDevice device{VPUDevice::NPU_6_0};
+
+        VPUNN::VPUCostModel test_model{device, modelFile};
+        EXPECT_TRUE(test_model.nn_initialized());
+        auto cycles_dpu = test_model.DPU(wl);
+        auto cycles_Pack = test_model.DPUInfo(wl);
+
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_dpu));
+        EXPECT_FALSE(VPUNN::Cycles::isErrorCode(cycles_Pack.DPUCycles));
+        EXPECT_EQ(cycles_dpu, cycles_Pack.DPUCycles) << wl;
+    }
 }
 TEST_F(TestCostModel, SmokeTests_DPUInfo_stochastic) {
     {  // 20

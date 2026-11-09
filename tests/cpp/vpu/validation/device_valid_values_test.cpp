@@ -929,6 +929,7 @@ TEST_F(IntfDeviceValidValuesTest, GetValidEngines_PerDevice) {
     expect_scl_only(VPUDevice::VPU_4_0);
     expect_scl_only(VPUDevice::NPU_5_0);
     expect_scl_only(VPUDevice::NPU_5_0_W);
+    expect_scl_and_dcim(VPUDevice::NPU_6_0);
 }
 
 class DPUOperationTest : public ::testing::Test {

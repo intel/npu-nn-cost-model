@@ -53,6 +53,16 @@ TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Default) {
         EXPECT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_DMA_latency(MemoryLocation::CMX),
                   56 + plus);  // 32 cyc @ 1114MHZ  => 56.x @1950
     }
+    // mock tests
+    {
+        const int plus = (50 * evoX * (int)GlobalHarwdwareCharacteristics::get_dpu_fclk(VPUDevice::NPU_6_0)) /
+                         (int)GlobalHarwdwareCharacteristics::get_cmx_fclk(VPUDevice::NPU_6_0);
+        EXPECT_EQ(87 * evoX, plus);
+        EXPECT_EQ(hw_info.device(VPUDevice::NPU_6_0).get_DMA_latency(MemoryLocation::DRAM),
+                  585 + plus);  // 1864 956ns @1950Mhz,390 200ns @1950Mhz
+        EXPECT_EQ(hw_info.device(VPUDevice::NPU_6_0).get_DMA_latency(MemoryLocation::CMX),
+                  56 + plus);  // 32 cyc @ 1114MHZ  => 56.x @1950
+    }
 }
 
 TEST_F(TestHWPerformanceModel_BASICS, LatencyTests_Evo0) {
@@ -197,6 +207,7 @@ TEST_F(TestHWPerformanceModel_BASICS, TestGetProfilingClkMHz) {
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::VPU_4_0).get_profiling_clk_MHz(), 38.4f / 2);
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_profiling_clk_MHz(), 38.4f / 2);
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::NPU_5_0_W).get_profiling_clk_MHz(), 38.4f / 2);
+    EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::NPU_6_0).get_profiling_clk_MHz(), 38.4f / 2);
 
     EXPECT_FLOAT_EQ(hw_info.device(VPUDevice::__size).get_profiling_clk_MHz(),
                     0);  // Test with an unknown device
@@ -212,6 +223,7 @@ TEST_F(TestHWPerformanceModel_BASICS, TestGetProfilingClkHz_default) {
     EXPECT_EQ(hw_info.device(VPUDevice::NPU_5_0).get_profiling_clk_Hz(), 38400000 / 2);
     EXPECT_EQ(hw_info.device(VPUDevice::NPU_5_0_W).get_profiling_clk_Hz(), 38400000 / 2);
 
+    EXPECT_EQ(hw_info.device(VPUDevice::NPU_6_0).get_profiling_clk_Hz(), 38400000 / 2);
     EXPECT_EQ(hw_info.device(VPUDevice::__size).get_profiling_clk_Hz(), 0);             // Test with an unknown device
     EXPECT_EQ(hw_info.device(static_cast<VPUDevice>(9999)).get_profiling_clk_Hz(), 0);  // Test with an unknown device
 }

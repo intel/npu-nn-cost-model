@@ -24,6 +24,7 @@
 #include "interface_shave_op_executor.h"
 #include "shave_collection_NPU40.h"
 #include "shave_collection_NPU50.h"
+#include "shave_collection_NPU60.h"
 #include "shave_collection_VPU27.h"
 #include "shave_op_executors.h"
 #include "vpu/serialization/shave_cost_serialization_wrapper.h"

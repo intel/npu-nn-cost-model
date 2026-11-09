@@ -45,6 +45,9 @@ static_assert(false, "VPU_4_1_MODEL_PATH is not defined, please define it in CMa
 static_assert(false, "NPU_5_0_MODEL_PATH is not defined, please define it in CMakeLists.txt");
 #endif
 
+#ifndef NPU_6_0_MODEL_PATH
+static_assert(false, "NPU_6_0_MODEL_PATH is not defined, please define it in CMakeLists.txt");
+#endif
 
 
 // default path to DMA NN Models
@@ -120,6 +123,7 @@ public:
             {VPU_2_7_MODEL_PATH, VPUNN::VPUDevice::VPU_2_7},  //
             {VPU_4_0_MODEL_PATH, VPUNN::VPUDevice::VPU_4_0},  //
             {NPU_5_0_MODEL_PATH, VPUNN::VPUDevice::NPU_5_0},
+            {NPU_6_0_MODEL_PATH, VPUNN::VPUDevice::NPU_6_0},
     };
 
     /// DMA models

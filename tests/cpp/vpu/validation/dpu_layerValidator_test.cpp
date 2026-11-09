@@ -244,6 +244,40 @@ TEST_F(LayersValidationTest, BatchValues_Layer_and_SplitLayer_check_consistency_
             check_err_completeLayer(tests);
         }
     }
+    {
+        /// for VPUDevice::NPU_6_0 we accept only 1 as value for batch
+        VPUDevice device{VPUDevice::NPU_6_0};
+
+        {
+            TestsVector tests = {
+                    // clang-format off
+                {{mkLayer(device, 0U)},  {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}},
+                {{mkLayer(device, 1U)},  {Cycles::NO_ERROR}},
+                {{mkLayer(device, 2U)},  {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}},
+                {{mkLayer(device, 5U)},  {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}},
+                {{mkLayer(device, 7U)},  {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}},
+                {{mkLayer(device, 10U)}, {Cycles::ERROR_INVALID_INPUT_CONFIGURATION}}
+                    // clang-format on
+            };
+
+            check_err_splitLayer(tests);
+        }
+
+        {
+            TestsVector tests = {
+                    // clang-format off
+                {{mkLayer(device, 0U)},  {Cycles::ERROR_INVALID_LAYER_CONFIGURATION}},
+                {{mkLayer(device, 1U)},  {Cycles::NO_ERROR}},
+                {{mkLayer(device, 2U)},  {Cycles::ERROR_INVALID_LAYER_CONFIGURATION}},
+                {{mkLayer(device, 5U)},  {Cycles::ERROR_INVALID_LAYER_CONFIGURATION}},
+                {{mkLayer(device, 7U)},  {Cycles::ERROR_INVALID_LAYER_CONFIGURATION}},
+                {{mkLayer(device, 10U)}, {Cycles::ERROR_INVALID_LAYER_CONFIGURATION}}
+                    // clang-format on
+            };
+
+            check_err_completeLayer(tests);
+        }
+    }
 }
 TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
     VPUNN::LayersValidation dut;
@@ -401,6 +435,23 @@ TEST_F(LayersValidationTest, ExecutionModes_layer_level_test) {
                 {{mkWl(device, Operation::MAXPOOL)}, {Cycles::NO_ERROR}},
                 {{mkWl(device, Operation::ELTWISE_MUL)}, {Cycles::NO_ERROR}},
                 {{mkWl(device, Operation::LAYER_NORM)}, {Cycles::NO_ERROR}},
+
+        };
+
+        check_err_splitLayer(tests);
+        check_err_completeLayer(tests);
+    }
+    {
+        VPUDevice device = VPUDevice::NPU_6_0;
+
+        TestsVector tests = {
+                {{mkWl(device, Operation::CONVOLUTION)}, {Cycles::NO_ERROR}},
+                {{mkWl(device, Operation::DW_CONVOLUTION)}, {Cycles::NO_ERROR}},
+                {{mkWl(device, Operation::CM_CONVOLUTION, 15)}, {Cycles::NO_ERROR}},
+                {{mkWl(device, Operation::ELTWISE)}, {Cycles::NO_ERROR}},
+                {{mkWl(device, Operation::MAXPOOL)}, {Cycles::NO_ERROR}},
+                {{mkWl(device, Operation::ELTWISE_MUL)}, {Cycles::ERROR_INVALID_INPUT_OPERATION}},
+                {{mkWl(device, Operation::LAYER_NORM)}, {Cycles::ERROR_INVALID_INPUT_OPERATION}},
 
         };
 
